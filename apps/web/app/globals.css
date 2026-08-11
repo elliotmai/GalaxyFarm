@@ -1,28 +1,65 @@
 /*
- * The design tokens ship from @galaxy-farm/ui (spec §8, "Midnight Nebula /
- * Bluebonnet Linen"). Theme and density are set on the route-group layouts and
- * read from there — nothing below this line knows which surface it is on.
+ * The app's stylesheet (spec §8, "Midnight Nebula / Bluebonnet Linen").
+ *
+ * Tokens ship from @galaxy-farm/ui as custom properties; theme and density are
+ * set on the route-group layouts and read from there. Nothing below this line
+ * knows which surface it is on.
  */
+@import "tailwindcss";
 @import "@galaxy-farm/ui/theme.css";
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+/* The design system lives outside this app, so Tailwind is told to scan it. */
+@source "../../../packages/ui/src";
+
+/*
+ * `inline` is load-bearing. Without it Tailwind resolves `var(--gf-canvas)`
+ * once at `:root`, where it is undefined, and every semantic colour comes out
+ * empty. Inlined, `bg-canvas` compiles to `background-color: var(--gf-canvas)`
+ * and resolves on the element — which is the whole point, since the value
+ * depends on which surface the element is inside.
+ */
+@theme inline {
+  --color-canvas: var(--gf-canvas);
+  --color-panel: var(--gf-panel);
+  --color-ink: var(--gf-text);
+  --color-muted: var(--gf-muted);
+  --color-edge: var(--gf-border);
+  --color-action: var(--gf-action);
+  --color-action-ink: var(--gf-action-ink);
+  --color-identity: var(--gf-identity);
+  --color-calm: var(--gf-calm);
+  --color-danger: var(--gf-danger);
+  --color-brass: #c9a24b;
+
+  --font-heading: "Zilla Slab", Georgia, serif;
+  --font-body: Inter, system-ui, sans-serif;
+
+  --spacing-density: var(--gf-gap);
+  --spacing-target: var(--gf-touch-target);
+  --spacing-control: var(--gf-control);
+  --radius-density: var(--gf-radius);
+  --text-density: var(--gf-text-size);
 }
 
 html {
-  /* The page behind the surfaces. Without it a short page shows the browser's
-     own white below the fold, which on the admin theme is a bright band. */
+  /* The ground behind the surfaces. Without it a short page shows the
+     browser's own white below the fold, a bright band on the admin theme. */
   background-color: var(--gf-canvas, #0e1026);
 }
 
 body {
   margin: 0;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: var(--font-body);
 }
 
 /* Surfaces fill the viewport so their canvas reaches the bottom of a short page. */
 [data-surface] {
   min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
 }
