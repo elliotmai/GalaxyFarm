@@ -1,40 +1,15 @@
-import type { Ulid } from "@galaxy-farm/core";
-
-import type { Patch } from "./patch.js";
+import type { OutboxEntry, OutboxOperation, OutboxStore, Ulid } from "@galaxy-farm/core";
 
 /**
- * The outbox (spec §4.2).
+ * Outbox implementations and retry policy (spec §4.2).
  *
- * Every mutation is written to the local store *and* here, atomically. When
- * signal returns the outbox drains in order. Two properties matter more than
- * anything else: it survives a full app restart before ever syncing, and
- * replaying a push does not double-apply.
+ * The port itself is in the shared kernel — the device-persisted
+ * implementation lives in the local-store adapter, and adapters must not
+ * depend on each other. What lives here is the in-memory implementation used
+ * by tests and by the server, plus the backoff policy.
  */
 
-export type OutboxOperation = "create" | "update" | "delete";
-
-export interface OutboxEntry {
-  /** ULID — sorts by creation time, which is the drain order. */
-  readonly id: Ulid;
-  readonly operation: OutboxOperation;
-  readonly patch: Patch;
-  readonly queuedAt: Date;
-  readonly deviceId: string;
-  /** Incremented on each failed drain; drives backoff. */
-  readonly attempts: number;
-  readonly lastError?: string | undefined;
-}
-
-export interface OutboxStore {
-  append(entry: OutboxEntry): Promise<void>;
-  /** Oldest first. */
-  pending(limit?: number): Promise<OutboxEntry[]>;
-  /** Remove entries the server has accepted. */
-  ack(ids: readonly Ulid[]): Promise<void>;
-  /** Record a failure and bump the attempt count. */
-  fail(id: Ulid, error: string): Promise<void>;
-  size(): Promise<number>;
-}
+export type { OutboxEntry, OutboxOperation, OutboxStore };
 
 export class InMemoryOutbox implements OutboxStore {
   private readonly entries = new Map<string, OutboxEntry>();

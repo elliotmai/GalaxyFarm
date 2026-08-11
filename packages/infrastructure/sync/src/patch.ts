@@ -1,29 +1,15 @@
-import type { Ulid } from "@galaxy-farm/core";
+import type { FieldChange, FieldValue, Patch } from "@galaxy-farm/core";
 
 /**
- * Field-level patches (spec §4.2).
+ * Patch *operations* (spec §4.2).
  *
- * The unit of sync is a changed *field*, not a changed record. That choice is
- * what lets two people edit the same animal from the house and the barn and
- * both keep their edits — record-level replacement would silently discard one
- * of them.
+ * The shapes themselves are ports and live in the shared kernel, because both
+ * this adapter and the local-store adapter need them. What lives here is the
+ * logic: computing a diff, applying one, and deciding whether two values are
+ * the same.
  */
 
-export type FieldValue = unknown;
-
-export interface FieldChange {
-  readonly field: string;
-  readonly value: FieldValue;
-  /** When the field was changed on the originating device. */
-  readonly at: Date;
-  readonly deviceId: string;
-}
-
-export interface Patch {
-  readonly entity: string;
-  readonly recordId: Ulid;
-  readonly changes: readonly FieldChange[];
-}
+export type { FieldChange, FieldValue, Patch };
 
 /** Fields the sync engine manages itself and never accepts from a patch. */
 const RESERVED_FIELDS = new Set(["id", "propertyId", "createdAt"]);
