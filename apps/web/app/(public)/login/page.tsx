@@ -1,3 +1,5 @@
+import { Logomark } from "@galaxy-farm/ui";
+
 import { LoginForm } from "./login-form";
 
 export const metadata = { title: "Sign In" };
@@ -19,9 +21,22 @@ export default async function LoginPage({
   // attacker a link that looks like ours and lands somewhere that is not.
   const next = requested.startsWith("/") && !requested.startsWith("//") ? requested : "/admin";
 
+  // A BrandingConfig value (§5.1), never a literal. Reads from the environment
+  // until the settings store is wired, so there is still one place to change it.
+  const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? "Galaxy Farm";
+
   return (
-    <main className="flex min-h-screen items-center justify-center p-6">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-density p-6">
+      <div className="flex flex-col items-center gap-2">
+        <Logomark size="large" decorative />
+        <h1 className="font-heading text-2xl font-semibold text-ink">{farmName}</h1>
+      </div>
+
       <LoginForm next={next} />
+
+      <p className="max-w-sm text-center text-sm text-muted">
+        Accounts are created by the farm owner — there is no public sign-up.
+      </p>
     </main>
   );
 }

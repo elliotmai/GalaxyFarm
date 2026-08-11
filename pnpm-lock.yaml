@@ -71,9 +71,18 @@ importers:
       '@galaxy-farm/infra-db':
         specifier: workspace:*
         version: link:../../packages/infrastructure/db
+      '@galaxy-farm/infra-local':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure/local
+      '@galaxy-farm/infra-sync':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure/sync
       '@galaxy-farm/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      dexie:
+        specifier: ^4.4.4
+        version: 4.4.4
       drizzle-orm:
         specifier: ^0.38.4
         version: 0.38.4(@electric-sql/pglite@0.5.4)(@types/react@19.2.18)(postgres@3.4.9)(react@19.2.8)

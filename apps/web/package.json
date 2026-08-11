@@ -8,13 +8,17 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "db:seed": "tsx scripts/seed.mts"
+    "db:seed": "tsx scripts/seed.mts",
+    "db:user": "tsx scripts/user.mts"
   },
   "dependencies": {
     "@galaxy-farm/core": "workspace:*",
     "@galaxy-farm/infra-auth": "workspace:*",
     "@galaxy-farm/infra-db": "workspace:*",
+    "@galaxy-farm/infra-local": "workspace:*",
+    "@galaxy-farm/infra-sync": "workspace:*",
     "@galaxy-farm/ui": "workspace:*",
+    "dexie": "^4.4.4",
     "drizzle-orm": "^0.38.4",
     "next": "^15.1.3",
     "next-auth": "5.0.0-beta.32",
@@ -27,7 +31,7 @@
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "tailwindcss": "^4.3.3",
-    "typescript": "^5.7.2",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
   }
 }

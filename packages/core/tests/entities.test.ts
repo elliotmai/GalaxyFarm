@@ -26,7 +26,6 @@ import {
 } from "../src/entities/zone-assignment.js";
 import { emergencyContacts, hasTag, primaryPhone, contactSchema } from "../src/entities/contact.js";
 import { attachmentSchema, isImage, pendingUploads } from "../src/entities/attachment.js";
-import { dateRange } from "../src/value-objects/date-range.js";
 
 let counter = 0;
 const nextId = (): Ulid => encodeUlid(1_000 + counter++, () => 0.5);
@@ -186,7 +185,8 @@ describe("ZoneAssignment", () => {
     ...base(),
     animalId,
     zoneId,
-    period: dateRange(from, to),
+    periodFrom: from,
+    ...(to === undefined ? {} : { periodTo: to }),
     slot: "primary",
   });
 
@@ -195,7 +195,7 @@ describe("ZoneAssignment", () => {
   });
 
   it("rejects an assignment ending before it starts", () => {
-    const bad = { ...assignment(zoneA, jan), period: { from: mar, to: jan } };
+    const bad = { ...assignment(zoneA, jan), periodFrom: mar, periodTo: jan };
 
     expect(zoneAssignmentSchema.safeParse(bad).success).toBe(false);
   });
@@ -218,10 +218,10 @@ describe("ZoneAssignment", () => {
       const from = assignment(zoneA, jan);
       const result = move(from, { ...base(), animalId, zoneId: zoneB, slot: "primary", at: mar });
 
-      expect(result.closed?.period.to).toEqual(mar);
+      expect(result.closed?.periodTo).toEqual(mar);
       expect(result.closed?.zoneId).toBe(zoneA);
       expect(result.opened.zoneId).toBe(zoneB);
-      expect(result.opened.period.to).toBeUndefined();
+      expect(result.opened.periodTo).toBeUndefined();
     });
 
     it("handles an animal that was nowhere before", () => {

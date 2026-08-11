@@ -1,3 +1,5 @@
+"use client";
+
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 
 import { ConfirmDialog } from "./confirm-dialog.js";

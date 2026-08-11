@@ -25,6 +25,12 @@ declare module "next-auth" {
 export const authConfig = {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
+  // Auth.js refuses to trust the Host header unless it is told to, and off
+  // Vercel that refusal surfaces as an opaque `UntrustedHost` on the first
+  // request the browser makes. This app is always served from a host we
+  // control — Netlify now, a box in the barn later — so the header is the
+  // right source for the callback URL.
+  trustHost: true,
   // Filled in by `auth.ts`. Empty here is what keeps this file edge-safe.
   providers: [],
 
