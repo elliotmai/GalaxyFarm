@@ -4,6 +4,7 @@ import {
   discoverEntities,
   findIncompleteCrudSurfaces,
   findUnconfirmedDestructiveCalls,
+  notStartedEntities,
   type SourceFile,
 } from "../../tools/crud-guard.js";
 import { listFiles, readText } from "../../tools/workspace.js";
@@ -53,14 +54,23 @@ describe("spec §4.5 clause 1 — every entity carries a full CRUD surface", () 
     expect(report).toEqual([]);
   });
 
-  it("documents the current entity count so the gate's reach is visible", () => {
-    // Deliberately an inequality, not a snapshot: this test should never be the
-    // reason a legitimate new entity fails CI. It exists so the count shows up
-    // in the CI log, making it obvious when the guard above stops being vacuous.
-    expect(entities.length).toBeGreaterThanOrEqual(0);
-    if (entities.length === 0) {
-      expect(domainSources.length).toBeGreaterThan(0);
-    }
+  it("is no longer vacuous — the kernel holds real entities now", () => {
+    // This assertion earns its keep by failing if entity discovery ever breaks:
+    // a guard that silently finds nothing passes for the wrong reason.
+    expect(entities.length).toBeGreaterThanOrEqual(10);
+    expect(entities.map((e) => e.name)).toContain("Zone");
+    expect(entities.map((e) => e.name)).toContain("Animal");
+    expect(entities.map((e) => e.name)).toContain("PurchaseCandidate");
+  });
+
+  it("tracks which entities have no use cases yet", () => {
+    // Not a failure — declared-but-unbuilt is the honest state of a Phase 0
+    // repo. Surfacing the list keeps it from being forgotten, and the check
+    // above turns hostile the moment one of them is half-built.
+    const pending = notStartedEntities(entities).map((e) => e.name);
+
+    expect(pending.length).toBeLessThanOrEqual(entities.length);
+    expect(domainSources.length).toBeGreaterThan(0);
   });
 });
 

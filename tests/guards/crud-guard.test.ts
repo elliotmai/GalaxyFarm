@@ -5,6 +5,7 @@ import {
   discoverEntities,
   findIncompleteCrudSurfaces,
   findUnconfirmedDestructiveCalls,
+  notStartedEntities,
   toSlug,
   type SourceFile,
 } from "../../tools/crud-guard.js";
@@ -178,6 +179,44 @@ describe("clause 1 — full CRUD surface", () => {
 
     expect(findings[0]?.reason).toContain("`delete`");
   });
+
+  describe("not-started entities", () => {
+    it("does not fail an entity with no use cases at all", () => {
+      // Declared but not yet built. Failing here would make the gate
+      // permanently red, and a permanently red gate is one nobody reads.
+      expect(findIncompleteCrudSurfaces([{ name: "Zone", file: "z.ts", operations: [] }])).toEqual(
+        [],
+      );
+    });
+
+    it("reports them separately so the count stays visible", () => {
+      const entities = [
+        { name: "Zone", file: "z.ts", operations: [] },
+        { name: "Animal", file: "a.ts", operations: [...REQUIRED_CRUD_OPERATIONS] },
+      ];
+
+      expect(notStartedEntities(entities).map((e) => e.name)).toEqual(["Zone"]);
+    });
+
+    it("fails the moment a surface is half-built", () => {
+      // This is the case that matters: a create screen shipped without a
+      // delete button is exactly what §4.5 exists to prevent.
+      const findings = findIncompleteCrudSurfaces([
+        { name: "Zone", file: "z.ts", operations: ["create"] },
+      ]);
+
+      expect(findings).toHaveLength(1);
+      expect(findings[0]?.reason).toContain("`delete`");
+    });
+
+    it("does not report an exempt entity as not started", () => {
+      const exempt = [
+        { name: "AuditEntry", file: "a.ts", operations: [], exempt: "immutable audit record" },
+      ];
+
+      expect(notStartedEntities(exempt)).toEqual([]);
+    });
+  });
 });
 
 describe("entity discovery", () => {
@@ -197,6 +236,31 @@ describe("entity discovery", () => {
     const entities = discoverEntities([entityFile("cattle", "CattleProfile")]);
 
     expect(entities.map((e) => e.name)).toEqual(["CattleProfile"]);
+  });
+
+  it("normalises a camelCase schema name to the entity it describes", () => {
+    // Schemas are values and are written `purchaseCandidateSchema`; the entity
+    // is `PurchaseCandidate`, and that is what a failure message should say.
+    const entities = discoverEntities([
+      file(
+        "packages/core/src/entities/purchase-candidate.ts",
+        "export const purchaseCandidateSchema = z.object({});",
+      ),
+    ]);
+
+    expect(entities.map((e) => e.name)).toEqual(["PurchaseCandidate"]);
+  });
+
+  it("still pairs use cases after normalising the name", () => {
+    const entities = discoverEntities([
+      file(
+        "packages/core/src/entities/purchase-candidate.ts",
+        "export const purchaseCandidateSchema = z.object({});",
+      ),
+      file("packages/core/src/use-cases/create-purchase-candidate.ts", ""),
+    ]);
+
+    expect(entities[0]?.operations).toEqual(["create"]);
   });
 
   it("pairs use cases to their entity by filename convention", () => {
@@ -230,12 +294,36 @@ describe("entity discovery", () => {
     expect(entities[0]?.exempt).toContain("immutable audit record");
   });
 
-  it("ignores files outside a domain entities directory", () => {
+  it("ignores files outside an entities directory", () => {
     const entities = discoverEntities([
       file("packages/ui/src/components/form.tsx", "export const ThingSchema = z.object({});"),
     ]);
 
     expect(entities).toEqual([]);
+  });
+
+  it("discovers entities in the shared kernel as well as in modules", () => {
+    // core holds Zone, Animal, Contact and friends. If the guard cannot see
+    // them it goes blind exactly where the first entities landed.
+    const entities = discoverEntities([
+      file("packages/core/src/entities/zone.ts", "export const ZoneSchema = z.object({});"),
+      file(
+        "packages/modules/cattle/src/domain/entities/cattle-profile.ts",
+        "export const CattleProfileSchema = z.object({});",
+      ),
+    ]);
+
+    expect(entities.map((e) => e.name)).toEqual(["CattleProfile", "Zone"]);
+  });
+
+  it("pairs kernel use cases to kernel entities", () => {
+    const entities = discoverEntities([
+      file("packages/core/src/entities/zone.ts", "export const ZoneSchema = z.object({});"),
+      file("packages/core/src/use-cases/create-zone.ts", ""),
+      file("packages/core/src/use-cases/delete-zone.ts", ""),
+    ]);
+
+    expect(entities[0]?.operations.sort()).toEqual(["create", "delete"]);
   });
 });
 

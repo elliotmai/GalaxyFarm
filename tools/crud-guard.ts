@@ -120,6 +120,12 @@ export function findUnconfirmedDestructiveCalls(files: readonly SourceFile[]): G
   return findings;
 }
 
+/** Where entity definitions live: module domain layers, and the shared kernel. */
+const ENTITY_FILE = /(?:\/src\/domain\/entities\/|packages\/core\/src\/entities\/).+\.ts$/;
+
+/** Use cases are named `<operation>-<entity-slug>.ts`, in either layer. */
+const USE_CASE_FILE = /\/src\/(?:application\/)?use-cases\/(\w+)-([\w-]+)\.ts$/;
+
 /** The use cases every CRUD-able entity must expose (spec §4.5 clause 1). */
 export const REQUIRED_CRUD_OPERATIONS = ["create", "get", "list", "update", "delete"] as const;
 
@@ -135,14 +141,28 @@ export interface EntityDeclaration {
 }
 
 /**
+ * An entity that exists but has no use cases at all — declared, not yet built.
+ *
+ * Kept separate from a *partial* surface on purpose. Failing the build for
+ * work that has not started yet produces a permanently red gate, and a
+ * permanently red gate is one nobody reads. What matters is the half-built
+ * case: the moment `create-zone.ts` lands without `delete-zone.ts`, that is a
+ * screen shipping without a delete button, and that fails.
+ */
+export function notStartedEntities(entities: readonly EntityDeclaration[]): EntityDeclaration[] {
+  return entities.filter((entity) => !entity.exempt && entity.operations.length === 0);
+}
+
+/**
  * Clause 1. Given the entities discovered in the codebase, report any whose
- * CRUD surface is incomplete.
+ * CRUD surface is started but incomplete.
  */
 export function findIncompleteCrudSurfaces(entities: readonly EntityDeclaration[]): GuardFinding[] {
   const findings: GuardFinding[] = [];
 
   for (const entity of entities) {
     if (entity.exempt) continue;
+    if (entity.operations.length === 0) continue; // not started — see notStartedEntities
     const missing = REQUIRED_CRUD_OPERATIONS.filter((op) => !entity.operations.includes(op));
     if (missing.length === 0) continue;
 
@@ -170,10 +190,15 @@ export function discoverEntities(files: readonly SourceFile[]): EntityDeclaratio
   const entities = new Map<string, EntityDeclaration>();
 
   for (const { path, source } of files) {
-    if (!/\/src\/domain\/entities\/.+\.ts$/.test(path)) continue;
+    // Modules keep entities under src/domain/entities; the shared kernel keeps
+    // them under src/entities. Both are subject to §4.5.
+    if (!ENTITY_FILE.test(path)) continue;
     for (const match of source.matchAll(/export\s+const\s+(\w+)Schema\b/g)) {
-      const name = match[1];
-      if (!name) continue;
+      // Schemas are values, so they are idiomatically camelCase
+      // (`purchaseCandidateSchema`). The entity they describe is PascalCase,
+      // and that is what belongs in a failure message.
+      const name = capitalise(match[1] ?? "");
+      if (name === "") continue;
       const exemptMatch = new RegExp(`crud-guard:\\s*exempt\\s*[—-]\\s*(.+)`, "i").exec(source);
       entities.set(name, {
         name,
@@ -185,7 +210,7 @@ export function discoverEntities(files: readonly SourceFile[]): EntityDeclaratio
   }
 
   for (const { path } of files) {
-    const match = /\/src\/application\/use-cases\/(\w+)-([\w-]+)\.ts$/.exec(path);
+    const match = USE_CASE_FILE.exec(path);
     if (!match?.[1] || !match[2]) continue;
     const [, operation, entitySlug] = match;
     for (const entity of entities.values()) {
@@ -194,6 +219,11 @@ export function discoverEntities(files: readonly SourceFile[]): EntityDeclaratio
   }
 
   return [...entities.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** `purchaseCandidate` → `PurchaseCandidate`. */
+export function capitalise(name: string): string {
+  return name === "" ? "" : name[0]!.toUpperCase() + name.slice(1);
 }
 
 /** `CattleProfile` → `cattle-profile`. */
