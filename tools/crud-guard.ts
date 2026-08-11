@@ -44,6 +44,16 @@ const CONFIRMATION_HELPERS = [
 ];
 
 /**
+ * A method signature, not a call.
+ *
+ * `remove(id: Ulid, reason?: string): Promise<void>;` inside an interface
+ * looks exactly like a call to a regex, and flagging it asks a type
+ * declaration to import a dialog. The tell is the return-type annotation
+ * followed by a semicolon and nothing else — a call cannot end that way.
+ */
+const METHOD_SIGNATURE = /^\s*(readonly\s+)?\w+(<[^>]*>)?\s*\([^)]*\)\s*:\s*[^;]+;\s*$/;
+
+/**
  * Opt-out marker. A reason is mandatory: `// crud-guard: allow-unconfirmed —
  * clearing a local draft, nothing is persisted`. A bare marker does not count.
  */
@@ -103,6 +113,9 @@ export function findUnconfirmedDestructiveCalls(files: readonly SourceFile[]): G
       const lineText = source.split("\n")[line - 1] ?? "";
       const previousLine = source.split("\n")[line - 2] ?? "";
       if (OPT_OUT.test(lineText) || OPT_OUT.test(previousLine)) continue;
+      // A declaration is not an action. The confirmation belongs at the call
+      // site, and this is not one.
+      if (METHOD_SIGNATURE.test(lineText)) continue;
 
       findings.push({
         file: path,

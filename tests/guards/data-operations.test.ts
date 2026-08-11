@@ -88,3 +88,37 @@ describe("spec §4.5 clause 2 — validation lives in one shared schema per enti
     expect(offenders).toEqual([]);
   });
 });
+
+describe("what counts as a destructive call", () => {
+  it("does not flag a method signature in an interface", () => {
+    // `remove(id: Ulid): Promise<void>;` looks exactly like a call to a
+    // regex. Flagging it asks a type declaration to import a dialog, and
+    // pushes real call sites towards the escape hatch to quiet the noise.
+    const findings = findUnconfirmedDestructiveCalls([
+      {
+        path: "fake/mutations.ts",
+        source: [
+          "export interface Mutations {",
+          "  remove(id: string, reason?: string): Promise<void>;",
+          "  purge(id: string): Promise<void>;",
+          "}",
+        ].join("\n"),
+      },
+    ]);
+
+    expect(findings).toEqual([]);
+  });
+
+  it("still flags an actual call in the same shape of file", () => {
+    // The signature exemption must not swallow the thing it sits next to.
+    const findings = findUnconfirmedDestructiveCalls([
+      {
+        path: "fake/screen.ts",
+        source: ["async function onClick() {", "  await mutations.remove(id);", "}"].join("\n"),
+      },
+    ]);
+
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.symbol).toBe("remove");
+  });
+});

@@ -1,6 +1,18 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  // The app compiles JSX through Next's own pipeline; vitest has to be told
+  // separately, or a .tsx test renders against an undefined React global.
+  esbuild: { jsx: "automatic" },
+  resolve: {
+    alias: {
+      // The app's own path alias, mirrored from apps/web/tsconfig.json. Vitest
+      // resolves imports itself and does not read that file.
+      "@/": fileURLToPath(new URL("./apps/web/", import.meta.url)),
+    },
+  },
   test: {
     include: [
       "tests/**/*.test.ts",
@@ -16,6 +28,8 @@ export default defineConfig({
       // Dexie needs structuredClone and an IndexedDB-shaped global; jsdom
       // supplies the former and fake-indexeddb is injected for the latter.
       ["packages/infrastructure/local/**", "jsdom"],
+      // The app's client-side tests render hooks against the local store.
+      ["apps/web/tests/**/*.test.tsx", "jsdom"],
     ],
     setupFiles: ["./tests/setup/dom.ts"],
     reporters: process.env["CI"] ? ["default", "github-actions"] : ["default"],

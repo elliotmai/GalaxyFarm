@@ -2,7 +2,7 @@
   "name": "@galaxy-farm/web",
   "version": "0.0.0",
   "private": true,
-  "description": "Next.js app \u2014 presentation and composition root",
+  "description": "Next.js app — presentation and composition root",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -30,6 +30,7 @@
     "@tailwindcss/postcss": "^4.3.3",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
+    "fake-indexeddb": "^6.2.5",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
