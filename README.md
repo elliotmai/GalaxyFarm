@@ -4,7 +4,7 @@ A local-first progressive web app for running a family beef-cattle operation and
 
 It manages registered cattle (Maine-Anjou, Chianina, Shorthorn), laying flocks, a garden, farm equipment, pets, ranch supplies, and — later — client calves and horses. One codebase serves three surfaces: a full admin experience on desktop and mobile, touch-first kiosk screens mounted in the barn, and a scaffolded customer portal for the boarding business.
 
-> **Status: scaffolding.** The workspace builds, lints, typechecks, and tests green, and every route in the spec resolves — but the routes render placeholders and no domain logic exists yet. See [Current state](#current-state).
+> **Status: Phase 0 in progress.** The shared kernel, the confirmation primitive, the sync engine, and the local store are built and tested. The routes still render placeholders — no screen is wired to the domain yet. See [Current state](#current-state).
 
 The full product and architecture specification lives in [`docs/galaxy-farm-spec.md`](docs/galaxy-farm-spec.md) (v1.1), with UI mockups in [`docs/galaxy-farm-mockups-complete.html`](docs/galaxy-farm-mockups-complete.html). The spec is the source of truth; this README is the map.
 
@@ -175,7 +175,7 @@ On a codebase this young, the valuable tests are the ones that constrain how it 
 - **`tests/architecture/spec-contract.test.ts`** — keeps the non-negotiables from quietly vanishing out of the spec, and the README from drifting from what the spec says.
 - **`tests/tools/`** — unit tests for the analysers underneath all of the above. A parser that silently missed `export … from` would turn every architecture assertion into a false pass.
 
-143 unit tests and 26 e2e tests, at 98% statement and 94% branch coverage of the tooling they exercise.
+492 unit tests and 84 e2e tests, at 99.6% statement and 97% branch coverage.
 
 ### A note on the guards
 
@@ -183,19 +183,29 @@ The §4.5 guards are convention checks over source text, not type-level proofs. 
 
 ## Current state
 
-The workspace is real and the pipeline is green, but **no domain logic exists yet**. Concretely:
+### Built
 
-- All 21 packages install, typecheck, and lint. `packages/core`, every module, and every infrastructure adapter is an empty `src/index.ts`.
-- All 55 routes from spec §7 resolve and render `PagePlaceholder`. They exist so navigation, permissions, and the route-map gate are real from day one.
-- API handlers return **501 Not Implemented** rather than 404 — an unbuilt endpoint should be distinguishable from a routing bug.
-- The design tokens from §8 live in `packages/config/tailwind.preset.ts`; the components that use them do not exist yet.
-- The logomark is chosen and committed — **Rocking Double Star**, in `packages/ui/src/brand/`, paired for both surface themes. No wordmark yet; the names are still open.
+- **`packages/core`** — the shared kernel. `Result`, ULIDs, value objects (safety levels, unit-tagged quantities, integer-cent money, date ranges), eleven entities each with a Zod schema, domain events, ports, and the §4.5 contracts. Plus `makeCrudUseCases`, so every entity gets its five operations from one tested implementation rather than a hand-rolled copy per module.
+- **`packages/ui`** — the confirmation primitive every destructive action routes through, in all three tiers. Nothing else of the design system yet.
+- **`packages/infrastructure/sync`** — field-level patches, last-write-wins per field with an audit trail, an outbox with capped exponential backoff, per-entity cursors, and the engine that drives push and pull against a transport port.
+- **`packages/infrastructure/local`** — the IndexedDB store, a device-persisted outbox that survives the app being killed, and live queries so a barn kiosk redraws when someone moves an animal from the house.
+- **The logomark** — **Rocking Double Star**, in `packages/ui/src/brand/`, paired for both surface themes. No wordmark; the names are still open (#26).
+
+One repository contract is shared by the in-memory and IndexedDB implementations, and Postgres will run it too. A disagreement between the local store and the server store shows up as data appearing on one device and not another, which is the hardest class of bug to notice here.
+
+### Not built
+
+- **No screen is wired to the domain.** All 55 routes from spec §7 resolve and render `PagePlaceholder`.
+- **No database.** `infrastructure/db` is empty; `/api/sync/push` and `/api/sync/pull` still answer 501, so nothing syncs to a server yet. The engine's transport port is the seam they plug into.
+- **No auth**, no PWA service worker, no kiosk pairing.
+- **No design system** beyond the confirmation dialog. The §8 tokens live in `packages/config/tailwind.preset.ts`; the components that consume them do not exist.
+- The kernel entities have no use cases yet, so they appear in the CRUD guard's "not started" list. That is deliberate — see [the note on the guards](#a-note-on-the-guards).
 
 ### Next steps
 
-1. Build `packages/core` — base `Animal`, `Zone`, `Task`, value objects, domain events, `Result`, and the shared CRUD contracts from §4.5.
-2. Build the design system in `packages/ui`, starting with the confirmation dialog every destructive action routes through.
-3. Build the sync engine before features pile onto it. It is the hard part, and everything else assumes it works.
+1. **Drizzle schema and the Postgres repository** (#5), run against the shared repository contract before anything bespoke is written.
+2. **Wire the sync API routes**, replacing the 501s. The transport port is already the seam.
+3. **Auth.js and roles** (#7), then Property/Zones and the SpatialEditor (#8).
 4. Then Phase 1 cattle — the cow is already bred, so that phase races a real due date.
 
 Raise the coverage thresholds in `vitest.config.ts` as the domain packages fill in. Never lower them to make a red build green.
