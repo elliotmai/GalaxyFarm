@@ -21,8 +21,8 @@ pasture is in regular use.
 | 2nd Pen | `pen` | Same auto tank as Pen 1 | |
 | Pen A | `pen` | Auto-refill tank, **shared with Pen B** | |
 | Pen B | `pen` | Same auto tank as Pen A | |
-| Tub / chute | working facility | None | Holds cattle during drop-offs, pickups, and staging |
-| Randy's pasture | `pasture` | Unknown | Neighbour's land, used on and off |
+| Tub / chute | `working_facility` | None | Holds cattle during drop-offs, pickups, and staging |
+| Randy's pasture | `pasture` | Same auto tank as Pen 1 / 2nd Pen | Neighbour's land, used on and off |
 
 Also on the property, not animal zones: barn, alley way, lean-to creep, well
 house, chicken coop, garden, house and carport.
@@ -32,7 +32,7 @@ house, chicken coop, garden, house and carport.
 | Tank | Serves | Type |
 |---|---|---|
 | 1 | Pasture + Hay Field | Auto-refill |
-| 2 | Pen 1 + 2nd Pen | Auto-refill |
+| 2 | Pen 1 + 2nd Pen + Randy's pasture | Auto-refill |
 | 3 | Pen A + Pen B | Auto-refill |
 | 4 | West Pen | Static, seasonal |
 
@@ -50,41 +50,36 @@ At the spec's flat 283-day gestation (§12, decision 2) that projects to
 **24 November 2026**, with the calving window opening **10 November**. Roughly
 fifteen weeks out from mid-August, and thirteen to the window.
 
-## Open modelling questions
+## Modelling decisions taken
 
-Three things here do not fit the current model. None should be guessed at.
+### Water is its own record — resolved
 
-### 1. Tanks are shared between zones
+`WaterSource` is now an entity, and `Zone.waterSourceIds` points at it. Four
+tanks serve eight zones here; the previous `hasWaterTank` boolean on `Zone`
+would have produced **eight ice-breaking chores for four tanks** on a freeze
+day, sending someone to the Pen 1/2 trough three times. `freezeCheckTargets`
+derives one chore per tank and names every zone it serves.
 
-`Zone` carries `hasWaterTank` and `hasTankHeater` as booleans, which assumes one
-tank per zone. Three of the four tanks serve **two zones each**.
+The heater is a property of the tank, not of every zone drinking from it, which
+also means the §6 "vulnerable" list is right by construction — here it is all
+four tanks.
 
-The consequence is concrete: §6 injects an ice-breaking chore per zone flagged
-`hasWaterTank`. As modelled, a freeze day would generate seven chores for four
-tanks, sending someone to the same trough twice and making the list less
-trustworthy every time it happens.
+### Seasonal water — resolved
 
-The fix is to make a water source its own record that zones reference — one
-chore per tank, and a heater becomes a property of the tank rather than of every
-zone that drinks from it. That is a small change now and an awkward one later.
+`WaterSource.active` is false when a tank is not currently out. West Pen's
+static tank raises no chore while it is stowed.
 
-### 2. West Pen's tank is seasonal
+### `working_facility` zone type — resolved
 
-`hasWaterTank` is a static boolean, but West Pen only has water when a tank is
-put out there. Either the flag needs to be editable in a way that changes the
-freeze chore, or the water source needs an active/inactive state.
+Added to `ZoneType`. The tub and chute hold cattle under handling but nothing
+lives there, and calling them pens would put them on the Pen Board as though
+something did.
 
-### 3. Randy's pasture is not on this property
+### Randy's pasture — still open
 
-Everything hangs off `propertyId` (§5). A neighbour's pasture that cattle
-genuinely occupy is either a `Zone` flagged as not-owned, or a second `Property`.
-The flag is simpler; a second property is more honest and costs a query filter.
-
-### 4. `ZoneType` has no working facility
-
-The tub and chute hold cattle. Calling them a `pen` would put them on the Pen
-Board as though something lived there, which is wrong on the screen that gets
-glanced at most. Adding `working_facility` to the enum is the obvious answer.
+Modelled as a `Zone` for now. It is the neighbour's land, so the honest options
+are a not-owned flag or a second `Property`. Nothing depends on the answer until
+the map is drawn, since it has no boundary polygon on this property anyway.
 
 ## Still unknown
 

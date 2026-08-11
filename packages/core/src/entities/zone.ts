@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { safetyLevelSchema, type SafetyLevel } from "../value-objects/safety-level.js";
+import { ulidSchema, type Ulid } from "../types/ids.js";
 import { baseRecordSchema, type BaseRecord } from "./record.js";
 
 /**
@@ -10,7 +11,16 @@ import { baseRecordSchema, type BaseRecord } from "./record.js";
  * something is" in the same terms.
  */
 
-export const ZONE_TYPES = ["pen", "pasture", "coop", "barn", "stall", "garden_area"] as const;
+export const ZONE_TYPES = [
+  "pen",
+  "pasture",
+  "coop",
+  "barn",
+  "stall",
+  "garden_area",
+  /** Tub, chute, alley — holds cattle under handling, nothing lives there. */
+  "working_facility",
+] as const;
 export type ZoneType = (typeof ZONE_TYPES)[number];
 
 /** A polygon vertex in real-world coordinates, never screen space (§8). */
@@ -28,8 +38,11 @@ export interface Zone extends BaseRecord {
   readonly boundary?: readonly GeoPoint[] | undefined;
   /** Hazards of the place itself, before any animal is in it (§5.1). */
   readonly baselineSafetyLevel: SafetyLevel;
-  readonly hasWaterTank: boolean;
-  readonly hasTankHeater: boolean;
+  /**
+   * The water this zone drinks from. Many-to-many on purpose: tanks are shared
+   * between zones here, and a zone can have more than one source.
+   */
+  readonly waterSourceIds: readonly Ulid[];
   /** Rich text. Group-level care instructions live here. */
   readonly customInstructions?: string | undefined;
   /** Resting pastures render dimmed and challenge animal moves (§5.1). */
@@ -49,24 +62,17 @@ export const zoneSchema = baseRecordSchema.extend({
   capacity: z.number().int().positive().optional(),
   boundary: z.array(geoPointSchema).min(3, "A boundary needs at least three points").optional(),
   baselineSafetyLevel: safetyLevelSchema,
-  hasWaterTank: z.boolean(),
-  hasTankHeater: z.boolean(),
+  waterSourceIds: z.array(ulidSchema),
   customInstructions: z.string().max(5000).optional(),
   resting: z.boolean(),
   active: z.boolean(),
 }) as unknown as z.ZodType<Zone>;
 
 /**
- * Zones needing an ice-breaking chore injected on a freeze day (§6).
- * Zones without a heater are the vulnerable ones and get named individually.
+ * Freeze-day chores are derived per *water source*, not per zone — see
+ * `freezeCheckTargets` in `water-source.ts`. Deriving them here would produce
+ * one chore per zone and send someone to a shared trough twice.
  */
-export function zonesNeedingFreezeCheck(zones: readonly Zone[]): {
-  readonly all: Zone[];
-  readonly withoutHeater: Zone[];
-} {
-  const all = zones.filter((zone) => zone.active && zone.hasWaterTank);
-  return { all, withoutHeater: all.filter((zone) => !zone.hasTankHeater) };
-}
 
 export function isOverCapacity(zone: Pick<Zone, "capacity">, occupantCount: number): boolean {
   return zone.capacity !== undefined && occupantCount > zone.capacity;

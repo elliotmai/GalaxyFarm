@@ -8,12 +8,7 @@ import {
   resolveBusinessName,
   resolveFarmName,
 } from "../src/entities/branding-config.js";
-import {
-  isOverCapacity,
-  zoneSchema,
-  zonesNeedingFreezeCheck,
-  type Zone,
-} from "../src/entities/zone.js";
+import { isOverCapacity, zoneSchema } from "../src/entities/zone.js";
 import {
   ageInDays,
   ageInMonths,
@@ -92,8 +87,7 @@ describe("Zone", () => {
     type: "pasture" as const,
     indoor: false,
     baselineSafetyLevel: 1 as const,
-    hasWaterTank: true,
-    hasTankHeater: false,
+    waterSourceIds: [],
     resting: false,
     active: true,
   };
@@ -111,18 +105,10 @@ describe("Zone", () => {
     expect(zoneSchema.safeParse({ ...valid, boundary: twoPoints }).success).toBe(false);
   });
 
-  it("finds the zones needing an ice-breaking chore, naming the heaterless ones", () => {
-    // Spec §6: zones without a heater are called out by name as vulnerable.
-    const zones = [
-      { ...valid, hasWaterTank: true, hasTankHeater: false } as unknown as Zone,
-      { ...valid, hasWaterTank: true, hasTankHeater: true } as unknown as Zone,
-      { ...valid, hasWaterTank: false, hasTankHeater: false } as unknown as Zone,
-      { ...valid, hasWaterTank: true, hasTankHeater: false, active: false } as unknown as Zone,
-    ];
-    const result = zonesNeedingFreezeCheck(zones);
-
-    expect(result.all).toHaveLength(2);
-    expect(result.withoutHeater).toHaveLength(1);
+  it("accepts the working facility type, since the tub holds cattle", () => {
+    // Not a pen: nothing lives there, and putting it on the Pen Board as
+    // though something did would be wrong on the most-glanced-at screen.
+    expect(zoneSchema.safeParse({ ...valid, type: "working_facility" }).success).toBe(true);
   });
 
   it("reports over-capacity only when a capacity is set", () => {

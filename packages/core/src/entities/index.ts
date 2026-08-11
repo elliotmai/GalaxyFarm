@@ -2,6 +2,7 @@ export * from "./record.js";
 export * from "./property.js";
 export * from "./branding-config.js";
 export * from "./zone.js";
+export * from "./water-source.js";
 export * from "./animal.js";
 export * from "./zone-assignment.js";
 export * from "./contact.js";
