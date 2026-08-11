@@ -1,6 +1,6 @@
 # Galaxy Farm — Product & Architecture Specification
 
-**Version 1.3 · August 2026 · Status: Approved for build — decision log in §12**
+**Version 1.4 · August 2026 · Status: Approved for build — decision log in §12**
 
 ---
 
@@ -559,3 +559,10 @@ The point of expressing §4.1 and §4.5 as *executable* checks rather than prose
 
 24. **Water is its own record** (§5.1, §6) — `WaterSource` with `hasHeater` and `active`, referenced many-to-many by `Zone.waterSourceIds`, replacing the `hasWaterTank` / `hasTankHeater` booleans. Forced by the real layout: four tanks serve eight zones, one serving three, so the per-zone freeze chore would have fired eight times for four tanks. Freeze chores derive per tank and name the zones served; a stowed seasonal tank raises nothing.
 25. **`working_facility` zone type** (§5.1) — for the tub, chute, and alley. They hold cattle under handling but nothing lives there, and typing them as pens would put them on the Pen Board as occupied.
+
+**v1.4 additions:**
+
+26. **Per-field write times are stored server-side** (§4.2) — `sync_field_meta`, a row per (entity, record, field) holding when the field was written and by which device. Field-level LWW is unimplementable without it: the row's `updatedAt` is the time of the last change to *any* field, so a note written offline on Monday and pushed on Wednesday would lose to an unrelated rename on Tuesday and vanish without trace. A row per field rather than a JSON blob per record, so two pushes touching different fields cannot lose each other through a read-modify-write. A field with no recorded write and no value is treated as never written, so an uncontested first write always wins; a field holding a value but no write record — seeded or imported data — falls back to the record's `createdAt`.
+27. **`updatedAt` is server arrival time, not device edit time** (§4.2) — it is the pull cursor, and a record stamped with a past timestamp would land behind cursors other devices already hold and never be delivered. The device's own edit time is preserved in `sync_field_meta`, which is where the merge reads it from, so nothing is lost by the distinction.
+28. **Patch, merge, cursors, and the transport shapes live in the kernel** (§4.1, §4.2) — not in the sync adapter. The server runs the same merge the device runs, and §4.1 forbids one adapter importing another; two implementations of who-wins would agree until the afternoon somebody changed one of them.
+29. **`node-linker=hoisted`** (§11.1) — the working copy lives on an exFAT volume, which has no symlinks, and pnpm's default layout is built out of them. Hoisting flattens `node_modules`, which would let a package import something it never declared and still run, so the architecture test now checks third-party imports as well as workspace ones and fails the build on any undeclared dependency. The guarantee moves from the installer to the test suite rather than being given up.

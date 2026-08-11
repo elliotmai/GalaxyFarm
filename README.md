@@ -6,7 +6,7 @@ It manages registered cattle (Maine-Anjou, Chianina, Shorthorn), laying flocks, 
 
 > **Status: Phase 0 in progress.** The shared kernel, the confirmation primitive, the sync engine, and the local store are built and tested. The routes still render placeholders — no screen is wired to the domain yet. See [Current state](#current-state).
 
-The full product and architecture specification lives in [`docs/galaxy-farm-spec.md`](docs/galaxy-farm-spec.md) (v1.3), with UI mockups in [`docs/galaxy-farm-mockups-complete.html`](docs/galaxy-farm-mockups-complete.html). The spec is the source of truth; this README is the map.
+The full product and architecture specification lives in [`docs/galaxy-farm-spec.md`](docs/galaxy-farm-spec.md) (v1.4), with UI mockups in [`docs/galaxy-farm-mockups-complete.html`](docs/galaxy-farm-mockups-complete.html). The spec is the source of truth; this README is the map.
 
 ---
 
@@ -189,25 +189,25 @@ The §4.5 guards are convention checks over source text, not type-level proofs. 
 - **`packages/ui`** — the confirmation primitive every destructive action routes through, in all three tiers. Nothing else of the design system yet.
 - **`packages/infrastructure/sync`** — field-level patches, last-write-wins per field with an audit trail, an outbox with capped exponential backoff, per-entity cursors, and the engine that drives push and pull against a transport port.
 - **`packages/infrastructure/local`** — the IndexedDB store, a device-persisted outbox that survives the app being killed, and live queries so a barn kiosk redraws when someone moves an animal from the house.
-- **`packages/infrastructure/db`** — the Drizzle schema and its first migration, verified against real PostgreSQL 18 in CI via PGlite. No extensions, integer cents, timezone-aware timestamps throughout.
+- **`packages/infrastructure/db`** — the Drizzle schema and migrations, the Postgres repository, and the server side of sync. Verified against real PostgreSQL 18 in CI via PGlite. No extensions, integer cents, timezone-aware timestamps throughout.
 - **The logomark** — **Rocking Double Star**, in `packages/ui/src/brand/`, paired for both surface themes. No wordmark; the names are still open (#26).
 
-One repository contract is shared by the in-memory and IndexedDB implementations, and Postgres will run it too. A disagreement between the local store and the server store shows up as data appearing on one device and not another, which is the hardest class of bug to notice here.
+One repository contract is shared by all three implementations — in-memory, IndexedDB, and Postgres. A disagreement between the local store and the server store shows up as data appearing on one device and not another, which is the hardest class of bug to notice here, so the contract is written once and run three times rather than written three times.
 
 ### Not built
 
 - **No screen is wired to the domain.** All 55 routes from spec §7 resolve and render `PagePlaceholder`.
-- **No Postgres repository yet**, so nothing reads or writes the database — the schema exists and applies, but `/api/sync/push` and `/api/sync/pull` still answer 501. The engine's transport port is the seam they plug into.
-- **The migration has never run against Neon.** It is verified against real Postgres, but the managed database is unreachable from CI; see below.
+- **`/api/sync/push` and `/api/sync/pull` still answer 501.** The handlers behind them are built and tested — what is missing is auth. Both take the property from the caller's session, and until there is a session to take it from, publishing these routes would be an unauthenticated write endpoint into the farm's database. They stay 501 until #7 lands.
+- **The migrations have never run against Neon.** They are verified against real Postgres, but the managed database is unreachable from CI; see below.
 - **No auth**, no PWA service worker, no kiosk pairing.
 - **No design system** beyond the confirmation dialog. The §8 tokens live in `packages/config/tailwind.preset.ts`; the components that consume them do not exist.
 - The kernel entities have no use cases yet, so they appear in the CRUD guard's "not started" list. That is deliberate — see [the note on the guards](#a-note-on-the-guards).
 
 ### Next steps
 
-1. **The Postgres repository** (#5), run against the shared repository contract before anything bespoke is written.
-2. **Wire the sync API routes**, replacing the 501s. The transport port is already the seam.
-3. **Auth.js and roles** (#7), then Property/Zones and the SpatialEditor (#8).
+1. **The design system** (#3) — nothing can be looked at until the components that consume the §8 tokens exist.
+2. **Auth.js and roles** (#7), which is also what unblocks the two sync routes.
+3. **Property, Zones, and the SpatialEditor** (#8), against the real nine-zone layout in `docs/property-layout.md`.
 4. Then Phase 1 cattle — the cow is already bred, so that phase races a real due date.
 
 Raise the coverage thresholds in `vitest.config.ts` as the domain packages fill in. Never lower them to make a red build green.
@@ -233,7 +233,16 @@ PGlite, so the SQL is known to apply before it ever reaches a real server.
 
 ### Environment
 
-`.env.example` is still a placeholder. It will cover `DATABASE_URL` (Neon), Auth.js secrets, Cloudflare R2 credentials, the Resend API key, the Google Maps browser key, and the `NEXT_PUBLIC_FARM_NAME` / business-name branding fallbacks.
+Copy `.env.example` to `.env.local` and fill it in. It covers `DATABASE_URL` (Neon), the Auth.js secret, Cloudflare R2 credentials, the Resend API key, the Google Maps browser key, and the `NEXT_PUBLIC_FARM_NAME` / business-name branding fallbacks. `.env.local` is gitignored and must stay that way — no real value belongs in `.env.example`.
+
+### A note on node_modules
+
+`.npmrc` pins `node-linker=hoisted`, because the working copy lives on an
+exFAT volume and pnpm's default layout needs symlinks. Hoisting flattens
+`node_modules`, so a package can import something it never declared and still
+run — `tests/architecture/boundaries.test.ts` fails the build on exactly that,
+for third-party and workspace imports alike. The guarantee moved from the
+installer to the test suite; it was not given up.
 
 ## License
 
