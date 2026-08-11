@@ -5,6 +5,12 @@
     "jsx": "preserve",
     "allowJs": true,
     "incremental": true,
+    // The app is the end of the graph: nothing imports its types, so there is
+    // no declaration to emit and no reason to enforce that every inferred type
+    // be nameable from outside. next-auth's inferred `auth` cannot be, and
+    // demanding it is a check with no consumer. The packages keep it on.
+    "declaration": false,
+    "declarationMap": false,
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./*"]

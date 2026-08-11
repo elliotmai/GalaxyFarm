@@ -2,7 +2,11 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["tests/**/*.test.ts", "packages/**/tests/**/*.test.{ts,tsx}"],
+    include: [
+      "tests/**/*.test.ts",
+      "packages/**/tests/**/*.test.{ts,tsx}",
+      "apps/web/tests/**/*.test.{ts,tsx}",
+    ],
     exclude: ["**/node_modules/**", "**/.next/**", "**/dist/**", "apps/web/e2e/**"],
     environment: "node",
     // Only the design system needs a DOM. Everything else stays on node, which
@@ -19,7 +23,12 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text-summary", "lcov", "json-summary"],
       reportsDirectory: "coverage",
-      include: ["tools/**/*.ts", "packages/*/src/**/*.{ts,tsx}", "packages/*/*/src/**/*.{ts,tsx}"],
+      include: [
+        "tools/**/*.ts",
+        "packages/*/src/**/*.{ts,tsx}",
+        "packages/*/*/src/**/*.{ts,tsx}",
+        "apps/web/lib/**/*.ts",
+      ],
       exclude: ["**/index.ts", "**/*.d.ts", "**/tests/**"],
       // Thresholds fail the build (spec §11.1). They are deliberately set at
       // the current real coverage of the code that exists; raise them as the

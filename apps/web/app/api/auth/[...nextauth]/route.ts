@@ -1,20 +1,7 @@
-import { NextResponse } from "next/server";
+import { handlers } from "@/lib/auth";
 
 /**
- * /api/auth/[...nextauth] — not implemented yet. Returning 501 keeps the contract honest:
- * a caller gets an explicit "not built" rather than a silent 404 that looks
- * like a routing bug.
+ * Auth.js route handlers. The configuration lives in `lib/auth.ts`; this file
+ * exists only to mount it.
  */
-export function GET() {
-  return NextResponse.json(
-    { error: "Not implemented", route: "/api/auth/[...nextauth]" },
-    { status: 501 },
-  );
-}
-
-export function POST() {
-  return NextResponse.json(
-    { error: "Not implemented", route: "/api/auth/[...nextauth]" },
-    { status: 501 },
-  );
-}
+export const { GET, POST } = handlers;

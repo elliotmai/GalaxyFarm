@@ -61,8 +61,76 @@ export function listFiles(dir: string, extensions?: readonly string[]): string[]
   return out.sort();
 }
 
+/**
+ * Read a JSON file, tolerating comments.
+ *
+ * `tsconfig.json` is JSONC — TypeScript has always accepted comments in it,
+ * and the reasons a compiler option is set are worth writing down next to the
+ * option. A strict parser here would mean choosing between an explained
+ * setting and a passing build.
+ */
 export function readJson(relPath: string): Record<string, unknown> {
-  return JSON.parse(readFileSync(join(repoRoot, relPath), "utf8")) as Record<string, unknown>;
+  const text = readFileSync(join(repoRoot, relPath), "utf8");
+  return JSON.parse(stripJsonComments(text)) as Record<string, unknown>;
+}
+
+/** Remove `//` and block comments, leaving anything inside a string alone. */
+export function stripJsonComments(text: string): string {
+  let out = "";
+  let inString = false;
+  let escaped = false;
+  let comment: "line" | "block" | undefined;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i]!;
+    const next = text[i + 1];
+
+    if (comment === "line") {
+      if (char === "\n") {
+        comment = undefined;
+        out += char;
+      }
+      continue;
+    }
+
+    if (comment === "block") {
+      if (char === "*" && next === "/") {
+        comment = undefined;
+        i += 1;
+      }
+      continue;
+    }
+
+    if (inString) {
+      out += char;
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      out += char;
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      comment = "line";
+      i += 1;
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      comment = "block";
+      i += 1;
+      continue;
+    }
+
+    out += char;
+  }
+
+  return out;
 }
 
 export function readText(relPath: string): string {

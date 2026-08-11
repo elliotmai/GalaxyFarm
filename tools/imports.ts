@@ -70,6 +70,8 @@ const BUILT_IN = /^(node:|assert|buffer|crypto|events|fs|http|https|os|path|stre
  */
 export function packageFromSpecifier(specifier: string): string | undefined {
   if (isRelativeSpecifier(specifier) || specifier.startsWith("/")) return undefined;
+  // `@/...` is the app's own path alias for its root, not a scoped package.
+  if (specifier.startsWith("@/")) return undefined;
   if (BUILT_IN.test(specifier)) return undefined;
 
   const parts = specifier.split("/");

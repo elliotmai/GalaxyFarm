@@ -30,8 +30,13 @@ export interface StoredCredential {
  */
 export interface CredentialStore {
   findByEmail(email: string): Promise<StoredCredential | undefined>;
-  /** Called after a successful sign-in when the hash was made with old parameters. */
-  updatePasswordHash?(userId: string, hash: string): Promise<void>;
+  /**
+   * Called after a successful sign-in when the hash was made with old
+   * parameters. Takes the time rather than reading a clock, like everything
+   * else in this codebase — a store that stamps `new Date()` cannot be tested
+   * against a fixed moment, and the rest of the sign-in path can.
+   */
+  updatePasswordHash?(userId: string, hash: string, at: Date): Promise<void>;
   recordSignIn?(userId: string, at: Date): Promise<void>;
 }
 
@@ -99,7 +104,7 @@ export async function signIn(
   // The one moment the plaintext exists is the one moment an old hash can be
   // upgraded, so raising the cost parameters later costs nobody a reset.
   if (needsRehash(found.passwordHash) && store.updatePasswordHash !== undefined) {
-    await store.updatePasswordHash(found.user.id, await hashPassword(credentials.password));
+    await store.updatePasswordHash(found.user.id, await hashPassword(credentials.password), now);
   }
 
   await store.recordSignIn?.(found.user.id, now);

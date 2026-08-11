@@ -1,8 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-import * as schema from "./schema/index.js";
-
 /**
  * Connecting to Neon.
  *
@@ -72,5 +70,9 @@ export function describeConnection(url: string): {
 
 export function createDatabase(url: string, options: ConnectionOptions = {}) {
   const sql = postgres(url, connectionConfig(options));
-  return { db: drizzle(sql, { schema }), close: () => sql.end() };
+  // No schema handed to drizzle: nothing here uses the relational query API,
+  // and registering one narrows the instance's type so it no longer satisfies
+  // the plain `Database` the repositories and sync handlers are written
+  // against. Queries name their table explicitly instead.
+  return { db: drizzle(sql), close: () => sql.end() };
 }
