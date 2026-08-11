@@ -13,9 +13,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@galaxy-farm/core": "workspace:*"
+    "@galaxy-farm/core": "workspace:*",
+    "drizzle-orm": "^0.38.3",
+    "postgres": "^3.4.5"
   },
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "drizzle-kit": "^0.30.1",
+    "dotenv": "^16.4.7"
   }
 }

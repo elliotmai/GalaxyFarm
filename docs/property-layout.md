@@ -1,89 +1,97 @@
 # Property layout
 
-Transcribed from the hand-drawn sketch (2 June 2026). **This is my reading of
-that drawing, not verified ground truth** — correct anything wrong before it
-gets seeded, because these zone records are what the Pen Board, the housesitter
-guide, and the freeze alerts all hang off.
+**1220 County Road 4651, Rhome TX 76078** (Wise County)
 
-The sketch itself should live alongside this file as `property-sketch.jpg` once
-someone adds it to the repo.
+Transcribed from the hand-drawn sketch of 2 June 2026 and corrected against
+answers given 11 August 2026. These zone records are what the Pen Board, the
+housesitter guide, and the freeze alerts all hang off.
 
 ## Zones
 
-Six named pens and pastures, which matches the count spec §5.1 expects to seed.
+Nine, not the six the sketch first suggested. The tub holds cattle during
+drop-offs and staging, the hay area turned out to be a field, and the neighbour's
+pasture is in regular use.
 
-| Zone | Type | Notes from the sketch |
+| Zone | Type | Water | Notes |
+|---|---|---|---|
+| Pasture | `pasture` | Auto-refill tank, **shared with Hay Field** | Dashed line on the sketch — cross-fence, existing or planned, unconfirmed |
+| Hay Field | `pasture` | Same auto tank as Pasture | Hay is stored in a section of it; cattle can graze it |
+| West Pen | `pen` | Static tank, **only when one is put out** | Not plumbed |
+| Pen 1 | `pen` | Auto-refill tank, **shared with 2nd Pen** | |
+| 2nd Pen | `pen` | Same auto tank as Pen 1 | |
+| Pen A | `pen` | Auto-refill tank, **shared with Pen B** | |
+| Pen B | `pen` | Same auto tank as Pen A | |
+| Tub / chute | working facility | None | Holds cattle during drop-offs, pickups, and staging |
+| Randy's pasture | `pasture` | Unknown | Neighbour's land, used on and off |
+
+Also on the property, not animal zones: barn, alley way, lean-to creep, well
+house, chicken coop, garden, house and carport.
+
+## Water — four tanks, no heaters
+
+| Tank | Serves | Type |
 |---|---|---|
-| Pasture | `pasture` | The large block. A dashed line runs through it — an interior cross-fence, or a planned one |
-| West Pen | `pen` | Along the western boundary |
-| Pen 1 | `pen` | Adjacent to the alley |
-| 2nd Pen | `pen` | Water point marked inside |
-| Pen A | `pen` | Off the alley, near the barn |
-| Pen B | `pen` | Water point marked inside; nearest the house |
+| 1 | Pasture + Hay Field | Auto-refill |
+| 2 | Pen 1 + 2nd Pen | Auto-refill |
+| 3 | Pen A + Pen B | Auto-refill |
+| 4 | West Pen | Static, seasonal |
 
-## Working facility
+**Not one of them has a heater.** Spec §6 treats heaterless tanks as the
+vulnerable ones and calls them out by name in the freeze alert — here that is
+every tank on the place. This is worth knowing ahead of the first hard freeze,
+and it lands in the same window as calving (see below).
 
-| Place | Notes |
-|---|---|
-| Barn | South-west of the house |
-| Alley way | Runs between the pens and the working facility |
-| Tub / chute | Attached to the alley |
-| Lean-to creep | Small structure at the north end, by the well house |
+## Livestock
 
-## Other structures
+**Andromeda ("Andy")** — bred **14 February 2026** by **AI** to **ZNT Montego
+Bay**.
 
-| Place | Notes |
-|---|---|
-| House, carport | Red outline — the residence, not a farm zone |
-| Well house | North end, adjacent to the lean-to creep |
-| Chickens | Coop, between Pen B and the barn |
-| Garden | North-east, below the hay area |
-| Hay | Curved storage area near the garden |
-| "1000" | Circled, near the house. Reading this as a 1,000-gallon tank |
+At the spec's flat 283-day gestation (§12, decision 2) that projects to
+**24 November 2026**, with the calving window opening **10 November**. Roughly
+fifteen weeks out from mid-August, and thirteen to the window.
 
-Scattered squiggles are read as trees. The double line curving from the road to
-the house is read as the driveway.
+## Open modelling questions
 
-## Water points
+Three things here do not fit the current model. None should be guessed at.
 
-Three circled marks, read as tanks or troughs:
+### 1. Tanks are shared between zones
 
-1. At the gate between the pasture and the lane
-2. Inside 2nd Pen
-3. Inside Pen B
+`Zone` carries `hasWaterTank` and `hasTankHeater` as booleans, which assumes one
+tank per zone. Three of the four tanks serve **two zones each**.
 
-**This is the part most worth getting right.** Spec §6 auto-injects a
-"break ice / verify tank heaters" chore for every zone flagged `hasWaterTank`
-on a hard-freeze day, and calls out by name the ones without a heater. A missing
-flag means a tank nobody was told to check.
+The consequence is concrete: §6 injects an ice-breaking chore per zone flagged
+`hasWaterTank`. As modelled, a freeze day would generate seven chores for four
+tanks, sending someone to the same trough twice and making the list less
+trustworthy every time it happens.
 
-## Open questions
+The fix is to make a water source its own record that zones reference — one
+chore per tank, and a heater becomes a property of the tank rather than of every
+zone that drinks from it. That is a small change now and an awkward one later.
 
-Nothing below can be inferred from the sketch.
+### 2. West Pen's tank is seasonal
 
-1. **Which tanks have heaters?** Drives the freeze alert (§6).
-2. **Do the pens have water at all**, beyond the three marked points — Pen 1,
-   Pen A, and West Pen show none.
-3. **Baseline safety level per zone** (§5.1). The working facility in particular
-   — is the tub/chute a place a helper should be in unaccompanied?
-4. **Capacity per pen**, if you want the over-capacity warning to mean anything.
-5. **Is the dashed line in the pasture an existing cross-fence or a plan?**
-6. **Which pens are covered vs. open** (`indoor` flag).
-7. **Property coordinates.** Needed for weather, calving watch, frost warnings,
-   and the growing-zone suggestion.
+`hasWaterTank` is a static boolean, but West Pen only has water when a tank is
+put out there. Either the flag needs to be editable in a way that changes the
+freeze chore, or the water source needs an active/inactive state.
 
-## A gap this exposed in the spec
+### 3. Randy's pasture is not on this property
 
-`ZoneType` in §5.1 is `pen | pasture | coop | barn | stall | garden_area`. The
-sketch has three places that do not fit any of them:
+Everything hangs off `propertyId` (§5). A neighbour's pasture that cattle
+genuinely occupy is either a `Zone` flagged as not-owned, or a second `Property`.
+The flag is simpler; a second property is more honest and costs a query filter.
 
-- **the alley way and tub/chute** — animals occupy them, briefly and under
-  handling, but they are not pens and treating them as pens would put them on
-  the Pen Board as though something lived there
-- **hay storage** — matters to the feed module, is not an animal zone
-- **the well house** — infrastructure
+### 4. `ZoneType` has no working facility
 
-Options: add a `working_facility` type (and possibly `storage`), or model the
-working facility as a single zone and leave hay and the well house out of the
-zone model entirely. Worth a decision-log entry either way; see the note on the
-issue rather than guessing.
+The tub and chute hold cattle. Calling them a `pen` would put them on the Pen
+Board as though something lived there, which is wrong on the screen that gets
+glanced at most. Adding `working_facility` to the enum is the obvious answer.
+
+## Still unknown
+
+- **Exact coordinates.** The address places the farm near 33.05° N, 97.47° W,
+  but that is a town-level approximation and the weather, calving watch, and
+  frost thresholds deserve the real thing. A pin dropped on the house is enough.
+- **Growing zone.** Wise County reads 8a on the 2023 USDA map, against Fort
+  Worth's 8a/8b. Worth confirming rather than inheriting the spec's "≈ 8b".
+- Baseline safety level per zone, and per-pen capacity.
+- Whether the pasture's dashed line is a fence that exists.
