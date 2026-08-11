@@ -1,0 +1,471 @@
+# Galaxy Farm — Product & Architecture Specification
+
+**Version 0.9 · August 2026 · Status: Approved for build — decision log in §12**
+
+---
+
+## 1. Overview
+
+Galaxy Farm is a local-first progressive web app for managing a family beef-cattle operation and homestead near Fort Worth, TX, designed to grow into a show-calf boarding and training business. It manages registered cattle (Maine-Anjou, Chianina, Shorthorn), laying flocks, a garden, farm equipment, pets, and — later — client calves and horses.
+
+The app serves three surfaces from one codebase: a full admin experience on desktop and mobile, touch-first kiosk screens mounted in the barn, and a scaffolded customer portal for the future boarding business.
+
+**Non-negotiable qualities**, in priority order:
+
+1. **Local-first / offline-capable.** Barn connectivity is spotty. Every read and write happens against an on-device store instantly; a sync engine reconciles with the server when signal returns.
+2. **Clean architecture with obsessive modularization.** Each farm domain is an isolated module with pure domain logic, so new domains (horses, quail, a second property) bolt on without touching existing ones.
+3. **Portability.** Cloud-hosted frontend forever; cloud-hosted Postgres now, migrating to self-hosted Postgres at the farm later, with zero application code changes.
+
+## 2. Guiding principles
+
+- **The domain layer knows nothing about the web, the database, or the cloud.** Entities and use cases are pure TypeScript, testable without any infrastructure.
+- **Speak only standard Postgres to the database.** No provider-proprietary APIs (no Supabase client SDK, no vendor auth). This is what makes the future move to a self-hosted box a `pg_dump | pg_restore`, not a rewrite.
+- **One Animal model, many species.** Cattle, chickens (as flocks), pets, client calves, and future horses share a kernel (identity, location, photos, instructions, health) and extend it per species. The boarding business reuses the same entities with an `owner` attached — no parallel system.
+- **Derive, don't duplicate.** Calving due dates derive from breeding records; feed run-out dates derive from feeding plans; rule deadlines (bull ring by 8 months) derive from birth dates; the housesitter guide derives from live data. Manual entry is for facts, not for consequences of facts.
+- **Everything spatial is one component.** The property map (pens/pastures) and the garden layout designer are the same SVG editor with different palettes.
+
+## 3. Stack
+
+Your Next.js/React inclination is the right call — it's the strongest option for a PWA with three distinct surfaces, deploys first-class on Netlify, and has the deepest library ecosystem for the odd requirements here (SVG editors, e-signatures, PDF generation).
+
+| Concern | Choice | Why |
+|---|---|---|
+| Framework | **Next.js 15+ (App Router) + TypeScript** | Route groups map perfectly to `/admin`, `/account`, `/kiosk` surfaces; Netlify has a first-party Next runtime |
+| Monorepo | **pnpm workspaces + Turborepo** | Enforces module boundaries at the package level |
+| Database | **PostgreSQL** (managed now → self-hosted later) | The portability requirement decides this outright |
+| ORM / migrations | **Drizzle** | SQL-first, zero runtime magic, generates plain migration SQL that any Postgres accepts — ideal for the self-host move |
+| Local store | **Dexie (IndexedDB)** + custom sync engine | Full control, no vendor coupling; see §5 |
+| Validation | **Zod** | One schema per entity shared by client forms, sync payloads, and API handlers |
+| Auth | **Auth.js v5** with credentials + Postgres adapter | Users live in *your* database, so auth migrates with it |
+| Service worker / PWA | **Serwist** | Maintained Workbox successor for Next.js; app shell + asset caching |
+| Photos & documents | **Cloudflare R2** via presigned URLs | 10 GB free, zero egress fees, S3-compatible (swappable to a home NAS/MinIO later) |
+| Email | **Resend** | Free tier (~3,000/mo) covers alerts for years |
+| UI | **Tailwind + shadcn/ui** + custom design system package | Professional look fast, fully ownable components |
+| Charts | **Recharts** | Egg trends, feed spend, herd growth |
+| PDF (housesitter guide, liability snapshots) | **@react-pdf/renderer** + print stylesheets | |
+| Testing | **Vitest** (domain/use cases) + **Playwright** (smoke e2e) | |
+
+Alternatives considered: SvelteKit (great, but smaller ecosystem for e-sign/PDF/PWA tooling); Supabase client SDK (fast start but couples auth/storage to a vendor, fighting the self-host goal); off-the-shelf sync services like PowerSync or ElectricSQL (excellent, revisit if the custom engine ever feels limiting — the repository pattern makes them drop-in replaceable).
+
+## 4. System architecture
+
+### 4.1 Monorepo layout
+
+```
+galaxy-farm/
+├── apps/
+│   └── web/                      # Next.js — presentation + composition root ONLY
+│       └── app/
+│           ├── (public)/         # landing, /book, /login
+│           ├── (admin)/admin/    # full management UI
+│           ├── (account)/account/# customer portal (scaffold)
+│           ├── (sitter)/sitter/  # housesitter limited view
+│           └── (kiosk)/kiosk/    # barn touch screens
+├── packages/
+│   ├── core/                     # shared kernel: base Animal, Zone, Task,
+│   │                             #   value objects, domain events, Result type
+│   ├── modules/
+│   │   ├── cattle/               # each module contains ONLY:
+│   │   ├── feed/                 #   domain/       entities, services, ports
+│   │   ├── poultry/              #   application/  use cases, queries, DTOs
+│   │   ├── garden/
+│   │   ├── equipment/
+│   │   ├── business/             # scaffold (schema + rules, thin UI)
+│   │   ├── pets/
+│   │   ├── horses/               # placeholder (roadmap active)
+│   │   └── housesitting/
+│   ├── infrastructure/
+│   │   ├── db/                   # Drizzle schema, migrations, Postgres repos
+│   │   ├── local/                # Dexie schema, IndexedDB repos
+│   │   ├── sync/                 # outbox, cursors, conflict resolution
+│   │   ├── storage/              # R2 adapter
+│   │   ├── email/                # Resend adapter
+│   │   └── quickbooks/           # port defined now, adapter later
+│   ├── ui/                       # design system, SpatialEditor, charts, kiosk kit
+│   └── config/                   # shared tsconfig/eslint/tailwind presets
+```
+
+**Dependency rules (lint-enforced):**
+- `modules/*/domain` imports only `core`. Nothing else. Ever.
+- `modules/*/application` imports its own domain + `core`.
+- Modules never import each other; they communicate through IDs and domain events (e.g., `CalvingRecorded` → feed module offers a creep plan; business module listens to `AnimalAgeThresholdReached`).
+- `infrastructure/*` implements repository ports defined in domain layers.
+- `apps/web` is the only place everything meets (dependency injection at the route level).
+
+The payoff: when the database moves home, only `infrastructure/db`'s connection string changes. If the API later moves home too, the application packages lift into a standalone Node service unchanged, with the Netlify frontend reaching it over Tailscale or a reverse proxy.
+
+### 4.2 Offline-first sync engine (`infrastructure/sync`)
+
+- **Reads:** UI always reads from IndexedDB via live queries — instant, works with zero bars in the barn.
+- **Writes:** every mutation is a command written atomically to the local store *and* an **outbox** (ULID id, entity, field patch, timestamp, deviceId).
+- **Push:** when online, the outbox drains to `/api/sync/push`; the server applies patches with **field-level last-write-wins** and records everything in an audit log (so a rare conflict is recoverable, not silent).
+- **Pull:** per-entity `updatedAt` cursors via `/api/sync/pull`; deletions ship as tombstones.
+- **Photos/documents:** compressed client-side, queued, uploaded to R2 via presigned URLs when online; records store the key immediately and render a placeholder until synced.
+- **Conflict reality check:** two writers (you two) plus kiosks, mostly appending records — real conflicts will be vanishingly rare. LWW-per-field + audit log is the right amount of machinery.
+
+A nice side effect: because reads never wait on the network, a scale-to-zero database with cold starts (see §12) is invisible to daily use.
+
+### 4.3 Auth, roles, permissions
+
+Roles from day one, cheap to add now and painful later:
+
+| Role | Access |
+|---|---|
+| `owner` | Everything, user management, settings |
+| `member` | Everything operational (the two of you are both owners; this exists for future family/employees) |
+| `customer` | `/account` only — their animals, milestones, forms, invoices |
+| `housesitter` | `/sitter` only — care guide, today's chores (check-off), emergency info; time-boxed access window |
+| `kiosk` | Device-scoped token; read + whitelisted quick actions (log eggs, complete chores, move animals between pens). PIN unlock for anything else |
+
+Permission checks live in the application layer (use cases declare required capability), not in UI conditionals.
+
+### 4.4 Kiosk mode
+
+Barn screens pair via a one-time code and hold a long-lived device token. Kiosk home offers preset boards: **Pen Board** (property map + who's where + care instructions), **Calendar**, **Today's Chores**, **Egg Quick-Entry** (big +1 buttons per coop/color/size), **Program Day Sheet** (today's show-program schedule as a calf × activity grid — tap to check off rinses, exercise, and training slots as they happen), and **Housesitter Mode**. Large touch targets, high contrast, auto-refresh on sync, screen-wake hints. Any screen can be locked to a single board from settings.
+
+## 5. Domain model
+
+Field lists below are the significant ones, not exhaustive schemas. All entities carry `id (ULID)`, `propertyId`, `createdAt`, `updatedAt`, soft-delete tombstones, and audit metadata. Everything hangs off `propertyId` so multiple locations later is a query filter, not a migration.
+
+### 5.1 Shared kernel (`core`)
+
+**Property** — name, address, timezone, growingZone (auto-suggested from ZIP against the USDA dataset, editable — dynamic per property as requested), map imagery (§8: Google satellite online, cached NAIP snapshot offline).
+
+**BrandingConfig** — the farm name and the business name are **global variables, never strings in code**: stored in settings (env-var fallbacks) and injected into every page title, navigation header, email template, PDF (housesitter guide, liability form), kiosk board, and the customer portal. Both names are undecided today — set them in one place whenever you land on them and the entire app updates. One deliberate exception: signed liability-form PDF snapshots retain the business name as it read at signing, because those are immutable legal records.
+
+**Zone** — the universal "place": `type: pen | pasture | coop | barn | stall | garden_area`, name, `indoor/outdoor`, capacity, polygon geometry for the map, **baseline safetyLevel** (hazards of the place itself — electric fence, footing, equipment; see *Safety levels* below), **water source flags** (`hasWaterTank`, `hasTankHeater` — feeds the freeze alerts in §6), **customInstructions** (rich text — group-level care instructions live here), active flag. Six named pens/pastures seeded; fully editable as the layout changes.
+
+**Pasture care (added v0.7)** — land upkeep tracked per zone. **PastureCareLog**: action (`seed | overseed | fertilize | spray | mow | drag | soil_test`), product/variety (e.g., winter rye), rate (lbs or units per acre), cost, date, attachments (soil-test results), notes. Seed, fertilizer, and chemical stock live in the supplies module, so costs flow into whole-farm operating reports and per-pasture cost history. A pasture can be marked **resting** — it renders dimmed/hatched on the Pen Board, and moving an animal into a resting pasture prompts a confirmation. Seasonal work (overseed rye every fall, fertilize each spring) uses recurring task templates tied to the zone, so the reminder shows up on the calendar and chore list when the season comes around.
+
+**Animal** (base) — species, name, tagNumber, sex, dob (or estimate), status (`active | sold | deceased | processed | boarding | departed`), ownership (`own | client` + optional ownerId), **safetyLevel + safetyNotes** (see *Safety levels* below), photos[], **customInstructions** (animal-level), notes.
+
+**ZoneAssignment** — animalId, zoneId, from, to. Current location is the open assignment; history is free. Client calves can hold *two* concurrent assignments tagged `inside` and `outside`.
+
+**CareInstruction resolution** — any animal's effective instructions = its own instructions + its current zone's instructions + any group instructions, displayed merged on the Pen Board and in the housesitter guide.
+
+**Safety levels (added v0.5)** — a farm-wide handling/difficulty scale so helpers know what they can safely interact with. Five levels with configurable labels, defaults:
+
+| Level | Color | Default meaning |
+|---|---|---|
+| 1 | Green | Safe for anyone — gentle, halter-broke |
+| 2 | Lime | Safe with basic caution |
+| 3 | Yellow | Confident handlers only |
+| 4 | Orange | Owners only |
+| 5 | Red | Do not handle / do not enter |
+
+Every animal carries a level plus **safetyNotes** stating *why* ("kicks when cornered," "protective with calf at side"). Every zone carries a baseline level for the place itself, and its **effective level is derived: max(zone baseline, highest-level animal currently inside)** — so a green pen turns red the moment the bull is moved into it, automatically, everywhere at once. Smart default: a dam is auto-suggested to an elevated level from calving until you clear it (protective mommas). Badges render on Pen Board zones (border color) and animal chips, stall cards, rosters, and profiles; the housesitter guide and `/sitter` view lead every pen section with its level and list what a helper may and may not interact with.
+
+**FeedingPlan** — target (`animal | zone | group`), lines of `{feedTypeId, quantity, unit, frequency, timeOfDay}`, special notes. Per-cow custom mixtures are just an animal-targeted plan that overrides/extends the group plan.
+
+**Contact** — one CRM for everyone the farm touches: tags (`vet | ai_tech | customer | buyer | seller | feed_vendor | supply_vendor | processor | hauler | emergency | friend_family`), multiple phones/emails, address, company, notes, and **linked history** — animals bought from or sold to them, treatments they administered, feed and supply purchases from them, egg dispositions, and (Phase 5) bookings, agreements, and invoices. Business customers are a Contact plus a portal login; the emergency-tagged subset auto-populates the housesitter guide. Route: `/admin/contacts`.
+
+**Attachment** — polymorphic file link (registration papers, manuals, receipts, signed forms) → R2 key.
+
+**Task / ChoreTemplate** — recurring templates (daily, weekly, cron-ish) generate dated instances; completable from kiosk; assignable; overdue state feeds notifications.
+
+**CalendarEvent** — mostly *projected* from other modules (calving windows, withdrawal ends, maintenance due, rule deadlines, planting windows, drop-offs) plus manual events. The calendar is a read model, so nothing is entered twice.
+
+**Roadmap** (generic aggregate) — used by cattle, horses (active now), and equipment. Items: `type: goal | milestone | wishlist | planned_action`, title, detail, targetDate/season, priority, budgetEstimate, status. Cattle adds structured PlannedMatings (§5.2); equipment adds wishlist costing (§5.6).
+
+### 5.2 Cattle module
+
+**CattleProfile** extends Animal — breed composition as percentages (e.g., ½ Maine-Anjou ¼ Chi ¼ Shorthorn — show cattle are rarely purebred), polled/horned, color/markings, **registrations[]**: `{association: AMAA | ACA | ASA | other, regNumber, tattoo, registeredName, epdSnapshot?}` — an animal can be papered in multiple associations.
+
+**Pedigree** — sire/dam references resolving to either an on-farm Animal or an **ExternalAnimal** (name, regNumber, association, own sire/dam refs). External ancestors chain recursively, giving "all the way back" depth without requiring every ancestor to be a farm record. Pedigree view renders the standard 3/4/5-generation tree with drill-down.
+
+**SemenInventory** — sire (ExternalAnimal or own bull), strawsOnHand, tank/canister/cane location, source, pricePerStraw, purchase date. Decremented by AI breeding records.
+
+**SyncProtocol** — named templates (e.g., 7-day CO-Synch + CIDR) as day-offset steps; applying one to a cow projects each step onto the calendar with notifications.
+
+**HeatRecord** — cow, observed datetime, intensity, notes; supports 21-day return predictions.
+
+**BreedingRecord** — dam, method (`AI | natural | ET`), sire/straw or bull, embryo details if ET, date, technician, linked protocol, **pregCheck** {date, result, method}, projected due date = breed-configurable gestation (default 283 days) → creates a *calving window* calendar event two weeks out with notification.
+
+**CalvingRecord** — dam, date, birthWeight, calvingEase (1–5), vigor, notes, assist details; **creates the calf as a new Animal** with pedigree pre-wired to dam + service sire.
+
+**WeightRecord** — animal, date, weight, context (`birth | weaning | yearling | other`). Birth weights are the reliable ones; weaning/yearling fields exist and, when present, the system computes ADG between any two weights and unadjusted 205-day weaning weight. (Association age-of-dam adjustments: future enhancement.)
+
+**HealthRecord** — animal, type (`vaccination | treatment | exam | injury | deworming`), product → MedInventory, dose/route, administeredBy, vet contact, cost, **withdrawalDays → computed withdrawalEndDate** with a hard flag on the animal until it passes (critical for beef). Vaccination protocols can schedule boosters.
+
+**MedInventory** — product, qty, unit, expirationDate (expiry alerts), cost, defaultWithdrawalDays, storage location.
+
+**AcquisitionRecord / SaleRecord** — counterparty contact, date, price, type (`private | sale_barn | auction | breeding_stock | show`), transport notes. 
+
+**ProcessingRecord** (packer) — processor contact, dates, **liveScaleWeight, hangingWeight (HCW), computed dressing %**, processing cost, payment received, and **CutLine[]**: `{cut, pounds, disposition: kept | sold, pricePerLb?, buyer?, total}`. Rolls up: revenue from sold cuts, pounds kept for the freezer, and full per-animal picture.
+
+**Per-animal P&L** (read model) — acquisition/breeding costs + allocated feed (§5.3) + health costs + processing costs vs. sale/packer/cut revenue. Herd-level rollups feed Reports.
+
+**HerdRoadmap** — Roadmap + **GeneticGoal** (trait, direction, notes), target herd-size milestones by year (1 → 20 over 5 years), and **PlannedMating**: `{dam or dam-criteria, planned sire (semen inventory link), target season, rationale, status}` — one tap converts a planned mating into a real BreedingRecord when it happens.
+
+### 5.3 Feed module (cross-species)
+
+**FeedType** — name, category (`hay | grain | mineral | creep | supplement`), unit (`round_bale | square_bale | bag | bulk_lb | bulk_ton | block`), estWeightPerUnit, currentUnitCost, reorderLeadDays, reorderThreshold.
+
+**FeedPurchase** — feedType, qty, unitCost, vendor, date, receipt attachment → inventory in.
+
+**Inventory & projections** — on-hand = purchases − consumption. Daily demand is *derived from active FeedingPlans* (Σ quantity × frequency across assigned animals/groups), correctable by manual consumption entries (a torn bag, an extra bale). **Run-out date = onHand ÷ dailyDemand**, with a "buy more" notification at `runOutDate − reorderLeadDays`.
+
+**Cost per head** — consumption valued at purchase cost, allocated to animals directly (animal plans) or split by headcount (group/zone plans), rolled into per-animal P&L and the feed-spend report. Client calves' allocations flow to their boarding invoices later.
+
+### 5.4 Poultry module
+
+**Flock** — species (`chicken | quail | ...` — quail is a dropdown value, not a new module), coop (Zone), breed mix, headCount maintained by an **adjustment log** (`added | died | predator | culled | sold`, qty, note) so count history is auditable.
+
+**EggLog** — date, flock/coop, total count, optional breakdown rows by `{color, size, count}`. Kiosk quick-entry: tap +1 buttons at the coop; detailed breakdown optional on the same screen.
+
+**EggDisposition** (lightweight, optional) — date, qty, `kept | given | sold`, contact, price. Keeps the door open for real sales without pretending it's a business.
+
+Hatching/incubation: not built; the module boundary leaves a clean seam if that changes.
+
+### 5.5 Garden module
+
+**Bed** — a child of a garden Zone: shape/position from the layout designer, type (`raised_bed | row`), dimensions, soil notes.
+
+**Crop / Variety** — name, **family (for rotation logic)**, daysToMaturity, spacing, source. **SeedInventory** — variety, qty, packedForYear, source, germination notes.
+
+**Planting** — bed, variety, method (`direct_sow | transplant`), optional indoor start date, plantedDate, expectedHarvestDate (derived), status. **CareLog** — bed/planting, action (`fertilize | water | weed | pest_treatment | amend`), product, notes.
+
+**SeasonPlan → planting notifications.** A per-season plan of **PlannedPlanting** entries: `{variety, method (indoor_start | direct_sow | transplant), target bed, window}` — the window auto-derives from the property's growing zone + the variety's timing, or is set manually. When a planned window opens, a notification fires (*"start tomatoes indoors this week," "direct-sow okra window opens Friday"*), and one tap converts the plan into a real Planting record — the same planned→actual pattern as PlannedMating → BreedingRecord. Notifications fire only for what's *in the plan*, not the whole seed catalog; the general planting calendar remains browseable for everything else.
+
+**Rotation guard** — each bed keeps its crop-family history; planting the same family in a bed within a configurable window (default 3 years) raises a visible warning in the designer.
+
+**HarvestLog** — planting, date, qty, unit. **PreservationLog** — method (`canned | frozen | dried | fermented`), qty, date, storage location — your pantry inventory.
+
+**Planting calendar** — derived from the property's growing zone (dynamic; Fort Worth ≈ 8b today, but it's a property setting): per-crop sow/transplant windows and frost dates projected onto the unified calendar.
+
+### 5.6 Equipment module
+
+**Equipment** — name, category (`vehicle | trailer | implement | tool`), make/model/year, VIN/serial, photos, purchase info, status, attachments (manuals, receipts). Seeded: gooseneck cattle trailer, hay bale buggy.
+
+**MaintenanceRule** — per equipment: trigger `every N engine-hours | N miles | N months` (any combination), task, parts. **MeterReading** — hours/miles logs drive due calculations. **MaintenanceLog** — date, task, cost, parts, meter snapshot. **FuelLog** — date, gallons, cost, meter → consumption and cost-of-operation stats.
+
+**EquipmentRoadmap** — Roadmap items with priority + budgetEstimate. Seeded: truck (**need, ASAP**), tractor (want), ATV (want).
+
+### 5.7 Business module (scaffold — full schema + rules now, UI in Phase 5)
+
+**Customer** — user (role `customer`) + contact + QuickBooks customer id (nullable).
+
+**BookingRequest** (`/book`, public) — customer details, calf details (dob, sex, breed, weaned?, visible ID?), requested drop-off, services → **admin approve/decline**. Approval runs the eligibility rules and creates the agreement + client animal records.
+
+**BoardingAgreement** — customer, rates {dailyBoard, feedRate}, packages[] (`halter_breaking | hair_growing | showing_service | ...` with prices), startDate, estPickupDate, liabilityFormId, status, termination record (date, reason) for the behavior clause.
+
+**ProgramEnrollment** — the training/showing program is **decoupled from ownership**: any Animal, `own` or `client`, can be enrolled, so your own show calves run through the identical pipeline as customers'. Fields: animal, **halterColor** (every calf in the program has one — **defaults to black**, rendered as a color swatch on the Pen Board chip, program roster, stall cards, and profile header, so anyone in the barn can match calf to halter at a glance), startDate, targetEndDate, inside + outside zone assignments, feeding requirements (FeedingPlan), packages/goals. **Client enrollments additionally carry**: owner, dropOffDate, estPickupDate, the BoardingAgreement, invoice lines, and owner-responsibility notes (medical/vaccines are the owner's per your rules — tracked as owner-provided records, not your vet workflow). Own-animal enrollments skip billing, liability, and the drop-off eligibility rules. The program roster shows everything enrolled regardless of ownership — which is also your real capacity picture, since your own calves occupy the same pens and hours.
+
+**TrainingLog & Milestones** — dated entries per **enrollment** (so they apply equally to your own calves); milestone flags: `haltered, leads, sets_up, washed_blown, loads` with achieved dates. Milestones are what customers see for their animals; your own calves' progress stays internal.
+
+**ProgramSchedule (added v0.6)** — the show barn's daily rhythm as data. A program-wide **default template** of time-slotted activities — `morning_chores | rinse | blow_dry | exercise | training | evening_chores | feeding | custom` — where any activity can repeat (rinse at 10:00 *and* 4:00; hair-growing season means more slots). Each enrollment can **override the template** (this calf rinses 3×, that one gets extra stick work), and packages can imply schedule additions (the hair-growing package adds rinse/blow slots automatically). The schedule generates **daily checklist instances per calf** that merge into the farm-wide chore system — checkable from the kiosk, with completion logged per calf per slot so you can see at 2 p.m. exactly who's had their second rinse and who hasn't. Missed-slot alerts follow the normal overdue-chore path.
+
+**ShowEntry** — customer-created (their transport, their supplies): show name, date, location, and a `requestUsToShow` flag that triggers your approval + the extra fee on the invoice.
+
+**LiabilityForm** — versioned template (adapted from your existing form), **e-signature** (typed/drawn name, timestamp, IP, form version) with an immutable PDF snapshot attached; visible in both admin and customer views; unsigned form blocks drop-off.
+
+**RuleEngine** — your rules encoded as first-class, testable policy objects, evaluated at booking and continuously against DOB (**client enrollments only** — your own calves bypass eligibility gates):
+
+| Rule | Enforcement |
+|---|---|
+| Must be weaned at drop-off (no pairs unless cow is here for breeding) | Booking checklist gate |
+| Under 6 months old at drop-off | Hard validation from DOB |
+| Tagged / visible ID | Booking checklist gate |
+| Bulls ringed by 8 months | Auto deadline event + escalating notifications |
+| Bulls depart by 10 months | Auto deadline + pickup scheduling prompt |
+| Heifers/steers depart by 12 months | Auto deadline + pickup scheduling prompt |
+| Behavior termination clause | Manual action with documented incident log |
+| Owner pays feed & supplies | Feed allocations flow to invoice lines |
+| Owner liability for damages / no responsibility assumed / owner handles medical | Encoded in liability form text + agreement record |
+
+**Invoice** — line items (board days, feed allocation, packages, showing fee, damages); **QuickBooks Online adapter** behind an `InvoicingProvider` port (OAuth + customer/invoice sync when you launch — the port exists from day one so nothing needs restructuring).
+
+### 5.8 Pets module
+
+**Pet** — Animal subtype (species `dog | cat`), reusing HealthRecord (vaccines, meds), FeedingPlan, vet visits (Contact), photos, and free-form notes. Pets appear in the housesitter guide automatically.
+
+### 5.9 Horses module (placeholder)
+
+Module skeleton with stub routes for herd / pens / feeding / breeding ("coming soon" shells so navigation and permissions are already real), plus an **active HorseRoadmap** now — same Roadmap aggregate as cattle, so goals, target acquisitions, and budget planning start today. When horses arrive, the build is filling in a prepared module, not designing one.
+
+### 5.10 Housesitting module
+
+**CareGuide** — a composed document: auto-sections pulled *live* (animals grouped by pen **with each pen's effective safety level leading its section and per-animal safety badges/notes**, merged care instructions and feeding plans; today's/weekly chores; emergency contacts; vet info; equipment quirks) + custom sections you write. Three outputs from the same source: **print-perfect PDF**, **`/sitter` limited login** (read + chore check-off, time-boxed), and **kiosk Housesitter Mode**. Update a feeding plan anywhere and every format is already current.
+
+### 5.11 Supplies module (added v0.3)
+
+Everything the ranch runs on that isn't feed, medicine, or engine-bearing equipment — from shavings to show sticks.
+
+**SupplyItem** — name, kind (`consumable | durable`), category (`bedding | show_and_fitting | tack | pen_hardware | feeding_gear | pasture_seed_chem | poultry | general`), unit, qtyOnHand, reorderThreshold, storageLocation, photo. Seeded from your list: shavings, nesting pads, Revive and other fitting/hair-care products (consumables); panels, gates, feed pans, bunks, halters, neck ties, show halters, show sticks, combs (durables).
+
+**SupplyPurchase** — item, qty, unitCost, vendor (Contact), date, receipt attachment — the same purchase/cost pattern as feed, so every dollar the ranch spends lands in one reporting model.
+
+**SupplyUsage** (consumables) — qty, date, optional target (animal or zone); decrements stock and triggers a **low-stock notification** at the reorder threshold. Usage tagged to a client calf flows straight onto its boarding invoice lines in Phase 5 — this is the mechanism behind your "owners pay for all feed and supplies" rule.
+
+**Durable tracking** — count (24 panels), condition, optional assignment to a zone or animal (which show halter lives with which calf), and a retired/lost/damaged log.
+
+Route: `/admin/supplies`. Builds in Phase 2.
+
+## 6. Cross-cutting services
+
+**Unified calendar** (`/admin/calendar`, kiosk board) — projected events from every module: breeding protocol steps, preg checks due, calving windows, withdrawal-period ends, booster schedules, med expirations, feed run-out, maintenance due, rule deadlines (bull ring / departures), drop-offs & est. pickups, planting windows, chores, manual events. Filter by module; month/week/agenda views.
+
+**Chores** — cross-farm daily checklist generated from templates; kiosk check-off; overdue escalation.
+
+**Notifications** — email now (Resend), web push later behind the same `Notifier` port. Default triggers: vaccine/booster due · withdrawal ending · preg check due · calving window opening · sync-protocol step today · feed run-out approaching · med expiring · maintenance due (hours/miles/date) · bull ring due · bull/heifer/steer departure approaching · new booking request · liability form unsigned near drop-off · drop-off/pickup reminders · planting window opening (per season plan, indoor & outdoor) · chore overdue · low semen inventory · supply low-stock · frost warning · tank-freeze warning · calving watch (pressure drop / full moon / cold snap inside a due window). Per-trigger opt-out and lead-time settings.
+
+**Weather, moon phases & calving watch** — a `WeatherProvider` port with two adapters: **Open-Meteo** (free for non-commercial use, no API key, hourly forecasts including surface pressure) as primary and the **National Weather Service API** (free, official US watches/warnings) for alerts. A scheduled function polls forecasts for the property's coordinates and projects onto the calendar and notifications:
+
+- **Frost warnings** for the garden: forecast low below a configurable threshold (default 36 °F) during the growing season.
+- **Tank-freeze alerts:** when forecast lows cross a hard-freeze threshold (default 28 °F, or sustained sub-32), you're alerted the evening before, and a *"break ice / verify tank heaters"* chore is auto-injected for each freeze day covering every zone flagged `hasWaterTank` — zones without a `hasTankHeater` flag are called out by name as the vulnerable ones.
+- **Calving watch:** for every cow inside her calving window (due date ± 14 days, configurable), the dashboard shows a watch card and notifications fire when the window coincides with a **full moon** (± 1 day — computed locally with an astronomy library, so moon phases render on the calendar indefinitely and offline), a **rapid barometric fall** (default ≥ 4 hPa / ~0.12 inHg within 24 h) or forecast low-pressure trough, or a **cold snap** (calf-chill threshold, default 20 °F). Example alert: *"Front arriving Thursday night + full moon Friday — Dolly is at day 279."*
+- Licensing seam: Open-Meteo's free tier is non-commercial; when the boarding business launches, its inexpensive commercial plan or a full switch to NWS closes the gap — both sit behind the same port.
+
+**Reports** — cost per head · per-animal & herd P&L · feed spend and consumption trends · **supply spend by category & whole-farm operating cost** · egg production trends (by coop/color/size) · herd inventory growth vs. roadmap targets · processing yields (dressing %, $/lb realized) · equipment cost of ownership · business revenue (Phase 5). All exportable to CSV.
+
+## 7. Route map
+
+```
+/                               landing (public, later)
+/book                           public booking request (Phase 5)
+/login
+
+/admin                          dashboard: today's chores, alerts, calving countdowns, run-outs
+/admin/map                      property map — draw pens/pastures over aerial photo,
+                                drag animal chips between zones, tap for instructions
+/admin/pastures                 care logs (seed/overseed, fertilize, spray, mow), rest status,
+                                seasonal reminders, per-pasture cost history
+/admin/calendar                 unified calendar
+/admin/chores                   templates + today
+/admin/reports
+/admin/contacts                 CRM: vets, buyers/sellers, vendors, customers + linked history
+
+/admin/cattle                   herd list
+/admin/cattle/[id]              profile tabs: overview · pedigree · breeding · health ·
+                                weights · feeding · finance · photos
+/admin/cattle/breeding          heat log, sync protocols, semen tank, breedings, preg checks
+/admin/cattle/calving
+/admin/cattle/health            treatments, withdrawal board, med inventory
+/admin/cattle/feed              feeding plans per animal & group
+/admin/cattle/sales             acquisitions, sales, processing records
+/admin/cattle/roadmap           genetic goals, target size, planned matings
+
+/admin/feed                     inventory, purchases, run-out projections, cost per head
+/admin/supplies                 ranch supply inventory: consumables, show/fitting gear, hardware
+/admin/chickens/flock           flocks & headcount log
+/admin/chickens/eggs            logs + trends
+/admin/garden/layout            visual designer (beds/rows, rotation warnings)
+/admin/garden/plantings         + care logs
+/admin/garden/seeds
+/admin/garden/harvest           + preservation
+/admin/equipment                fleet · /admin/equipment/[id] · /admin/equipment/roadmap
+/admin/pets
+/admin/horses                   placeholder shells · /admin/horses/roadmap (active)
+/admin/business/*               scaffold: bookings · clients · program roster (own + client,
+                                halter colors) · day schedule · forms · invoices
+/admin/housesitter              guide builder + PDF + access management
+/admin/settings                 branding (farm & business names), users/roles, property & zones,
+                                feed types, breeds/gestation, notification prefs, kiosk devices, integrations
+
+/account                        customer portal (scaffold): animals, milestones, forms, invoices, shows
+/sitter                         housesitter view
+/kiosk                          pen board · calendar · chores · egg entry · housesitter mode
+```
+
+## 8. UI/UX notes
+
+### Design language (locked v0.8) — "Midnight Nebula / Bluebonnet Linen"
+
+One brand, two modes sharing the same hue anchors. **Theme per surface:** `/admin` and `/kiosk` render Midnight Nebula (dark); `/account`, `/book`, `/sitter`, and public pages render Bluebonnet Linen (light). The neutrals mirror: admin's starlight text is the customer's linen sky, and the customer's violet ink is the admin's night surface.
+
+| Role | Bluebonnet Linen (light) | Midnight Nebula (dark) |
+|---|---|---|
+| Canvas | `#F8F5EC` linen | `#0E1026` midnight |
+| Panel / card | `#FFFFFF` | `#191C3C` |
+| Text | `#24243A` ink | `#F2EFE6` starlight |
+| Action — bluebonnet blue | `#35569E` | `#8CA3E8` |
+| Identity — nebula purple | `#5F45B0` | `#9D85E8` |
+| Calm — sage green | `#67805F` | `#A3BC9C` |
+
+Role assignments: **bluebonnet blue** = every primary action, link, and interactive control on both sides; **nebula purple** = brand and identity moments (star mark, constellation pedigree lines, milestones, headers); **sage green** = calm states (resting pastures, signed forms, quiet confirmations). Sage is deliberately gray-leaning so the **safety scale (unchanged, saturated green→red, always numbered)** never competes with it. Brass gold `#C9A24B` is held in reserve as an optional "champion" accent for wins (show results, milestones) — currently unused. Signature elements: the **star-brand logomark** and **pedigrees drawn as constellations** (ancestors as stars, descent as connecting lines — at full glory in dark mode). Typography across both modes: **Zilla Slab** for headings, **Inter** for UI and body, tabular figures wherever numbers carry meaning (weights, tags, straw counts).
+
+- **Design system first** (`packages/ui`): tokens above, then components. Clean, professional, generous whitespace; no template feel. Distinct density modes: desktop (data-dense tables + side panels), mobile (card stacks, bottom nav, one-thumb logging), kiosk (oversized type + targets).
+- **The Pen Board is the heart of the app** — the property map with live animal positions, merged instructions, halter-color swatches, and **safety-level color coding** (pen borders show effective level; chips show each animal's) is what you'll glance at ten times a day and what barn screens show by default.
+- **SpatialEditor** (one component, two skins): property mode (satellite/aerial background, free polygons, animal chips) and garden mode (grid snap, bed shapes, planting chips, rotation warnings).
+- **Property imagery — hybrid Google + owned (resolves v0.1 Q4):** pens are stored as real lat/lng polygons, so they render over any base layer. **Online**, the editor loads the **Google Maps JavaScript API satellite layer** and you trace/adjust pens directly over live imagery; Dynamic Maps includes 10,000 free map loads per month (a Google Cloud billing account must be on file), and this household's usage won't approach 5% of that. **Offline and on barn kiosks**, Google's terms don't permit storing its tiles, so the identical polygons render over an **owned, cached background**: a georeferenced **USDA NAIP** aerial image of the property — public-domain imagery covering the continental US at roughly 0.3–0.6 m resolution, refreshed on a 2–3-year cycle, downloadable free (USGS EarthExplorer / USDA Geospatial Data Gateway) — stored once in R2 and cached by the service worker. One data model, two interchangeable backgrounds, no terms-of-service risk, and the Pen Board works with zero bars in the barn.
+- **Logging must be fast**: every frequent action (egg count, weight, treatment, chore) reachable in ≤2 taps from its context, with smart defaults (today's date, last-used product).
+
+## 9. Hosting & cost options (decided: Option B — see below)
+
+Prices verified August 2026; treat as estimates and re-verify before committing.
+
+| | Option A — Free start | Option B — Usage-based (recommended) | Option C — Bundled |
+|---|---|---|---|
+| Frontend | Netlify free | Netlify free | Netlify free |
+| Postgres | Supabase Free *used as plain Postgres* (500 MB DB — years of farm records; daily use avoids the 7-day pause) | **Neon Launch** — pure usage-based, no monthly minimum, ~$0.106/CU-hr + $0.35/GB-mo, scale-to-zero | Supabase Pro $25/mo (8 GB DB, bundled storage, always-on compute) |
+| Photos/docs | Cloudflare R2 free (10 GB) | R2 free → pennies | Supabase storage (100 GB incl.) |
+| Email | Resend free | Resend free | Resend free |
+| **Est. total** | **$0/mo** | **~$1–8/mo** at your traffic | **~$25/mo** |
+| Trade-off | Hard free-tier cutoffs; upgrade path is simply switching connection string | Bill scales with actual use; cold starts hidden by local-first reads | Simplest mentally; pays for capacity you won't use for years |
+
+**Decision (v0.9): Option B across the board.** Netlify (frontend) + **Neon Launch** (usage-based Postgres, no monthly minimum, card on file required) + **Cloudflare R2** (photos/documents) + **Resend** (email). Expected bill at your scale: roughly $1–8/month, dominated by Neon compute; scale-to-zero cold starts are invisible because the local-first client never waits on the database for reads. The Google Maps satellite layer (§8) sits on its own Google Cloud billing account within its 10k-free-loads tier. Because everything speaks plain Postgres and S3-compatible storage, the eventual self-host migration (§10) remains a connection-string change.
+
+## 10. Self-hosting migration path (later)
+
+1. Postgres in Docker on a small home server/NUC; nightly `pg_dump` to R2 or a second disk from day one of self-hosting.
+2. `pg_dump` from cloud → `pg_restore` at home. Change `DATABASE_URL`. Done — Drizzle migrations are plain SQL, Auth.js users live in the same DB.
+3. Expose to the Netlify frontend via **Tailscale Funnel** or a Cloudflare Tunnel (no port-forwarding, no static IP needed).
+4. Optional later: move the API itself home (application packages run unchanged in a Node container beside the DB); optional MinIO to bring photos home too. Kiosks on the barn LAN then work even when the internet is out entirely.
+
+## 11. Build roadmap
+
+**Phase 0 — Foundation (build first).** Monorepo + module skeletons, design system, Auth.js + roles, PWA shell, **sync engine** (the hard part — built and tested before features pile onto it), Property + Zones + SpatialEditor property mode, base Animal + photos, kiosk pairing.
+
+**Phase 1 — Cattle core.** *Your cow is bred — this phase races her due date.* Cattle profiles + registrations, pedigree (incl. external ancestors), breeding records + due-date projection + calving-window alerts, calving flow (creates the calf), health + withdrawal tracking + med inventory, weights, feed module (types, purchases, plans, run-out, cost/head), pen board with live assignments, herd roadmap + planned matings, semen inventory, sync protocols, **calving watch** (weather + moon monitoring for cows in a due window — pulled forward from Phase 3 because it applies to this pregnancy).
+
+**Phase 2 — The rest of the daily farm.** Chickens (flocks, egg logs, kiosk egg entry), equipment (fleet, maintenance rules, fuel, roadmap — get the truck on the wishlist), **supplies inventory**, **contacts CRM**, pets, chores, unified calendar, email notifications, **tank-freeze alerts** (rides on the Phase 1 weather service, lands before winter), **pasture care logs** (in time for fall overseeding), sales/processing records.
+
+**Phase 3 — Garden.** Layout designer, seeds, plantings + care logs, rotation guard, harvest + preservation, zone-aware planting calendar, **season plan + planting notifications**, frost-warning notifications.
+
+**Phase 4 — Sharing the farm.** Housesitter guide (PDF + `/sitter` login + kiosk mode), reports suite, settings polish, push notifications.
+
+**Phase 5 — Business launch (~1 yr+).** Booking flow + approval, customer portal, e-signature liability forms, training milestones UI, show entries, invoicing + QuickBooks OAuth. (Schema, rules, and routes already exist from Phase 0/1 scaffolding.)
+
+## 12. Decision log
+
+**v0.2 — v0.1 open questions resolved:**
+
+1. **Registry data → manual entry.** All three associations run on Digital Beef, which exposes nothing programmatically. Registrations are entered by hand; a low-priority backlog item covers CSV import if Digital Beef's exports ever become worth parsing.
+2. **Gestation → flat 283-day default** for all breeds, editable in settings. No Chi-influence adjustment needed.
+3. **QuickBooks Online** confirmed for the Phase 5 invoicing adapter.
+4. **Mapping → hybrid Google Maps + owned NAIP imagery** (full design in §8): live Google satellite for online pen editing, public-domain USDA aerial imagery cached for offline/kiosk rendering.
+5. **Weather → yes**, including the full-moon and low-pressure calving watch (full design in §6), with calving watch pulled forward into Phase 1.
+
+**v0.3 additions:**
+
+6. **Tank-freeze alerts** with auto-injected ice-breaking chores, driven by per-zone water/heater flags (§6).
+7. **Whole-ranch supplies module** (§5.11) — consumables and durable gear with purchases, usage, low-stock alerts, and client-calf usage flowing to future boarding invoices.
+8. **Season plan → planting notifications** (§5.5) — indoor-start and outdoor windows alert only for planned varieties.
+9. **Contacts expanded to a full CRM** (§5.1) with tags and linked buy/sell/vet/vendor/booking history at `/admin/contacts`.
+10. **Farm & business names as global BrandingConfig** (§5.1) — undecided names set once in settings later, propagated everywhere; signed liability PDFs keep their as-signed name.
+
+**v0.4 additions:**
+
+11. **Program decoupled from ownership** (§5.7) — ProgramEnrollment replaces ClientAnimal, so personal herd calves run through the same training pipeline, roster, and milestones as customer calves; billing, liability, and eligibility rules attach only to client enrollments.
+12. **Halter color per enrolled calf** (§5.7) — a required field on every enrollment, own or client, shown as a color swatch on Pen Board chips, the roster, stall cards, and profiles.
+
+**v0.5 additions:**
+
+13. **Safety/difficulty levels** (§5.1) — five-level, color-coded scale on every animal (with safety notes explaining why) and a baseline level on every pen/coop; a zone's effective level derives from max(baseline, most dangerous occupant), so moving an animal recolors the map instantly. Surfaced on the Pen Board, kiosks, rosters, and prominently in the housesitter guide and `/sitter` view so helpers know exactly what they may and may not interact with. Dams auto-suggest an elevated level from calving until cleared.
+
+**v0.6 additions:**
+
+14. **ProgramSchedule** (§5.7) — the show program's daily routine as a time-slotted template (morning chores, repeatable rinses, blow-outs, exercise, training, evening chores) with per-calf overrides and package-driven additions; generates per-calf daily checklists in the chore system, checkable from a new **Program Day Sheet** kiosk board (§4.4).
+15. **Halter color defaults to black** (§5.7).
+
+**v0.7 additions:**
+
+16. **Pasture care** (§5.1) — per-zone logs for seeding/overseeding, fertilizing, spraying, mowing, dragging, and soil tests with rates and costs; seed/chem inventory in supplies; a resting status that dims the pasture on the map and challenges animal moves into it; seasonal recurring reminders (fall rye, spring fertilizer). Lands in Phase 2 ahead of fall overseeding.
+
+**v0.8 additions:**
+
+17. **Design language locked** (§8) — "Midnight Nebula" dark theme for `/admin` and `/kiosk`, "Bluebonnet Linen" light theme for `/account`, `/book`, `/sitter`, and public pages; shared bluebonnet-blue / nebula-purple / sage-green hue anchors at mode-tuned stops; mirrored neutrals (starlight ↔ linen, ink ↔ midnight); safety scale untouched; gold reserved as an optional champion accent; Zilla Slab + Inter with tabular figures; star-brand logomark and constellation pedigrees as signature elements.
+
+**v0.9 additions:**
+
+18. **Hosting decided: Option B for everything** (§9) — Netlify + Neon Launch (usage-based Postgres) + Cloudflare R2 + Resend, est. $1–8/mo, with Google Maps on its own free-tier Google Cloud account; self-host path unchanged.

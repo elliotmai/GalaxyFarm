@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Galaxy Farm — screen previews</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#080916; color:#F2EFE6; font-family:'Inter',system-ui,sans-serif; padding:36px 16px 48px; }
+  .wrap { max-width:420px; margin:0 auto; }
+  h1,h2,h3,.slab { font-family:'Zilla Slab','Roboto Slab',Georgia,serif; }
+  .pagehead { text-align:center; margin-bottom:34px; }
+  .star { display:inline-block; }
+  .pagehead h1 { font-size:30px; font-weight:600; letter-spacing:.5px; margin:10px 0 4px; }
+  .pagehead p { font-size:13px; color:#8B90B8; }
+  .caption { text-align:center; font-size:13px; color:#8B90B8; margin:30px 0 12px; }
+  .caption b { color:#C9CBE6; font-weight:600; }
+
+  .phone { width:100%; max-width:372px; margin:0 auto; background:#04050D; border:1px solid #2A2E55; border-radius:46px; padding:10px; box-shadow:0 24px 60px rgba(0,0,0,.55); }
+  .screen { border-radius:37px; overflow:hidden; }
+  .dark { background:#0E1026; color:#F2EFE6; }
+  .light { background:#F8F5EC; color:#24243A; }
+
+  .sbar { display:flex; justify-content:space-between; align-items:center; padding:14px 24px 6px; font-size:12px; font-weight:600; letter-spacing:.3px; }
+  .light .sbar { color:#24243A; }
+  .sdots { letter-spacing:2px; font-size:10px; }
+
+  .appbar { display:flex; align-items:center; justify-content:space-between; padding:10px 20px 4px; }
+  .appbar .brand { display:flex; align-items:center; gap:8px; font-family:'Zilla Slab',serif; font-weight:600; font-size:18px; }
+  .avatar { width:30px; height:30px; border-radius:50%; background:#191C3C; border:1px solid #2E3468; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#8CA3E8; }
+  .light .avatar { background:#fff; border-color:#E4DDCB; color:#35569E; }
+
+  .pad { padding:12px 16px 22px; }
+  .card { background:#191C3C; border-radius:16px; padding:14px 16px; margin-bottom:12px; }
+  .light .card { background:#FFFFFF; border:1px solid #E7E0CE; }
+  .eyebrow { font-size:11px; letter-spacing:1.4px; text-transform:uppercase; color:#8B90B8; font-weight:600; margin-bottom:6px; }
+  .light .eyebrow { color:#8A8672; }
+
+  .row { display:flex; align-items:center; justify-content:space-between; }
+  .muted { color:#8B90B8; } .light .muted { color:#7A7666; }
+  .blue { color:#8CA3E8; } .light .blue { color:#35569E; }
+  .purple { color:#9D85E8; } .light .purple { color:#5F45B0; }
+  .sage { color:#A3BC9C; } .light .sage { color:#67805F; }
+
+  .btn { display:inline-block; background:#8CA3E8; color:#0E1026; font-weight:600; font-size:13px; padding:8px 14px; border-radius:10px; }
+  .light .btn { background:#35569E; color:#fff; }
+  .chip { display:inline-flex; align-items:center; gap:6px; background:#12142E; border:1px solid #262A4E; border-radius:999px; padding:4px 10px; font-size:12px; }
+  .light .chip { background:#FBF9F2; border-color:#E7E0CE; }
+  .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .l1{background:#639922}.l2{background:#97C459}.l3{background:#EF9F27}.l4{background:#D85A30}.l5{background:#E24B4A}
+
+  .prog { height:7px; border-radius:99px; background:#262A4E; overflow:hidden; margin:10px 0 6px; }
+  .prog i { display:block; height:100%; background:#9D85E8; }
+  .light .prog { background:#EDE7D6; } .light .prog i { background:#5F45B0; }
+
+  .stats { display:flex; gap:10px; margin-bottom:12px; }
+  .stat { flex:1; background:#191C3C; border-radius:14px; padding:12px 10px; text-align:center; }
+  .stat b { display:block; font-size:21px; font-weight:600; font-family:'Zilla Slab',serif; }
+  .stat span { font-size:11px; color:#8B90B8; }
+
+  .task { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #23274A; font-size:13.5px; }
+  .task:last-child { border-bottom:none; }
+  .tick { width:20px; height:20px; border-radius:7px; border:1.5px solid #3A3F70; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:12px; }
+  .tick.done { background:#A3BC9C; border-color:#A3BC9C; color:#0E1026; font-weight:700; }
+  .done + span { color:#8B90B8; text-decoration:line-through; }
+
+  .navbar { display:flex; justify-content:space-around; padding:10px 8px 16px; border-top:1px solid #1C2044; font-size:10px; color:#8B90B8; text-align:center; }
+  .light .navbar { border-color:#E7E0CE; color:#8A8672; }
+  .navbar div { width:56px; }
+  .navbar .on { color:#8CA3E8; font-weight:600; }
+  .light .navbar .on { color:#35569E; }
+  .navbar svg { display:block; margin:0 auto 3px; }
+
+  .detail td { padding:6px 0; font-size:13px; }
+  .detail td:first-child { color:#8B90B8; }
+  .detail td:last-child { text-align:right; font-weight:500; }
+
+  .mstep { display:flex; align-items:center; gap:10px; padding:8px 0; font-size:13.5px; }
+  .mdot { width:22px; height:22px; border-radius:50%; border:2px solid #D9D2BD; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:#fff; }
+  .mdot.done { background:#5F45B0; border-color:#5F45B0; font-weight:700; }
+  .mline { flex:1; }
+
+  .kiosk .bigbtn { background:#191C3C; border:1px solid #2E3468; border-radius:18px; padding:18px 8px; text-align:center; }
+  .kiosk .bigbtn b { font-size:26px; font-family:'Zilla Slab',serif; display:block; }
+  .kiosk .bigbtn span { font-size:11px; color:#8B90B8; }
+
+  footer { text-align:center; font-size:12px; color:#575C86; margin-top:36px; line-height:1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="pagehead">
+    <svg class="star" width="44" height="44" viewBox="0 0 44 44" fill="none">
+      <path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/>
+      <circle cx="22" cy="22" r="3.2" fill="#F2EFE6"/>
+    </svg>
+    <h1>Galaxy Farm</h1>
+    <p>Screen previews · Midnight Nebula &amp; Bluebonnet Linen · spec v0.8</p>
+  </div>
+  <p class="caption"><b>Admin dashboard</b> — 6 a.m., coffee in hand</p>
+  <div class="phone"><div class="screen dark">
+    <div class="sbar"><span>6:12</span><span class="sdots">●●●●</span></div>
+    <div class="appbar">
+      <div class="brand"><svg width="18" height="18" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+      <div class="avatar">GF</div>
+    </div>
+    <div class="pad">
+      <div class="card" style="border:1px solid #3A2F6E;">
+        <div class="eyebrow purple">Calving watch</div>
+        <div class="row"><b class="slab" style="font-size:19px;">Andromeda</b><span style="font-size:13px;" class="muted">due Sep 14</span></div>
+        <div class="prog"><i style="width:87%;"></i></div>
+        <div class="row" style="font-size:12px;"><span class="muted">Day 248 of 283</span><span class="purple" style="font-weight:600;">35 days</span></div>
+        <div style="margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;">
+          <span class="chip"><span class="purple">☾</span>Full moon Aug 28</span>
+          <span class="chip"><span class="blue">▾</span>Pressure steady</span>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b class="sage">1</b><span>Egg today</span></div>
+        <div class="stat"><b>1</b><span>Head of cattle</span></div>
+        <div class="stat"><b class="blue">2/4</b><span>Chores done</span></div>
+      </div>
+      <div class="card">
+        <div class="eyebrow">This morning</div>
+        <div class="task"><span class="tick done">✓</span><span>Check Andromeda's water &amp; feed</span></div>
+        <div class="task"><span class="tick done">✓</span><span>Feed Pepsi &amp; Sierra (barn)</span></div>
+        <div class="task"><span class="tick"></span><span>Collect eggs — Coop 1</span></div>
+        <div class="task"><span class="tick"></span><span>Walk Halsey</span></div>
+      </div>
+      <div class="card row" style="border-left:3px solid #EF9F27; border-radius:6px 16px 16px 6px;">
+        <div><b style="font-size:13.5px;">Square bales running low</b><br><span class="muted" style="font-size:12px;">~12 days left · reorder by Aug 17</span></div>
+        <span class="btn" style="background:#191C3C; color:#8CA3E8; border:1px solid #2E3468;">Log buy</span>
+      </div>
+    </div>
+    <div class="navbar">
+      <div class="on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8CA3E8" stroke-width="2"><path d="M3 11 12 4l9 7v9H3z"/></svg>Home</div>
+      <div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B90B8" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 12h18M12 3v18"/></svg>Map</div>
+      <div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B90B8" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>Calendar</div>
+      <div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B90B8" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>More</div>
+    </div>
+  </div></div>
+
+  <p class="caption"><b>Pen Board</b> — the property map, live</p>
+  <div class="phone"><div class="screen dark">
+    <div class="sbar"><span>6:14</span><span class="sdots">●●●●</span></div>
+    <div class="appbar"><div class="brand">Pen Board</div><div class="avatar">GF</div></div>
+    <div class="pad">
+      <svg width="100%" viewBox="0 0 328 336" style="display:block;">
+        <rect x="2" y="2" width="324" height="332" rx="14" fill="#12142E" stroke="#23274A"/>
+        <rect x="14" y="14" width="196" height="150" rx="10" fill="#191C3C" stroke="#97C459" stroke-width="2"/>
+        <text x="24" y="34" fill="#8B90B8" font-size="11" font-family="Inter,sans-serif">NORTH PASTURE · L2</text>
+        <g><rect x="24" y="46" width="112" height="26" rx="13" fill="#0E1026" stroke="#2E3468"/>
+          <circle cx="40" cy="59" r="5" fill="#97C459"/>
+          <text x="50" y="63" fill="#F2EFE6" font-size="12" font-weight="600" font-family="Inter,sans-serif">Andromeda</text></g>
+        <text x="24" y="92" fill="#575C86" font-size="10" font-family="Inter,sans-serif">bred · due Sep 14 · red roan</text>
+        <rect x="222" y="14" width="92" height="70" rx="10" fill="#191C3C" stroke="#639922" stroke-width="2"/>
+        <text x="232" y="34" fill="#8B90B8" font-size="11" font-family="Inter,sans-serif">COOP 1 · L1</text>
+        <g><rect x="232" y="44" width="72" height="24" rx="12" fill="#0E1026" stroke="#2E3468"/>
+          <circle cx="246" cy="56" r="5" fill="#639922"/>
+          <text x="255" y="60" fill="#F2EFE6" font-size="11" font-family="Inter,sans-serif">Flock ×1</text></g>
+        <rect x="222" y="96" width="92" height="98" rx="10" fill="#191C3C" stroke="#639922" stroke-width="2"/>
+        <text x="232" y="116" fill="#8B90B8" font-size="11" font-family="Inter,sans-serif">BARN · L1</text>
+        <g><rect x="232" y="126" width="64" height="24" rx="12" fill="#0E1026" stroke="#2E3468"/>
+          <circle cx="246" cy="138" r="5" fill="#639922"/>
+          <text x="255" y="142" fill="#F2EFE6" font-size="11" font-family="Inter,sans-serif">Pepsi</text></g>
+        <g><rect x="232" y="156" width="66" height="24" rx="12" fill="#0E1026" stroke="#2E3468"/>
+          <circle cx="246" cy="168" r="5" fill="#639922"/>
+          <text x="255" y="172" fill="#F2EFE6" font-size="11" font-family="Inter,sans-serif">Sierra</text></g>
+        <rect x="14" y="176" width="196" height="76" rx="10" fill="#191C3C" stroke="#3A3F70" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <text x="24" y="196" fill="#8B90B8" font-size="11" font-family="Inter,sans-serif">SOUTH PASTURE · resting</text>
+        <text x="24" y="216" fill="#67805F" font-size="10" font-family="Inter,sans-serif">overseeded rye · keep stock off</text>
+        <rect x="14" y="264" width="140" height="58" rx="10" fill="#191C3C" stroke="#639922" stroke-width="2"/>
+        <text x="24" y="284" fill="#8B90B8" font-size="11" font-family="Inter,sans-serif">HOUSE · L1</text>
+        <g><rect x="24" y="292" width="62" height="22" rx="11" fill="#0E1026" stroke="#2E3468"/>
+          <text x="34" y="307" fill="#F2EFE6" font-size="11" font-family="Inter,sans-serif">Halsey</text></g>
+        <g><rect x="92" y="292" width="56" height="22" rx="11" fill="#0E1026" stroke="#2E3468"/>
+          <text x="102" y="307" fill="#F2EFE6" font-size="11" font-family="Inter,sans-serif">Jeaux</text></g>
+        <rect x="166" y="264" width="148" height="58" rx="10" fill="#12142E" stroke="#23274A"/>
+        <text x="178" y="286" fill="#575C86" font-size="10" font-family="Inter,sans-serif">SHOW BARN · Phase 5</text>
+        <text x="178" y="302" fill="#575C86" font-size="10" font-family="Inter,sans-serif">reserved for the program</text>
+      </svg>
+      <div style="display:flex; gap:8px; margin-top:12px; align-items:center; font-size:11px;" class="muted">
+        Safety
+        <span class="dot l1"></span><span class="dot l2"></span><span class="dot l3"></span><span class="dot l4"></span><span class="dot l5"></span>
+        <span style="margin-left:auto;">drag to move animals</span>
+      </div>
+    </div>
+    <div class="navbar">
+      <div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B90B8" stroke-width="2"><path d="M3 11 12 4l9 7v9H3z"/></svg>Home</div>
+      <div class="on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8CA3E8" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 12h18M12 3v18"/></svg>Map</div>
+      <div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B90B8" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>Calendar</div>
+      <div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B90B8" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>More</div>
+    </div>
+  </div></div>
+
+  <p class="caption"><b>Andromeda's profile</b> — pedigree as constellation</p>
+  <div class="phone"><div class="screen dark">
+    <div class="sbar"><span>6:15</span><span class="sdots">●●●●</span></div>
+    <div class="appbar"><div class="brand">‹ &nbsp;Cattle</div><div class="avatar">GF</div></div>
+    <div class="pad">
+      <div class="row" style="margin:2px 2px 12px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="width:52px;height:52px;border-radius:50%;background:#5A2E28;border:2px solid #8C5148;display:flex;align-items:center;justify-content:center;font-family:'Zilla Slab',serif;font-weight:600;color:#F2EFE6;">A1</div>
+          <div><b class="slab" style="font-size:21px;">Andromeda</b><br><span class="muted" style="font-size:12px;">Maine-Anjou × Shorthorn · red roan</span></div>
+        </div>
+        <span class="chip"><span class="dot l2"></span>L2</span>
+      </div>
+      <div class="card">
+        <div class="eyebrow purple">Constellation pedigree</div>
+        <svg width="100%" viewBox="0 0 296 178" style="display:block;">
+          <circle cx="30" cy="22" r="1" fill="#575C86"/><circle cx="262" cy="14" r="1.4" fill="#575C86"/>
+          <circle cx="120" cy="10" r="1" fill="#575C86"/><circle cx="200" cy="30" r="1" fill="#575C86"/>
+          <circle cx="18" cy="120" r="1.2" fill="#575C86"/><circle cx="282" cy="130" r="1" fill="#575C86"/>
+          <path d="M148 140 L84 88 M148 140 L212 88 M84 88 L44 38 M84 88 L124 38 M212 88 L172 38 M212 88 L252 38" stroke="#9D85E8" stroke-opacity=".45" stroke-width="1.2"/>
+          <g fill="#9D85E8"><circle cx="44" cy="38" r="3.4"/><circle cx="124" cy="38" r="3.4"/><circle cx="172" cy="38" r="3.4"/><circle cx="252" cy="38" r="3.4"/></g>
+          <g fill="#8CA3E8"><circle cx="84" cy="88" r="4.6"/><circle cx="212" cy="88" r="4.6"/></g>
+          <path d="M148 128 L150.6 137.4 L160 140 L150.6 142.6 L148 152 L145.4 142.6 L136 140 L145.4 137.4 Z" fill="#F2EFE6"/>
+          <text x="44" y="24" text-anchor="middle" fill="#8B90B8" font-size="9" font-family="Inter,sans-serif">Maine Express</text>
+          <text x="124" y="24" text-anchor="middle" fill="#8B90B8" font-size="9" font-family="Inter,sans-serif">Cassiopeia 7</text>
+          <text x="172" y="24" text-anchor="middle" fill="#8B90B8" font-size="9" font-family="Inter,sans-serif">Red Baron</text>
+          <text x="252" y="24" text-anchor="middle" fill="#8B90B8" font-size="9" font-family="Inter,sans-serif">Dynasty 18</text>
+          <text x="66" y="107" text-anchor="middle" fill="#C9CBE6" font-size="10" font-family="Inter,sans-serif">Stellar Cargo</text>
+          <text x="232" y="107" text-anchor="middle" fill="#C9CBE6" font-size="10" font-family="Inter,sans-serif">Roan Dynasty 42</text>
+          <text x="148" y="170" text-anchor="middle" fill="#F2EFE6" font-size="12" font-weight="600" font-family="Inter,sans-serif">Andromeda</text>
+        </svg>
+      </div>
+      <div class="card">
+        <table class="detail" width="100%">
+          <tr><td>Status</td><td class="purple">Bred · due Sep 14</td></tr>
+          <tr><td>Registrations</td><td>AMAA · ASA</td></tr>
+          <tr><td>Birth weight</td><td>74 lb</td></tr>
+          <tr><td>Last vaccination</td><td>Jun 2 · no withdrawal</td></tr>
+          <tr><td>Pen</td><td>North Pasture</td></tr>
+          <tr><td>Feed plan</td><td class="sage">Custom mix · 2× daily</td></tr>
+        </table>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <span class="btn" style="flex:1; text-align:center;">Log weight</span>
+        <span class="btn" style="flex:1; text-align:center; background:#191C3C; color:#8CA3E8; border:1px solid #2E3468;">Health record</span>
+      </div>
+    </div>
+  </div></div>
+
+  <p class="caption"><b>Customer portal</b> — the future business, in Bluebonnet Linen</p>
+  <div class="phone"><div class="screen light">
+    <div class="sbar"><span>4:30</span><span class="sdots">●●●●</span></div>
+    <div class="appbar">
+      <div class="brand"><svg width="18" height="18" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#5F45B0"/></svg>Your calves</div>
+      <div class="avatar">SK</div>
+    </div>
+    <div class="pad">
+      <div class="card">
+        <div class="row" style="margin-bottom:6px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:44px;height:44px;border-radius:50%;background:#2B2B33;display:flex;align-items:center;justify-content:center;color:#F8F5EC;font-family:'Zilla Slab',serif;font-weight:600;">C</div>
+            <div><b class="slab" style="font-size:18px;">Comet</b><br><span class="muted" style="font-size:12px;">steer · dropped off Jul 12</span></div>
+          </div>
+          <span class="chip"><span class="dot" style="background:#111; border:1px solid #C7C2B4;"></span>halter</span>
+        </div>
+        <div class="eyebrow" style="margin-top:10px;">Training milestones</div>
+        <div class="mstep"><span class="mdot done">✓</span><span class="mline">Haltered</span><span class="muted" style="font-size:11px;">Jul 15</span></div>
+        <div class="mstep"><span class="mdot done">✓</span><span class="mline">Leads</span><span class="muted" style="font-size:11px;">Jul 29</span></div>
+        <div class="mstep"><span class="mdot" style="border-color:#5F45B0;"></span><span class="mline">Sets up</span><span class="purple" style="font-size:11px; font-weight:600;">in progress</span></div>
+        <div class="mstep"><span class="mdot"></span><span class="mline muted">Washed &amp; blown</span></div>
+        <div class="mstep"><span class="mdot"></span><span class="mline muted">Loads</span></div>
+      </div>
+      <div class="card row">
+        <div><b style="font-size:13.5px;">August board &amp; feed</b><br><span class="muted" style="font-size:12px;">Invoice #014 · due Sep 1</span></div>
+        <span class="btn">View invoice</span>
+      </div>
+      <div class="card row">
+        <div><b style="font-size:13.5px;" class="sage">✓ Liability form signed</b><br><span class="muted" style="font-size:12px;">Jul 10 · v2 on file</span></div>
+        <span style="font-size:12px;" class="blue">View</span>
+      </div>
+      <div style="text-align:center; font-size:11px;" class="muted">Estimated pickup · Nov 20</div>
+    </div>
+    <div class="navbar">
+      <div class="on">Calves</div><div>Shows</div><div>Invoices</div><div>Forms</div>
+    </div>
+  </div></div>
+
+  <p class="caption"><b>Kiosk — egg quick-entry</b> — mounted at Coop 1</p>
+  <div class="phone kiosk"><div class="screen dark">
+    <div class="pad" style="padding-top:22px;">
+      <div class="row" style="margin-bottom:14px;">
+        <b class="slab" style="font-size:20px;">Coop 1</b>
+        <span class="chip"><span class="dot l1"></span>Australorps ×1</span>
+      </div>
+      <div class="card" style="text-align:center; padding:20px;">
+        <span class="eyebrow">Today</span>
+        <b class="slab" style="font-size:52px; line-height:1;">1</b>
+        <div class="muted" style="font-size:12px; margin-top:4px;">egg collected · nice work, girl</div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div class="bigbtn"><b class="blue">+1</b><span>Brown · large</span></div>
+        <div class="bigbtn"><b class="blue">+1</b><span>Brown · medium</span></div>
+        <div class="bigbtn"><b class="purple">+1</b><span>Other color</span></div>
+        <div class="bigbtn"><b class="sage">Details</b><span>size &amp; notes</span></div>
+      </div>
+    </div>
+  </div></div>
+
+
+<style>
+.sect{text-align:center;margin:46px 0 2px;font-size:12px;letter-spacing:2.6px;text-transform:uppercase;color:#575C86;font-weight:600;}
+.browser{background:#04050D;border:1px solid #2A2E55;border-radius:16px;overflow:hidden;margin:0 auto;box-shadow:0 20px 50px rgba(0,0,0,.5);}
+.bchrome{display:flex;align-items:center;gap:7px;padding:11px 14px;background:#0B0C1C;border-bottom:1px solid #1C2044;}
+.b{width:10px;height:10px;border-radius:50%;}
+.url{margin-left:10px;background:#12142E;border:1px solid #23274A;color:#8B90B8;font-size:11.5px;padding:4px 12px;border-radius:99px;font-family:Inter,sans-serif;}
+.deskwrap{width:100%;overflow:hidden;}
+.desk{width:1160px;background:#0E1026;color:#F2EFE6;transform-origin:top left;}
+.dtop{display:flex;align-items:center;gap:26px;padding:14px 28px;border-bottom:1px solid #1C2044;}
+.dbrand{display:flex;align-items:center;gap:8px;font-family:'Zilla Slab',serif;font-weight:600;font-size:17px;}
+.dtabs{display:flex;gap:20px;font-size:13px;color:#8B90B8;}
+.dtabs span{padding:6px 2px;}
+.dtabs .on{color:#F2EFE6;border-bottom:2px solid #8CA3E8;}
+.dtop .avatar{margin-left:auto;}
+.dmain{padding:22px 28px 30px;}
+.dhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.dhead h2{font-size:22px;font-weight:600;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{text-align:left;color:#8B90B8;font-weight:600;font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;padding:8px 12px;border-bottom:1px solid #23274A;}
+.tbl td{padding:11px 12px;border-bottom:1px solid #1B1E3E;}
+.bar{height:6px;background:#262A4E;border-radius:99px;overflow:hidden;min-width:90px;}
+.bar i{display:block;height:100%;border-radius:99px;}
+.tag{display:inline-block;font-size:11px;padding:3px 9px;border-radius:99px;border:1px solid #2E3468;background:#12142E;color:#C9CBE6;white-space:nowrap;}
+.tag.amber{color:#EF9F27;border-color:#4C3A12;}
+.tag.sage{color:#A3BC9C;border-color:#2C3A2A;}
+.tag.purple{color:#9D85E8;border-color:#3A2F6E;}
+.tag.blue{color:#8CA3E8;border-color:#25315E;}
+.tag.red{color:#E24B4A;border-color:#4A1B1B;}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;font-size:11px;}
+.cal .dow{color:#575C86;text-align:center;font-size:10px;letter-spacing:1px;}
+.cal .d{background:#12142E;border:1px solid #1C2044;border-radius:8px;min-height:58px;padding:5px 6px;color:#8B90B8;}
+.cal .ev{display:block;font-size:9.5px;margin-top:3px;line-height:1.3;}
+.cell{border:1px solid #23274A;border-radius:10px;padding:12px 8px;text-align:center;font-size:14px;color:#575C86;}
+.cell.done{background:#1D2B22;color:#A3BC9C;border-color:#2C3A2A;font-weight:600;}
+.tv{background:#04050D;border:1px solid #2A2E55;border-radius:18px;padding:12px;box-shadow:0 20px 50px rgba(0,0,0,.5);}
+</style>
+
+<p class="sect">Admin · desktop</p>
+
+<p class="caption"><b>Herd</b> — the cattle registry</p>
+<div class="browser"><div class="bchrome"><span class="b" style="background:#E24B4A"></span><span class="b" style="background:#EF9F27"></span><span class="b" style="background:#639922"></span><span class="url">galaxyfarm.com/admin/cattle</span></div>
+<div class="deskwrap"><div class="desk">
+  <div class="dtop"><div class="dbrand"><svg width="16" height="16" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+    <div class="dtabs"><span class="on">Cattle</span><span>Feed</span><span>Map</span><span>Garden</span><span>Equipment</span><span>Calendar</span><span>Reports</span></div><div class="avatar">GF</div></div>
+  <div class="dmain">
+    <div class="dhead"><h2 class="slab">Herd</h2><span class="btn">Add animal</span></div>
+    <div class="grid3" style="margin-bottom:16px;">
+      <div class="stat"><b>1</b><span>Head on the ground</span></div>
+      <div class="stat"><b class="purple">1</b><span>Bred · due Sep 14</span></div>
+      <div class="stat"><b class="blue">20</b><span>Roadmap target · 2031</span></div>
+    </div>
+    <table class="tbl">
+      <tr><th>Tag</th><th>Name</th><th>Breed</th><th>Sex</th><th>Status</th><th>Pen</th><th>Safety</th></tr>
+      <tr><td class="mono">A1</td><td style="font-weight:600;">Andromeda</td><td>Maine-Anjou × Shorthorn · red roan</td><td>Cow</td><td><span class="tag purple">Bred · due Sep 14</span></td><td>North Pasture</td><td><span class="dot l2"></span></td></tr>
+      <tr><td class="mono muted">—</td><td class="purple" style="font-style:italic;">✦ First calf</td><td class="muted">Andromeda × Stellar Cargo</td><td class="muted">?</td><td><span class="tag">arriving September</span></td><td class="muted">—</td><td class="muted">—</td></tr>
+    </table>
+  </div>
+</div></div></div>
+
+<p class="caption"><b>Breeding hub</b> — tank, protocols, records</p>
+<div class="browser"><div class="bchrome"><span class="b" style="background:#E24B4A"></span><span class="b" style="background:#EF9F27"></span><span class="b" style="background:#639922"></span><span class="url">galaxyfarm.com/admin/cattle/breeding</span></div>
+<div class="deskwrap"><div class="desk">
+  <div class="dtop"><div class="dbrand"><svg width="16" height="16" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+    <div class="dtabs"><span class="on">Cattle</span><span>Feed</span><span>Map</span><span>Garden</span><span>Equipment</span><span>Calendar</span><span>Reports</span></div><div class="avatar">GF</div></div>
+  <div class="dmain">
+    <div class="dhead"><h2 class="slab">Breeding</h2><span class="btn">Record breeding</span></div>
+    <div class="grid2" style="margin-bottom:14px;">
+      <div class="card"><div class="eyebrow blue">Semen tank · canister 2</div>
+        <div class="row" style="padding:6px 0; border-bottom:1px solid #23274A;"><span>Stellar Cargo <span class="muted">· Maine-Anjou</span></span><b class="mono">4 straws</b></div>
+        <div class="row" style="padding:6px 0;"><span>Solar Wind <span class="muted">· Shorthorn</span></span><b class="mono">2 straws</b></div>
+      </div>
+      <div class="card"><div class="eyebrow purple">Protocol · CO-Synch + CIDR</div>
+        <div style="font-size:12.5px; line-height:2;">
+          <span class="tag sage">Day 0 · CIDR in ✓</span> &nbsp;<span class="tag sage">Day 7 · CIDR out + Lut ✓</span> &nbsp;<span class="tag purple">Day 9–10 · timed AI ✓</span>
+        </div>
+        <div class="muted" style="font-size:11.5px; margin-top:6px;">last run Dec 2025 · reusable for spring group</div>
+      </div>
+    </div>
+    <table class="tbl">
+      <tr><th>Dam</th><th>Method</th><th>Sire</th><th>Date</th><th>Preg check</th><th>Due</th></tr>
+      <tr><td style="font-weight:600;">Andromeda</td><td>AI</td><td>Stellar Cargo</td><td class="mono">Dec 5, 2025</td><td><span class="tag sage">✓ confirmed Jan 9</span></td><td class="mono purple">Sep 14, 2026</td></tr>
+    </table>
+  </div>
+</div></div></div>
+
+<p class="caption"><b>Health</b> — withdrawal board &amp; med inventory</p>
+<div class="browser"><div class="bchrome"><span class="b" style="background:#E24B4A"></span><span class="b" style="background:#EF9F27"></span><span class="b" style="background:#639922"></span><span class="url">galaxyfarm.com/admin/cattle/health</span></div>
+<div class="deskwrap"><div class="desk">
+  <div class="dtop"><div class="dbrand"><svg width="16" height="16" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+    <div class="dtabs"><span class="on">Cattle</span><span>Feed</span><span>Map</span><span>Garden</span><span>Equipment</span><span>Calendar</span><span>Reports</span></div><div class="avatar">GF</div></div>
+  <div class="dmain">
+    <div class="dhead"><h2 class="slab">Health</h2><span class="btn">Log treatment</span></div>
+    <div class="grid2" style="margin-bottom:14px;">
+      <div class="card" style="border:1px solid #2C3A2A;"><div class="eyebrow sage">Withdrawal board</div>
+        <b class="sage" style="font-size:16px;">All clear</b><div class="muted" style="font-size:12px;">no active withdrawal periods on any animal</div></div>
+      <div class="card" style="border:1px solid #4C3A12;"><div class="eyebrow amber" style="color:#EF9F27;">Coming due</div>
+        <b style="font-size:14px;">Andromeda — pre-calving booster</b><div class="muted" style="font-size:12px;">due Aug 17 · scours protection for the calf</div></div>
+    </div>
+    <table class="tbl">
+      <tr><th>Product</th><th>On hand</th><th>Expires</th><th>Withdrawal</th></tr>
+      <tr><td>Scour booster</td><td class="mono">3 doses</td><td class="mono">Mar 2027</td><td class="muted">none</td></tr>
+      <tr><td>LA-300</td><td class="mono">1 bottle</td><td><span class="tag amber">Nov 2026 — expiring</span></td><td class="mono">28 days</td></tr>
+      <tr><td>Dewormer pour-on</td><td class="mono">2.4 L</td><td class="mono">Aug 2028</td><td class="mono">48 days</td></tr>
+    </table>
+  </div>
+</div></div></div>
+
+<p class="caption"><b>Feed</b> — inventory, run-out math, cost per head</p>
+<div class="browser"><div class="bchrome"><span class="b" style="background:#E24B4A"></span><span class="b" style="background:#EF9F27"></span><span class="b" style="background:#639922"></span><span class="url">galaxyfarm.com/admin/feed</span></div>
+<div class="deskwrap"><div class="desk">
+  <div class="dtop"><div class="dbrand"><svg width="16" height="16" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+    <div class="dtabs"><span>Cattle</span><span class="on">Feed</span><span>Map</span><span>Garden</span><span>Equipment</span><span>Calendar</span><span>Reports</span></div><div class="avatar">GF</div></div>
+  <div class="dmain">
+    <div class="dhead"><h2 class="slab">Feed &amp; supplies</h2><span class="btn">Log purchase</span></div>
+    <table class="tbl" style="margin-bottom:14px;">
+      <tr><th>Feed</th><th>On hand</th><th>Daily use</th><th>Runway</th><th>Reorder</th></tr>
+      <tr><td>Square bales</td><td class="mono">18</td><td class="mono">1.5 / day</td><td><div class="bar"><i style="width:24%;background:#EF9F27;"></i></div></td><td><span class="tag amber">12 days · buy by Aug 17</span></td></tr>
+      <tr><td>Round bales</td><td class="mono">6</td><td class="mono">0.15 / day</td><td><div class="bar"><i style="width:70%;background:#A3BC9C;"></i></div></td><td class="muted">~40 days</td></tr>
+      <tr><td>14% grain · bags</td><td class="mono">9</td><td class="mono">0.3 / day</td><td><div class="bar"><i style="width:55%;background:#A3BC9C;"></i></div></td><td class="muted">~30 days</td></tr>
+      <tr><td>Mineral block</td><td class="mono">2</td><td class="mono">—</td><td><div class="bar"><i style="width:90%;background:#A3BC9C;"></i></div></td><td class="muted">~90 days</td></tr>
+    </table>
+    <div class="grid3">
+      <div class="stat"><b class="mono">$2.38</b><span>Cost per head · day</span></div>
+      <div class="stat"><b class="mono">$214</b><span>Feed spend · Aug</span></div>
+      <div class="stat"><b class="amber" style="color:#EF9F27;">1</b><span>Supply low-stock: shavings</span></div>
+    </div>
+  </div>
+</div></div></div>
+
+<p class="caption"><b>Garden designer</b> — beds, rotation guard, season plan</p>
+<div class="browser"><div class="bchrome"><span class="b" style="background:#E24B4A"></span><span class="b" style="background:#EF9F27"></span><span class="b" style="background:#639922"></span><span class="url">galaxyfarm.com/admin/garden/layout</span></div>
+<div class="deskwrap"><div class="desk">
+  <div class="dtop"><div class="dbrand"><svg width="16" height="16" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+    <div class="dtabs"><span>Cattle</span><span>Feed</span><span>Map</span><span class="on">Garden</span><span>Equipment</span><span>Calendar</span><span>Reports</span></div><div class="avatar">GF</div></div>
+  <div class="dmain">
+    <div class="dhead"><h2 class="slab">Garden layout</h2><span class="tag blue">Season plan: fall 2026</span></div>
+    <div class="card row" style="border:1px solid #25315E; margin-bottom:14px;">
+      <span style="font-size:13px;"><b class="blue">Planting window opens Aug 20</b> — direct-sow okra &amp; squash (zone 8b)</span><span class="btn">Plan it</span>
+    </div>
+    <div style="display:flex; gap:14px;">
+      <div style="width:180px;">
+        <div class="card" style="padding:12px;"><div class="eyebrow">Palette</div>
+          <div class="tag" style="display:block; text-align:center; margin-bottom:8px; padding:8px;">▭ Raised bed</div>
+          <div class="tag" style="display:block; text-align:center; margin-bottom:8px; padding:8px;">≡ Row</div>
+          <div class="tag sage" style="display:block; text-align:center; padding:8px;">✦ Plant</div>
+        </div>
+      </div>
+      <div style="flex:1;">
+        <svg width="100%" viewBox="0 0 860 300" style="display:block; background:#12142E; border:1px solid #23274A; border-radius:12px;">
+          <defs></defs>
+          <g stroke="#1B1E3E" stroke-width="1"><path d="M0 60H860M0 120H860M0 180H860M0 240H860M86 0V300M172 0V300M258 0V300M344 0V300M430 0V300M516 0V300M602 0V300M688 0V300M774 0V300"/></g>
+          <rect x="40" y="40" width="220" height="90" rx="8" fill="#1D2B22" stroke="#67805F" stroke-width="2"/>
+          <text x="56" y="66" fill="#A3BC9C" font-size="13" font-family="Inter,sans-serif" font-weight="600">Bed 1 · tomatoes</text>
+          <text x="56" y="86" fill="#8B90B8" font-size="11" font-family="Inter,sans-serif">planted Mar 20 · winding down</text>
+          <rect x="52" y="98" width="150" height="18" rx="9" fill="#4C3A12"/>
+          <text x="62" y="111" fill="#EF9F27" font-size="10.5" font-family="Inter,sans-serif">⚠ nightshades 2 yrs — rotate</text>
+          <rect x="300" y="40" width="220" height="90" rx="8" fill="#1D2B22" stroke="#67805F" stroke-width="2"/>
+          <text x="316" y="66" fill="#A3BC9C" font-size="13" font-family="Inter,sans-serif" font-weight="600">Bed 2 · okra</text>
+          <text x="316" y="86" fill="#8B90B8" font-size="11" font-family="Inter,sans-serif">harvesting · 14 lb so far</text>
+          <rect x="560" y="40" width="220" height="90" rx="8" fill="#12142E" stroke="#3A3F70" stroke-width="2" stroke-dasharray="6 4"/>
+          <text x="576" y="66" fill="#8B90B8" font-size="13" font-family="Inter,sans-serif">Bed 3 · open</text>
+          <text x="576" y="86" fill="#8CA3E8" font-size="11" font-family="Inter,sans-serif">suggested: fall greens</text>
+          <rect x="40" y="170" width="740" height="52" rx="8" fill="#191C3C" stroke="#3A3F70" stroke-width="1.5"/>
+          <text x="56" y="192" fill="#C9CBE6" font-size="12" font-family="Inter,sans-serif" font-weight="600">Row A · sweet corn (spent)</text>
+          <text x="56" y="210" fill="#575C86" font-size="10.5" font-family="Inter,sans-serif">clear by Sep · compost stalks</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div></div></div>
+
+<p class="caption"><b>Equipment</b> — fleet &amp; the wishlist</p>
+<div class="browser"><div class="bchrome"><span class="b" style="background:#E24B4A"></span><span class="b" style="background:#EF9F27"></span><span class="b" style="background:#639922"></span><span class="url">galaxyfarm.com/admin/equipment</span></div>
+<div class="deskwrap"><div class="desk">
+  <div class="dtop"><div class="dbrand"><svg width="16" height="16" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+    <div class="dtabs"><span>Cattle</span><span>Feed</span><span>Map</span><span>Garden</span><span class="on">Equipment</span><span>Calendar</span><span>Reports</span></div><div class="avatar">GF</div></div>
+  <div class="dmain">
+    <div class="dhead"><h2 class="slab">Equipment</h2><span class="btn">Add equipment</span></div>
+    <div class="grid2" style="margin-bottom:14px;">
+      <div class="card">
+        <div style="height:74px; background:#12142E; border:1px solid #23274A; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#575C86; font-size:11px; margin-bottom:10px;">photo</div>
+        <b style="font-size:14px;">Gooseneck cattle trailer</b>
+        <div class="muted" style="font-size:12px; margin:2px 0 8px;">24 ft · 2019</div>
+        <span class="tag amber">Bearing repack due · 6 mo</span> <span class="tag">Manual on file</span>
+      </div>
+      <div class="card">
+        <div style="height:74px; background:#12142E; border:1px solid #23274A; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#575C86; font-size:11px; margin-bottom:10px;">photo</div>
+        <b style="font-size:14px;">Hay bale buggy</b>
+        <div class="muted" style="font-size:12px; margin:2px 0 8px;">truck hitch</div>
+        <span class="tag sage">Greased Jul 22 ✓</span>
+      </div>
+    </div>
+    <div class="card"><div class="eyebrow purple">Roadmap</div>
+      <div class="row" style="padding:8px 0; border-bottom:1px solid #23274A;"><span><b>Truck</b> <span class="tag red" style="margin-left:8px;">need · ASAP</span></span><span class="mono muted">target $38,000</span></div>
+      <div class="row" style="padding:8px 0; border-bottom:1px solid #23274A;"><span><b>Tractor</b> <span class="tag" style="margin-left:8px;">want</span></span><span class="mono muted">target $28,000</span></div>
+      <div class="row" style="padding:8px 0;"><span><b>ATV</b> <span class="tag" style="margin-left:8px;">want</span></span><span class="mono muted">target $9,000</span></div>
+    </div>
+  </div>
+</div></div></div>
+
+<p class="caption"><b>Calendar</b> — everything, one grid</p>
+<div class="browser"><div class="bchrome"><span class="b" style="background:#E24B4A"></span><span class="b" style="background:#EF9F27"></span><span class="b" style="background:#639922"></span><span class="url">galaxyfarm.com/admin/calendar</span></div>
+<div class="deskwrap"><div class="desk">
+  <div class="dtop"><div class="dbrand"><svg width="16" height="16" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+    <div class="dtabs"><span>Cattle</span><span>Feed</span><span>Map</span><span>Garden</span><span>Equipment</span><span class="on">Calendar</span><span>Reports</span></div><div class="avatar">GF</div></div>
+  <div class="dmain">
+    <div class="dhead"><h2 class="slab">August 2026</h2><div><span class="tag blue">All modules</span> <span class="tag">Cattle</span> <span class="tag">Garden</span> <span class="tag">Chores</span></div></div>
+    <div class="cal">
+      <span class="dow">SUN</span><span class="dow">MON</span><span class="dow">TUE</span><span class="dow">WED</span><span class="dow">THU</span><span class="dow">FRI</span><span class="dow">SAT</span>
+      <div class="d">26</div><div class="d">27</div><div class="d">28</div><div class="d">29</div><div class="d">30</div><div class="d">31</div><div class="d">1</div>
+      <div class="d">2</div><div class="d">3<span class="ev sage">overseeded S. pasture</span></div><div class="d">4</div><div class="d">5</div><div class="d">6</div><div class="d">7</div><div class="d">8</div>
+      <div class="d">9</div><div class="d" style="border-color:#8CA3E8;">10<span class="ev blue">today</span></div><div class="d">11</div><div class="d">12</div><div class="d">13</div><div class="d">14</div><div class="d">15</div>
+      <div class="d">16</div><div class="d">17<span class="ev" style="color:#EF9F27;">buy hay · booster</span></div><div class="d">18</div><div class="d">19</div><div class="d">20<span class="ev blue">sow window opens</span></div><div class="d">21</div><div class="d">22</div>
+      <div class="d">23</div><div class="d">24</div><div class="d">25</div><div class="d">26</div><div class="d">27</div><div class="d">28<span class="ev purple">☾ full moon</span></div><div class="d">29</div>
+      <div class="d">30</div><div class="d">31<span class="ev purple">calving window opens</span></div><div class="d muted">1</div><div class="d muted">2</div><div class="d muted">3</div><div class="d muted">4</div><div class="d muted">5</div>
+    </div>
+  </div>
+</div></div></div>
+
+<p class="caption"><b>Reports</b> — where the money went</p>
+<div class="browser"><div class="bchrome"><span class="b" style="background:#E24B4A"></span><span class="b" style="background:#EF9F27"></span><span class="b" style="background:#639922"></span><span class="url">galaxyfarm.com/admin/reports</span></div>
+<div class="deskwrap"><div class="desk">
+  <div class="dtop"><div class="dbrand"><svg width="16" height="16" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+    <div class="dtabs"><span>Cattle</span><span>Feed</span><span>Map</span><span>Garden</span><span>Equipment</span><span>Calendar</span><span class="on">Reports</span></div><div class="avatar">GF</div></div>
+  <div class="dmain">
+    <div class="dhead"><h2 class="slab">Reports</h2><span class="tag">Export CSV</span></div>
+    <div class="grid3" style="margin-bottom:14px;">
+      <div class="stat"><b class="mono">$71</b><span>Cost per head · Aug</span></div>
+      <div class="stat"><b class="mono">$487</b><span>Operating cost · Aug</span></div>
+      <div class="stat"><b class="mono sage">27</b><span>Eggs · Aug (one hen!)</span></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><div class="eyebrow">Feed spend by month</div>
+        <div style="display:flex; align-items:flex-end; gap:14px; height:110px; padding-top:8px;">
+          <div style="flex:1; text-align:center;"><div style="height:52%; background:#25315E; border-radius:6px 6px 0 0;"></div><span class="muted" style="font-size:10px;">May</span></div>
+          <div style="flex:1; text-align:center;"><div style="height:64%; background:#25315E; border-radius:6px 6px 0 0;"></div><span class="muted" style="font-size:10px;">Jun</span></div>
+          <div style="flex:1; text-align:center;"><div style="height:58%; background:#25315E; border-radius:6px 6px 0 0;"></div><span class="muted" style="font-size:10px;">Jul</span></div>
+          <div style="flex:1; text-align:center;"><div style="height:78%; background:#8CA3E8; border-radius:6px 6px 0 0;"></div><span style="font-size:10px; color:#8CA3E8;">Aug</span></div>
+        </div>
+      </div>
+      <div class="card"><div class="eyebrow">Egg production · 4 weeks</div>
+        <svg width="100%" viewBox="0 0 300 110" style="display:block;">
+          <path d="M10 80 L85 70 L160 76 L235 58 L290 52" stroke="#A3BC9C" stroke-width="2.5" fill="none"/>
+          <g fill="#A3BC9C"><circle cx="10" cy="80" r="3"/><circle cx="85" cy="70" r="3"/><circle cx="160" cy="76" r="3"/><circle cx="235" cy="58" r="3"/><circle cx="290" cy="52" r="3"/></g>
+          <text x="10" y="102" fill="#575C86" font-size="10" font-family="Inter,sans-serif">W1</text>
+          <text x="283" y="102" fill="#575C86" font-size="10" font-family="Inter,sans-serif">W5</text>
+          <text x="238" y="46" fill="#A3BC9C" font-size="10" font-family="Inter,sans-serif">7/wk</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div></div></div>
+
+<p class="caption"><b>Herd roadmap</b> — 1 to 20, on purpose</p>
+<div class="browser"><div class="bchrome"><span class="b" style="background:#E24B4A"></span><span class="b" style="background:#EF9F27"></span><span class="b" style="background:#639922"></span><span class="url">galaxyfarm.com/admin/cattle/roadmap</span></div>
+<div class="deskwrap"><div class="desk">
+  <div class="dtop"><div class="dbrand"><svg width="16" height="16" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+    <div class="dtabs"><span class="on">Cattle</span><span>Feed</span><span>Map</span><span>Garden</span><span>Equipment</span><span>Calendar</span><span>Reports</span></div><div class="avatar">GF</div></div>
+  <div class="dmain">
+    <div class="dhead"><h2 class="slab">Herd roadmap</h2><span class="btn">Plan a mating</span></div>
+    <div class="card" style="margin-bottom:14px;"><div class="eyebrow purple">Genetic goals</div>
+      <span class="tag purple">Hair &amp; show look</span> <span class="tag purple">Structure &amp; soundness</span> <span class="tag purple">Docility</span> <span class="tag purple">Maternal · keep the roan</span>
+    </div>
+    <div class="grid2">
+      <div class="card"><div class="eyebrow">Growth to target</div>
+        <div class="row" style="padding:6px 0;"><span class="mono">2026</span><div class="bar" style="flex:1; margin:0 12px;"><i style="width:10%; background:#8CA3E8;"></i></div><span class="mono">2 head</span></div>
+        <div class="row" style="padding:6px 0;"><span class="mono">2028</span><div class="bar" style="flex:1; margin:0 12px;"><i style="width:40%; background:#25315E;"></i></div><span class="mono muted">8 head</span></div>
+        <div class="row" style="padding:6px 0;"><span class="mono">2031</span><div class="bar" style="flex:1; margin:0 12px;"><i style="width:100%; background:#25315E;"></i></div><span class="mono muted">20 head</span></div>
+      </div>
+      <div class="card" style="border:1px solid #3A2F6E;"><div class="eyebrow purple">Planned mating · spring 2027</div>
+        <b style="font-size:14px;">Andromeda × Solar Wind</b>
+        <div class="muted" style="font-size:12px; margin:4px 0 10px;">add bone and body, hold the roan color · 2 straws banked</div>
+        <span class="tag blue">Convert to breeding →</span>
+      </div>
+    </div>
+  </div>
+</div></div></div>
+
+<p class="caption"><b>Program roster &amp; day sheet</b> — Phase 5 preview</p>
+<div class="browser"><div class="bchrome"><span class="b" style="background:#E24B4A"></span><span class="b" style="background:#EF9F27"></span><span class="b" style="background:#639922"></span><span class="url">galaxyfarm.com/admin/business/roster</span></div>
+<div class="deskwrap"><div class="desk">
+  <div class="dtop"><div class="dbrand"><svg width="16" height="16" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+    <div class="dtabs"><span>Cattle</span><span class="on">Program</span><span>Bookings</span><span>Forms</span><span>Invoices</span></div><div class="avatar">GF</div></div>
+  <div class="dmain">
+    <div class="dhead"><h2 class="slab">Show program</h2><span class="tag purple">Phase 5 · preview</span></div>
+    <table class="tbl" style="margin-bottom:14px;">
+      <tr><th>Calf</th><th>Halter</th><th>Owner</th><th>Inside</th><th>Outside</th><th>Milestones</th><th>Rules</th></tr>
+      <tr><td style="font-weight:600;">Comet</td><td><span class="dot" style="background:#111; border:1px solid #575C86;"></span></td><td>S. Kelly</td><td>Stall 2</td><td>Pen 4</td><td class="mono">2 / 5</td><td><span class="tag sage">eligible ✓</span></td></tr>
+      <tr><td style="font-weight:600;">Nova <span class="tag" style="margin-left:6px;">ours</span></td><td><span class="dot" style="background:#5F45B0;"></span></td><td class="muted">—</td><td>Stall 1</td><td>Pen 4</td><td class="mono">4 / 5</td><td class="muted">n/a</td></tr>
+    </table>
+    <div class="card"><div class="eyebrow blue">Day sheet · Wednesday</div>
+      <div style="display:grid; grid-template-columns:110px repeat(6,1fr); gap:8px; align-items:center; font-size:12.5px;">
+        <span class="muted"></span><span class="muted" style="text-align:center;">AM</span><span class="muted" style="text-align:center;">Rinse 1</span><span class="muted" style="text-align:center;">Exercise</span><span class="muted" style="text-align:center;">Rinse 2</span><span class="muted" style="text-align:center;">Training</span><span class="muted" style="text-align:center;">PM</span>
+        <b>Comet</b><div class="cell done">✓</div><div class="cell done">✓</div><div class="cell done">✓</div><div class="cell">2:00</div><div class="cell">4:30</div><div class="cell">6:00</div>
+        <b>Nova</b><div class="cell done">✓</div><div class="cell done">✓</div><div class="cell">1:30</div><div class="cell">3:00</div><div class="cell">4:30</div><div class="cell">6:00</div>
+      </div>
+    </div>
+  </div>
+</div></div></div>
+
+<p class="caption"><b>Contacts</b> — the whole farm's rolodex</p>
+<div class="browser"><div class="bchrome"><span class="b" style="background:#E24B4A"></span><span class="b" style="background:#EF9F27"></span><span class="b" style="background:#639922"></span><span class="url">galaxyfarm.com/admin/contacts</span></div>
+<div class="deskwrap"><div class="desk">
+  <div class="dtop"><div class="dbrand"><svg width="16" height="16" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+    <div class="dtabs"><span>Cattle</span><span>Feed</span><span>Map</span><span>Garden</span><span>Equipment</span><span>Calendar</span><span class="on">Contacts</span></div><div class="avatar">GF</div></div>
+  <div class="dmain">
+    <div class="dhead"><h2 class="slab">Contacts</h2><span class="btn">Add contact</span></div>
+    <table class="tbl">
+      <tr><th>Name</th><th>Tags</th><th>Phone</th><th>Linked history</th></tr>
+      <tr><td style="font-weight:600;">Dr. M. Reyes</td><td><span class="tag blue">vet</span> <span class="tag red">emergency</span></td><td class="mono">(817) 555-0141</td><td class="muted">2 treatments · in housesitter guide</td></tr>
+      <tr><td style="font-weight:600;">J. Mercer</td><td><span class="tag blue">AI tech</span></td><td class="mono">(817) 555-0177</td><td class="muted">1 breeding · Dec 2025</td></tr>
+      <tr><td style="font-weight:600;">Fort Worth Feed &amp; Supply</td><td><span class="tag">feed vendor</span></td><td class="mono">(817) 555-0102</td><td class="muted">6 purchases · $1,240 YTD</td></tr>
+      <tr><td style="font-weight:600;">S. Kelly</td><td><span class="tag purple">customer</span></td><td class="mono">(940) 555-0189</td><td class="muted">1 booking · form v2 signed</td></tr>
+    </table>
+  </div>
+</div></div></div>
+
+<p class="caption"><b>Housesitter guide builder</b> — live data → printable doc</p>
+<div class="browser"><div class="bchrome"><span class="b" style="background:#E24B4A"></span><span class="b" style="background:#EF9F27"></span><span class="b" style="background:#639922"></span><span class="url">galaxyfarm.com/admin/housesitter</span></div>
+<div class="deskwrap"><div class="desk">
+  <div class="dtop"><div class="dbrand"><svg width="16" height="16" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#9D85E8"/></svg>Galaxy Farm</div>
+    <div class="dtabs"><span>Cattle</span><span>Feed</span><span>Map</span><span>Garden</span><span>Equipment</span><span>Calendar</span><span class="on">Housesitter</span></div><div class="avatar">GF</div></div>
+  <div class="dmain">
+    <div class="dhead"><h2 class="slab">Care guide</h2><div><span class="btn">Print PDF</span> <span class="tag blue" style="margin-left:8px;">Sitter login link</span> <span class="tag">Kiosk mode</span></div></div>
+    <div style="display:flex; gap:14px;">
+      <div style="width:300px;">
+        <div class="card"><div class="eyebrow">Sections · auto-filled live</div>
+          <div class="task"><span class="tick done">✓</span><span>Animals by pen + safety</span></div>
+          <div class="task"><span class="tick done">✓</span><span>Feeding plans</span></div>
+          <div class="task"><span class="tick done">✓</span><span>Daily chores</span></div>
+          <div class="task"><span class="tick done">✓</span><span>Emergency contacts</span></div>
+          <div class="task"><span class="tick"></span><span>Custom: gate latch trick</span></div>
+        </div>
+      </div>
+      <div style="flex:1; background:#F8F5EC; color:#24243A; border-radius:12px; padding:20px 24px; font-size:12.5px;">
+        <b class="slab" style="font-size:17px;">Caring for Galaxy Farm</b>
+        <div style="color:#7A7666; font-size:11px; margin-bottom:12px;">generated Aug 10 · always current</div>
+        <div style="border-left:3px solid #639922; padding-left:10px; margin-bottom:10px;"><b>House · Level 1</b><br>Halsey — walk AM &amp; PM · Jeaux — indoor only, food 6a/6p</div>
+        <div style="border-left:3px solid #639922; padding-left:10px; margin-bottom:10px;"><b>Barn · Level 1</b><br>Pepsi &amp; Sierra — feed at dusk, water by tack room</div>
+        <div style="border-left:3px solid #97C459; padding-left:10px; margin-bottom:10px;"><b>North Pasture · Level 2 — observe only</b><br>Andromeda is due Sep 14. Do not enter. Call if she isolates or leaks milk.</div>
+        <div style="border-left:3px solid #E24B4A; padding-left:10px;"><b>Emergency</b> — Dr. M. Reyes (vet) (817) 555-0141 · us: any hour</div>
+      </div>
+    </div>
+  </div>
+</div></div></div>
+
+<p class="sect">Admin · mobile</p>
+
+<p class="caption"><b>Chores</b> — the daily rhythm</p>
+<div class="phone"><div class="screen dark">
+  <div class="sbar"><span>5:58</span><span class="sdots">●●●●</span></div>
+  <div class="appbar"><div class="brand">Chores</div><div class="avatar">GF</div></div>
+  <div class="pad">
+    <div style="display:flex; gap:8px; margin-bottom:12px;"><span class="tag blue">Today</span><span class="tag">Templates</span></div>
+    <div class="card"><div class="eyebrow">Morning</div>
+      <div class="task"><span class="tick done">✓</span><span>Feed &amp; water Andromeda</span></div>
+      <div class="task"><span class="tick done">✓</span><span>Feed barn cats</span></div>
+      <div class="task"><span class="tick"></span><span>Collect eggs</span></div>
+      <div class="task"><span class="tick"></span><span>Walk Halsey</span></div>
+    </div>
+    <div class="card"><div class="eyebrow">Evening</div>
+      <div class="task"><span class="tick"></span><span>Hay Andromeda · 1 flake</span></div>
+      <div class="task"><span class="tick"></span><span>Close coop at dusk</span></div>
+      <div class="task"><span class="tick"></span><span>Feed Jeaux · Halsey</span></div>
+    </div>
+    <div class="muted" style="text-align:center; font-size:11px;">14-day completion streak ✦</div>
+  </div>
+</div></div>
+
+<p class="caption"><b>Supplies</b> — shavings to show sticks</p>
+<div class="phone"><div class="screen dark">
+  <div class="sbar"><span>9:20</span><span class="sdots">●●●●</span></div>
+  <div class="appbar"><div class="brand">Supplies</div><div class="avatar">GF</div></div>
+  <div class="pad">
+    <div class="card row" style="border:1px solid #4C3A12;"><div><b style="font-size:13.5px;">Pine shavings</b><br><span class="muted" style="font-size:12px;">4 bags · below reorder point</span></div><span class="tag amber">low</span></div>
+    <div class="card row"><div><b style="font-size:13.5px;">Show halters</b><br><span class="muted" style="font-size:12px;">×2 · one assigned to Nova</span></div><span class="tag">durable</span></div>
+    <div class="card row"><div><b style="font-size:13.5px;">Revive</b><br><span class="muted" style="font-size:12px;">1 bottle · show &amp; fitting</span></div><span class="tag">consumable</span></div>
+    <div class="card row"><div><b style="font-size:13.5px;">Corral panels</b><br><span class="muted" style="font-size:12px;">×12 · good condition</span></div><span class="tag">durable</span></div>
+    <div class="card row"><div><b style="font-size:13.5px;">Winter rye seed</b><br><span class="muted" style="font-size:12px;">2 bags · pasture</span></div><span class="tag sage">pasture</span></div>
+    <span class="btn" style="display:block; text-align:center;">Log purchase</span>
+  </div>
+</div></div>
+
+<p class="caption"><b>Pastures</b> — care logs &amp; rest</p>
+<div class="phone"><div class="screen dark">
+  <div class="sbar"><span>9:22</span><span class="sdots">●●●●</span></div>
+  <div class="appbar"><div class="brand">Pastures</div><div class="avatar">GF</div></div>
+  <div class="pad">
+    <div class="card" style="border:1px dashed #3A3F70;">
+      <div class="row"><b style="font-size:14px;">South Pasture</b><span class="tag sage">resting</span></div>
+      <div class="muted" style="font-size:12px; margin:6px 0 8px;">Overseeded winter rye · Aug 3 · 40 lb/ac · $86</div>
+      <div class="muted" style="font-size:11px;">keep stock off until established (~6 wks)</div>
+    </div>
+    <div class="card">
+      <div class="row"><b style="font-size:14px;">North Pasture</b><span class="dot l2"></span></div>
+      <div class="muted" style="font-size:12px; margin:6px 0;">Mowed Jul 22 · soil test on file</div>
+      <span class="tag">Andromeda grazing</span>
+    </div>
+    <div class="card row" style="border:1px solid #25315E;"><span style="font-size:13px;"><b class="blue">Seasonal reminder</b> — fertilize both pastures next spring</span><span class="tag blue">Mar 2027</span></div>
+  </div>
+</div></div>
+
+<p class="caption"><b>Pets</b> — the payroll-free employees</p>
+<div class="phone"><div class="screen dark">
+  <div class="sbar"><span>9:24</span><span class="sdots">●●●●</span></div>
+  <div class="appbar"><div class="brand">Pets</div><div class="avatar">GF</div></div>
+  <div class="pad">
+    <div class="card row"><div><b style="font-size:14px;">Halsey</b> <span class="muted" style="font-size:12px;">· dog</span><br><span class="muted" style="font-size:12px;">walks 2× daily · sleeps inside</span></div><span class="tag amber">rabies due Oct 3</span></div>
+    <div class="card row"><div><b style="font-size:14px;">Jeaux</b> <span class="muted" style="font-size:12px;">· cat, indoor</span><br><span class="muted" style="font-size:12px;">food 6a / 6p · window supervisor</span></div><span class="tag sage">up to date ✓</span></div>
+    <div class="card row"><div><b style="font-size:14px;">Pepsi</b> <span class="muted" style="font-size:12px;">· barn cat</span><br><span class="muted" style="font-size:12px;">rodent control, senior staff</span></div><span class="tag sage">flea tx Aug 1 ✓</span></div>
+    <div class="card row"><div><b style="font-size:14px;">Sierra</b> <span class="muted" style="font-size:12px;">· barn cat</span><br><span class="muted" style="font-size:12px;">Pepsi's apprentice</span></div><span class="tag sage">flea tx Aug 1 ✓</span></div>
+  </div>
+</div></div>
+
+<p class="caption"><b>Horses</b> — the placeholder, with a live roadmap</p>
+<div class="phone"><div class="screen dark">
+  <div class="sbar"><span>9:26</span><span class="sdots">●●●●</span></div>
+  <div class="appbar"><div class="brand">Horses</div><div class="avatar">GF</div></div>
+  <div class="pad">
+    <div class="card" style="text-align:center; padding:26px 16px;">
+      <svg width="40" height="40" viewBox="0 0 44 44" style="opacity:.8;"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#3A3F70"/></svg>
+      <b class="slab" style="display:block; font-size:17px; margin:8px 0 4px;">This constellation is unwritten</b>
+      <span class="muted" style="font-size:12px;">Herd · pens · feeding · breeding arrive with the first horse</span>
+    </div>
+    <div class="card"><div class="eyebrow purple">Roadmap · active now</div>
+      <div class="task"><span class="tick"></span><span>2028 — first mare <span class="muted">· budget $12k</span></span></div>
+      <div class="task"><span class="tick"></span><span>Fence east paddock first</span></div>
+      <div class="task"><span class="tick"></span><span>Tack: western saddle fund</span></div>
+    </div>
+  </div>
+</div></div>
+
+<p class="caption"><b>Record calving</b> — the form we're racing September for</p>
+<div class="phone"><div class="screen dark">
+  <div class="sbar"><span>3:40</span><span class="sdots">●●●●</span></div>
+  <div class="appbar"><div class="brand">‹ &nbsp;Record calving</div><div class="avatar">GF</div></div>
+  <div class="pad">
+    <div class="card">
+      <div class="eyebrow purple">Dam</div><b class="slab" style="font-size:17px;">Andromeda</b>
+      <div class="muted" style="font-size:12px;">day 248 · sire on record: Stellar Cargo</div>
+    </div>
+    <div class="card">
+      <div class="row" style="padding:7px 0; border-bottom:1px solid #23274A;"><span class="muted" style="font-size:13px;">Date</span><b class="mono" style="font-size:13px;">Sep 14, 2026 ▾</b></div>
+      <div class="row" style="padding:7px 0; border-bottom:1px solid #23274A;"><span class="muted" style="font-size:13px;">Birth weight</span><b class="mono" style="font-size:13px;">___ lb</b></div>
+      <div class="row" style="padding:7px 0; border-bottom:1px solid #23274A;"><span class="muted" style="font-size:13px;">Calving ease</span><span><span class="tag blue">1</span> <span class="tag">2</span> <span class="tag">3</span> <span class="tag">4</span> <span class="tag">5</span></span></div>
+      <div class="row" style="padding:7px 0; border-bottom:1px solid #23274A;"><span class="muted" style="font-size:13px;">Vigor</span><span class="tag sage">strong ▾</span></div>
+      <div class="row" style="padding:7px 0;"><span class="muted" style="font-size:13px;">Sex</span><span><span class="tag">Bull</span> <span class="tag">Heifer</span></span></div>
+    </div>
+    <span class="btn" style="display:block; text-align:center;">Save — creates the calf's record</span>
+    <div class="muted" style="text-align:center; font-size:11px; margin-top:8px;">pedigree wires itself: Andromeda × Stellar Cargo</div>
+  </div>
+</div></div>
+
+<p class="caption"><b>Sales &amp; processing</b> — every dollar per animal</p>
+<div class="phone"><div class="screen dark">
+  <div class="sbar"><span>9:30</span><span class="sdots">●●●●</span></div>
+  <div class="appbar"><div class="brand">Sales</div><div class="avatar">GF</div></div>
+  <div class="pad">
+    <div class="card row"><div><b style="font-size:13.5px;">Andromeda — acquired</b><br><span class="muted" style="font-size:12px;">Mar 2025 · private treaty · $3,200</span></div><span class="tag">purchase</span></div>
+    <div class="card"><div class="eyebrow">When you sell or process</div>
+      <div class="muted" style="font-size:12.5px; line-height:1.8;">Scale weight → hanging weight → dressing % · cut sheet with kept vs. sold pounds · buyer &amp; price per cut · full P&amp;L against feed, health, and supply costs</div>
+    </div>
+    <div class="card row" style="border:1px solid #25315E;"><span style="font-size:13px;" class="muted">No sales yet — the herd is growing, not shrinking</span><span class="tag blue">+ Record</span></div>
+  </div>
+</div></div>
+
+<p class="caption"><b>Settings</b> — where the names live as variables</p>
+<div class="phone"><div class="screen dark">
+  <div class="sbar"><span>9:32</span><span class="sdots">●●●●</span></div>
+  <div class="appbar"><div class="brand">Settings</div><div class="avatar">GF</div></div>
+  <div class="pad">
+    <div class="card"><div class="eyebrow purple">Branding · global variables</div>
+      <div class="row" style="padding:7px 0; border-bottom:1px solid #23274A;"><span class="muted" style="font-size:13px;">Farm name</span><b style="font-size:13px;">Galaxy Farm <span class="tag" style="margin-left:4px;">working</span></b></div>
+      <div class="row" style="padding:7px 0;"><span class="muted" style="font-size:13px;">Business name</span><span class="tag amber">not set — fills in everywhere later</span></div>
+    </div>
+    <div class="card"><div class="eyebrow">Theme per surface</div>
+      <div class="row" style="padding:7px 0; border-bottom:1px solid #23274A;"><span style="font-size:13px;">Admin &amp; kiosk</span><span class="tag purple">Midnight Nebula</span></div>
+      <div class="row" style="padding:7px 0;"><span style="font-size:13px;">Customers &amp; sitter</span><span class="tag blue">Bluebonnet Linen</span></div>
+    </div>
+    <div class="card"><div class="eyebrow">Kiosk devices</div>
+      <div class="row" style="padding:7px 0; border-bottom:1px solid #23274A;"><span style="font-size:13px;">Barn TV</span><span class="tag sage">paired · Pen Board</span></div>
+      <div class="row" style="padding:7px 0;"><span style="font-size:13px;">Coop tablet</span><span class="tag sage">paired · Egg entry</span></div>
+    </div>
+  </div>
+</div></div>
+
+<p class="sect">Customer &amp; sitter · Bluebonnet Linen</p>
+
+<p class="caption"><b>Public booking</b> — rules checked before you ever see it</p>
+<div class="phone"><div class="screen light">
+  <div class="sbar"><span>7:12</span><span class="sdots">●●●●</span></div>
+  <div class="appbar"><div class="brand"><svg width="18" height="18" viewBox="0 0 44 44"><path d="M22 3 L25.4 18.6 L41 22 L25.4 25.4 L22 41 L18.6 25.4 L3 22 L18.6 18.6 Z" fill="#5F45B0"/></svg>Book the program</div></div>
+  <div class="pad">
+    <div class="card">
+      <div class="row" style="padding:7px 0; border-bottom:1px solid #EDE7D6;"><span class="muted" style="font-size:13px;">Calf name</span><b style="font-size:13px;">Comet</b></div>
+      <div class="row" style="padding:7px 0; border-bottom:1px solid #EDE7D6;"><span class="muted" style="font-size:13px;">Date of birth</span><b class="mono" style="font-size:13px;">Apr 2, 2026</b></div>
+      <div class="row" style="padding:7px 0; border-bottom:1px solid #EDE7D6;"><span class="muted" style="font-size:13px;">Sex</span><b style="font-size:13px;">Steer</b></div>
+      <div class="row" style="padding:7px 0;"><span class="muted" style="font-size:13px;">Requested drop-off</span><b class="mono" style="font-size:13px;">Sep 1 ▾</b></div>
+    </div>
+    <div class="card"><div class="eyebrow">Eligibility · checked live</div>
+      <div class="task" style="border-color:#EDE7D6;"><span style="color:#67805F; font-weight:700;">✓</span><span>Under 6 months at drop-off</span></div>
+      <div class="task" style="border-color:#EDE7D6;"><span style="color:#67805F; font-weight:700;">✓</span><span>Weaned — no pairs</span></div>
+      <div class="task" style="border-color:#EDE7D6;"><span style="color:#67805F; font-weight:700;">✓</span><span>Visible ID / tagged</span></div>
+    </div>
+    <div class="card"><div class="eyebrow">Packages</div>
+      <div class="task" style="border-color:#EDE7D6;"><span class="tick done" style="background:#5F45B0; border-color:#5F45B0; color:#fff;">✓</span><span>Halter breaking</span></div>
+      <div class="task" style="border-color:#EDE7D6;"><span class="tick" style="border-color:#D9D2BD;"></span><span>Hair program <span class="muted">· adds daily rinses</span></span></div>
+    </div>
+    <span class="btn" style="display:block; text-align:center;">Request booking</span>
+    <div class="muted" style="text-align:center; font-size:11px; margin-top:8px;">every request is reviewed before approval</div>
+  </div>
+</div></div>
+
+<p class="caption"><b>Liability form</b> — e-signed, versioned, on file for both sides</p>
+<div class="phone"><div class="screen light">
+  <div class="sbar"><span>7:15</span><span class="sdots">●●●●</span></div>
+  <div class="appbar"><div class="brand">‹ &nbsp;Liability form</div><div class="avatar">SK</div></div>
+  <div class="pad">
+    <div class="card">
+      <div class="eyebrow">Boarding &amp; training agreement · v2</div>
+      <div style="font-size:12.5px; line-height:1.8;" class="muted">
+        Owners are financially responsible for all feed and supplies used on their animals. Owners are responsible for all medical care and vaccines. We may terminate for behavior that puts people or animals at risk. We assume no responsibility for injury or loss…
+      </div>
+      <div style="height:6px; background:#EDE7D6; border-radius:99px; margin:10px 0 4px;"></div>
+      <div style="height:6px; background:#EDE7D6; border-radius:99px; width:70%;"></div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Signature</div>
+      <div style="font-family:'Zilla Slab',serif; font-style:italic; font-size:23px; color:#24243A; border-bottom:1.5px solid #24243A; padding:6px 2px 8px;">Sarah Kelly</div>
+      <div class="muted" style="font-size:11px; margin-top:6px;">signed name · timestamped · saved as an immutable PDF</div>
+    </div>
+    <span class="btn" style="display:block; text-align:center;">Sign agreement</span>
+  </div>
+</div></div>
+
+<p class="caption"><b>Shows</b> — their travel, your option to show</p>
+<div class="phone"><div class="screen light">
+  <div class="sbar"><span>7:18</span><span class="sdots">●●●●</span></div>
+  <div class="appbar"><div class="brand">Shows</div><div class="avatar">SK</div></div>
+  <div class="pad">
+    <div class="card">
+      <div class="row"><b style="font-size:14px;">State Fair of Texas</b><span class="tag purple">Oct 2</span></div>
+      <div class="muted" style="font-size:12px; margin:4px 0 10px;">Comet · you transport &amp; supply</div>
+      <div class="row" style="background:#FBF9F2; border:1px solid #E7E0CE; border-radius:10px; padding:10px 12px;">
+        <span style="font-size:12.5px;">Ask Galaxy Farm to show for me <span class="muted">(added fee)</span></span>
+        <span style="width:34px; height:20px; border-radius:99px; background:#5F45B0; display:inline-block; position:relative;"><span style="position:absolute; right:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#fff;"></span></span>
+      </div>
+    </div>
+    <span class="btn" style="display:block; text-align:center; background:#fff; color:#35569E; border:1px solid #C9C3B0;">+ Add a show</span>
+    <div class="muted" style="text-align:center; font-size:11px; margin-top:8px;">show fees appear on your next invoice if requested</div>
+  </div>
+</div></div>
+
+<p class="caption"><b>Housesitter view</b> — /sitter, safety first</p>
+<div class="phone"><div class="screen light">
+  <div class="sbar"><span>8:00</span><span class="sdots">●●●●</span></div>
+  <div class="appbar"><div class="brand">Caring for Galaxy Farm</div></div>
+  <div class="pad">
+    <div class="card" style="border-left:3px solid #97C459; border-radius:6px 16px 16px 6px;">
+      <b style="font-size:13.5px;">North Pasture · Level 2 — observe only</b>
+      <div class="muted" style="font-size:12px; margin-top:3px;">Andromeda is due soon. Don't enter — call us if she's isolating.</div>
+    </div>
+    <div class="card"><div class="eyebrow">Today</div>
+      <div class="task" style="border-color:#EDE7D6;"><span class="tick" style="border-color:#D9D2BD;"></span><span>Walk Halsey · AM</span></div>
+      <div class="task" style="border-color:#EDE7D6;"><span class="tick" style="border-color:#D9D2BD;"></span><span>Feed Jeaux 6a · indoor only!</span></div>
+      <div class="task" style="border-color:#EDE7D6;"><span class="tick" style="border-color:#D9D2BD;"></span><span>Collect eggs · close coop at dusk</span></div>
+      <div class="task" style="border-color:#EDE7D6;"><span class="tick" style="border-color:#D9D2BD;"></span><span>Barn cats Pepsi &amp; Sierra · dusk</span></div>
+    </div>
+    <div class="card row" style="border-left:3px solid #E24B4A; border-radius:6px 16px 16px 6px;">
+      <div><b style="font-size:13.5px;">Emergency</b><br><span class="muted" style="font-size:12px;">Dr. M. Reyes · vet</span></div><span class="btn">Call</span>
+    </div>
+  </div>
+</div></div>
+
+<p class="sect">Kiosk · barn screen</p>
+
+<p class="caption"><b>Program day sheet</b> — landscape, tap to check off (Phase 5 preview)</p>
+<div class="tv"><div class="deskwrap"><div class="desk" style="border-radius:8px;">
+  <div class="dmain" style="padding:26px 34px 32px;">
+    <div class="dhead"><h2 class="slab" style="font-size:28px;">Day sheet · Wednesday</h2><div><span class="tag purple" style="font-size:13px; padding:6px 14px;">Phase 5 preview</span> <span class="tag" style="font-size:13px; padding:6px 14px;">6:40 PM</span></div></div>
+    <div style="display:grid; grid-template-columns:190px repeat(6,1fr); gap:12px; align-items:center; font-size:16px;">
+      <span></span><span class="muted" style="text-align:center; font-size:13px;">AM CHORES</span><span class="muted" style="text-align:center; font-size:13px;">RINSE 1</span><span class="muted" style="text-align:center; font-size:13px;">EXERCISE</span><span class="muted" style="text-align:center; font-size:13px;">RINSE 2</span><span class="muted" style="text-align:center; font-size:13px;">TRAINING</span><span class="muted" style="text-align:center; font-size:13px;">PM CHORES</span>
+      <div><b style="font-size:19px;">Comet</b><br><span class="muted" style="font-size:12px;"><span class="dot" style="background:#111; border:1px solid #575C86;"></span> black · Stall 2</span></div>
+      <div class="cell done" style="padding:18px 8px; font-size:19px;">✓</div><div class="cell done" style="padding:18px 8px; font-size:19px;">✓</div><div class="cell done" style="padding:18px 8px; font-size:19px;">✓</div><div class="cell done" style="padding:18px 8px; font-size:19px;">✓</div><div class="cell" style="padding:18px 8px;">tap ✓</div><div class="cell" style="padding:18px 8px;">6:00</div>
+      <div><b style="font-size:19px;">Nova</b><br><span class="muted" style="font-size:12px;"><span class="dot" style="background:#5F45B0;"></span> purple · ours</span></div>
+      <div class="cell done" style="padding:18px 8px; font-size:19px;">✓</div><div class="cell done" style="padding:18px 8px; font-size:19px;">✓</div><div class="cell done" style="padding:18px 8px; font-size:19px;">✓</div><div class="cell done" style="padding:18px 8px; font-size:19px;">✓</div><div class="cell done" style="padding:18px 8px; font-size:19px;">✓</div><div class="cell" style="padding:18px 8px;">6:00</div>
+    </div>
+    <div class="muted" style="font-size:13px; margin-top:18px;">Andromeda · calving watch day 248 &nbsp;·&nbsp; eggs today: 1 &nbsp;·&nbsp; hay reorder by Aug 17</div>
+  </div>
+</div></div></div>
+
+  <footer>
+    30 screens · sample data for preview — Andromeda, one hardworking Australorp, Halsey, Jeaux,<br>
+    Pepsi &amp; Sierra are real; Comet, Nova, S. Kelly, and all pedigree ancestors are placeholders.<br>
+    Galaxy Farm app · specification v0.9 · farm &amp; business names remain global variables ✦
+  </footer>
+</div>
+<script>
+function fit(){document.querySelectorAll('.deskwrap').forEach(function(w){var d=w.firstElementChild;var s=Math.min(1,w.clientWidth/1160);d.style.transform='scale('+s+')';w.style.height=(d.offsetHeight*s)+'px';});}
+window.addEventListener('resize',fit);window.addEventListener('load',fit);setTimeout(fit,60);
+</script>
+</body>
+</html>
