@@ -28,10 +28,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <ToastProvider>
           <ConfirmProvider>
             <div className="flex min-h-screen flex-col md:flex-row">
-              <aside className="border-b border-edge md:w-64 md:shrink-0 md:border-b-0 md:border-r">
+              {/*
+                Sticky and full height so the sidebar scrolls in its own right.
+                That is what preserves its position across a navigation: the
+                layout does not remount, so the scrolled element survives — and
+                a nav that jumps back to the top every time you click a link is
+                the thing that makes a long list unusable.
+              */}
+              <aside className="border-b border-edge bg-panel/40 md:sticky md:top-0 md:h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
                 <AdminNav farmName={farmName} />
               </aside>
-              <main className="flex-1 p-density">{children}</main>
+              <main className="min-w-0 flex-1 p-density">{children}</main>
             </div>
           </ConfirmProvider>
         </ToastProvider>

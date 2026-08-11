@@ -2,116 +2,132 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "@galaxy-farm/ui";
 
 import { useSync } from "@/app/_components/sync-provider";
+import { NAV, groupContaining, isCurrent, isWithin } from "@/app/(admin)/_components/nav-groups";
+
+export { NAV, isCurrent } from "@/app/(admin)/_components/nav-groups";
 
 /**
  * The admin navigation (spec §7).
  *
- * Grouped by domain rather than flattened, because §7 has fifty-five routes
- * and a flat list of fifty-five is not navigation. The groups match the way
- * the farm is actually divided — cattle, chickens, garden, equipment — which
- * is how someone thinks about where they are going.
- */
-
-interface NavItem {
-  readonly href: string;
-  readonly label: string;
-}
-
-interface NavGroup {
-  readonly label: string;
-  readonly items: readonly NavItem[];
-}
-
-export const NAV: readonly NavGroup[] = [
-  {
-    label: "Today",
-    items: [
-      { href: "/admin", label: "Dashboard" },
-      { href: "/admin/calendar", label: "Calendar" },
-      { href: "/admin/chores", label: "Chores" },
-      { href: "/admin/map", label: "Property map" },
-    ],
-  },
-  {
-    label: "Cattle",
-    items: [
-      { href: "/admin/cattle", label: "Herd" },
-      { href: "/admin/cattle/breeding", label: "Breeding" },
-      { href: "/admin/cattle/calving", label: "Calving" },
-      { href: "/admin/cattle/health", label: "Health" },
-      { href: "/admin/cattle/feed", label: "Feed plans" },
-      { href: "/admin/cattle/sales", label: "Sales" },
-      { href: "/admin/cattle/roadmap", label: "Roadmap" },
-      { href: "/admin/cattle/candidates", label: "Candidates" },
-    ],
-  },
-  {
-    label: "Land",
-    items: [
-      { href: "/admin/pastures", label: "Pastures" },
-      { href: "/admin/garden/plantings", label: "Garden" },
-      { href: "/admin/garden/harvest", label: "Harvest" },
-    ],
-  },
-  {
-    label: "Flock",
-    items: [
-      { href: "/admin/chickens/flock", label: "Flocks" },
-      { href: "/admin/chickens/eggs", label: "Eggs" },
-    ],
-  },
-  {
-    label: "Kit",
-    items: [
-      { href: "/admin/equipment", label: "Equipment" },
-      { href: "/admin/feed", label: "Feed inventory" },
-      { href: "/admin/supplies", label: "Supplies" },
-    ],
-  },
-  {
-    label: "People & places",
-    items: [
-      { href: "/admin/contacts", label: "Contacts" },
-      { href: "/admin/pets", label: "Pets" },
-      { href: "/admin/horses", label: "Horses" },
-      { href: "/admin/housesitter", label: "Housesitter" },
-      { href: "/admin/reports", label: "Reports" },
-      { href: "/admin/settings", label: "Settings" },
-      { href: "/admin/settings/trash", label: "Trash" },
-    ],
-  },
-];
-
-/**
- * Is this the route we are on?
+ * Two things it has to get right that a list of links does not do for free.
  *
- * Exact match only. A `startsWith` check would light up "Herd" while someone
- * is on the breeding page, and a nav that lies about where you are is worse
- * than one that says nothing.
+ * **It keeps its scroll.** The sidebar scrolls in its own right rather than
+ * with the page, so the layout — which Next does not remount between routes —
+ * holds its scroll position across a navigation. Somebody who has scrolled
+ * down to Business and clicked Invoices should still be looking at Business.
+ * The position is also written to sessionStorage, because a full reload does
+ * remount and landing back at the top after every refresh is the same
+ * annoyance in slower motion.
+ *
+ * **It collapses.** Fifty-five routes is a wall. Everything touched daily is
+ * open; the rest starts closed, remembers being opened, and the group holding
+ * the current route opens itself so a deep link never lands you somewhere the
+ * nav cannot show you.
  */
-export function isCurrent(href: string, pathname: string): boolean {
-  return href === pathname;
+
+const OPEN_GROUPS_KEY = "galaxy-farm:nav-open-groups";
+const SCROLL_KEY = "galaxy-farm:nav-scroll";
+
+function readOpenGroups(): Set<string> | undefined {
+  try {
+    const raw = globalThis.sessionStorage?.getItem(OPEN_GROUPS_KEY);
+    if (raw === null || raw === undefined) return undefined;
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((v): v is string => typeof v === "string"))
+      : undefined;
+  } catch {
+    // Private browsing, a full quota, a value somebody hand-edited — none of
+    // which is a reason for the nav not to render.
+    return undefined;
+  }
+}
+
+/** Groups open on first paint: the ones not marked collapsed by default. */
+export function defaultOpenGroups(): string[] {
+  return NAV.filter((group) => group.collapsedByDefault !== true).map((group) => group.label);
 }
 
 export function AdminNav({ farmName }: { readonly farmName: string }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [open, setOpen] = useState<Set<string>>(() => new Set(defaultOpenGroups()));
+  const scroller = useRef<HTMLDivElement | null>(null);
+
+  // Restored in an effect, not in the initial state: sessionStorage does not
+  // exist during the server render, and a state initialiser that reads it
+  // makes the first client render disagree with the HTML.
+  useEffect(() => {
+    const stored = readOpenGroups();
+    const current = groupContaining(pathname);
+    setOpen(
+      new Set([
+        ...(stored ?? new Set(defaultOpenGroups())),
+        ...(current === undefined ? [] : [current]),
+      ]),
+    );
+
+    const element = scroller.current;
+    const saved = Number(globalThis.sessionStorage?.getItem(SCROLL_KEY) ?? "0");
+    if (element !== null && Number.isFinite(saved)) element.scrollTop = saved;
+    // Deliberately once, on mount, and `pathname` is deliberately not a
+    // dependency: re-running on navigation would fight the scroll position
+    // that is the whole thing being preserved. The route-arrival case is
+    // handled by the effect below, which only ever *adds* an open group.
+  }, []);
+
+  // Opening the group that holds the route we just navigated to, without
+  // touching anything else the person has opened or closed.
+  useEffect(() => {
+    const current = groupContaining(pathname);
+    if (current === undefined) return;
+    setOpen((was) => (was.has(current) ? was : new Set([...was, current])));
+  }, [pathname]);
+
+  function toggle(label: string): void {
+    setOpen((was) => {
+      // Rebuilt by filtering rather than by mutating a copy. `Set.delete` is
+      // not a record deletion, but the §4.5 guard reads call sites and not
+      // types, and teaching people to annotate their way past it is how a real
+      // unconfirmed delete eventually slips through behind the same comment.
+      const next = was.has(label)
+        ? new Set([...was].filter((entry) => entry !== label))
+        : new Set([...was, label]);
+      try {
+        globalThis.sessionStorage?.setItem(OPEN_GROUPS_KEY, JSON.stringify([...next]));
+      } catch {
+        // See `readOpenGroups` — storage being unavailable is not fatal here.
+      }
+      return next;
+    });
+  }
+
+  function rememberScroll(): void {
+    try {
+      globalThis.sessionStorage?.setItem(SCROLL_KEY, String(scroller.current?.scrollTop ?? 0));
+    } catch {
+      /* not fatal */
+    }
+  }
 
   return (
-    <nav aria-label="Admin sections" className="flex flex-col gap-2 p-density">
-      <div className="flex items-center justify-between gap-2">
-        <Link href="/admin" className="font-heading text-lg font-semibold text-ink">
-          {farmName}
+    <nav aria-label="Admin sections" className="flex h-full flex-col">
+      <div className="flex items-center justify-between gap-2 border-b border-edge px-density py-3">
+        <Link
+          href="/admin"
+          className="flex min-w-0 items-center gap-2 font-heading text-lg font-semibold text-ink"
+        >
+          <span className="truncate">{farmName}</span>
         </Link>
         <button
           type="button"
-          onClick={() => setOpen((was) => !was)}
-          aria-expanded={open}
+          onClick={() => setMenuOpen((was) => !was)}
+          aria-expanded={menuOpen}
           aria-controls="admin-nav-groups"
           className="min-h-target rounded-density border border-edge px-3 text-density text-ink md:hidden"
         >
@@ -119,43 +135,77 @@ export function AdminNav({ farmName }: { readonly farmName: string }) {
         </button>
       </div>
 
-      <SyncBadge />
+      <div className="border-b border-edge px-density py-2">
+        <SyncBadge />
+      </div>
 
       <div
         id="admin-nav-groups"
-        // Hidden on a phone until asked for, always visible from tablet up.
-        // `hidden` rather than unmounting, so the state of anything inside
-        // survives opening and closing it.
-        className={`${open ? "flex" : "hidden"} flex-col gap-4 md:flex`}
+        ref={scroller}
+        onScroll={rememberScroll}
+        // `hidden` rather than unmounting on a phone, so anything open inside
+        // survives closing and reopening the menu.
+        className={`${menuOpen ? "flex" : "hidden"} min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 py-density md:flex`}
       >
-        {NAV.map((group) => (
-          <div key={group.label} className="flex flex-col gap-1">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {group.label}
-            </h2>
-            <ul className="flex flex-col">
-              {group.items.map((item) => {
-                const current = isCurrent(item.href, pathname);
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      // The one thing a screen reader needs from a nav: which
-                      // of these is the page I am on.
-                      aria-current={current ? "page" : undefined}
-                      onClick={() => setOpen(false)}
-                      className={`flex min-h-target items-center rounded-density px-2 text-density ${
-                        current ? "bg-panel font-semibold text-ink" : "text-muted hover:text-ink"
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+        {NAV.map((group) => {
+          const expanded = open.has(group.label);
+          const holdsCurrent = group.items.some((item) => isWithin(item, pathname));
+
+          return (
+            <div key={group.label} className="flex flex-col">
+              <button
+                type="button"
+                onClick={() => toggle(group.label)}
+                aria-expanded={expanded}
+                aria-controls={`nav-group-${group.label.replace(/\W+/g, "-")}`}
+                className="flex min-h-target items-center justify-between gap-2 rounded-density px-2 text-left text-xs font-semibold uppercase tracking-widest text-muted hover:text-ink"
+              >
+                <span className="flex items-center gap-2">
+                  {group.label}
+                  {/* A closed group holding the current page still says so. */}
+                  {!expanded && holdsCurrent ? (
+                    <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-action" />
+                  ) : null}
+                </span>
+                <span aria-hidden className={`transition-transform ${expanded ? "rotate-90" : ""}`}>
+                  ›
+                </span>
+              </button>
+
+              <ul
+                id={`nav-group-${group.label.replace(/\W+/g, "-")}`}
+                className={`${expanded ? "flex" : "hidden"} flex-col border-l border-edge pl-2 ml-3`}
+              >
+                {group.items.map((item) => {
+                  const current = isCurrent(item.href, pathname);
+                  const within = isWithin(item, pathname);
+
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        // The one thing a screen reader needs from a nav: which
+                        // of these is the page I am on.
+                        aria-current={current ? "page" : undefined}
+                        onClick={() => {
+                          rememberScroll();
+                          setMenuOpen(false);
+                        }}
+                        className={`flex min-h-target items-center rounded-density px-2 text-density ${
+                          within
+                            ? "bg-panel font-semibold text-ink shadow-[inset_2px_0_0_0_var(--color-action)]"
+                            : "text-muted hover:bg-panel/60 hover:text-ink"
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </div>
     </nav>
   );

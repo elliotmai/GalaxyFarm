@@ -77,6 +77,9 @@ importers:
       '@galaxy-farm/infra-sync':
         specifier: workspace:*
         version: link:../../packages/infrastructure/sync
+      '@galaxy-farm/module-cattle':
+        specifier: workspace:*
+        version: link:../../packages/modules/cattle
       '@galaxy-farm/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -174,6 +177,9 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.5.4
         version: 0.5.4
+      '@galaxy-farm/module-cattle':
+        specifier: workspace:*
+        version: link:../../modules/cattle
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1

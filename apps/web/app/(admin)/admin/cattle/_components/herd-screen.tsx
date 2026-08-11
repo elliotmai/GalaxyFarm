@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useState } from "react";
 
 import {
@@ -35,6 +37,7 @@ import {
 } from "@galaxy-farm/core";
 
 import { useMutations } from "@/lib/local/mutations";
+import { animalHref, animalTitle } from "@/lib/animal-slug";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -255,7 +258,16 @@ export function HerdScreen({
     {
       key: "name",
       header: "Name",
-      render: (animal) => animal.name ?? <span className="text-muted">Unnamed</span>,
+      // The name is the link. A row that needs a separate "open" button puts
+      // the smallest target on the screen in front of the most common action.
+      render: (animal) => (
+        <Link
+          href={animalHref(animal)}
+          className="font-medium text-ink underline decoration-edge underline-offset-4 hover:decoration-action"
+        >
+          {animalTitle(animal)}
+        </Link>
+      ),
     },
     {
       key: "tag",

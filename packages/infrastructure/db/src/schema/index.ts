@@ -153,6 +153,67 @@ export const animals = pgTable(
   baseIndexes("animals"),
 );
 
+/**
+ * The papers (spec §5.2).
+ *
+ * A sidecar on `animals` rather than more columns on it, because §2 keeps one
+ * Animal model across species and a chicken has no breed percentages or
+ * association number. Registrations are an array: §5.2 says an animal can be
+ * papered in several associations at once, which is ordinary for show cattle.
+ */
+export const cattleProfiles = pgTable(
+  "cattle_profiles",
+  {
+    ...baseColumns,
+    animalId: text("animal_id").notNull(),
+    breedComposition: jsonb("breed_composition")
+      .$type<{ breed: string; percent: number }[]>()
+      .notNull()
+      .default([]),
+    hornStatus: text("horn_status"),
+    colour: text("colour"),
+    markings: text("markings"),
+    registrations: jsonb("registrations")
+      .$type<
+        {
+          association: string;
+          regNumber: string;
+          registeredName?: string;
+          tattoo?: string;
+          epdSnapshot?: Record<string, number>;
+          epdCapturedOn?: string;
+        }[]
+      >()
+      .notNull()
+      .default([]),
+    /** Sire and dam resolve to an on-farm animal or an ExternalAnimal (§5.2). */
+    sire: jsonb("sire").$type<{ kind: string; id: string }>(),
+    dam: jsonb("dam").$type<{ kind: string; id: string }>(),
+  },
+  baseIndexes("cattle_profiles"),
+);
+
+/**
+ * Ancestors that are not ours (spec §5.2).
+ *
+ * A five-generation tree has thirty ancestors and this farm will own two of
+ * them. Requiring the rest to be Animals would mean thirty records with no
+ * location, no health, and no reason to exist.
+ */
+export const externalAnimals = pgTable(
+  "external_animals",
+  {
+    ...baseColumns,
+    name: text("name").notNull(),
+    regNumber: text("reg_number"),
+    association: text("association"),
+    sire: jsonb("sire").$type<{ kind: string; id: string }>(),
+    dam: jsonb("dam").$type<{ kind: string; id: string }>(),
+    notes: text("notes"),
+  },
+  baseIndexes("external_animals"),
+);
+
 export const zoneAssignments = pgTable(
   "zone_assignments",
   {
@@ -466,6 +527,8 @@ export const allTables = {
   zones,
   pastureCareLogs,
   animals,
+  cattleProfiles,
+  externalAnimals,
   zoneAssignments,
   feedingPlans,
   contacts,

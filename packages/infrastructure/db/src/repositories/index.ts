@@ -29,6 +29,8 @@ export const SEARCHABLE_FIELDS = {
   zones: ["name", "customInstructions"],
   pastureCareLogs: ["product", "notes"],
   animals: ["name", "tagNumber", "notes"],
+  cattleProfiles: ["colour", "markings"],
+  externalAnimals: ["name", "regNumber"],
   // Assignments are found through the animal or the zone, never by typing.
   zoneAssignments: [],
   feedingPlans: ["name", "specialNotes"],

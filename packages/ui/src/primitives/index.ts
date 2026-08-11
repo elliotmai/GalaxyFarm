@@ -9,6 +9,7 @@
 
 export * from "./button.js";
 export * from "./field.js";
+export * from "./layout.js";
 export * from "./surfaces.js";
 export * from "./tabs.js";
 export * from "./toast.js";

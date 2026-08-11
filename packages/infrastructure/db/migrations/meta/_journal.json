@@ -36,6 +36,13 @@
       "when": 1786474049360,
       "tag": "0004_money_as_jsonb",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786481103730,
+      "tag": "0005_cattle_profiles",
+      "breakpoints": true
     }
   ]
 }

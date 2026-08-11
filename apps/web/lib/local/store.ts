@@ -29,6 +29,8 @@ export const LOCAL_STORES = [
   "zones",
   "pastureCareLogs",
   "animals",
+  "cattleProfiles",
+  "externalAnimals",
   "zoneAssignments",
   "feedingPlans",
   "contacts",
@@ -54,8 +56,9 @@ export type LocalStoreName = (typeof LOCAL_STORES)[number];
  *
  * 2 — the outbox arrived.
  * 3 — pasture care logs, feeding plans, calendar events (spec §5.1).
+ * 4 — cattle profiles and external animals: papers and pedigree (§5.2).
  */
-export const LOCAL_SCHEMA_VERSION = 3;
+export const LOCAL_SCHEMA_VERSION = 4;
 
 /**
  * Which fields each entity's search box looks at.
@@ -72,6 +75,8 @@ const SEARCHABLE: Readonly<Record<LocalStoreName, readonly string[]>> = {
   zones: ["name", "customInstructions"],
   pastureCareLogs: ["product", "notes"],
   animals: ["name", "tagNumber", "notes"],
+  cattleProfiles: ["colour", "markings"],
+  externalAnimals: ["name", "regNumber"],
   zoneAssignments: [],
   feedingPlans: ["name", "specialNotes"],
   contacts: ["name", "company", "address", "notes"],

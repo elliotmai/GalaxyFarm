@@ -25,6 +25,7 @@
     "drizzle-kit": "^0.30.1",
     "dotenv": "^16.4.7",
     "@electric-sql/pglite": "^0.5.4",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "@galaxy-farm/module-cattle": "workspace:*"
   }
 }

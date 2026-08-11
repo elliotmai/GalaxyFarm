@@ -62,6 +62,8 @@ describe("schemaDrift", () => {
 
     expect([...drift.missingTables].sort()).toEqual([
       "calendar_events",
+      "cattle_profiles",
+      "external_animals",
       "feeding_plans",
       "pasture_care_logs",
     ]);
