@@ -21,7 +21,11 @@ import {
   zoneSchema,
 } from "@galaxy-farm/core";
 
-import { cattleProfileSchema, externalAnimalSchema } from "@galaxy-farm/module-cattle";
+import {
+  breedingRecordSchema,
+  cattleProfileSchema,
+  externalAnimalSchema,
+} from "@galaxy-farm/module-cattle";
 
 import { allTables } from "../src/schema/index.js";
 import { REPOSITORY_TABLES } from "../src/sync/entities.js";
@@ -53,6 +57,7 @@ const SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   animals: animalSchema,
   cattleProfiles: cattleProfileSchema,
   externalAnimals: externalAnimalSchema,
+  breedingRecords: breedingRecordSchema,
   zoneAssignments: zoneAssignmentSchema,
   feedingPlans: feedingPlanSchema,
   contacts: contactSchema,

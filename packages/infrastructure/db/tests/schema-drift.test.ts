@@ -60,13 +60,28 @@ describe("schemaDrift", () => {
 
     const drift = await schemaDrift(drizzle(pg) as unknown as Database);
 
-    expect([...drift.missingTables].sort()).toEqual([
+    // Named individually rather than as a whole-set equality: the set grows
+    // with every migration added after 0002, and a test that has to be edited
+    // each time a table is created is one that eventually gets edited without
+    // being read. What matters is that each of these is reported.
+    for (const table of [
       "calendar_events",
       "cattle_profiles",
       "external_animals",
       "feeding_plans",
       "pasture_care_logs",
-    ]);
+    ]) {
+      expect(drift.missingTables).toContain(table);
+    }
+
+    // And the other half of accuracy: nothing that *is* there gets reported.
+    // A drift check that cries wolf about existing tables is one people learn
+    // to skip past, which is how the outage this test was written for happened.
+    const live = await pg.query<{ table_name: string }>(
+      "select table_name from information_schema.tables where table_schema = 'public'",
+    );
+    const present = new Set(live.rows.map((row) => row.table_name));
+    expect(drift.missingTables.filter((table) => present.has(table))).toEqual([]);
     expect(drift.missingColumns.map((entry) => `${entry.table}.${entry.column}`).sort()).toEqual([
       "properties.safety_level_labels",
       "purchase_candidates.asking_price",

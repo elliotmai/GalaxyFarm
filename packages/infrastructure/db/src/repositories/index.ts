@@ -31,6 +31,7 @@ export const SEARCHABLE_FIELDS = {
   animals: ["name", "tagNumber", "notes"],
   cattleProfiles: ["colour", "markings"],
   externalAnimals: ["name", "regNumber"],
+  breedingRecords: ["notes", "embryoCode"],
   // Assignments are found through the animal or the zone, never by typing.
   zoneAssignments: [],
   feedingPlans: ["name", "specialNotes"],

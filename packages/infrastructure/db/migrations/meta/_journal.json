@@ -43,6 +43,13 @@
       "when": 1786481103730,
       "tag": "0005_cattle_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786483343508,
+      "tag": "0006_breeding_records",
+      "breakpoints": true
     }
   ]
 }

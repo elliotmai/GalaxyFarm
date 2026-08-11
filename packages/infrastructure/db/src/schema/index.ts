@@ -214,6 +214,41 @@ export const externalAnimals = pgTable(
   baseIndexes("external_animals"),
 );
 
+/**
+ * Breeding, and every date that falls out of it (spec §5.2).
+ *
+ * `date` and `gestationDays` are the only things anybody types. The due date,
+ * the calving window, the preg-check reminder and the watch card are all
+ * derived from them (§2), so correcting a breeding date moves everything
+ * downstream rather than leaving a stale copy behind.
+ */
+export const breedingRecords = pgTable(
+  "breeding_records",
+  {
+    ...baseColumns,
+    damId: text("dam_id").notNull(),
+    method: text("method").notNull(),
+    bullId: text("bull_id"),
+    semenInventoryId: text("semen_inventory_id"),
+    sireExternalId: text("sire_external_id"),
+    embryoDonorId: text("embryo_donor_id"),
+    embryoCode: text("embryo_code"),
+    date: timestamp("date", { withTimezone: true, mode: "date" }).notNull(),
+    technicianId: text("technician_id"),
+    syncProtocolId: text("sync_protocol_id"),
+    pregCheck: jsonb("preg_check").$type<{
+      date: string;
+      result: string;
+      method: string;
+      notes?: string;
+    }>(),
+    /** Overrides the property default; §12 decision 2 makes it configurable. */
+    gestationDays: integer("gestation_days"),
+    notes: text("notes"),
+  },
+  baseIndexes("breeding_records"),
+);
+
 export const zoneAssignments = pgTable(
   "zone_assignments",
   {
@@ -529,6 +564,7 @@ export const allTables = {
   animals,
   cattleProfiles,
   externalAnimals,
+  breedingRecords,
   zoneAssignments,
   feedingPlans,
   contacts,
