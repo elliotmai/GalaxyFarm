@@ -348,21 +348,21 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     kind: "entity",
     declares: ["flockSchema", "flockAdjustmentSchema", "headCountOn"],
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
   },
   EggLog: {
     section: "5.4",
     kind: "entity",
     declares: ["eggLogSchema", "eggBreakdownSchema", "eggTotalsByPeriod"],
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
   },
   EggDisposition: {
     section: "5.4",
     kind: "entity",
     declares: ["eggDispositionSchema", "EGG_DISPOSITIONS"],
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
   },
 
   // ---------------------------------------------------------------- §5.5
@@ -422,7 +422,7 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     kind: "entity",
     declares: ["equipmentSchema", "EQUIPMENT_CATEGORIES"],
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
   },
   MaintenanceRule: {
     section: "5.6",
@@ -435,14 +435,14 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
       "maintenanceDue",
     ],
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
   },
   EquipmentCandidate: {
     section: "5.6",
     kind: "entity",
     declares: ["equipmentCandidateSchema", "pricePerMile", "pricePerHour", "TITLE_STATUSES"],
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
   },
   EquipmentRoadmap: {
     section: "5.6",
@@ -554,28 +554,28 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     kind: "entity",
     declares: ["supplyItemSchema", "SUPPLY_CATEGORIES", "isLowStock"],
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
   },
   SupplyPurchase: {
     section: "5.11",
     kind: "entity",
     declares: ["supplyPurchaseSchema"],
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
   },
   SupplyUsage: {
     section: "5.11",
     kind: "entity",
     declares: ["supplyUsageSchema", "stockOnHand"],
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
   },
   "Durable tracking": {
     section: "5.11",
     kind: "entity",
     declares: ["durableAssignmentSchema", "DURABLE_CONDITIONS"],
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
   },
 };
 
@@ -598,7 +598,7 @@ export const SECTION_ONLY_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> 
     kind: "entity",
     declares: ["horseCandidateSchema", "TRAINING_LEVELS", "SOUNDNESS_STATUSES"],
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
   },
 };
 
@@ -628,7 +628,7 @@ export const NOTIFICATION_COVERAGE: Readonly<
   "maintenance due (hours/miles/date)": {
     derivedFrom: "maintenanceDue",
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
   },
   "bull ring due": { derivedFrom: "ruleDeadlines", phase: "Phase 5", status: "planned" },
   "bull/heifer/steer departure approaching": {
@@ -662,7 +662,7 @@ export const NOTIFICATION_COVERAGE: Readonly<
     phase: "Phase 1",
     status: "built",
   },
-  "supply low-stock": { derivedFrom: "isLowStock", phase: "Phase 2", status: "planned" },
+  "supply low-stock": { derivedFrom: "isLowStock", phase: "Phase 2", status: "built" },
   "purchase-candidate sale date approaching": {
     derivedFrom: "isExpiring",
     phase: "Phase 1",
