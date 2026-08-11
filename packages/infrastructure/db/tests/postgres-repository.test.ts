@@ -7,7 +7,7 @@ import {
   repositoryConformanceCases,
   unsearchableRepositoryCases,
   type ConformanceRecord,
-} from "@galaxy-farm/core";
+} from "@galaxy-farm/core/testing";
 
 import { baseColumns } from "../src/schema/columns.js";
 import {

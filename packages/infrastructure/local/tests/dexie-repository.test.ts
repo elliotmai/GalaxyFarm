@@ -5,7 +5,7 @@ import {
   repositoryConformanceCases,
   unsearchableRepositoryCases,
   type ConformanceRecord,
-} from "@galaxy-farm/core";
+} from "@galaxy-farm/core/testing";
 
 import { FarmDatabase } from "../src/database.js";
 import { DexieRepository } from "../src/dexie-repository.js";

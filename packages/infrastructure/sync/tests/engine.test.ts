@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { InMemoryRepository, fixedClock, type BaseRecord, type Ulid } from "@galaxy-farm/core";
+import { fixedClock, type BaseRecord, type Ulid } from "@galaxy-farm/core";
+import { InMemoryRepository } from "@galaxy-farm/core/testing";
 
 import { InMemoryOutbox } from "../src/outbox.js";
 import { SyncEngine } from "../src/engine.js";

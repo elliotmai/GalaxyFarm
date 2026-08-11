@@ -1,35 +1,31 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
-import { systemClock, type Actor, type Role, type Ulid } from "@galaxy-farm/core";
+import { systemClock, type Actor } from "@galaxy-farm/core";
 import { signIn as verifyCredentials } from "@galaxy-farm/infra-auth";
 
+import { authConfig } from "@/lib/auth.config";
 import { credentialStore } from "@/lib/credential-store";
 
 /**
  * Auth.js, over our own users table (spec §4.3).
  *
- * JWT sessions rather than database sessions. Credentials providers cannot use
- * database sessions anyway, and a stateless session is the right shape here:
- * every read in this app comes from the device's local store (§4.2), so a
- * session lookup on each request would add a Neon round trip to pages that
- * otherwise touch the database not at all.
+ * This file loads only in the Node runtime — the credentials provider hashes
+ * with scrypt. The middleware uses `auth.config.ts`, which carries the same
+ * callbacks and no providers.
+ *
+ * JWT sessions rather than database sessions. A credentials provider cannot
+ * use database sessions anyway, and stateless is the right shape here: every
+ * read comes from the device's local store (§4.2), so a session lookup per
+ * request would add a Neon round trip to pages that otherwise touch the
+ * database not at all.
  *
  * The token carries only what a capability check needs — id, role, property,
- * and the access window. Not the name, not the email, and certainly not the
- * hash: a JWT is signed, not encrypted at rest in the browser, and everything
- * put in one is readable by whoever holds the cookie.
+ * access window. Not the name, not the email, and certainly not the hash: a
+ * JWT is signed, not secret, and whoever holds the cookie can read it.
  */
-
-declare module "next-auth" {
-  interface Session {
-    actor: Actor;
-  }
-}
-
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt" },
-  pages: { signIn: "/login" },
+  ...authConfig,
 
   providers: [
     Credentials({
@@ -48,9 +44,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           systemClock(),
         );
 
-        // Returning null for every failure keeps the responses
-        // indistinguishable all the way out to the browser, which is the
-        // property `signIn` went to some trouble to establish.
+        // Null for every failure, so the responses stay indistinguishable all
+        // the way out to the browser — the property `signIn` went to some
+        // trouble to establish.
         if (!result.ok) return null;
 
         return {
@@ -65,36 +61,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-
-  callbacks: {
-    jwt({ token, user }) {
-      // `user` is set only on the sign-in pass; afterwards the token is
-      // whatever was already there.
-      if (user !== undefined) {
-        const source = user as unknown as Record<string, unknown>;
-        token["role"] = source["role"];
-        token["propertyId"] = source["propertyId"];
-        token["accessFrom"] = source["accessFrom"];
-        token["accessTo"] = source["accessTo"];
-      }
-      return token;
-    },
-
-    session({ session, token }) {
-      const from = token["accessFrom"];
-      const to = token["accessTo"];
-
-      session.actor = {
-        id: token.sub as Ulid,
-        role: token["role"] as Role,
-        propertyId: token["propertyId"] as Ulid,
-        ...(typeof from === "string" && typeof to === "string"
-          ? { accessWindow: { from: new Date(from), to: new Date(to) } }
-          : {}),
-      };
-      return session;
-    },
-  },
 });
 
 /**

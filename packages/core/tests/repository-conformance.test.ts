@@ -1,11 +1,11 @@
 import { describe, it } from "vitest";
 
-import { InMemoryRepository } from "../src/testing/in-memory-repository.js";
 import {
+  InMemoryRepository,
   repositoryConformanceCases,
   unsearchableRepositoryCases,
   type ConformanceRecord,
-} from "../src/testing/repository-conformance.js";
+} from "../src/testing/index.js";
 
 /**
  * The in-memory repository is the reference implementation. If it cannot pass
