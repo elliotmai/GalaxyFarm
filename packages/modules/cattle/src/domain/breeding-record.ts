@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   addDays,
   baseRecordSchema,
-  daysBetween,
+  MS_PER_DAY,
   ulidSchema,
   type BaseRecord,
   type DateRange,
@@ -152,9 +152,15 @@ export function isInCalvingWindow(
   return now >= window.from && now < (window.to as Date);
 }
 
-/** Days along she is, which is how a calving-watch alert says it out loud. */
+/**
+ * Days along she is, which is how a calving-watch alert says it out loud.
+ *
+ * Floored rather than rounded. A cow is "at day 279" for the whole of day 279,
+ * not from lunchtime onwards — `daysBetween` rounds, which would have her at
+ * day 280 by early afternoon and report two different numbers for one evening.
+ */
 export function daysBred(record: Pick<BreedingRecord, "date">, now: Date): number {
-  return daysBetween(record.date, now);
+  return Math.floor((now.getTime() - record.date.getTime()) / MS_PER_DAY);
 }
 
 /**

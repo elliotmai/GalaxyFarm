@@ -3,6 +3,7 @@ import type { Ulid } from "../types/ids.js";
 import type { ListQuery } from "../crud/contracts.js";
 
 export * from "./sync.js";
+export * from "./weather.js";
 
 /**
  * Ports the domain defines and infrastructure implements (spec §4.1).

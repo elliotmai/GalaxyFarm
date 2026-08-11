@@ -19,3 +19,4 @@ export * from "./ports/index.js";
 export * from "./crud/index.js";
 export * from "./auth/index.js";
 export * from "./sync/index.js";
+export * from "./weather/index.js";

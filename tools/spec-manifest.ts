@@ -669,12 +669,12 @@ export const NOTIFICATION_COVERAGE: Readonly<
     status: "built",
   },
   "candidate listing expiring": { derivedFrom: "isExpiring", phase: "Phase 1", status: "built" },
-  "frost warning": { derivedFrom: "frostRisk", phase: "Phase 3", status: "planned" },
-  "tank-freeze warning": { derivedFrom: "freezeCheckTargets", phase: "Phase 2", status: "built" },
+  "frost warning": { derivedFrom: "frostRisk", phase: "Phase 3", status: "built" },
+  "tank-freeze warning": { derivedFrom: "freezeChores", phase: "Phase 2", status: "built" },
   "calving watch (pressure drop / full moon / cold snap inside a due window)": {
     derivedFrom: "calvingWatchSignals",
     phase: "Phase 1",
-    status: "planned",
+    status: "built",
   },
 };
 
