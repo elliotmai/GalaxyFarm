@@ -318,28 +318,28 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     kind: "entity",
     declares: ["feedTypeSchema", "FEED_CATEGORIES", "FEED_UNITS"],
     phase: "Phase 1",
-    status: "planned",
+    status: "built",
   },
   FeedPurchase: {
     section: "5.3",
     kind: "entity",
     declares: ["feedPurchaseSchema", "feedConsumptionSchema"],
     phase: "Phase 1",
-    status: "planned",
+    status: "built",
   },
   "Inventory & projections": {
     section: "5.3",
     kind: "derivation",
-    declares: ["onHand", "dailyDemand", "runOutDate", "reorderOn"],
+    declares: ["onHand", "dailyDemand", "runOutDate", "reorderOn", "projectFeed"],
     phase: "Phase 1",
-    status: "planned",
+    status: "built",
   },
   "Cost per head": {
     section: "5.3",
     kind: "derivation",
     declares: ["allocateFeedCost", "costPerHead"],
     phase: "Phase 1",
-    status: "planned",
+    status: "built",
   },
 
   // ---------------------------------------------------------------- §5.4
@@ -623,7 +623,7 @@ export const NOTIFICATION_COVERAGE: Readonly<
     phase: "Phase 1",
     status: "built",
   },
-  "feed run-out approaching": { derivedFrom: "reorderOn", phase: "Phase 1", status: "planned" },
+  "feed run-out approaching": { derivedFrom: "reorderOn", phase: "Phase 1", status: "built" },
   "med expiring": { derivedFrom: "expiringSoon", phase: "Phase 1", status: "built" },
   "maintenance due (hours/miles/date)": {
     derivedFrom: "maintenanceDue",
