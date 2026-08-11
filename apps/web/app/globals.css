@@ -1,14 +1,28 @@
 /*
- * Design tokens land in @galaxy-farm/ui (spec §8, "Midnight Nebula /
- * Bluebonnet Linen"). This file only carries the reset until then.
+ * The design tokens ship from @galaxy-farm/ui (spec §8, "Midnight Nebula /
+ * Bluebonnet Linen"). Theme and density are set on the route-group layouts and
+ * read from there — nothing below this line knows which surface it is on.
  */
+@import "@galaxy-farm/ui/theme.css";
+
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
+html {
+  /* The page behind the surfaces. Without it a short page shows the browser's
+     own white below the fold, which on the admin theme is a bright band. */
+  background-color: var(--gf-canvas, #0e1026);
+}
+
 body {
   margin: 0;
   font-family: Inter, system-ui, sans-serif;
+}
+
+/* Surfaces fill the viewport so their canvas reaches the bottom of a short page. */
+[data-surface] {
+  min-height: 100vh;
 }

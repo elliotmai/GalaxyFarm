@@ -7,3 +7,6 @@
  */
 
 export * from "./confirm/index.js";
+export * from "./tokens/contrast.js";
+export * from "./safety/safety-badge.js";
+export * from "./halter/halter-swatch.js";

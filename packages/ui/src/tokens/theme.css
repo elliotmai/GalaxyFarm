@@ -1,0 +1,130 @@
+/*
+ * Theme and density tokens (spec §8).
+ *
+ * Theme is a property of the surface, not a user preference, so it is set once
+ * on the route-group layout and read from there by everything inside. A
+ * component that branched on the theme would have to be revisited every time a
+ * surface moved; a component that named `midnight` would be wrong the first
+ * time it appeared on the customer portal.
+ *
+ * Density is the same idea for layout: `desktop` is data-dense tables with side
+ * panels, `mobile` is one-thumb logging, `kiosk` is a 64px target pressed with
+ * a gloved hand in February by someone who is not looking closely.
+ *
+ * The values here mirror `themes` and `density` in
+ * `@galaxy-farm/config/tailwind`. That file is what the contrast tests read and
+ * this file is what ships, so `tests/theme-tokens.test.ts` asserts the two
+ * still agree — a token changed in one place and not the other is otherwise
+ * invisible until someone photographs a badge that has gone unreadable.
+ */
+
+[data-theme="midnight-nebula"] {
+  --gf-canvas: #0e1026;
+  --gf-panel: #191c3c;
+  --gf-text: #f2efe6;
+  --gf-muted: #a8a6bc;
+  --gf-border: #6e7298;
+  --gf-action: #8ca3e8;
+  --gf-action-ink: #14141f;
+  --gf-identity: #9d85e8;
+  --gf-calm: #a3bc9c;
+  --gf-danger: #f08a84;
+
+  color-scheme: dark;
+}
+
+[data-theme="bluebonnet-linen"] {
+  --gf-canvas: #f8f5ec;
+  --gf-panel: #ffffff;
+  --gf-text: #24243a;
+  --gf-muted: #565669;
+  --gf-border: #888897;
+  --gf-action: #35569e;
+  --gf-action-ink: #ffffff;
+  --gf-identity: #5f45b0;
+  --gf-calm: #5b7154;
+  --gf-danger: #b3261e;
+
+  color-scheme: light;
+}
+
+/* Surfaces paint their own ground; nothing inherits a colour from the host. */
+[data-theme] {
+  background-color: var(--gf-canvas);
+  color: var(--gf-text);
+}
+
+/*
+ * No explicit density means "follow the viewport": a phone gets the mobile
+ * layout, a laptop gets the dense one. Only the kiosk fixes its density,
+ * because a kiosk is a known screen at a known distance — everything else is
+ * whatever someone happens to be holding.
+ */
+[data-theme]:not([data-density]) {
+  --gf-control: 44px;
+  --gf-touch-target: 44px;
+  --gf-text-size: 16px;
+  --gf-gap: 14px;
+  --gf-radius: 10px;
+}
+
+@media (min-width: 48rem) {
+  [data-theme]:not([data-density]) {
+    --gf-control: 36px;
+    --gf-touch-target: 36px;
+    --gf-text-size: 15px;
+    --gf-gap: 12px;
+    --gf-radius: 6px;
+  }
+}
+
+[data-density="desktop"] {
+  --gf-control: 36px;
+  --gf-touch-target: 36px;
+  --gf-text-size: 15px;
+  --gf-gap: 12px;
+  --gf-radius: 6px;
+}
+
+[data-density="mobile"] {
+  --gf-control: 44px;
+  --gf-touch-target: 44px;
+  --gf-text-size: 16px;
+  --gf-gap: 14px;
+  --gf-radius: 10px;
+}
+
+[data-density="kiosk"] {
+  --gf-control: 64px;
+  --gf-touch-target: 64px;
+  --gf-text-size: 20px;
+  --gf-gap: 20px;
+  --gf-radius: 14px;
+}
+
+[data-theme] {
+  font-size: var(--gf-text-size);
+}
+
+/*
+ * Numbers that carry meaning line up in columns — weights, tag numbers, straw
+ * counts, egg totals. Proportional figures make a column of weights impossible
+ * to scan, and scanning is the whole reason the column exists.
+ */
+.gf-numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Respect a reduced-motion preference everywhere rather than per component.
+ * A kiosk in a barn has no business animating at someone who asked it not to.
+ */
+@media (prefers-reduced-motion: reduce) {
+  [data-theme] *,
+  [data-theme] *::before,
+  [data-theme] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
