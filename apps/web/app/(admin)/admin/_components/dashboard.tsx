@@ -37,8 +37,19 @@ export function Dashboard({ propertyId }: { readonly propertyId: Ulid }) {
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
   const { records: water } = useRecords<WaterSource>("waterSources", query);
 
+  // The heading stays put through every state. A page whose `h1` only exists
+  // once its data arrives has no heading at all while it is loading and none
+  // when it is empty — which is the state a new install spends its first week
+  // in, and the state the e2e suite found it in.
+  const heading = <h1 className="font-heading text-2xl font-semibold text-ink">Today</h1>;
+
   if (zonesLoading) {
-    return <p className="text-muted">Loading the farm…</p>;
+    return (
+      <div className="flex flex-col gap-density">
+        {heading}
+        <p className="text-muted">Loading the farm…</p>
+      </div>
+    );
   }
 
   const inUse = new Set(assignments.filter((a) => a.periodTo === undefined).map((a) => a.zoneId))
@@ -47,16 +58,19 @@ export function Dashboard({ propertyId }: { readonly propertyId: Ulid }) {
 
   if (zones.length === 0) {
     return (
-      <EmptyState
-        title="Nothing here yet"
-        detail="Run pnpm db:seed to load the property, or add a zone to get started."
-      />
+      <div className="flex flex-col gap-density">
+        {heading}
+        <EmptyState
+          title="Nothing here yet"
+          detail="Run pnpm db:seed to load the property, or add a zone to get started."
+        />
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-density">
-      <h1 className="font-heading text-2xl font-semibold text-ink">Today</h1>
+      {heading}
 
       {/*
         First, above the pen board. §12 decision 5 pulled the calving watch

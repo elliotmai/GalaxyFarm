@@ -17,14 +17,22 @@ export function PagePlaceholder({
   route: string;
   phase?: string;
 }) {
+  // A `section`, not a `main`. Every route group's layout already provides the
+  // page's single `main` landmark, and a second one nested inside it is invalid
+  // HTML — a screen reader offers two "main" landmarks and neither is the page.
+  // It also broke the e2e suite's `main` locator, which is how it was found.
   return (
-    <main data-testid="page-placeholder" data-route={route}>
-      <h1>{title}</h1>
-      <p>
+    <section
+      data-testid="page-placeholder"
+      data-route={route}
+      className="flex flex-col gap-density"
+    >
+      <h1 className="font-heading text-2xl font-semibold text-ink">{title}</h1>
+      <p className="text-muted">
         This screen is scaffolded but not implemented yet.
         {phase ? ` Planned for ${phase}.` : ""}
       </p>
-      <code>{route}</code>
-    </main>
+      <code className="text-sm text-muted">{route}</code>
+    </section>
   );
 }
