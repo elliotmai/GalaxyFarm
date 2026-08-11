@@ -10,3 +10,4 @@ export * from "./patch.js";
 export * from "./merge.js";
 export * from "./cursors.js";
 export * from "./transport.js";
+export * from "./retry.js";

@@ -21,9 +21,10 @@
 [data-theme="midnight-nebula"] {
   --gf-canvas: #0e1026;
   --gf-panel: #191c3c;
+  --gf-raised: #242a52;
   --gf-text: #f2efe6;
-  --gf-muted: #a8a6bc;
-  --gf-border: #6e7298;
+  --gf-muted: #b4b2c8;
+  --gf-border: #7c80a6;
   --gf-action: #8ca3e8;
   --gf-action-ink: #14141f;
   --gf-identity: #9d85e8;
@@ -36,6 +37,8 @@
 [data-theme="bluebonnet-linen"] {
   --gf-canvas: #f8f5ec;
   --gf-panel: #ffffff;
+  --gf-raised: #f1eee4;
+  --gf-raised: #f1eee4;
   --gf-text: #24243a;
   --gf-muted: #565669;
   --gf-border: #888897;

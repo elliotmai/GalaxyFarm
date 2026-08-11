@@ -40,7 +40,13 @@ export interface OutboxEntry {
   readonly patch: Patch;
   readonly queuedAt: Date;
   readonly deviceId: string;
-  /** Incremented on each failed drain; drives backoff. */
+  /**
+   * How many times the *server* has rejected this entry.
+   *
+   * Not "how many times a sync failed". A server that was down is not a
+   * verdict on the entry, and counting it as one is how a whole outbox went
+   * permanently stuck during an outage that lasted eight minutes.
+   */
   readonly attempts: number;
   readonly lastError?: string | undefined;
 }
@@ -51,7 +57,21 @@ export interface OutboxStore {
   pending(limit?: number): Promise<OutboxEntry[]>;
   /** Remove entries the server has accepted. */
   ack(ids: readonly Ulid[]): Promise<void>;
-  /** Record a failure and bump the attempt count. */
+  /**
+   * The server considered this entry and refused it. Bumps the attempt count.
+   */
   fail(id: Ulid, error: string): Promise<void>;
+  /**
+   * The entry could not be delivered at all — no signal, or a server that
+   * answered 500 to the whole batch.
+   *
+   * Records why, and deliberately does *not* count as an attempt: the entry
+   * did nothing wrong and must not be retired for somebody else's outage.
+   */
+  defer(id: Ulid, error: string): Promise<void>;
   size(): Promise<number>;
+  /** Entries retired after too many rejections, which a person has to see. */
+  stuck(): Promise<OutboxEntry[]>;
+  /** Put a retired entry back in the queue. */
+  revive(ids: readonly Ulid[]): Promise<void>;
 }

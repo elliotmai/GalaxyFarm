@@ -42,7 +42,17 @@ export interface SyncState {
   readonly lastSyncedAt: Date | undefined;
   /** Local edits not yet accepted by the server. */
   readonly pending: number;
+  /**
+   * Edits the server rejected often enough to be set aside.
+   *
+   * Counted apart from `pending` because they mean something different: these
+   * will not go on their own, and a badge that folds them into one number is a
+   * badge that says "12 to send" for a fortnight.
+   */
+  readonly stuck: number;
   syncNow(): Promise<void>;
+  /** Put the set-aside entries back in the queue. */
+  retryStuck(): Promise<void>;
 }
 
 const SyncContext = createContext<SyncState | undefined>(undefined);
@@ -62,6 +72,7 @@ export function SyncProvider({ children }: { readonly children: ReactNode }) {
   const [problem, setProblem] = useState<string | undefined>();
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | undefined>();
   const [pending, setPending] = useState(0);
+  const [stuck, setStuck] = useState(0);
   const running = useRef(false);
 
   useEffect(() => {
@@ -87,11 +98,18 @@ export function SyncProvider({ children }: { readonly children: ReactNode }) {
         saveCursors(store.engine.cursorState());
       }
       setPending(await store.engine.pendingCount());
+      setStuck(await store.engine.stuckCount());
     } finally {
       running.current = false;
       setSyncing(false);
     }
   }, [store]);
+
+  const retryStuck = useCallback(async () => {
+    if (store === undefined) return;
+    await store.engine.retryStuck();
+    await syncNow();
+  }, [store, syncNow]);
 
   useEffect(() => {
     if (store === undefined) return;
@@ -117,8 +135,8 @@ export function SyncProvider({ children }: { readonly children: ReactNode }) {
   }, [store, syncNow]);
 
   const value = useMemo<SyncState>(
-    () => ({ store, syncing, offline, problem, lastSyncedAt, pending, syncNow }),
-    [store, syncing, offline, problem, lastSyncedAt, pending, syncNow],
+    () => ({ store, syncing, offline, problem, lastSyncedAt, pending, stuck, syncNow, retryStuck }),
+    [store, syncing, offline, problem, lastSyncedAt, pending, stuck, syncNow, retryStuck],
   );
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;

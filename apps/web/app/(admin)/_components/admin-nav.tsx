@@ -222,7 +222,24 @@ export function AdminNav({ farmName }: { readonly farmName: string }) {
  * say so.
  */
 function SyncBadge() {
-  const { offline, problem, syncing, pending } = useSync();
+  const { offline, problem, syncing, pending, stuck, retryStuck } = useSync();
+
+  // Set-aside entries first: they are the only state here that will not fix
+  // itself, and the only one with something for a person to do about it.
+  if (stuck > 0) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge tone="danger">{stuck} not sent</Badge>
+        <button
+          type="button"
+          onClick={() => void retryStuck()}
+          className="min-h-target text-sm text-action underline underline-offset-4"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   if (syncing) return <Badge tone="neutral">Syncing…</Badge>;
   if (problem !== undefined) {

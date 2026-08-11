@@ -1,4 +1,4 @@
-import { advance, cursorFor, isServerError } from "@galaxy-farm/core";
+import { advance, backoffDelayMs, cursorFor, drainableNow, isServerError } from "@galaxy-farm/core";
 import type {
   AuditEntry,
   BaseRecord,
@@ -12,12 +12,7 @@ import type {
   SyncTransport,
 } from "@galaxy-farm/core";
 
-import {
-  drainableNow,
-  type OutboxEntry,
-  type OutboxOperation,
-  type OutboxStore,
-} from "./outbox.js";
+import { type OutboxEntry, type OutboxOperation, type OutboxStore } from "./outbox.js";
 
 /**
  * The engine that drives push and pull (spec §4.2).
@@ -68,6 +63,16 @@ export class SyncEngine<T extends BaseRecord> {
   private cursors: CursorSet = {};
   private lastAttemptAt: Date | undefined;
 
+  /**
+   * Consecutive failures to reach the server at all.
+   *
+   * Backoff belongs to the connection, not to the entries waiting on it. A
+   * server that is down is not a verdict on what somebody typed, so the delay
+   * is tracked here and every queued entry keeps its attempt count of zero.
+   */
+  private transportFailures = 0;
+  private lastFailureAt: Date | undefined;
+
   constructor(private readonly options: SyncEngineOptions<T>) {}
 
   /**
@@ -93,6 +98,29 @@ export class SyncEngine<T extends BaseRecord> {
     return this.options.outbox.size();
   }
 
+  /** Entries the server has rejected often enough to be set aside (§4.2). */
+  async stuckCount(): Promise<number> {
+    return (await this.options.outbox.stuck()).length;
+  }
+
+  /**
+   * Put every retired entry back in the queue.
+   *
+   * Offered rather than automatic. An entry the server keeps refusing usually
+   * needs a person to look at what it is trying to write; retrying it on a
+   * timer forever would just hide that.
+   */
+  async retryStuck(): Promise<number> {
+    const stuck = await this.options.outbox.stuck();
+    await this.options.outbox.revive(stuck.map((entry) => entry.id));
+    // Cleared so the revived entries are eligible immediately rather than
+    // waiting out a backoff earned before they were set aside.
+    this.lastAttemptAt = undefined;
+    this.transportFailures = 0;
+    this.lastFailureAt = undefined;
+    return stuck.length;
+  }
+
   cursorState(): CursorSet {
     return this.cursors;
   }
@@ -104,8 +132,28 @@ export class SyncEngine<T extends BaseRecord> {
 
   async push(): Promise<Omit<SyncOutcome, "pulled">> {
     const now = this.options.clock.now();
-    const queued = await this.options.outbox.pending(this.options.batchSize ?? 50);
-    const ready = drainableNow(queued, now, this.lastAttemptAt);
+
+    // Still cooling off from a server that could not be reached. Returning
+    // early rather than hammering a dead endpoint every time the tab regains
+    // focus; the entries themselves are untouched and stay eligible.
+    if (
+      this.lastFailureAt !== undefined &&
+      now.getTime() - this.lastFailureAt.getTime() < backoffDelayMs(this.transportFailures)
+    ) {
+      return { pushed: 0, rejected: 0, audit: [], offline: this.transportFailures > 0 };
+    }
+
+    // The whole queue, then filter, then take a batch — in that order.
+    //
+    // Taking the oldest N and *then* filtering is head-of-line blocking: a
+    // handful of retired entries at the front of the queue makes every fresh
+    // edit behind them invisible to this method, and the count on screen goes
+    // up forever while nothing is ever sent. That is exactly what happened.
+    const queued = await this.options.outbox.pending();
+    const ready = drainableNow(queued, now, this.lastAttemptAt).slice(
+      0,
+      this.options.batchSize ?? 50,
+    );
 
     if (ready.length === 0) {
       return { pushed: 0, rejected: 0, audit: [], offline: false };
@@ -122,12 +170,23 @@ export class SyncEngine<T extends BaseRecord> {
       // point of the outbox — but a refusal is reported so it can be shown as
       // a fault rather than as ordinary offline.
       const reason = error instanceof Error ? error.message : String(error);
-      for (const entry of ready) await this.options.outbox.fail(entry.id, reason);
+      // `defer`, not `fail`. Nothing here was rejected — the batch never
+      // arrived — and counting an outage against each entry is what retires a
+      // whole outbox eight minutes into a server being down.
+      for (const entry of ready) await this.options.outbox.defer(entry.id, reason);
+
+      this.transportFailures += 1;
+      this.lastFailureAt = now;
 
       return isServerError(error)
         ? { pushed: 0, rejected: 0, audit: [], offline: false, problem: reason }
         : { pushed: 0, rejected: 0, audit: [], offline: true };
     }
+
+    // Reached the server: the connection backoff resets whatever the server
+    // then had to say about individual entries.
+    this.transportFailures = 0;
+    this.lastFailureAt = undefined;
 
     await this.options.outbox.ack(result.accepted);
     for (const rejection of result.rejected) {

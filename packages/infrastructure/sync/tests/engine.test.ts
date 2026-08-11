@@ -114,7 +114,11 @@ describe("push", () => {
     expect(await outbox.size()).toBe(1);
   });
 
-  it("records the failure so backoff can space out the retry", async () => {
+  it("records why an entry did not go without counting it against the entry", async () => {
+    // The distinction that matters. A server that could not be reached is not
+    // a verdict on what somebody typed — counting it as one is how a whole
+    // outbox retired itself eight minutes into an outage and then sat there
+    // showing "12 to send" forever.
     const { engine, outbox } = harness({
       push: async () => {
         throw new Error("network unreachable");
@@ -124,8 +128,78 @@ describe("push", () => {
     await engine.push();
 
     const [entry] = await outbox.pending();
-    expect(entry?.attempts).toBe(1);
     expect(entry?.lastError).toBe("network unreachable");
+    expect(entry?.attempts).toBe(0);
+  });
+
+  it("never retires an entry no matter how long the server is down", async () => {
+    // Eight failed syncs used to be enough to set an entry aside permanently.
+    const { engine, outbox } = harness({
+      push: async () => {
+        throw new Error("still down");
+      },
+    });
+    await engine.enqueue("update", patch("01ARZ3NDEKTSV4RRFFQ69G5FR2"));
+
+    for (let round = 0; round < 20; round += 1) await engine.push();
+
+    expect(await outbox.stuck()).toEqual([]);
+  });
+
+  it("counts an attempt only when the server rejected that entry", async () => {
+    const { engine, outbox } = harness({
+      push: async (entries) => ({
+        accepted: [],
+        rejected: entries.map((entry) => ({ id: entry.id, reason: "validation failed" })),
+        audit: [],
+      }),
+    });
+    await engine.enqueue("update", patch("01ARZ3NDEKTSV4RRFFQ69G5FR3"));
+    await engine.push();
+
+    const [entry] = await outbox.pending();
+    expect(entry?.attempts).toBe(1);
+  });
+
+  it("does not let retired entries hide the fresh ones behind them", async () => {
+    // Head-of-line blocking, which is what actually stopped anything sending:
+    // the oldest N were taken and *then* filtered, so a few retired entries at
+    // the front of the queue made every later edit invisible to push.
+    const outbox = new InMemoryOutbox();
+    const sent: string[][] = [];
+    const engine = new SyncEngine<Cow>({
+      outbox,
+      transport: {
+        push: async (entries) => {
+          sent.push(entries.map((entry) => entry.id));
+          return { accepted: entries.map((entry) => entry.id), rejected: [], audit: [] };
+        },
+        pull: async () => [],
+      },
+      repositories: new Map(),
+      clock: fixedClock(at),
+      ids,
+      deviceId: "barn",
+      batchSize: 2,
+    });
+
+    const retired = await engine.enqueue("update", patch("01ARZ3NDEKTSV4RRFFQ69G5FS7"));
+    for (let round = 0; round < 8; round += 1) await outbox.fail(retired.id, "rejected");
+    const fresh = await engine.enqueue("update", patch("01ARZ3NDEKTSV4RRFFQ69G5FS8"));
+
+    await engine.push();
+
+    expect(sent[0]).toEqual([fresh.id]);
+  });
+
+  it("puts retired entries back when asked, and says how many", async () => {
+    const { engine, outbox } = harness();
+    const entry = await engine.enqueue("update", patch("01ARZ3NDEKTSV4RRFFQ69G5FS9"));
+    for (let round = 0; round < 8; round += 1) await outbox.fail(entry.id, "rejected");
+
+    expect(await engine.stuckCount()).toBe(1);
+    expect(await engine.retryStuck()).toBe(1);
+    expect(await engine.stuckCount()).toBe(0);
   });
 
   it("keeps a rejected entry but drops an accepted one from the same batch", async () => {

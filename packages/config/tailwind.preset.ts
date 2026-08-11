@@ -82,9 +82,14 @@ export const themes = {
   "midnight-nebula": {
     canvas: palette.midnight.canvas,
     panel: palette.midnight.panel,
+    // A step above panel, for anything sitting *on* a panel — a table head, a
+    // selected row, a nested well. §8 locks canvas and panel and says nothing
+    // about a third; without one, every surface on this theme is one of two
+    // near-identical values and the screen reads as flat dark-on-dark.
+    raised: "#242A52",
     text: palette.midnight.text,
-    muted: "#A8A6BC",
-    border: "#6E7298",
+    muted: "#B4B2C8",
+    border: "#7C80A6",
     action: palette.midnight.action,
     actionInk: chipInk.dark,
     identity: palette.midnight.identity,
@@ -94,6 +99,7 @@ export const themes = {
   "bluebonnet-linen": {
     canvas: palette.linen.canvas,
     panel: palette.linen.panel,
+    raised: "#F1EEE4",
     text: palette.linen.text,
     muted: "#565669",
     border: "#888897",
@@ -131,6 +137,7 @@ export const density = {
 const semanticColors = {
   canvas: "var(--gf-canvas)",
   panel: "var(--gf-panel)",
+  raised: "var(--gf-raised)",
   text: "var(--gf-text)",
   muted: "var(--gf-muted)",
   border: "var(--gf-border)",

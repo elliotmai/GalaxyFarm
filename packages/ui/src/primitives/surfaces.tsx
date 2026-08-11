@@ -19,7 +19,13 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 export function Card({ title, actions, children, className, ...rest }: CardProps) {
   return (
     <section
-      className={["rounded-density border border-edge bg-panel p-density text-ink", className ?? ""]
+      className={[
+        // A hairline plus a soft drop. Two near-identical dark surfaces need
+        // an edge *and* a shadow to read apart; on the light theme the shadow
+        // does most of the work and the border does the rest.
+        "rounded-density border border-edge bg-panel p-density text-ink shadow-[0_1px_2px_rgba(0,0,0,0.28),0_8px_24px_-12px_rgba(0,0,0,0.45)]",
+        className ?? "",
+      ]
         .filter(Boolean)
         .join(" ")}
       {...rest}

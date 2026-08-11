@@ -1,4 +1,4 @@
-import type { OutboxEntry, OutboxStore, Ulid } from "@galaxy-farm/core";
+import { isStuck, type OutboxEntry, type OutboxStore, type Ulid } from "@galaxy-farm/core";
 
 import { OUTBOX_STORE, type FarmDatabase, type StoredRecord } from "./database.js";
 
@@ -57,6 +57,28 @@ export class DexieOutbox implements OutboxStore {
       attempts: existing.attempts + 1,
       lastError: error,
     } as unknown as StoredRecord);
+  }
+
+  async defer(id: Ulid, error: string): Promise<void> {
+    const existing = (await this.table().get(id)) as unknown as StoredOutboxEntry | undefined;
+    if (existing === undefined) return;
+
+    // Why it did not go, without counting it against the entry. A server that
+    // was down is not a verdict on what somebody typed.
+    await this.table().put({ ...existing, lastError: error } as unknown as StoredRecord);
+  }
+
+  async stuck(): Promise<OutboxEntry[]> {
+    const rows = (await this.table().toArray()) as unknown as StoredOutboxEntry[];
+    return rows.map(fromStored).filter(isStuck);
+  }
+
+  async revive(ids: readonly Ulid[]): Promise<void> {
+    for (const id of ids) {
+      const existing = (await this.table().get(id)) as unknown as StoredOutboxEntry | undefined;
+      if (existing === undefined) continue;
+      await this.table().put({ ...existing, attempts: 0 } as unknown as StoredRecord);
+    }
   }
 
   async size(): Promise<number> {

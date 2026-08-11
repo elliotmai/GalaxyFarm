@@ -164,7 +164,7 @@ export interface StatProps {
  */
 export function Stat({ label, value, hint, emphasis = false }: StatProps) {
   return (
-    <div className="flex flex-col gap-1 rounded-density border border-edge bg-panel px-density py-3">
+    <div className="flex flex-col gap-1 rounded-density border border-edge bg-raised px-density py-3">
       <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
       <span
         className={`[font-variant-numeric:tabular-nums] ${
