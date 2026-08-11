@@ -1,6 +1,6 @@
 import type { OutboxEntry, OutboxStore, Ulid } from "@galaxy-farm/core";
 
-import type { FarmDatabase, StoredRecord } from "./database.js";
+import { OUTBOX_STORE, type FarmDatabase, type StoredRecord } from "./database.js";
 
 /**
  * The outbox, persisted to IndexedDB.
@@ -11,8 +11,9 @@ import type { FarmDatabase, StoredRecord } from "./database.js";
  * chute has to still be there tomorrow morning.
  */
 
-export const OUTBOX_STORE = "outbox";
-export const OUTBOX_INDEXES = "id, queuedAt, attempts";
+// Declared in `database.ts` so the table can be created unconditionally —
+// re-exported here because this is where callers look for it.
+export { OUTBOX_STORE, OUTBOX_INDEXES } from "./database.js";
 
 /** Dexie stores plain data, so the entry is flattened on the way in. */
 interface StoredOutboxEntry extends Record<string, unknown> {

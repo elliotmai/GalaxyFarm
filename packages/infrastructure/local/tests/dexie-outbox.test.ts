@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { OutboxEntry, Ulid } from "@galaxy-farm/core";
 
-import { FarmDatabase } from "../src/database.js";
+import Dexie from "dexie";
+
+import { FarmDatabase, RECORD_INDEXES } from "../src/database.js";
 import { DexieOutbox, OUTBOX_STORE } from "../src/dexie-outbox.js";
 
 /**
@@ -160,5 +162,94 @@ describe("DexieOutbox", () => {
 
     await expect(outbox.fail(ids[0]!, "gone")).resolves.toBeUndefined();
     expect(await outbox.size()).toBe(0);
+  });
+});
+
+/** A throwaway database, only ever asked about its schema. */
+function schemaDatabase(stores: string[]): FarmDatabase {
+  const db = new FarmDatabase({
+    name: `schema-${stores.join("-")}`,
+    stores,
+    indexedDB: new IDBFactory(),
+    iDBKeyRange: FakeIDBKeyRange as unknown as typeof IDBKeyRange,
+  });
+  open.push(db);
+  return db;
+}
+
+describe("the outbox table", () => {
+  it("exists even when nobody asked for it", async () => {
+    // The bug this caught: the app built its database from a list of entity
+    // stores and never mentioned the outbox, so the first queued write threw
+    // "Table outbox does not exist" — a store accepting work it could never
+    // send, which is the one failure this architecture exists to prevent.
+    const db = schemaDatabase(["animals"]);
+    await db.open();
+
+    try {
+      expect(db.tables.map((t) => t.name)).toContain(OUTBOX_STORE);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("is indexed as queued work, not as records", async () => {
+    // Entries have no propertyId, no updatedAt and no tombstone. Indexing them
+    // like records indexes three fields that are not there, and loses the two
+    // that drive draining: queue order and attempt count.
+    const db = schemaDatabase(["animals"]);
+    await db.open();
+
+    try {
+      const indexes = db.table(OUTBOX_STORE).schema.indexes.map((index) => index.name);
+      expect(indexes).toContain("queuedAt");
+      expect(indexes).toContain("attempts");
+      expect(indexes).not.toContain("propertyId");
+    } finally {
+      db.close();
+    }
+  });
+
+  it("does not create it twice when a caller lists it as well", async () => {
+    const db = schemaDatabase(["animals", OUTBOX_STORE]);
+    await db.open();
+
+    try {
+      expect(db.tables.filter((t) => t.name === OUTBOX_STORE)).toHaveLength(1);
+    } finally {
+      db.close();
+    }
+  });
+});
+
+describe("upgrading a device that already has a database", () => {
+  it("adds the outbox to an existing store without losing what is in it", async () => {
+    // Version 1 shipped without the outbox. A device that already holds one
+    // has to gain the table in place — telling somebody to clear site data
+    // means throwing away work that has not reached the server yet.
+    const storage = new IDBFactory();
+    const name = "upgrade-in-place";
+
+    // A version-1 database, as the first build created it.
+    const before = new Dexie(name, {
+      indexedDB: storage,
+      IDBKeyRange: FakeIDBKeyRange as unknown as typeof IDBKeyRange,
+    });
+    before.version(1).stores({ animals: RECORD_INDEXES });
+    await before.open();
+    await before.table("animals").put({ id: "01ARZ3NDEKTSV4RRFFQ69G5FA1", propertyId: "p" });
+    before.close();
+
+    const after = new FarmDatabase({
+      name,
+      stores: ["animals"],
+      indexedDB: storage,
+      iDBKeyRange: FakeIDBKeyRange as unknown as typeof IDBKeyRange,
+    });
+    open.push(after);
+    await after.open();
+
+    expect(after.tables.map((t) => t.name)).toContain(OUTBOX_STORE);
+    expect(await after.table("animals").count()).toBe(1);
   });
 });

@@ -20,6 +20,19 @@ export type StoredRecord = BaseRecord & Record<string, unknown>;
  */
 export const RECORD_INDEXES = "id, propertyId, updatedAt, deletedAt, [propertyId+deletedAt]";
 
+/**
+ * The outbox is not a record store, and is not optional.
+ *
+ * Its entries have no `propertyId`, no `updatedAt`, and no tombstone — they are
+ * queued work, not data — so indexing them like records would index three
+ * fields that do not exist. And every device that has a local store has an
+ * outbox: a store without one accepts writes it can never send, which is the
+ * one failure this whole architecture is built to prevent. So the table is
+ * created unconditionally rather than being something a caller lists.
+ */
+export const OUTBOX_STORE = "outbox";
+export const OUTBOX_INDEXES = "id, queuedAt, attempts";
+
 export interface FarmDatabaseOptions {
   readonly name?: string;
   /** Entity names to create tables for. */
@@ -44,9 +57,19 @@ export class FarmDatabase extends Dexie {
       ...(options.iDBKeyRange ? { IDBKeyRange: options.iDBKeyRange } : {}),
     });
 
-    this.version(1).stores(
-      Object.fromEntries(options.stores.map((store) => [store, RECORD_INDEXES])),
+    const records = Object.fromEntries(
+      options.stores
+        .filter((store) => store !== OUTBOX_STORE)
+        .map((store) => [store, RECORD_INDEXES]),
     );
+
+    // Version 1 shipped without the outbox table, and a browser that already
+    // holds one will not open against a changed version 1 — Dexie needs the
+    // history, not just the destination. Declaring both is what upgrades an
+    // existing device in place instead of asking somebody to clear site data,
+    // which on this app means throwing away work that has not synced yet.
+    this.version(1).stores(records);
+    this.version(2).stores({ ...records, [OUTBOX_STORE]: OUTBOX_INDEXES });
   }
 
   /**
