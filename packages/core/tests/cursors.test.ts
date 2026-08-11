@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { advance, cursorFor, isTombstone, since, type CursorSet } from "../src/cursors.js";
+import { advance, cursorFor, isTombstone, since, type CursorSet } from "../src/sync/cursors.js";
 
 const t = (iso: string) => new Date(iso);
 

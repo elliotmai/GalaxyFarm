@@ -1,4 +1,13 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 // Extensionless on purpose: drizzle-kit loads this file through a CommonJS
 // bundler that does not resolve the ".js" specifier the rest of the
@@ -237,6 +246,38 @@ export const purchaseCandidates = pgTable(
 );
 
 /**
+ * Who last wrote each field, and when (§4.2).
+ *
+ * The merge is per-field last-write-wins, so the server has to know when each
+ * *field* was last written. The row's `updated_at` cannot answer that: a device
+ * that edits `notes` offline on Monday and pushes on Wednesday would lose the
+ * edit to an unrelated change of `name` on Tuesday — silently, and in exactly
+ * the offline case this whole architecture exists to serve.
+ *
+ * A row per field rather than a JSON blob per record, so two pushes touching
+ * different fields of one record cannot lose each other's update through a
+ * read-modify-write. Kept out of the entity tables because it is sync
+ * bookkeeping: the domain types know nothing about it and it never crosses the
+ * wire on a pull.
+ */
+export const syncFieldMeta = pgTable(
+  "sync_field_meta",
+  {
+    entity: text("entity").notNull(),
+    recordId: text("record_id").notNull(),
+    field: text("field").notNull(),
+    propertyId: text("property_id").notNull(),
+    /** When the field changed on the device that wrote it, not on arrival. */
+    writtenAt: timestamp("written_at", { withTimezone: true, mode: "date" }).notNull(),
+    writtenBy: text("written_by").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.entity, table.recordId, table.field] }),
+    index("sync_field_meta_record_idx").on(table.entity, table.recordId),
+  ],
+);
+
+/**
  * The sync audit — a field-level change log (§4.2, decision 23).
  *
  * Append-only and on the §4.5 exception list: create-and-read, never edited,
@@ -279,4 +320,5 @@ export const allTables = {
   roadmapItems,
   purchaseCandidates,
   syncAudit,
+  syncFieldMeta,
 };

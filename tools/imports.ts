@@ -60,3 +60,18 @@ export function isWorkspaceSpecifier(specifier: string): boolean {
 export function isRelativeSpecifier(specifier: string): boolean {
   return specifier.startsWith(".");
 }
+
+/** Node's own modules, which no package declares. */
+const BUILT_IN = /^(node:|assert|buffer|crypto|events|fs|http|https|os|path|stream|url|util|zlib)/;
+
+/**
+ * The package a bare specifier resolves to: `@scope/name/sub` → `@scope/name`,
+ * `dexie/live` → `dexie`. Relative paths and Node built-ins return undefined.
+ */
+export function packageFromSpecifier(specifier: string): string | undefined {
+  if (isRelativeSpecifier(specifier) || specifier.startsWith("/")) return undefined;
+  if (BUILT_IN.test(specifier)) return undefined;
+
+  const parts = specifier.split("/");
+  return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
+}

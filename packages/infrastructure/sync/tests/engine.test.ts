@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { InMemoryRepository, fixedClock, type BaseRecord, type Ulid } from "@galaxy-farm/core";
 
 import { InMemoryOutbox } from "../src/outbox.js";
-import { SyncEngine, type PullPage, type PushResult, type SyncTransport } from "../src/engine.js";
-import type { Patch } from "../src/patch.js";
+import { SyncEngine } from "../src/engine.js";
+import type { Patch, PullPage, PushResult, SyncTransport } from "@galaxy-farm/core";
 
 /**
  * The reconciliation loop, driven against a transport that fails, delays, and
@@ -201,7 +201,9 @@ describe("push", () => {
 });
 
 describe("pull", () => {
-  const page = (records: Cow[]): PullPage<Cow>[] => [{ entity: "Animal", records }];
+  const page = (records: Cow[], hasMore = false): PullPage<Cow>[] => [
+    { entity: "Animal", records, hasMore },
+  ];
 
   it("writes pulled records into the local store", async () => {
     const { engine, repository } = harness({
@@ -272,10 +274,70 @@ describe("pull", () => {
 
   it("ignores a page for an entity it has no store for", async () => {
     const { engine } = harness({
-      pull: async () => [{ entity: "Unknown", records: [cow("01ARZ3NDEKTSV4RRFFQ69G5FR1")] }],
+      pull: async () => [
+        { entity: "Unknown", records: [cow("01ARZ3NDEKTSV4RRFFQ69G5FR1")], hasMore: false },
+      ],
     });
 
     expect((await engine.pull()).pulled).toBe(0);
+  });
+
+  it("keeps pulling while the server says there is more", async () => {
+    // A device that has been off for a week is the one furthest behind, and
+    // stopping after one page would leave it that way.
+    const cows = [
+      cow("01ARZ3NDEKTSV4RRFFQ69G5FR1", { updatedAt: new Date("2026-06-01T00:00:01Z") }),
+      cow("01ARZ3NDEKTSV4RRFFQ69G5FR2", { updatedAt: new Date("2026-06-01T00:00:02Z") }),
+      cow("01ARZ3NDEKTSV4RRFFQ69G5FR3", { updatedAt: new Date("2026-06-01T00:00:03Z") }),
+    ];
+    let round = 0;
+    const { engine, repository } = harness({
+      pull: async () => {
+        const record = cows[round];
+        round += 1;
+        return record === undefined ? page([]) : page([record], round < cows.length);
+      },
+    });
+
+    const result = await engine.pull();
+
+    expect(result.pulled).toBe(3);
+    expect(await repository.count({ propertyId })).toBe(3);
+  });
+
+  it("stops when a round says there is more but sends nothing", async () => {
+    // A server that always claims more would otherwise spin this loop until
+    // the round ceiling, on every single sync.
+    let calls = 0;
+    const { engine } = harness({
+      pull: async () => {
+        calls += 1;
+        return page([], true);
+      },
+    });
+
+    await engine.pull();
+
+    expect(calls).toBe(1);
+  });
+
+  it("keeps what earlier rounds wrote when the connection drops mid-catch-up", async () => {
+    let round = 0;
+    const { engine, repository } = harness({
+      pull: async () => {
+        round += 1;
+        if (round > 1) throw new Error("down");
+        return page([cow("01ARZ3NDEKTSV4RRFFQ69G5FR1")], true);
+      },
+    });
+
+    const result = await engine.pull();
+
+    expect(result).toEqual({ pulled: 1, offline: true });
+    expect(await repository.count({ propertyId })).toBe(1);
+    // The cursor moved with the page, so the next sync resumes from there
+    // rather than replaying everything the device already holds.
+    expect(engine.cursorForEntity("Animal")).toBeDefined();
   });
 
   it("restores cursors after a restart so it does not start from scratch", async () => {
@@ -323,7 +385,9 @@ describe("sync", () => {
 
   it("reports what it moved in both directions", async () => {
     const { engine } = harness({
-      pull: async () => [{ entity: "Animal", records: [cow("01ARZ3NDEKTSV4RRFFQ69G5FR1")] }],
+      pull: async () => [
+        { entity: "Animal", records: [cow("01ARZ3NDEKTSV4RRFFQ69G5FR1")], hasMore: false },
+      ],
     });
     await engine.enqueue("update", patch("01ARZ3NDEKTSV4RRFFQ69G5FR2"));
 

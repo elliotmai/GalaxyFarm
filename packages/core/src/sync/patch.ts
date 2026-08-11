@@ -1,18 +1,28 @@
-import type { FieldChange, FieldValue, Patch } from "@galaxy-farm/core";
+import type { FieldChange, FieldValue, Patch } from "../ports/sync.js";
 
 /**
  * Patch *operations* (spec §4.2).
  *
- * The shapes themselves are ports and live in the shared kernel, because both
- * this adapter and the local-store adapter need them. What lives here is the
- * logic: computing a diff, applying one, and deciding whether two values are
- * the same.
+ * The shapes are ports (`ports/sync.ts`); this is the logic that acts on them —
+ * computing a diff, applying one, deciding whether two values are the same.
+ *
+ * It lives in the kernel rather than in the sync adapter because it has three
+ * callers on two sides of the wire: the engine on device, the IndexedDB store,
+ * and the push handler on the server. Adapters may not import each other
+ * (§4.1), and there is nothing infrastructural in here to justify the
+ * duplication that would otherwise follow.
  */
 
 export type { FieldChange, FieldValue, Patch };
 
-/** Fields the sync engine manages itself and never accepts from a patch. */
-const RESERVED_FIELDS = new Set(["id", "propertyId", "createdAt"]);
+/**
+ * Fields the sync engine manages itself and never accepts from a patch.
+ *
+ * Exported because the server enforces the same list: `propertyId` in
+ * particular is taken from the authenticated session, never from the payload,
+ * or a device could write into a property it cannot see.
+ */
+export const RESERVED_FIELDS: ReadonlySet<string> = new Set(["id", "propertyId", "createdAt"]);
 
 /**
  * Compute the fields that actually changed.

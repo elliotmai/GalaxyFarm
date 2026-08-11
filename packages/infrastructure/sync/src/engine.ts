@@ -1,14 +1,23 @@
-import type { BaseRecord, Clock, IdGenerator, Repository, Ulid } from "@galaxy-farm/core";
+import { advance, cursorFor } from "@galaxy-farm/core";
+import type {
+  AuditEntry,
+  BaseRecord,
+  Clock,
+  CursorSet,
+  IdGenerator,
+  Patch,
+  PullPage,
+  PushResult,
+  Repository,
+  SyncTransport,
+} from "@galaxy-farm/core";
 
-import { advance, cursorFor, type CursorSet } from "./cursors.js";
 import {
   drainableNow,
   type OutboxEntry,
   type OutboxOperation,
   type OutboxStore,
 } from "./outbox.js";
-import type { AuditEntry } from "./merge.js";
-import type { Patch } from "./patch.js";
 
 /**
  * The engine that drives push and pull (spec §4.2).
@@ -19,25 +28,12 @@ import type { Patch } from "./patch.js";
  * behaviour that only ever misbehaves on a bad connection in a metal barn.
  */
 
-export interface PushResult {
-  /** Entries the server durably accepted; safe to drop from the outbox. */
-  readonly accepted: readonly Ulid[];
-  /** Entries the server rejected, with the reason. */
-  readonly rejected: readonly { readonly id: Ulid; readonly reason: string }[];
-  /** Field-level resolutions the server performed while applying. */
-  readonly audit: readonly AuditEntry[];
-}
-
-export interface PullPage<T extends BaseRecord> {
-  readonly entity: string;
-  /** Live records and tombstones alike — a deletion travels as a record. */
-  readonly records: readonly T[];
-}
-
-export interface SyncTransport<T extends BaseRecord> {
-  push(entries: readonly OutboxEntry[]): Promise<PushResult>;
-  pull(cursors: CursorSet, entities: readonly string[]): Promise<readonly PullPage<T>[]>;
-}
+/**
+ * A ceiling on pull rounds per sync. Reached only by a device that has been
+ * offline for a very long time, which then catches up on the next sync rather
+ * than holding this one open indefinitely.
+ */
+const MAX_PULL_ROUNDS = 20;
 
 export interface SyncEngineOptions<T extends BaseRecord> {
   readonly outbox: OutboxStore;
@@ -133,28 +129,49 @@ export class SyncEngine<T extends BaseRecord> {
     };
   }
 
+  /**
+   * Pull until the server has nothing more.
+   *
+   * The server pages, and a device that stopped after one full page would sit
+   * permanently one page behind — worst on the device that has been off
+   * longest, which is exactly the one that needs to catch up. Each round
+   * advances the cursors, so a round that returns nothing new terminates it.
+   */
   async pull(): Promise<{ readonly pulled: number; readonly offline: boolean }> {
     const entities = [...this.options.repositories.keys()];
     if (entities.length === 0) return { pulled: 0, offline: false };
 
-    let pages: readonly PullPage<T>[];
-    try {
-      pages = await this.options.transport.pull(this.cursors, entities);
-    } catch {
-      return { pulled: 0, offline: true };
-    }
-
     let pulled = 0;
-    for (const page of pages) {
-      const repository = this.options.repositories.get(page.entity);
-      if (repository === undefined || page.records.length === 0) continue;
 
-      // Tombstones are saved like any other record. Writing them rather than
-      // deleting locally is what stops a record resurrecting on the next pull
-      // from a device that missed the deletion.
-      await repository.saveMany(page.records);
-      this.cursors = advance(this.cursors, page.entity, page.records);
-      pulled += page.records.length;
+    for (let round = 0; round < MAX_PULL_ROUNDS; round += 1) {
+      let pages: readonly PullPage<T>[];
+      try {
+        pages = await this.options.transport.pull(this.cursors, entities);
+      } catch {
+        // Whatever earlier rounds wrote is kept — the cursors moved with it,
+        // so the next sync resumes rather than starting over.
+        return { pulled, offline: true };
+      }
+
+      let written = 0;
+      for (const page of pages) {
+        const repository = this.options.repositories.get(page.entity);
+        if (repository === undefined || page.records.length === 0) continue;
+
+        // Tombstones are saved like any other record. Writing them rather than
+        // deleting locally is what stops a record resurrecting on the next pull
+        // from a device that missed the deletion.
+        await repository.saveMany(page.records);
+        this.cursors = advance(this.cursors, page.entity, page.records);
+        written += page.records.length;
+      }
+
+      pulled += written;
+
+      // Stop when the server says there is no more, or when a round wrote
+      // nothing — the second guard is what stops a server that always claims
+      // more from spinning this loop forever.
+      if (!pages.some((page) => page.hasMore) || written === 0) break;
     }
 
     return { pulled, offline: false };

@@ -15,10 +15,14 @@ describe("SEARCHABLE_FIELDS", () => {
   const registered = Object.keys(SEARCHABLE_FIELDS);
 
   it("covers every table that is a repository", () => {
-    // syncAudit is append-only and on the §4.5 exception list, so it is not a
-    // Repository at all. Everything else must appear, even if the answer is
-    // "nothing here is worth searching" — that is a decision, not a default.
-    const expected = Object.keys(allTables).filter((name) => name !== "syncAudit");
+    // The two sync bookkeeping tables are not entities and not Repositories:
+    // syncAudit is the append-only change log (§4.5 exception list), and
+    // syncFieldMeta holds per-field write times. Every other table must
+    // appear, even if the answer is "nothing here is worth searching" — that
+    // is a decision, not a default.
+    const expected = Object.keys(allTables).filter(
+      (name) => name !== "syncAudit" && name !== "syncFieldMeta",
+    );
 
     expect(registered.sort()).toEqual(expected.sort());
   });

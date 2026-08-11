@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyPatch, diff, isEqual, type Patch } from "../src/patch.js";
+import { applyPatch, diff, isEqual, type Patch } from "../src/sync/patch.js";
 
 const meta = { at: new Date("2026-05-01T10:00:00Z"), deviceId: "barn-kiosk" };
 

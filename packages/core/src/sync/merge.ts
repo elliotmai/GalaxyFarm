@@ -1,6 +1,6 @@
-import type { Ulid } from "@galaxy-farm/core";
-
-import { isEqual, type FieldChange, type FieldValue, type Patch } from "./patch.js";
+import type { Ulid } from "../types/ids.js";
+import type { FieldChange, FieldValue, Patch } from "../ports/sync.js";
+import { isEqual } from "./patch.js";
 
 /**
  * Field-level last-write-wins, with an audit log (spec §4.2).

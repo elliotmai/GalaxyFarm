@@ -55,6 +55,7 @@ describe("migrations", () => {
       "purchase_candidates",
       "roadmap_items",
       "sync_audit",
+      "sync_field_meta",
       "tasks",
       "water_sources",
       "zone_assignments",
@@ -78,7 +79,9 @@ describe("migrations", () => {
     }
 
     for (const [table, columns] of byTable) {
-      if (table === "sync_audit") continue; // append-only, exempt (§4.5)
+      // Sync bookkeeping, not entities: append-only change log and per-field
+      // write times. Neither is a Repository and neither carries a tombstone.
+      if (table === "sync_audit" || table === "sync_field_meta") continue;
       for (const required of ["id", "property_id", "created_at", "updated_at", "deleted_at"]) {
         expect(columns.has(required), `${table} is missing ${required}`).toBe(true);
       }

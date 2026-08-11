@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { importGraph, isWorkspaceSpecifier, moduleFromSpecifier } from "../../tools/imports.js";
-import { workspacePackages } from "../../tools/workspace.js";
+import {
+  importGraph,
+  isWorkspaceSpecifier,
+  moduleFromSpecifier,
+  packageFromSpecifier,
+} from "../../tools/imports.js";
+import { readJson, workspacePackages } from "../../tools/workspace.js";
 
 /**
  * The dependency rules from spec §4.1, enforced against the real import graph.
@@ -142,28 +147,40 @@ describe("spec §4.1 — dependency rules", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("declares every workspace dependency it imports", () => {
+  /**
+   * Every import, workspace or third-party, declared by the package making it.
+   *
+   * This carries more weight than it looks like it does. `node-linker=hoisted`
+   * (see `.npmrc` — the working copy lives on a volume with no symlinks) puts
+   * every transitive dependency in one flat `node_modules`, so an undeclared
+   * import resolves at runtime and nothing objects. Until, one day, the
+   * dependency that happened to hoist it stops depending on it. This test is
+   * where that guarantee lives now.
+   */
+  it("declares every dependency it imports", () => {
     const byDir = workspacePackages();
     const offenders: string[] = [];
 
     for (const edge of graph) {
-      if (!isWorkspaceSpecifier(edge.specifier)) continue;
+      const dependency = packageFromSpecifier(edge.specifier);
+      if (dependency === undefined) continue;
+
       const pkg = byDir
         .filter((p) => edge.from.startsWith(`${p.dir}/`))
         .sort((a, b) => b.dir.length - a.dir.length)[0];
       if (!pkg) continue;
 
-      const scope = edge.specifier.split("/").slice(0, 2).join("/");
       const deps = {
         ...(pkg.manifest["dependencies"] as Record<string, string> | undefined),
         ...(pkg.manifest["devDependencies"] as Record<string, string> | undefined),
+        ...(pkg.manifest["peerDependencies"] as Record<string, string> | undefined),
       };
-      if (!(scope in deps)) {
+      if (!(dependency in deps) && !(dependency in rootDevDependencies())) {
         offenders.push(
           violation(
             edge.from,
             edge.specifier,
-            `${pkg.name} imports ${scope} without declaring it in package.json.`,
+            `${pkg.name} imports ${dependency} without declaring it in package.json.`,
           ),
         );
       }
@@ -172,6 +189,15 @@ describe("spec §4.1 — dependency rules", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+/**
+ * Test tooling — vitest and the testing-library family — is declared once at
+ * the root rather than in all twenty-odd packages. Everything a package ships
+ * still has to be declared by that package.
+ */
+function rootDevDependencies(): Record<string, string> {
+  return (readJson("package.json")["devDependencies"] as Record<string, string> | undefined) ?? {};
+}
 
 describe("spec §4.1 — composition root", () => {
   it("apps/web is the only place that composes infrastructure", () => {

@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { changesToState, initialState, materialise, mergePatch, winner } from "../src/merge.js";
-import type { Patch } from "../src/patch.js";
+import {
+  changesToState,
+  initialState,
+  materialise,
+  mergePatch,
+  winner,
+} from "../src/sync/merge.js";
+import type { Patch } from "../src/sync/patch.js";
 
 /**
  * Field-level last-write-wins (spec §4.2).

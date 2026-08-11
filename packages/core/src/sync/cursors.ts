@@ -1,4 +1,4 @@
-import type { FieldValue } from "./patch.js";
+import type { FieldValue } from "../ports/sync.js";
 
 /**
  * Pull cursors (spec §4.2).
@@ -6,6 +6,10 @@ import type { FieldValue } from "./patch.js";
  * One `updatedAt` cursor per entity type rather than a single global one, so a
  * busy entity cannot starve a quiet one and a failed pull only replays its own
  * slice.
+ *
+ * In the kernel because both ends hold one: the device advances it, the server
+ * filters by it. Two implementations of "strictly newer" would eventually
+ * disagree by a millisecond and skip a record nobody would ever notice missing.
  */
 
 export interface Cursor {

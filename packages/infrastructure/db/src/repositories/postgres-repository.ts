@@ -43,6 +43,25 @@ export function escapeLikePattern(term: string): string {
   return term.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
+/**
+ * Row to entity.
+ *
+ * `null` becomes an absent key, not `undefined`. `BaseRecord` states the
+ * optional fields with `?`, and `restore()` deletes them outright — a record
+ * read back from Postgres has to look like one that never left.
+ *
+ * Exported because the pull handler maps rows without going through a
+ * repository, and two mappers would be two chances to disagree about that.
+ */
+export function rowToRecord<T>(columns: Record<string, PgColumn>, row: Record<string, unknown>): T {
+  const record: Record<string, unknown> = {};
+  for (const key of Object.keys(columns)) {
+    const value = row[key];
+    if (value !== null && value !== undefined) record[key] = value;
+  }
+  return record as T;
+}
+
 export class PostgresRepository<T extends BaseRecord> implements Repository<T> {
   private readonly columns: Record<string, PgColumn>;
 
@@ -143,27 +162,23 @@ export class PostgresRepository<T extends BaseRecord> implements Repository<T> {
    */
   private toRow(record: T): Record<string, unknown> {
     const row: Record<string, unknown> = {};
-    for (const key of Object.keys(this.columns)) {
+    for (const [key, column] of Object.entries(this.columns)) {
       const value = (record as Record<string, unknown>)[key];
-      row[key] = value === undefined ? null : value;
+      if (value !== undefined) {
+        row[key] = value;
+        continue;
+      }
+      // An absent value on a NOT NULL column with a default means "the
+      // default", not null. `photoKeys` is the everyday case: a record created
+      // without photos has no such field, and writing null would fail the
+      // insert rather than storing the empty array the column already promises.
+      row[key] = column.notNull && column.hasDefault ? (column.default as unknown as null) : null;
     }
     return row;
   }
 
-  /**
-   * Row to entity.
-   *
-   * `null` becomes an absent key, not `undefined`. `BaseRecord` states the
-   * optional fields with `?`, and `restore()` deletes them outright — a record
-   * read back from Postgres has to look like one that never left.
-   */
   private toRecord(row: Record<string, unknown>): T {
-    const record: Record<string, unknown> = {};
-    for (const key of Object.keys(this.columns)) {
-      const value = row[key];
-      if (value !== null && value !== undefined) record[key] = value;
-    }
-    return record as T;
+    return rowToRecord<T>(this.columns, row);
   }
 
   private upsertSet(): Record<string, SQL> {
