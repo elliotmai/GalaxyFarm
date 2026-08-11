@@ -25,6 +25,22 @@ export interface Repository<T extends BaseRecord> extends ReadRepository<T> {
   purge(id: Ulid): Promise<void>;
 }
 
+export type Unsubscribe = () => void;
+
+/**
+ * A repository whose reads can be watched.
+ *
+ * This is what makes local-first feel local: the Pen Board on a barn kiosk has
+ * to redraw when someone moves an animal from the house, and that change
+ * arrives through a sync pull rather than through anything the kiosk did. A
+ * store that only notifies on local writes would leave every other screen
+ * stale until somebody refreshed it.
+ */
+export interface ObservableRepository<T extends BaseRecord> extends Repository<T> {
+  observe(query: ListQuery, onChange: (records: T[]) => void): Unsubscribe;
+  observeById(id: Ulid, onChange: (record: T | undefined) => void): Unsubscribe;
+}
+
 /** Injected so the domain stays pure and tests are deterministic. */
 export interface Clock {
   now(): Date;

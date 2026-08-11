@@ -1,4 +1,12 @@
-import type { ListQuery, Repository, BaseRecord, Ulid } from "@galaxy-farm/core";
+import { liveQuery } from "dexie";
+
+import type {
+  BaseRecord,
+  ListQuery,
+  ObservableRepository,
+  Ulid,
+  Unsubscribe,
+} from "@galaxy-farm/core";
 
 import type { FarmDatabase, StoredRecord } from "./database.js";
 
@@ -9,7 +17,7 @@ import type { FarmDatabase, StoredRecord } from "./database.js";
  * `repositoryConformanceCases` in the shared kernel runs against all three, so
  * the local store and the server store cannot disagree about what a list means.
  */
-export class DexieRepository<T extends BaseRecord> implements Repository<T> {
+export class DexieRepository<T extends BaseRecord> implements ObservableRepository<T> {
   constructor(
     private readonly db: FarmDatabase,
     private readonly storeName: string,
@@ -43,6 +51,31 @@ export class DexieRepository<T extends BaseRecord> implements Repository<T> {
 
   async purge(id: Ulid): Promise<void> {
     await this.table().delete(id);
+  }
+
+  /**
+   * Watch a query.
+   *
+   * Dexie's liveQuery re-runs the read whenever the underlying table changes,
+   * whichever way the change arrived — a local write or a sync pull writing a
+   * batch of pulled records. That is the property the Pen Board depends on.
+   */
+  observe(query: ListQuery, onChange: (records: T[]) => void): Unsubscribe {
+    const subscription = liveQuery(() => this.list(query)).subscribe({
+      next: onChange,
+      // A failed read must not tear down the subscription — the screen keeps
+      // its last good data and the next change re-runs the query.
+      error: () => {},
+    });
+    return () => subscription.unsubscribe();
+  }
+
+  observeById(id: Ulid, onChange: (record: T | undefined) => void): Unsubscribe {
+    const subscription = liveQuery(() => this.findById(id)).subscribe({
+      next: onChange,
+      error: () => {},
+    });
+    return () => subscription.unsubscribe();
   }
 
   private table() {

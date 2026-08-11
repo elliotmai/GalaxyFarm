@@ -24,7 +24,15 @@ export interface FarmDatabaseOptions {
   readonly name?: string;
   /** Entity names to create tables for. */
   readonly stores: readonly string[];
-  /** Injected so tests can supply fake-indexeddb. */
+  /**
+   * Injected so tests can supply an isolated fake-indexeddb instance.
+   *
+   * Note that Dexie's `liveQuery` change tracking hooks the *global*
+   * indexedDB, so a database built on an injected factory will read and write
+   * correctly but will never emit live updates. Tests that need live queries
+   * have to install fake-indexeddb globally instead. In the browser this never
+   * arises — the global is the only one there is.
+   */
   readonly indexedDB?: IDBFactory;
   readonly iDBKeyRange?: typeof IDBKeyRange;
 }
