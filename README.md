@@ -231,6 +231,27 @@ laptop, not against a database holding calving records.
 CI verifies the migrations against PostgreSQL 18 running in-process through
 PGlite, so the SQL is known to apply before it ever reaches a real server.
 
+**On a push to `main`, CI then applies them for real.** The `migrate` job runs
+`pnpm db:migrate:deployed` against the `DATABASE_URL` repository secret — the
+same runner, taking the connection string from the environment instead of from
+a gitignored `.env.local`. It runs on pushes to `main` only: a pull request's
+migrations have not been reviewed yet, and a fork's PR is not given secrets at
+all.
+
+It waits on the test job rather than on the whole `ci` gate, because the test
+job is the one that actually validates the migration files, and putting the
+twenty-minute e2e run in front of it would leave the deployed code without its
+schema for that long. Every migration is additive and old code ignores a
+column it does not know about, so applying one ahead of a build that later
+fails is safe — applying one late is what caused a sync outage.
+
+**This does not fully close the race.** Netlify starts building from the same
+push, independently, and may publish before the migration lands. What it costs
+is smaller than it was: the sync routes detect the drift and return a 503 with
+a plain explanation rather than a bare 500, and the migration follows within a
+few minutes. Closing it properly means moving the migration into Netlify's own
+build command so a deploy cannot publish without it.
+
 ### Environment
 
 Copy `.env.example` to `.env.local` and fill it in. It covers `DATABASE_URL` (Neon), the Auth.js secret, Cloudflare R2 credentials, the Resend API key, the Google Maps browser key, and the `NEXT_PUBLIC_FARM_NAME` / business-name branding fallbacks. `.env.local` is gitignored and must stay that way — no real value belongs in `.env.example`.

@@ -137,6 +137,61 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  # Applying migrations is a deploy step, not a gate, so it is deliberately not
+  # in the `ci` job's `needs` list below — a database that is already up to
+  # date must not be able to fail a merge.
+  migrate:
+    name: Apply migrations
+    # Pushes to main only. Never on a pull request: a PR's migrations have not
+    # been reviewed yet, and a fork's PR cannot be handed the production
+    # connection string at all — secrets are not exposed to fork runs, so the
+    # job would fail confusingly rather than do anything useful.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # `test` rather than `ci`, and the reason is timing. The migration files
+    # are what `migrate-runner.test.ts` applies to an empty PGlite, so this job
+    # already waits on the gate that actually validates them; waiting on the
+    # full `ci` job would add the twenty-minute e2e run in front of it. Every
+    # migration here is additive, and old code ignores a column it does not
+    # know about — which is why running one against a build that later fails
+    # its e2e is safe, and why running one ten minutes late is not.
+    needs: [test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # A named environment, so the connection string can be scoped to it and
+    # required reviewers can be added later without touching this file.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Fail here rather than three minutes later inside the runner, and say
+      # which of the two places the value is missing from.
+      - name: Check the connection string is configured
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::The DATABASE_URL secret is not set on this repository (or on the 'production' environment). Migrations cannot run, and the deploy will be serving code the schema does not support."
+            exit 1
+          fi
+
+      # Idempotent by ledger: a re-run of an old commit applies nothing. The
+      # command exits non-zero if the schema is still short afterwards, which
+      # is the case a green migration run used to hide.
+      - name: Apply pending migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm run db:migrate:deployed
+
   # Single job to point branch protection at, so adding a gate above does not
   # require reconfiguring the protected-branch rules.
   ci:

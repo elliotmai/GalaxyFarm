@@ -161,7 +161,14 @@ export function isEntryPoint(moduleUrl: string, argv1: string | undefined): bool
 if (isEntryPoint(import.meta.url, process.argv[1])) {
   const url = process.env["DATABASE_URL"];
   if (url === undefined || url === "") {
-    console.error("DATABASE_URL is not set. Copy .env.example to .env.local and fill it in.");
+    // Two places this runs and two different fixes, so name both. Telling
+    // somebody staring at a red CI log to edit a file that is gitignored and
+    // does not exist on the runner sends them the wrong way entirely.
+    console.error(
+      "DATABASE_URL is not set.\n" +
+        "  Locally: copy .env.example to .env.local and fill it in.\n" +
+        "  In CI: set the DATABASE_URL secret on the repository.",
+    );
     process.exit(1);
   }
 
