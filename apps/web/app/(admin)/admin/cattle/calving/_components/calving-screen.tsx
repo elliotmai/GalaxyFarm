@@ -110,6 +110,10 @@ export function CalvingScreen({
   const now = new Date();
   const byId = useMemo(() => new Map(animals.map((animal) => [animal.id, animal])), [animals]);
 
+  // Memoised: a fresh array each render would re-run the effect that prefills
+  // the calf tag, on every keystroke in the form.
+  const tagsInUse = useMemo(() => animals.map((animal) => animal.tagNumber), [animals]);
+
   const dams = animals.filter(
     (animal) =>
       animal.species === "cattle" && animal.sex === "female" && animal.status === "active",
@@ -312,6 +316,7 @@ export function CalvingScreen({
       <Section title="Record a calving" id="record-calving">
         <RecordCalving
           dams={dams}
+          existingTags={tagsInUse}
           breedings={breedings}
           defaultDamId={params.get("dam") ?? ""}
           propertyId={propertyId}
@@ -361,6 +366,7 @@ export function CalvingScreen({
  */
 function RecordCalving({
   dams,
+  existingTags,
   breedings,
   defaultDamId,
   propertyId,
@@ -368,6 +374,8 @@ function RecordCalving({
   onDamLevel,
 }: {
   readonly dams: readonly Animal[];
+  /** Every tag on the property, so the next calf number skips the ones in use. */
+  readonly existingTags: readonly (string | undefined)[];
   readonly breedings: readonly BreedingRecord[];
   readonly defaultDamId: string;
   readonly propertyId: Ulid;
@@ -400,8 +408,8 @@ function RecordCalving({
   // somebody types in it, and then it stops moving under them.
   useEffect(() => {
     if (tagTouched) return;
-    setCalfTag(suggestedCalfTag(dam, new Date(`${date}T12:00:00`)));
-  }, [dam, date, tagTouched]);
+    setCalfTag(suggestedCalfTag(existingTags, new Date(`${date}T12:00:00`)));
+  }, [existingTags, date, tagTouched]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -506,7 +514,7 @@ function RecordCalving({
               />
               <TextInput
                 label="Calf tag"
-                hint="Dam and year, prefilled. Overwrite it if you tag differently."
+                hint="Year digit, calf number, year letter — the next one free."
                 value={calfTag}
                 onChange={(event) => {
                   setTagTouched(true);

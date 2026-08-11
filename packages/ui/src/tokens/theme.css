@@ -38,7 +38,6 @@
   --gf-canvas: #f8f5ec;
   --gf-panel: #ffffff;
   --gf-raised: #f1eee4;
-  --gf-raised: #f1eee4;
   --gf-text: #24243a;
   --gf-muted: #565669;
   --gf-border: #888897;
@@ -55,6 +54,97 @@
 [data-theme] {
   background-color: var(--gf-canvas);
   color: var(--gf-text);
+}
+
+/*
+ * The sky (spec §8, "Midnight Nebula").
+ *
+ * A flat navy field is what makes a dark theme read as *unfinished* rather
+ * than as dark — there is nothing for the eye to land on between the panels,
+ * so the panels look like boxes floating on nothing. Stars and two soft nebula
+ * washes give the ground depth, and every card on top then reads as sitting
+ * *in* something rather than on nothing.
+ *
+ * Gradients rather than an image: no request, no cache, no second file to keep
+ * in step with the tokens, and it stays crisp at any pixel density.
+ *
+ * A fixed pseudo-element rather than `background-attachment: fixed`. The
+ * shorthand is the obvious way to hold a sky still while content scrolls over
+ * it, and it is unreliable on iOS Safari — it degrades to `scroll`, or
+ * flickers on every scroll frame. A fixed layer behaves the same everywhere.
+ *
+ * `isolation: isolate` is what makes `z-index: -1` safe here: it confines the
+ * layer to this element's stacking context, so it sits above the surface's own
+ * background colour and below everything inside it, without any child needing
+ * a z-index of its own.
+ *
+ * Only the admin and kiosk theme. The customer-facing linen is a daylight
+ * surface, and a starfield on it would be a costume.
+ */
+[data-theme="midnight-nebula"] {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-theme="midnight-nebula"]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    /* Two nebula washes, in the identity violet and the action blue. Very low
+       alpha on purpose — anything stronger tints the text sitting on it. */
+    radial-gradient(60rem 40rem at 15% -10%, rgb(157 133 232 / 16%), transparent 70%),
+    radial-gradient(45rem 35rem at 95% 12%, rgb(140 163 232 / 12%), transparent 70%),
+    radial-gradient(50rem 40rem at 50% 108%, rgb(157 133 232 / 10%), transparent 70%),
+    /* Two star fields at different tile sizes, so the pattern does not read as
+       a grid at any one scale. */
+    radial-gradient(1.6px 1.6px at 12% 18%, rgb(242 239 230 / 70%), transparent),
+    radial-gradient(1.2px 1.2px at 74% 8%, rgb(242 239 230 / 55%), transparent),
+    radial-gradient(1.4px 1.4px at 38% 62%, rgb(242 239 230 / 60%), transparent),
+    radial-gradient(1px 1px at 88% 46%, rgb(242 239 230 / 45%), transparent),
+    radial-gradient(1.8px 1.8px at 62% 88%, rgb(157 133 232 / 65%), transparent),
+    radial-gradient(1px 1px at 24% 92%, rgb(242 239 230 / 40%), transparent),
+    radial-gradient(1.2px 1.2px at 92% 74%, rgb(140 163 232 / 50%), transparent),
+    radial-gradient(1px 1px at 6% 54%, rgb(242 239 230 / 35%), transparent);
+  background-size:
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    23rem 23rem,
+    23rem 23rem,
+    23rem 23rem,
+    23rem 23rem,
+    31rem 31rem,
+    31rem 31rem,
+    31rem 31rem,
+    31rem 31rem;
+  background-repeat:
+    no-repeat, no-repeat, no-repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat;
+}
+
+/*
+ * The stars breathe, very slowly.
+ *
+ * Ninety seconds a cycle and eight percent of opacity — far too slow to
+ * notice while looking at it, which is the point. Anything faster is a
+ * distraction on a screen somebody is reading a weight off.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="midnight-nebula"]::before {
+    animation: gf-drift 90s ease-in-out infinite;
+  }
+}
+
+@keyframes gf-drift {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.92;
+  }
 }
 
 /*

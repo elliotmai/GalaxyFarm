@@ -6,6 +6,7 @@ export * from "./sync.js";
 export * from "./weather.js";
 export * from "./storage.js";
 export * from "./invoicing.js";
+export * from "./geocoder.js";
 
 /**
  * Ports the domain defines and infrastructure implements (spec §4.1).

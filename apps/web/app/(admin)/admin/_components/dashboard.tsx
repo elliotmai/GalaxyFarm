@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { Badge, Card, DataTable, EmptyState, SafetyBadge, type Column } from "@galaxy-farm/ui";
+import { Card, CardGrid, EmptyState, Pill, RecordCard, SafetyBadge, Tile } from "@galaxy-farm/ui";
 import {
   effectiveSafetyLevel,
   freezeCheckTargets,
@@ -41,6 +41,10 @@ export function Dashboard({ propertyId }: { readonly propertyId: Ulid }) {
     return <p className="text-muted">Loading the farm…</p>;
   }
 
+  const inUse = new Set(assignments.filter((a) => a.periodTo === undefined).map((a) => a.zoneId))
+    .size;
+  const atRisk = water.filter((source) => source.active && !source.hasHeater).length;
+
   if (zones.length === 0) {
     return (
       <EmptyState
@@ -61,10 +65,29 @@ export function Dashboard({ propertyId }: { readonly propertyId: Ulid }) {
       */}
       <CalvingWatchCard propertyId={propertyId} />
 
-      <div className="grid gap-density md:grid-cols-2">
-        <PenBoard zones={zones} animals={animals} assignments={assignments} />
-        <FreezeWatch zones={zones} water={water} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Tile
+          label="Cattle"
+          value={animals.filter((a) => a.status === "active").length}
+          tone="identity"
+        />
+        <Tile
+          label="Pens in use"
+          value={inUse}
+          hint={`of ${zones.filter((z) => z.active).length} active`}
+        />
+        <Tile
+          label="Tanks at risk"
+          value={atRisk}
+          tone={atRisk > 0 ? "danger" : "calm"}
+          emphasis={atRisk > 0}
+          hint={atRisk > 0 ? "No heater fitted" : "All heated"}
+        />
+        <Tile label="Zones resting" value={zones.filter((z) => z.resting).length} tone="calm" />
       </div>
+
+      <PenBoard zones={zones} animals={animals} assignments={assignments} />
+      <FreezeWatch zones={zones} water={water} />
     </div>
   );
 }
@@ -78,7 +101,13 @@ interface PenRow {
 /**
  * Who is where, and how careful to be.
  *
- * The safety column is the *effective* level — the higher of the zone's own
+ * Cards rather than a table (§8). A table is the right shape for comparing
+ * forty rows on one number; this is nine pens where the question is "what is
+ * in this one and do I need to be careful", which is three facts about each
+ * and no comparison at all. The accent edge carries the safety level, so a pen
+ * holding a fresh cow is findable by colour before anybody reads a word.
+ *
+ * The safety shown is the *effective* level — the higher of the zone's own
  * baseline and whatever is standing in it. A quiet pen holding a fresh cow is
  * not a quiet pen, and a board that showed the baseline would say it was.
  */
@@ -113,42 +142,57 @@ function PenBoard({
       };
     });
 
-  const columns: readonly Column<PenRow>[] = [
-    { key: "zone", header: "Zone", render: (row) => row.zone.name },
-    {
-      key: "occupants",
-      header: "Who",
-      render: (row) =>
-        row.occupants.length === 0 ? (
-          <span className="text-muted">Empty</span>
-        ) : (
-          row.occupants.map((animal) => animal.name ?? animal.tagNumber ?? "Untagged").join(", ")
-        ),
-    },
-    {
-      key: "safety",
-      header: "Care",
-      render: (row) => (
-        <SafetyBadge
-          level={row.safety}
-          size="compact"
-          {...(row.safety > row.zone.baselineSafetyLevel
-            ? { raisedBy: row.occupants.map((a) => a.name ?? "an occupant").join(", ") }
-            : {})}
-        />
-      ),
-    },
-  ];
+  const occupied = rows.filter((row) => row.occupants.length > 0);
 
   return (
-    <Card title="Pen board" actions={<Badge tone="neutral">{rows.length} zones</Badge>}>
-      <DataTable
-        caption="Zones, who is in them, and how careful to be"
-        columns={columns}
-        rows={rows}
-        rowKey={(row) => row.zone.id}
-      />
-    </Card>
+    <section className="flex flex-col gap-density">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-heading text-lg font-semibold text-ink">Pen board</h2>
+        <span className="flex gap-1.5">
+          <Pill tone="action" dot>
+            {occupied.length} in use
+          </Pill>
+          <Pill>{rows.length - occupied.length} empty</Pill>
+        </span>
+      </div>
+
+      <CardGrid columns={3}>
+        {rows.map((row) => {
+          const raised = row.safety > row.zone.baselineSafetyLevel;
+
+          return (
+            <RecordCard
+              key={row.zone.id}
+              title={row.zone.name}
+              subtitle={row.zone.resting ? "Resting" : row.zone.indoor ? "Indoor" : undefined}
+              // Level 3 and up is the point at which somebody should not walk
+              // in without thinking, so that is where the card turns.
+              tone={row.safety >= 4 ? "danger" : row.safety >= 3 ? "identity" : "calm"}
+              actions={
+                <SafetyBadge
+                  level={row.safety}
+                  size="compact"
+                  {...(raised
+                    ? { raisedBy: row.occupants.map((a) => a.name ?? "an occupant").join(", ") }
+                    : {})}
+                />
+              }
+              meta={
+                row.occupants.length === 0 ? (
+                  <Pill>Empty</Pill>
+                ) : (
+                  row.occupants.map((animal) => (
+                    <Pill key={animal.id} tone={animal.safetyLevel >= 3 ? "danger" : "neutral"}>
+                      {animal.name ?? animal.tagNumber ?? "Untagged"}
+                    </Pill>
+                  ))
+                )
+              }
+            />
+          );
+        })}
+      </CardGrid>
+    </section>
   );
 }
 
@@ -184,9 +228,11 @@ function FreezeWatch({
       title="Freeze watch"
       actions={
         vulnerable.length > 0 ? (
-          <Badge tone="danger">{vulnerable.length} without heaters</Badge>
+          <Pill tone="danger" dot>
+            {vulnerable.length} without heaters
+          </Pill>
         ) : (
-          <Badge tone="calm">All heated</Badge>
+          <Pill tone="calm">All heated</Pill>
         )
       }
     >
@@ -201,7 +247,7 @@ function FreezeWatch({
             <li key={target.waterSource.id} className="flex flex-col gap-1">
               <span className="flex items-center gap-2 text-density text-ink">
                 {target.waterSource.name}
-                {target.vulnerable ? <Badge tone="danger">No heater</Badge> : null}
+                {target.vulnerable ? <Pill tone="danger">No heater</Pill> : null}
               </span>
               <span className="text-sm text-muted">
                 Serves {target.zones.map((zone) => zone.name).join(", ")}

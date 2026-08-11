@@ -86,6 +86,14 @@ export interface Column<T> {
   readonly render: (row: T) => ReactNode;
   /** Right-aligned and tabular — weights, counts, money. */
   readonly numeric?: boolean;
+  /**
+   * The column that says which row this is — the animal, the zone, the dam.
+   *
+   * On a phone it becomes the heading of the row's card. Without one the
+   * first column is used, which is right often enough that marking it is
+   * only necessary when the identity is not first.
+   */
+  readonly primary?: boolean;
 }
 
 export interface DataTableProps<T> extends Omit<TableHTMLAttributes<HTMLTableElement>, "children"> {
@@ -108,51 +116,104 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   if (rows.length === 0 && empty !== undefined) return <>{empty}</>;
 
+  const identity = columns.find((column) => column.primary) ?? columns[0];
+  const others = columns.filter((column) => column !== identity);
+
   return (
-    // Wide tables scroll inside their own box. Letting the page scroll
-    // sideways instead makes every other column on the screen move with it.
-    <div className="w-full overflow-x-auto">
-      <table
-        className={["w-full border-collapse text-density", className ?? ""]
-          .filter(Boolean)
-          .join(" ")}
-        {...rest}
-      >
-        {/* Named for screen readers; a page of unlabelled tables is a maze. */}
-        <caption className="sr-only">{caption}</caption>
-        <thead>
-          <tr className="border-b border-edge text-left text-muted">
-            {columns.map((column) => (
-              <th
-                key={column.key}
-                scope="col"
-                className={["py-2 pr-3 font-medium", column.numeric ? "text-right" : ""]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                {column.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={rowKey(row)} className="border-b border-edge/40 last:border-0">
+    <>
+      {/*
+        A phone gets one card per row (spec §8, "usable one-handed in a barn").
+        A seven-column table on a 375px screen is a table you read by dragging
+        sideways, and the moment you drag, the name of the animal the row is
+        about scrolls off the left — so every value you are looking at belongs
+        to a row you can no longer identify. The card keeps the name at the top
+        and puts the rest underneath as labelled pairs.
+
+        Built from the same `columns`, so a screen cannot add a column to one
+        layout and forget the other.
+      */}
+      <ul className="flex flex-col gap-3 sm:hidden">
+        {rows.map((row) => (
+          <li
+            key={rowKey(row)}
+            className="flex flex-col gap-2 rounded-density border border-edge bg-raised p-density"
+          >
+            {identity === undefined ? null : (
+              <div className="text-density font-medium text-ink">{identity.render(row)}</div>
+            )}
+            <dl className="flex flex-col gap-1.5">
+              {others.map((column) =>
+                // An empty header is the actions column. A label of "" above a
+                // row of buttons is noise, so it gets the full width instead.
+                column.header === "" ? (
+                  <dd key={column.key} className="flex flex-wrap gap-2 pt-1">
+                    {column.render(row)}
+                  </dd>
+                ) : (
+                  <div key={column.key} className="flex items-baseline justify-between gap-3">
+                    <dt className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted">
+                      {column.header}
+                    </dt>
+                    <dd
+                      className={`min-w-0 break-words text-right text-density text-ink ${
+                        column.numeric === true ? "gf-numeric" : ""
+                      }`}
+                    >
+                      {column.render(row)}
+                    </dd>
+                  </div>
+                ),
+              )}
+            </dl>
+          </li>
+        ))}
+      </ul>
+
+      {/* Wide tables scroll inside their own box. Letting the page scroll
+          sideways instead makes every other column on the screen move with it. */}
+      <div className="hidden w-full overflow-x-auto sm:block">
+        <table
+          className={["w-full border-collapse text-density", className ?? ""]
+            .filter(Boolean)
+            .join(" ")}
+          {...rest}
+        >
+          {/* Named for screen readers; a page of unlabelled tables is a maze. */}
+          <caption className="sr-only">{caption}</caption>
+          <thead>
+            <tr className="border-b border-edge text-left text-muted">
               {columns.map((column) => (
-                <td
+                <th
                   key={column.key}
-                  className={["py-2 pr-3", column.numeric ? "gf-numeric text-right" : ""]
+                  scope="col"
+                  className={["py-2 pr-3 font-medium", column.numeric ? "text-right" : ""]
                     .filter(Boolean)
                     .join(" ")}
                 >
-                  {column.render(row)}
-                </td>
+                  {column.header}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={rowKey(row)} className="border-b border-edge/40 last:border-0">
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className={["py-2 pr-3", column.numeric ? "gf-numeric text-right" : ""]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {column.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

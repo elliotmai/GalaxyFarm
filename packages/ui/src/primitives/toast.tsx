@@ -13,7 +13,16 @@ import type { ReactNode } from "react";
  * mouse must not watch it disappear on the way.
  */
 
-export type ToastTone = "info" | "success" | "danger";
+/**
+ * `warning` is separate from `danger` on purpose.
+ *
+ * Danger is "that happened and it was destructive" — a delete, a purge.
+ * Warning is "look at this before it becomes a problem" — a cow entering her
+ * window, a tank with no heater and a freeze coming. They are announced
+ * differently to a screen reader for the same reason: one is a report and the
+ * other is a heads-up.
+ */
+export type ToastTone = "info" | "success" | "warning" | "danger";
 
 export interface ToastAction {
   readonly label: string;
@@ -38,6 +47,35 @@ export interface ToastApi {
 }
 
 const ToastContext = createContext<ToastApi | undefined>(undefined);
+
+/** The accent bar, one per tone. */
+const TONE_EDGE: Record<ToastTone, string> = {
+  info: "before:bg-action",
+  success: "before:bg-calm",
+  warning: "before:bg-identity",
+  danger: "before:bg-danger",
+};
+
+/**
+ * A glyph, not an icon set.
+ *
+ * Text characters rather than SVGs so a toast costs no bundle and inherits the
+ * type, and they are `aria-hidden` because the message already says what
+ * happened — announcing "check mark" before it is noise.
+ */
+const TONE_GLYPH: Record<ToastTone, string> = {
+  info: "\u2139",
+  success: "\u2713",
+  warning: "\u26A0",
+  danger: "\u2715",
+};
+
+const TONE_GLYPH_COLOUR: Record<ToastTone, string> = {
+  info: "text-action",
+  success: "text-calm",
+  warning: "text-identity",
+  danger: "text-danger",
+};
 
 export const DEFAULT_TOAST_MS = 5_000;
 /** An action needs time to be noticed, moved to, and pressed. */
@@ -126,14 +164,25 @@ export function ToastProvider({ children, setTimer, clearTimer }: ToastProviderP
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            role={toast.tone === "danger" ? "alert" : "status"}
+            role={toast.tone === "danger" || toast.tone === "warning" ? "alert" : "status"}
             className={[
-              "pointer-events-auto flex min-h-target w-full max-w-md items-center justify-between gap-4",
-              "rounded-density border bg-panel px-4 py-2 text-density text-ink shadow-lg",
-              toast.tone === "danger" ? "border-danger" : "border-edge",
+              // The accent is a bar down the left rather than a coloured
+              // border all the way round. A fully outlined toast in five
+              // tones competes with the safety chips, which are the one place
+              // a saturated block of colour means something specific.
+              "pointer-events-auto relative flex min-h-target w-full max-w-md items-center justify-between gap-4",
+              "overflow-hidden rounded-density border border-edge bg-panel py-2 pl-4 pr-2 text-density text-ink",
+              "shadow-[0_2px_4px_rgba(0,0,0,0.3),0_12px_32px_-8px_rgba(0,0,0,0.55)]",
+              "before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:content-['']",
+              TONE_EDGE[toast.tone ?? "info"],
             ].join(" ")}
           >
-            <span>{toast.message}</span>
+            <span className="flex items-center gap-2">
+              <span aria-hidden className={TONE_GLYPH_COLOUR[toast.tone ?? "info"]}>
+                {TONE_GLYPH[toast.tone ?? "info"]}
+              </span>
+              {toast.message}
+            </span>
             <span className="flex items-center gap-2">
               {toast.action === undefined ? null : (
                 <button

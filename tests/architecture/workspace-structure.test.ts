@@ -34,6 +34,7 @@ const EXPECTED_INFRASTRUCTURE = [
   "storage",
   "email",
   "weather",
+  "geocoding",
   "auth",
   "quickbooks",
 ] as const;

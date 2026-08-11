@@ -18,8 +18,12 @@ import {
   calfFromCalving,
   calvingInterval,
   calvingRecordSchema,
+  calfSequencesIn,
+  calfTag,
+  nextCalfSequence,
   producedLiveCalf,
   suggestedCalfTag,
+  yearLetter,
   type CalvingRecord,
 } from "../src/domain/calving-record.js";
 
@@ -250,7 +254,7 @@ describe("calvingRecordSchema", () => {
 });
 
 describe("calfFromCalving", () => {
-  const context = { propertyId: id(0), ownership: "own" as const, tagNumber: "Andromeda-26" };
+  const context = { propertyId: id(0), ownership: "own" as const, tagNumber: "601P" };
 
   it("creates the calf with the dam's calving date as its birthday", () => {
     const draft = calfFromCalving(calving(), { externalId: id(3) }, context);
@@ -279,7 +283,7 @@ describe("calfFromCalving", () => {
     // tag is different — it is what actually goes in the ear.
     const draft = calfFromCalving(calving(), {}, context);
     expect(draft?.animal.name).toBeUndefined();
-    expect(draft?.animal.tagNumber).toBe("Andromeda-26");
+    expect(draft?.animal.tagNumber).toBe("601P");
   });
 
   it("produces a calf the animal schema will actually accept", () => {
@@ -319,7 +323,7 @@ describe("calfFromCalving", () => {
         propertyId: id(0),
         ownership: "client",
         ownerId: id(40),
-        tagNumber: "Andromeda-26",
+        tagNumber: "601P",
       },
     );
 
@@ -356,23 +360,121 @@ describe("calvingInterval", () => {
   });
 });
 
+describe("yearLetter", () => {
+  it("puts 2026 at P, which is the year this farm is calving", () => {
+    // The anchor for the whole system. Off by one here and every tag on the
+    // farm is wrong by a year.
+    expect(yearLetter(2026)).toBe("P");
+  });
+
+  it("skips I, O, Q and V", () => {
+    // Unreadable on a tag at arm's length in a chute: I and O read as 1 and 0,
+    // Q is a smudged O, V is a bent U.
+    const cycle = Array.from({ length: 22 }, (_, offset) => yearLetter(2013 + offset)).join("");
+
+    expect(cycle).toBe("ABCDEFGHJKLMNPRSTUWXYZ");
+    for (const skipped of ["I", "O", "Q", "V"]) {
+      expect(cycle).not.toContain(skipped);
+    }
+  });
+
+  it("runs the years either side of 2026 in order", () => {
+    expect(yearLetter(2025)).toBe("N");
+    expect(yearLetter(2027)).toBe("R");
+  });
+
+  it("wraps after twenty-two years rather than running off the end", () => {
+    expect(yearLetter(2035)).toBe(yearLetter(2013));
+    expect(yearLetter(2012)).toBe("Z");
+  });
+});
+
+describe("calfTag", () => {
+  it("builds the farm's format: year digit, calf number, year letter", () => {
+    expect(calfTag(2026, 1)).toBe("601P");
+    expect(calfTag(2026, 12)).toBe("612P");
+  });
+
+  it("pads a single-digit calf number", () => {
+    // 61P and 601P are different tags, and a farm reading a column of them
+    // wants the digits to line up.
+    expect(calfTag(2026, 7)).toBe("607P");
+  });
+
+  it("does not truncate past ninety-nine calves", () => {
+    // This farm will not have a hundred calves for years, but silently
+    // wrapping to 600P would put two animals in the same tag.
+    expect(calfTag(2026, 100)).toBe("6100P");
+  });
+});
+
+describe("calfSequencesIn", () => {
+  it("reads back the numbers already issued this year", () => {
+    expect(calfSequencesIn(["601P", "603P", "602P"], 2026)).toEqual([1, 3, 2]);
+  });
+
+  it("ignores tags from other years", () => {
+    // 501N is last year's. Counting it would skip a number this year.
+    expect(calfSequencesIn(["601P", "501N", "705R"], 2026)).toEqual([1]);
+  });
+
+  it("ignores a tag in somebody else's format", () => {
+    // A bought-in animal wears whatever it arrived in.
+    expect(calfSequencesIn(["601P", "Andromeda", "14", undefined], 2026)).toEqual([1]);
+  });
+
+  it("accepts a lower-case tag, because somebody will type one", () => {
+    expect(calfSequencesIn(["601p"], 2026)).toEqual([1]);
+  });
+});
+
+describe("nextCalfSequence", () => {
+  it("starts at one on an empty year", () => {
+    expect(nextCalfSequence([], 2026)).toBe(1);
+  });
+
+  it("takes the highest already used and adds one", () => {
+    expect(nextCalfSequence(["601P", "602P", "603P"], 2026)).toBe(4);
+  });
+
+  it("does not reuse a number when a calf has been removed", () => {
+    // Highest-plus-one rather than count-plus-one. Two animals wearing 603P
+    // is a problem that surfaces at weaning, when nobody can tell which
+    // weight belongs to which calf.
+    expect(nextCalfSequence(["601P", "603P"], 2026)).toBe(4);
+  });
+});
+
 describe("suggestedCalfTag", () => {
   const bornOn = new Date("2026-11-22T04:00:00Z");
 
-  it("uses the dam's tag and the birth year, which is what goes in the ear", () => {
-    expect(suggestedCalfTag({ tagNumber: "14", name: "Andromeda" }, bornOn)).toBe("14-26");
+  it("suggests 601P for the first calf of 2026", () => {
+    expect(suggestedCalfTag([], bornOn)).toBe("601P");
   });
 
-  it("falls back to the dam's name when she has no tag", () => {
-    expect(suggestedCalfTag({ tagNumber: undefined, name: "Andromeda" }, bornOn)).toBe(
-      "Andromeda-26",
+  it("counts only the calves already tagged this year", () => {
+    expect(suggestedCalfTag(["601P", "602P", "501N", "Andromeda"], bornOn)).toBe("603P");
+  });
+
+  it("does not count a stillbirth, because a stillbirth never gets a tag", () => {
+    // Structural rather than a special case, and worth pinning: `calfFromCalving`
+    // returns undefined for a stillborn calf, so no Animal is created, so no
+    // tag is ever issued — and the number it would have taken is still free
+    // for the next live calf. A stillbirth that consumed 602P would leave a
+    // gap in the year's tags that nobody could account for later.
+    const stillborn = calfFromCalving(
+      calving({ vigour: "stillborn" }),
+      {},
+      {
+        propertyId: id(0),
+        ownership: "own" as const,
+        tagNumber: "602P",
+      },
     );
-  });
+    expect(stillborn).toBeUndefined();
 
-  it("still produces something findable for an unknown dam", () => {
-    // Never returns an empty string: an animal with no tag and no name fails
-    // `animalSchema`, and the fallback is the last thing standing between a
-    // calving and an unsaveable calf.
-    expect(suggestedCalfTag(undefined, bornOn)).toBe("Calf 2026-11-22");
+    // One live calf on the ground and one stillbirth recorded: the next calf
+    // is 602P, not 603P.
+    expect(suggestedCalfTag(["601P"], bornOn)).toBe("602P");
   });
 });

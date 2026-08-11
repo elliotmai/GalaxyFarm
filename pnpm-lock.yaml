@@ -71,6 +71,9 @@ importers:
       '@galaxy-farm/infra-db':
         specifier: workspace:*
         version: link:../../packages/infrastructure/db
+      '@galaxy-farm/infra-geocoding':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure/geocoding
       '@galaxy-farm/infra-local':
         specifier: workspace:*
         version: link:../../packages/infrastructure/local
@@ -197,6 +200,16 @@ importers:
         version: 3.25.76
 
   packages/infrastructure/email:
+    dependencies:
+      '@galaxy-farm/core':
+        specifier: workspace:*
+        version: link:../../core
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/infrastructure/geocoding:
     dependencies:
       '@galaxy-farm/core':
         specifier: workspace:*

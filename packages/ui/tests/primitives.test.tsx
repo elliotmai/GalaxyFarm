@@ -178,7 +178,25 @@ describe("DataTable", () => {
   it("puts numbers in a tabular column", () => {
     render(<DataTable caption="Cattle" columns={columns} rows={rows} rowKey={(r) => r.id} />);
 
-    expect(screen.getByText("1320")).toHaveClass("gf-numeric");
+    // Scoped to the table: the phone layout renders the same values as cards,
+    // and both are in the DOM at once. Only one is ever *displayed* — the
+    // other is `display: none`, which also takes it out of the accessibility
+    // tree — but jsdom applies no CSS, so a bare query finds both.
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("1320")).toHaveClass("gf-numeric");
+  });
+
+  it("renders a card per row for a phone, built from the same columns", () => {
+    // A seven-column table on a 375px screen is one you read by dragging
+    // sideways, and the moment you drag, the name of the animal the row is
+    // about scrolls off the left.
+    render(<DataTable caption="Cattle" columns={columns} rows={rows} rowKey={(r) => r.id} />);
+
+    const cards = screen.getByRole("list");
+    expect(within(cards).getAllByRole("listitem")).toHaveLength(rows.length);
+    // The identity column heads the card; the rest arrive as labelled pairs.
+    expect(within(cards).getByText("Andromeda")).toBeInTheDocument();
+    expect(within(cards).getAllByRole("term").length).toBeGreaterThan(0);
   });
 
   it("shows the empty state instead of a table with no rows", () => {

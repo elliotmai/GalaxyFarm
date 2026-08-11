@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Badge, Button, Card, EmptyState } from "@galaxy-farm/ui";
+import { Button, Card, EmptyState, Meter, Pill, RecordCard } from "@galaxy-farm/ui";
 import {
   DEFAULT_WATCH_SETTINGS,
   displayName,
@@ -185,42 +185,74 @@ export function CalvingWatchCard({ propertyId }: { readonly propertyId: Ulid }) 
       title="Calving watch"
       actions={
         urgent ? (
-          <Badge tone="danger">Watch tonight</Badge>
+          <Pill tone="danger" dot>
+            Watch tonight
+          </Pill>
         ) : (
-          <Badge tone="action">
+          <Pill tone="identity">
             {cards.length} in {cards.length === 1 ? "her window" : "their windows"}
-          </Badge>
+          </Pill>
         )
       }
     >
-      <ul className="flex flex-col gap-density">
+      <div className="flex flex-col gap-density">
         {cards.map((card) => {
           const dam = byId.get(card.damId);
           const name = dam === undefined ? "A cow" : displayName(dam);
+          const total = settings.gestationDays;
+          const window = settings.calvingWindowDays;
 
           return (
-            <li key={card.breedingRecordId} className="flex flex-col gap-1">
-              <span className="flex flex-wrap items-center gap-2">
-                {dam === undefined ? (
-                  <span className="font-medium text-ink">{name}</span>
+            <RecordCard
+              key={card.breedingRecordId}
+              tone={card.urgent ? "danger" : "identity"}
+              title={
+                dam === undefined ? (
+                  name
                 ) : (
                   <Link
                     href={`/admin/cattle/calving?dam=${dam.id}`}
-                    className="font-medium text-ink underline decoration-edge underline-offset-4 hover:decoration-action"
+                    className="underline decoration-edge underline-offset-4 hover:decoration-action"
                   >
                     {name}
                   </Link>
-                )}
-                <Badge tone={card.urgent ? "danger" : "neutral"}>Day {card.dayOfGestation}</Badge>
-                <span className="text-sm text-muted [font-variant-numeric:tabular-nums]">
-                  due {card.dueOn.toLocaleDateString(undefined, { day: "numeric", month: "short" })}
-                </span>
-              </span>
-              <span className="text-sm text-muted">{describeWatch(card, name)}</span>
-            </li>
+                )
+              }
+              subtitle={describeWatch(card, name)}
+              actions={
+                <Pill tone={card.urgent ? "danger" : "identity"} dot={card.urgent}>
+                  Day {card.dayOfGestation}
+                </Pill>
+              }
+              meta={card.signals.map((signal) => (
+                <Pill
+                  key={signal.signal}
+                  tone={signal.signal === "full_moon" ? "neutral" : "danger"}
+                >
+                  {signal.signal.replace(/_/g, " ")}
+                </Pill>
+              ))}
+            >
+              {/*
+                The bar is the point of the card. "Day 279" means something to
+                somebody who already knows the number is 283; the bar means
+                "nearly" to anybody. The marker is where the window opened, so
+                you can see at a glance whether she is early in it or late.
+              */}
+              <Meter
+                value={card.dayOfGestation / total}
+                tone={card.urgent ? "danger" : "identity"}
+                label="Gestation"
+                marker={(total - window) / total}
+                detail={`day ${card.dayOfGestation} of ${total} · due ${card.dueOn.toLocaleDateString(
+                  undefined,
+                  { day: "numeric", month: "short" },
+                )}`}
+              />
+            </RecordCard>
           );
         })}
-      </ul>
+      </div>
 
       <div className="mt-density flex flex-wrap items-center justify-between gap-2 border-t border-edge pt-density text-sm text-muted">
         <span className="capitalize">

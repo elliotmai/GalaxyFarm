@@ -76,6 +76,65 @@ export function producedLiveCalf(record: Pick<CalvingRecord, "vigour">): boolean
 }
 
 /**
+ * The year letters, and the four the system leaves out (§5.2).
+ *
+ * The international beef letter system skips **I, O, Q and V** — I and O
+ * because they are unreadable as 1 and 0 on a tag at arm's length in a chute,
+ * Q because it is a smudged O, and V because it is a bent U. That leaves 22
+ * letters and a 22-year cycle.
+ *
+ * Anchored on A = 2013, which puts 2026 at P. The anchor is what makes this
+ * checkable: change it by one and every tag on the farm is wrong by a year,
+ * so it is stated once and asserted in a test against a year somebody knows.
+ */
+export const YEAR_LETTERS = "ABCDEFGHJKLMNPRSTUWXYZ";
+const LETTER_EPOCH = 2013;
+
+export function yearLetter(year: number): string {
+  const index =
+    (((year - LETTER_EPOCH) % YEAR_LETTERS.length) + YEAR_LETTERS.length) % YEAR_LETTERS.length;
+  return YEAR_LETTERS[index] as string;
+}
+
+/**
+ * A tag in this farm's own format: `601P`.
+ *
+ * Last digit of the year, then the calf's number within the year as two
+ * digits, then the year letter. The year appears twice on purpose — the digit
+ * reads at a glance from across a pen, and the letter is the part that is
+ * unambiguous when the digit has worn off.
+ */
+export function calfTag(year: number, sequence: number): string {
+  return `${String(year).slice(-1)}${String(sequence).padStart(2, "0")}${yearLetter(year)}`;
+}
+
+/** Every tag already issued for a year, as its sequence number. */
+export function calfSequencesIn(tags: readonly (string | undefined)[], year: number): number[] {
+  const digit = String(year).slice(-1);
+  const letter = yearLetter(year);
+  const pattern = new RegExp(`^${digit}(\\d{2,})${letter}$`, "i");
+
+  return tags
+    .map((tag) => pattern.exec(tag?.trim() ?? "")?.[1])
+    .filter((sequence): sequence is string => sequence !== undefined)
+    .map(Number);
+}
+
+/**
+ * The next number in the year, which is one past the highest already used.
+ *
+ * Highest-plus-one rather than count-plus-one. A calf that died and was
+ * removed, or a tag entered out of order, would make a count reuse a number
+ * that is already in an ear — and two animals wearing 603P is a problem that
+ * surfaces months later at weaning, when nobody can tell which weight belongs
+ * to which calf.
+ */
+export function nextCalfSequence(tags: readonly (string | undefined)[], year: number): number {
+  const used = calfSequencesIn(tags, year);
+  return used.length === 0 ? 1 : Math.max(...used) + 1;
+}
+
+/**
  * The tag to put in the calf's ear, suggested.
  *
  * `calfFromCalving` used to leave the calf with neither a name nor a tag, on
@@ -86,17 +145,17 @@ export function producedLiveCalf(record: Pick<CalvingRecord, "vigour">): boolean
  * draft was unsaveable, and the first real calving would have been the thing
  * that discovered it.
  *
- * Dam plus year is what actually gets written on the tag, so that is what this
- * suggests. It is a starting value in a field somebody can overwrite before
- * saving, not a decision made on their behalf.
+ * The format is the farm's own and not negotiable by this code: year digit,
+ * calf number, year letter. The first calf of 2026 is `601P`. It is still a
+ * starting value in a field somebody can overwrite — a calf bought in wears
+ * whatever tag it arrived in.
  */
 export function suggestedCalfTag(
-  dam: Pick<Animal, "tagNumber" | "name"> | undefined,
+  existingTags: readonly (string | undefined)[],
   bornOn: Date,
 ): string {
-  const year = String(bornOn.getFullYear()).slice(2);
-  const stem = dam?.tagNumber ?? dam?.name;
-  return stem === undefined ? `Calf ${bornOn.toISOString().slice(0, 10)}` : `${stem}-${year}`;
+  const year = bornOn.getFullYear();
+  return calfTag(year, nextCalfSequence(existingTags, year));
 }
 
 export interface CalfDraft {

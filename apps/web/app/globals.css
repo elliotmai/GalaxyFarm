@@ -52,9 +52,25 @@ body {
   font-family: var(--font-body);
 }
 
-/* Surfaces fill the viewport so their canvas reaches the bottom of a short page. */
+/*
+ * Surfaces fill the viewport so their canvas reaches the bottom of a short page.
+ *
+ * `100dvh` rather than `100vh`: on a phone, `vh` is measured against the
+ * viewport with the browser chrome *hidden*, so a full-height layout is taller
+ * than the screen until you scroll and the address bar retracts. The dynamic
+ * unit tracks the chrome, which is the difference between a sticky footer that
+ * sits on the bottom edge and one that hides just below it.
+ *
+ * The safe-area padding is the other half of `viewportFit: "cover"` — the
+ * surfaces paint edge to edge on a notched phone, and this keeps their
+ * *contents* out from under the notch and the home indicator. Every inset is
+ * zero on a screen that has none, so this costs nothing elsewhere.
+ */
 [data-surface] {
-  min-height: 100vh;
+  min-height: 100dvh;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 h1,

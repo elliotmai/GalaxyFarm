@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ConfirmProvider, ToastProvider } from "@galaxy-farm/ui";
 
 import { AdminNav } from "@/app/(admin)/_components/admin-nav";
+import { Refreshable } from "@/app/(admin)/_components/refreshable";
 import { SyncProvider } from "@/app/_components/sync-provider";
 import { currentActor } from "@/lib/auth";
 
@@ -35,10 +36,27 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 a nav that jumps back to the top every time you click a link is
                 the thing that makes a long list unusable.
               */}
-              <aside className="border-b border-edge bg-panel md:sticky md:top-0 md:h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
+              {/*
+                Sticky on both, for two different reasons. On a laptop it is a
+                full-height column that scrolls in its own right, which is what
+                preserves its position across a navigation — the layout does
+                not remount, so the scrolled element survives, and a nav that
+                jumps to the top on every click makes a long list unusable.
+
+                On a phone it is a bar: the farm name, the sync state, and the
+                Menu button. Sticking that means the way out of a page is still
+                on screen forty rows into the herd, rather than back at the top
+                where you would have to scroll to reach it.
+              */}
+              <aside className="sticky top-0 z-20 border-b border-edge bg-panel md:h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
                 <AdminNav farmName={farmName} />
               </aside>
-              <main className="min-w-0 flex-1 p-density">{children}</main>
+              {/* Tighter gutters on a phone: 14px of padding either side of a
+                  375px screen is 7% of the width, and every table and form
+                  inside is competing for the rest. */}
+              <main className="min-w-0 flex-1 px-3 py-density md:p-density">
+                <Refreshable>{children}</Refreshable>
+              </main>
             </div>
           </ConfirmProvider>
         </ToastProvider>

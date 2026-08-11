@@ -15,6 +15,7 @@
     "@galaxy-farm/core": "workspace:*",
     "@galaxy-farm/infra-auth": "workspace:*",
     "@galaxy-farm/infra-db": "workspace:*",
+    "@galaxy-farm/infra-geocoding": "workspace:*",
     "@galaxy-farm/infra-local": "workspace:*",
     "@galaxy-farm/infra-sync": "workspace:*",
     "@galaxy-farm/infra-weather": "workspace:*",

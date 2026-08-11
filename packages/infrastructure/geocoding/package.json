@@ -1,0 +1,21 @@
+{
+  "name": "@galaxy-farm/infra-geocoding",
+  "version": "0.0.0",
+  "private": true,
+  "description": "US Census and Nominatim geocoders, and USDA hardiness lookup",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@galaxy-farm/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}
