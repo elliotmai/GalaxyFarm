@@ -24,7 +24,8 @@ import {
 } from "@galaxy-farm/ui";
 import {
   ageInMonths,
-  currentAssignment,
+  effectiveSlot,
+  openAssignments,
   type Animal,
   type Ulid,
   type Zone,
@@ -104,8 +105,20 @@ export function AnimalScreen({
 
   const animal = found.animal;
   const profile = profiles.find((entry) => entry.animalId === animal.id);
-  const open = currentAssignment(placements.filter((entry) => entry.animalId === animal.id));
-  const zone = zones.find((entry) => entry.id === open?.zoneId);
+  // Both slots, not just one. `currentAssignment` defaults to the legacy
+  // `primary` slot, so a cow standing in the barn — an `inside` assignment —
+  // read as unassigned on her own page while the pen board showed her in it.
+  const indoorZoneIds = new Set(zones.filter((entry) => entry.indoor).map((entry) => entry.id));
+  const standing = openAssignments(placements, animal.id).map((entry) => ({
+    assignment: entry,
+    zone: zones.find((candidate) => candidate.id === entry.zoneId),
+    slot: effectiveSlot(entry, indoorZoneIds),
+  }));
+
+  // The outside pen is the one people mean by "where is she", so it leads.
+  const outside = standing.find((entry) => entry.slot === "outside");
+  const inside = standing.find((entry) => entry.slot === "inside");
+  const zone = (outside ?? inside)?.zone;
   const months = ageInMonths(animal, new Date());
 
   // The URL the record answers to now. Somebody who arrived by an old link
@@ -156,7 +169,13 @@ export function AnimalScreen({
             ) : (
               <Badge tone="neutral">Unpapered</Badge>
             )}
-            {zone === undefined ? null : <Badge tone="action">{zone.name}</Badge>}
+            {standing.map((entry) =>
+              entry.zone === undefined ? null : (
+                <Badge key={entry.assignment.id} tone="action">
+                  {entry.zone.name}
+                </Badge>
+              ),
+            )}
           </>
         }
       />
@@ -169,7 +188,13 @@ export function AnimalScreen({
           hint={animal.dobIsEstimate ? "Date of birth is an estimate" : undefined}
         />
         <Stat label="Sex" value={animal.sex} />
-        <Stat label="Where" value={zone?.name ?? "Unassigned"} />
+        <Stat
+          label="Where"
+          value={outside?.zone?.name ?? inside?.zone?.name ?? "Unassigned"}
+          {...(outside !== undefined && inside !== undefined
+            ? { hint: `and ${inside.zone?.name ?? "inside"}` }
+            : {})}
+        />
       </StatRow>
 
       <AnimalTabs

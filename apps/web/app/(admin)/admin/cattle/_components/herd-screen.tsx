@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   Badge,
@@ -25,7 +25,7 @@ import {
   SEXES,
   animalSchema,
   encodeUlid,
-  move,
+  moveToZone,
   zoneAssignmentSchema,
   type Animal,
   type AnimalStatus,
@@ -95,6 +95,14 @@ export function HerdScreen({
   const { records: all, loading } = useRecords<Animal>("animals", { propertyId, search });
   const { records: zones } = useRecords<Zone>("zones", { propertyId });
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", { propertyId });
+
+  // Which zones are indoor, so an assignment's slot can be read off its zone
+  // rather than trusted from the row — a legacy `primary` row has to count
+  // against the slot its zone implies, or the rule misses it entirely.
+  const indoorZoneIds = useMemo(
+    () => new Set(zones.filter((zone) => zone.indoor).map((zone) => zone.id)),
+    [zones],
+  );
 
   const animals = all.filter((animal) => animal.species === "cattle");
 
@@ -195,22 +203,33 @@ export function HerdScreen({
    * the close but not the open must not end up with the animal nowhere.
    */
   async function moveTo(animal: Animal, zoneId: Ulid) {
-    const open = assignments.find((a) => a.animalId === animal.id && a.periodTo === undefined);
+    const zone = zones.find((candidate) => candidate.id === zoneId);
+    if (zone === undefined) return;
+
     const at = new Date();
 
-    const { closed, opened } = move(open, {
-      id: encodeUlid(at.getTime()),
-      propertyId,
-      createdAt: at,
-      updatedAt: at,
-      animalId: animal.id,
-      zoneId,
-      slot: "primary",
-      at,
-    });
+    // The slot is the zone's, not a question. Moving a cow into the barn
+    // leaves her pasture assignment alone; moving her to another trap closes
+    // the first one. `closed` is a list because more than one open assignment
+    // in a slot means the rule was already broken, and this is where it gets
+    // repaired rather than left for somebody to notice on the pen board.
+    const { closed, opened } = moveToZone(
+      assignments,
+      {
+        id: encodeUlid(at.getTime()) as Ulid,
+        propertyId,
+        createdAt: at,
+        updatedAt: at,
+        animalId: animal.id,
+        zoneId,
+        indoor: zone.indoor,
+        at,
+      },
+      indoorZoneIds,
+    );
 
-    if (closed !== undefined) {
-      await placements.update(closed.id, { periodTo: closed.periodTo });
+    for (const entry of closed) {
+      await placements.update(entry.id, { periodTo: entry.periodTo });
     }
     const result = await placements.create(opened);
 
@@ -219,8 +238,10 @@ export function HerdScreen({
       return;
     }
 
-    const zone = zones.find((candidate) => candidate.id === zoneId);
-    show({ message: `${animal.name ?? "Animal"} moved to ${zone?.name ?? "a new zone"}` });
+    show({
+      message: `${animal.name ?? "Animal"} moved to ${zone.name}`,
+      tone: "success",
+    });
   }
 
   async function remove(animal: Animal) {
