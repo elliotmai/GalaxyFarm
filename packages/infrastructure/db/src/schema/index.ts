@@ -246,6 +246,63 @@ export const purchaseCandidates = pgTable(
 );
 
 /**
+ * People who can sign in (spec §4.3).
+ *
+ * In our own database rather than a provider's, which is what makes §10's
+ * move home a `pg_dump | pg_restore` rather than a re-registration of every
+ * account. Auth.js is a credentials provider over this table; no vendor holds
+ * the identity.
+ *
+ * `passwordHash` is a scrypt hash with its parameters and salt encoded in the
+ * string — see `@galaxy-farm/infra-auth`. Sessions are JWTs, so there is no
+ * session table to keep in step.
+ */
+export const users = pgTable(
+  "users",
+  {
+    ...baseColumns,
+    email: text("email").notNull().unique(),
+    name: text("name").notNull(),
+    role: text("role").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    /** Set for `housesitter`: outside this window they have no access at all. */
+    accessFrom: timestamp("access_from", { withTimezone: true, mode: "date" }),
+    accessTo: timestamp("access_to", { withTimezone: true, mode: "date" }),
+    /** Set for `customer`: their contact record in the CRM. */
+    contactId: text("contact_id"),
+    lastSignedInAt: timestamp("last_signed_in_at", { withTimezone: true, mode: "date" }),
+    active: boolean("active").notNull().default(true),
+  },
+  baseIndexes("users"),
+);
+
+/**
+ * Paired barn screens (spec §4.4).
+ *
+ * A device holds a long-lived token rather than a person's session, because
+ * the screen is unattended and the person who paired it goes home. Revocable
+ * by id and not editable — a §4.5 system-owned row.
+ */
+export const kioskDevices = pgTable(
+  "kiosk_devices",
+  {
+    ...baseColumns,
+    name: text("name").notNull(),
+    /** Hashed like a password: a leaked table must not be a set of keys. */
+    tokenHash: text("token_hash").notNull(),
+    /** One-time pairing code, cleared once used. */
+    pairingCode: text("pairing_code"),
+    pairingExpiresAt: timestamp("pairing_expires_at", { withTimezone: true, mode: "date" }),
+    pairedAt: timestamp("paired_at", { withTimezone: true, mode: "date" }),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "date" }),
+    /** Lock the screen to one board, per §4.4. */
+    lockedToBoard: text("locked_to_board"),
+    revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
+  },
+  baseIndexes("kiosk_devices"),
+);
+
+/**
  * Who last wrote each field, and when (§4.2).
  *
  * The merge is per-field last-write-wins, so the server has to know when each
@@ -319,6 +376,8 @@ export const allTables = {
   tasks,
   roadmapItems,
   purchaseCandidates,
+  users,
+  kioskDevices,
   syncAudit,
   syncFieldMeta,
 };

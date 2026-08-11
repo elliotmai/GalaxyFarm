@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { SEARCHABLE_FIELDS } from "../src/repositories/index.js";
 import { allTables } from "../src/schema/index.js";
+import { REPOSITORY_TABLES } from "../src/sync/entities.js";
 
 /**
  * The registry, checked against the schema.
@@ -20,11 +21,7 @@ describe("SEARCHABLE_FIELDS", () => {
     // syncFieldMeta holds per-field write times. Every other table must
     // appear, even if the answer is "nothing here is worth searching" — that
     // is a decision, not a default.
-    const expected = Object.keys(allTables).filter(
-      (name) => name !== "syncAudit" && name !== "syncFieldMeta",
-    );
-
-    expect(registered.sort()).toEqual(expected.sort());
+    expect(registered.sort()).toEqual([...REPOSITORY_TABLES].sort());
   });
 
   it("names only columns that exist, and only text ones", () => {

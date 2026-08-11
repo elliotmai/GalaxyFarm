@@ -10,3 +10,4 @@ export * from "./attachment.js";
 export * from "./task.js";
 export * from "./roadmap.js";
 export * from "./purchase-candidate.js";
+export * from "./user.js";

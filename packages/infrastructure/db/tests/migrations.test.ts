@@ -2,7 +2,11 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { PGlite } from "@electric-sql/pglite";
+import { getTableName } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
+
+import { allTables } from "../src/schema/index.js";
+import { BOOKKEEPING_TABLES } from "../src/sync/entities.js";
 
 /**
  * The migrations, applied to a real Postgres.
@@ -32,6 +36,11 @@ async function applyAll(db: PGlite): Promise<void> {
   }
 }
 
+/** Every table built from `baseColumns` — that is, everything but bookkeeping. */
+function entityTableCount(): number {
+  return Object.keys(allTables).filter((name) => !BOOKKEEPING_TABLES.includes(name)).length;
+}
+
 describe("migrations", () => {
   let db: PGlite;
 
@@ -45,22 +54,12 @@ describe("migrations", () => {
       `select tablename from pg_tables where schemaname = 'public' order by tablename`,
     );
 
-    expect(tables.rows.map((r) => r.tablename)).toEqual([
-      "animals",
-      "attachments",
-      "branding_configs",
-      "chore_templates",
-      "contacts",
-      "properties",
-      "purchase_candidates",
-      "roadmap_items",
-      "sync_audit",
-      "sync_field_meta",
-      "tasks",
-      "water_sources",
-      "zone_assignments",
-      "zones",
-    ]);
+    // Derived from the schema rather than written out, so the failure this
+    // catches is the one that matters: a table declared in TypeScript that no
+    // migration ever created. A hardcoded list only catches itself going stale.
+    const expected = Object.values(allTables).map(getTableName).sort();
+
+    expect(tables.rows.map((r) => r.tablename)).toEqual(expected);
   });
 
   it("gives every table the base columns §5 requires", async () => {
@@ -95,7 +94,7 @@ describe("migrations", () => {
       `select indexname from pg_indexes where schemaname = 'public' and indexname like '%_sync_cursor_idx'`,
     );
 
-    expect(rows.rows.length).toBe(12);
+    expect(rows.rows.length).toBe(entityTableCount());
   });
 
   it("has a partial index keeping the default read path off deleted history", async () => {
@@ -103,7 +102,7 @@ describe("migrations", () => {
       `select indexdef from pg_indexes where schemaname = 'public' and indexname like '%_live_idx'`,
     );
 
-    expect(rows.rows.length).toBe(12);
+    expect(rows.rows.length).toBe(entityTableCount());
     expect(rows.rows.every((r) => r.indexdef.includes("deleted_at IS NULL"))).toBe(true);
   });
 

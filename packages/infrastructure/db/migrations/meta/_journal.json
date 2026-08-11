@@ -15,6 +15,13 @@
       "when": 1786460419211,
       "tag": "0001_sync_field_meta",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786464093417,
+      "tag": "0002_users_and_kiosk_devices",
+      "breakpoints": true
     }
   ]
 }

@@ -14,8 +14,13 @@ export * from "./postgres-repository.js";
  * made deliberately, including the choice that a table has nothing worth
  * searching.
  *
- * `syncAudit` is absent on purpose: it is append-only and on the §4.5 exception
- * list, so it is not a `Repository` at all.
+ * The two sync bookkeeping tables are absent on purpose: `syncAudit` is
+ * append-only and on the §4.5 exception list, and `syncFieldMeta` holds
+ * per-field write times. Neither is a `Repository`.
+ *
+ * `users` and `kioskDevices` **are** here — they are administered through the
+ * app like anything else — but they never sync to a device. See
+ * `NOT_SYNCED` in `../sync/entities.ts`.
  */
 export const SEARCHABLE_FIELDS = {
   properties: ["name", "address"],
@@ -31,6 +36,8 @@ export const SEARCHABLE_FIELDS = {
   tasks: ["title", "detail"],
   roadmapItems: ["title", "detail"],
   purchaseCandidates: ["title", "location", "notes"],
+  users: ["email", "name"],
+  kioskDevices: ["name"],
 } as const satisfies Partial<Record<keyof typeof allTables, readonly string[]>>;
 
 export type RepositoryName = keyof typeof SEARCHABLE_FIELDS;
