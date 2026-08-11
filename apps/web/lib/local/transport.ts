@@ -30,13 +30,40 @@ const BASE_DATE_FIELDS = ["createdAt", "updatedAt", "deletedAt"] as const;
 /**
  * Anything named like a timestamp is one.
  *
- * A per-entity list would be exact and would also be a list somebody forgets
- * to update the day they add `weanedAt`. The convention is already enforced by
- * the schema — every timestamp column in Postgres is `*_at` or `*Date` — so
- * the naming is the contract.
+ * By name, because this runs in the browser and cannot import the drizzle
+ * schema to ask. The push side *does* ask the schema — see `dateFieldsOf` —
+ * and this is the one place a convention still stands in for the truth.
+ *
+ * It used to claim "every timestamp column in Postgres is `*_at` or `*Date`",
+ * and that was simply untrue: the schema has `date`, `dob`, `performed_on`,
+ * `period_from`, `period_to`. A missed timestamp arrives as a string, every
+ * comparison against it is NaN, and a cow drops out of her own calving window
+ * with nothing logged anywhere.
+ *
+ * So it is no longer a claim. `tests/date-fields.test.ts` walks every table in
+ * the schema and fails the build if a timestamp column is not matched here —
+ * add one named `weanedAt` and it passes, add one named `weaned` and the build
+ * tells you to fix the name or this predicate.
  */
-function isDateField(field: string): boolean {
-  return /(At|Date)$/.test(field) || (BASE_DATE_FIELDS as readonly string[]).includes(field);
+const NAMED_DATE_FIELDS: ReadonlySet<string> = new Set([
+  ...BASE_DATE_FIELDS,
+  "date",
+  "dob",
+  "at",
+  "periodFrom",
+  "periodTo",
+  "accessFrom",
+  "accessTo",
+  "firstSeen",
+]);
+
+export function isDateField(field: string): boolean {
+  // Suffixes for the ones that follow a pattern, an explicit list for the rest.
+  // Deliberately *not* matching `*From$`/`*To$` as suffixes: the test below
+  // only catches timestamps this misses, and a future `assignedTo` holding a
+  // user id would be silently turned into an Invalid Date — a false positive
+  // no test here would see.
+  return /(At|On|Date)$/.test(field) || NAMED_DATE_FIELDS.has(field);
 }
 
 export function reviveRecord<T extends BaseRecord>(raw: Record<string, unknown>): T {

@@ -47,3 +47,27 @@ export function tableFor(entity: string): RecordTable | undefined {
 export function columnsFor(table: RecordTable): Record<string, PgColumn> {
   return getTableColumns(table) as Record<string, PgColumn>;
 }
+
+/**
+ * Which of a table's fields are timestamps, asked of the schema.
+ *
+ * Not guessed from the name. A patch arrives as JSON, where a `Date` is a
+ * string, and drizzle's `timestamp({ mode: "date" })` writer calls
+ * `value.toISOString()` — so a string reaching it throws
+ * `value.toISOString is not a function`, the entry is rejected, and it is
+ * rejected again on every retry because the next attempt sends the same
+ * string. The queue grows and nothing ever leaves the device.
+ *
+ * That is exactly what happened. The client revived by field name, on a stated
+ * convention that "every timestamp column is `*_at` or `*Date`" — and the
+ * schema has `date`, `dob`, `performed_on`, `period_from` and `period_to`,
+ * none of which match. Reading `dataType` off the column instead cannot drift
+ * from the schema, because it *is* the schema.
+ */
+export function dateFieldsOf(table: RecordTable): Set<string> {
+  return new Set(
+    Object.entries(columnsFor(table))
+      .filter(([, column]) => column.dataType === "date")
+      .map(([field]) => field),
+  );
+}

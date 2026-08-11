@@ -7,6 +7,7 @@ import {
   type AuditEntry,
   type BaseRecord,
   type Clock,
+  type FieldChange,
   type FieldState,
   type IdGenerator,
   type OutboxEntry,
@@ -18,7 +19,7 @@ import {
 
 import { PostgresRepository, type Database } from "../repositories/postgres-repository.js";
 import { syncAudit, syncFieldMeta } from "../schema/index.js";
-import { columnsFor, tableFor } from "./entities.js";
+import { columnsFor, dateFieldsOf, tableFor } from "./entities.js";
 
 /**
  * Applying a push (spec §4.2).
@@ -67,6 +68,22 @@ export async function applyPush(
   return { accepted, rejected, audit };
 }
 
+/**
+ * A timestamp that crossed the wire as a string, made a `Date` again.
+ *
+ * Only for columns the schema says are timestamps, and only for strings — a
+ * value that is already a `Date` (the in-process path, and the tests that use
+ * it) is left alone. An unparseable string is passed through untouched so it
+ * fails loudly at the driver rather than being silently written as an Invalid
+ * Date, which would store `NULL` and look like the field was never sent.
+ */
+function reviveTimestamp(change: FieldChange, dateFields: ReadonlySet<string>): FieldChange {
+  if (!dateFields.has(change.field) || typeof change.value !== "string") return change;
+
+  const parsed = new Date(change.value);
+  return Number.isNaN(parsed.getTime()) ? change : { ...change, value: parsed as never };
+}
+
 async function applyEntry(
   db: Database,
   entry: OutboxEntry,
@@ -77,13 +94,14 @@ async function applyEntry(
   const table = tableFor(entity);
   if (table === undefined) throw new Error(`Unknown entity "${entity}"`);
   const columns = columnsFor(table);
+  const dateFields = dateFieldsOf(table);
 
   // A patch may not invent columns, and may not restate the fields the server
   // owns. Both are dropped rather than refused — an older device that still
   // sends a field this deploy removed should not have its whole batch stick.
-  const changes = entry.patch.changes.filter(
-    (change) => change.field in columns && !RESERVED_FIELDS.has(change.field),
-  );
+  const changes = entry.patch.changes
+    .filter((change) => change.field in columns && !RESERVED_FIELDS.has(change.field))
+    .map((change) => reviveTimestamp(change, dateFields));
   if (changes.length === 0) return [];
 
   const now = context.clock.now();
