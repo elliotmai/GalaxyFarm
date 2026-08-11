@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { encodeUlid, systemClock, type OutboxEntry } from "@galaxy-farm/core";
 import { applyPush } from "@galaxy-farm/infra-db";
 
+import { syncErrorResponse } from "@/lib/api-errors";
 import { currentActor } from "@/lib/auth";
 import { database } from "@/lib/credential-store";
 import { reviveOutboxEntries } from "@/lib/sync-payload";
@@ -41,11 +42,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await applyPush(database(), entries, {
-    propertyId: actor.propertyId,
-    clock: systemClock(),
-    ids: { next: () => encodeUlid(Date.now()) },
-  });
+  try {
+    const result = await applyPush(database(), entries, {
+      propertyId: actor.propertyId,
+      clock: systemClock(),
+      ids: { next: () => encodeUlid(Date.now()) },
+    });
 
-  return NextResponse.json(result);
+    return NextResponse.json(result);
+  } catch (error) {
+    // A push that fails silently is the expensive one: the outbox keeps the
+    // work, but nobody is told it is not leaving the device.
+    return syncErrorResponse(error, "push");
+  }
 }

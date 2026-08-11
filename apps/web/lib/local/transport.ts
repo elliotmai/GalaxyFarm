@@ -1,10 +1,11 @@
-import type {
-  BaseRecord,
-  CursorSet,
-  OutboxEntry,
-  PullPage,
-  PushResult,
-  SyncTransport,
+import {
+  SyncServerError,
+  type BaseRecord,
+  type CursorSet,
+  type OutboxEntry,
+  type PullPage,
+  type PushResult,
+  type SyncTransport,
 } from "@galaxy-farm/core";
 
 /**
@@ -78,10 +79,18 @@ export function httpTransport<T extends BaseRecord>(
     });
 
     if (!response.ok) {
-      // Thrown, not returned: the engine treats a throw as "could not reach
-      // the server", keeps the outbox intact, and backs off. That is the right
-      // response to a 500 or a captive portal alike.
-      throw new Error(`${url} responded ${response.status}`);
+      // Thrown, not returned: the outbox stays intact and the engine backs off.
+      // But a server that answered is not the same as one that was not there —
+      // no signal in a pasture is normal and fixes itself, a 500 does not — so
+      // this carries the status and whatever the server said about why.
+      const detail = (await response.json().catch(() => undefined)) as
+        { error?: string; kind?: string } | undefined;
+
+      throw new SyncServerError(
+        response.status,
+        detail?.error ?? `${url} responded ${response.status}`,
+        detail?.kind,
+      );
     }
 
     return response.json();

@@ -1,0 +1,133 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { describe, expect, it } from "vitest";
+
+import { describeDrift, isDrifted, schemaDrift } from "../src/schema-drift.js";
+import { pullSince } from "../src/sync/pull.js";
+import { SYNCED_ENTITIES } from "../src/sync/entities.js";
+import type { Database } from "../src/repositories/postgres-repository.js";
+
+/**
+ * Drift between the code and the live database.
+ *
+ * Written after a real outage: migrations 0003 and 0004 were committed and
+ * deployed but never run against the managed database, so the next sync pull
+ * selected `properties.safety_level_labels`, got a bare 500, and the only
+ * symptom was a red line in a browser console. Reads are local (§4.2), so
+ * nothing else looked wrong — work simply stopped leaving the devices.
+ */
+
+const DIR = join(process.cwd(), "packages/infrastructure/db/migrations");
+
+function migrations(): string[] {
+  return readdirSync(DIR)
+    .filter((file) => file.endsWith(".sql"))
+    .sort();
+}
+
+async function apply(pg: PGlite, from: number, to: number): Promise<void> {
+  for (const file of migrations().slice(from, to)) {
+    for (const statement of readFileSync(join(DIR, file), "utf8")
+      .split("--> statement-breakpoint")
+      .map((s) => s.trim())
+      .filter((s) => s !== "")) {
+      await pg.exec(statement);
+    }
+  }
+}
+
+describe("schemaDrift", () => {
+  it("reports nothing against a fully migrated database", async () => {
+    const pg = new PGlite();
+    await apply(pg, 0, migrations().length);
+
+    const drift = await schemaDrift(drizzle(pg) as unknown as Database);
+
+    expect(drift.missingTables).toEqual([]);
+    expect(drift.missingColumns).toEqual([]);
+    expect(isDrifted(drift)).toBe(false);
+    expect(describeDrift(drift)).toBeUndefined();
+  }, 60_000);
+
+  it("names the tables and columns a database three migrations back is missing", async () => {
+    // Exactly the production state: everything up to 0002, nothing after.
+    const pg = new PGlite();
+    await apply(pg, 0, 3);
+
+    const drift = await schemaDrift(drizzle(pg) as unknown as Database);
+
+    expect([...drift.missingTables].sort()).toEqual([
+      "calendar_events",
+      "feeding_plans",
+      "pasture_care_logs",
+    ]);
+    expect(drift.missingColumns.map((entry) => `${entry.table}.${entry.column}`).sort()).toEqual([
+      "properties.safety_level_labels",
+      "purchase_candidates.asking_price",
+      "roadmap_items.budget_estimate",
+    ]);
+  }, 60_000);
+
+  it("says what to do about it", async () => {
+    // "Schema mismatch" sends somebody reading logs at ten at night looking in
+    // the wrong place.
+    const pg = new PGlite();
+    await apply(pg, 0, 3);
+
+    const explanation = describeDrift(await schemaDrift(drizzle(pg) as unknown as Database));
+
+    expect(explanation).toMatch(/behind this deploy/);
+    expect(explanation).toMatch(/pnpm db:migrate/);
+    expect(explanation).toMatch(/pasture_care_logs/);
+    expect(explanation).toMatch(/properties\.safety_level_labels/);
+  }, 60_000);
+
+  it("does not call an extra table drift", async () => {
+    // A migration ahead of a rolled-back deploy is fine, and so is a table
+    // somebody added by hand.
+    const pg = new PGlite();
+    await apply(pg, 0, migrations().length);
+    await pg.exec("create table scratch (id text primary key)");
+
+    expect(isDrifted(await schemaDrift(drizzle(pg) as unknown as Database))).toBe(false);
+  }, 60_000);
+});
+
+describe("the failure it was written for", () => {
+  it("a pull against a database three migrations back throws on the first table", async () => {
+    const pg = new PGlite();
+    await apply(pg, 0, 3);
+
+    await expect(
+      pullSince(drizzle(pg) as unknown as Database, {
+        propertyId: "01ARZ3NDEKTSV4RRFFQ69G5FP1" as never,
+        cursors: {},
+        entities: SYNCED_ENTITIES,
+      }),
+    ).rejects.toThrow(/safety_level_labels/);
+  }, 60_000);
+
+  it("and succeeds once the pending migrations are applied", async () => {
+    const pg = new PGlite();
+    await apply(pg, 0, 3);
+    // With a row already in place, so a NOT NULL column added without a
+    // default would fail here rather than against the real database.
+    await pg.exec(
+      `insert into properties (id, property_id, created_at, updated_at, name, timezone)
+       values ('P1','P1', now(), now(), 'Galaxy Farm', 'America/Chicago')`,
+    );
+
+    await apply(pg, 3, migrations().length);
+
+    await expect(
+      pullSince(drizzle(pg) as unknown as Database, {
+        propertyId: "P1" as never,
+        cursors: {},
+        entities: SYNCED_ENTITIES,
+      }),
+    ).resolves.toBeDefined();
+  }, 60_000);
+});

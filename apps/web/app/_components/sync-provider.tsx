@@ -31,6 +31,14 @@ export interface SyncState {
   readonly syncing: boolean;
   /** True when the last attempt could not reach the server. */
   readonly offline: boolean;
+  /**
+   * Set when the server answered and refused.
+   *
+   * Kept apart from `offline` because the two mean opposite things to somebody
+   * holding a phone: no signal in a pasture is normal, and a 500 is a fault
+   * that will still be there tomorrow.
+   */
+  readonly problem: string | undefined;
   readonly lastSyncedAt: Date | undefined;
   /** Local edits not yet accepted by the server. */
   readonly pending: number;
@@ -51,6 +59,7 @@ export function SyncProvider({ children }: { readonly children: ReactNode }) {
   const [store, setStore] = useState<LocalStore | undefined>();
   const [syncing, setSyncing] = useState(false);
   const [offline, setOffline] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | undefined>();
   const [pending, setPending] = useState(0);
   const running = useRef(false);
@@ -72,7 +81,8 @@ export function SyncProvider({ children }: { readonly children: ReactNode }) {
     try {
       const outcome = await store.engine.sync();
       setOffline(outcome.offline);
-      if (!outcome.offline) {
+      setProblem(outcome.problem);
+      if (!outcome.offline && outcome.problem === undefined) {
         setLastSyncedAt(new Date());
         saveCursors(store.engine.cursorState());
       }
@@ -107,8 +117,8 @@ export function SyncProvider({ children }: { readonly children: ReactNode }) {
   }, [store, syncNow]);
 
   const value = useMemo<SyncState>(
-    () => ({ store, syncing, offline, lastSyncedAt, pending, syncNow }),
-    [store, syncing, offline, lastSyncedAt, pending, syncNow],
+    () => ({ store, syncing, offline, problem, lastSyncedAt, pending, syncNow }),
+    [store, syncing, offline, problem, lastSyncedAt, pending, syncNow],
   );
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;

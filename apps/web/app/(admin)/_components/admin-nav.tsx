@@ -164,14 +164,24 @@ export function AdminNav({ farmName }: { readonly farmName: string }) {
 /**
  * Whether the device is caught up.
  *
- * Worth showing, and worth showing calmly. Offline is the expected state in a
- * barn, not a failure — what someone needs to know is that their work is
- * queued and safe, not that something went wrong.
+ * Offline is worth showing calmly: it is the expected state in a barn, not a
+ * failure, and what someone needs to know is that their work is queued and
+ * safe. A server that answered and refused is the opposite — it will still be
+ * broken tomorrow — and showing that as "Offline" is what let a deploy sit
+ * ahead of its migrations with nothing but a red line in a browser console to
+ * say so.
  */
 function SyncBadge() {
-  const { offline, syncing, pending } = useSync();
+  const { offline, problem, syncing, pending } = useSync();
 
   if (syncing) return <Badge tone="neutral">Syncing…</Badge>;
+  if (problem !== undefined) {
+    return (
+      <Badge tone="danger" title={problem}>
+        Sync failing{pending > 0 ? ` · ${pending} queued` : ""}
+      </Badge>
+    );
+  }
   if (offline) {
     return <Badge tone="calm">Offline{pending > 0 ? ` · ${pending} queued` : ""}</Badge>;
   }

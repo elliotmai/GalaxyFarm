@@ -119,11 +119,17 @@ describe("httpTransport", () => {
   it("throws on a server error, so the engine keeps the outbox and backs off", async () => {
     // Returning a failure instead would look like "the server considered this
     // and said no", and the entries would be dropped. A 500 is not a verdict.
+    //
+    // The status lives on the error rather than in its text: the message is
+    // the server's own explanation, which is what a person needs to read.
     const fetch = vi.fn(async () =>
       response({ error: "boom" }, false, 500),
     ) as unknown as typeof globalThis.fetch;
 
-    await expect(httpTransport({ fetch }).push([entry])).rejects.toThrow(/500/);
+    await expect(httpTransport({ fetch }).push([entry])).rejects.toMatchObject({
+      status: 500,
+      message: "boom",
+    });
   });
 
   it("throws on a 401 too, rather than silently dropping a signed-out device's work", async () => {
@@ -131,7 +137,9 @@ describe("httpTransport", () => {
       response({ error: "Not signed in" }, false, 401),
     ) as unknown as typeof globalThis.fetch;
 
-    await expect(httpTransport({ fetch }).pull({}, ["animals"])).rejects.toThrow(/401/);
+    await expect(httpTransport({ fetch }).pull({}, ["animals"])).rejects.toMatchObject({
+      status: 401,
+    });
   });
 
   it("revives every record in a pulled page", async () => {

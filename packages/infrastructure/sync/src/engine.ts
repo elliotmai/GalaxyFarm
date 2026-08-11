@@ -1,4 +1,4 @@
-import { advance, cursorFor } from "@galaxy-farm/core";
+import { advance, cursorFor, isServerError } from "@galaxy-farm/core";
 import type {
   AuditEntry,
   BaseRecord,
@@ -54,6 +54,14 @@ export interface SyncOutcome {
   readonly audit: readonly AuditEntry[];
   /** Set when the engine could not reach the server at all. */
   readonly offline: boolean;
+  /**
+   * Set when the *server* refused, as opposed to not being reachable.
+   *
+   * The two need telling apart on screen: no signal in a pasture is normal and
+   * self-correcting, a 500 is a fault somebody has to fix. Reported as the
+   * message the server gave, because "sync failed" is not actionable.
+   */
+  readonly problem?: string | undefined;
 }
 
 export class SyncEngine<T extends BaseRecord> {
@@ -109,11 +117,16 @@ export class SyncEngine<T extends BaseRecord> {
     try {
       result = await this.options.transport.push(ready);
     } catch (error) {
-      // Unreachable server: keep every entry and let backoff space out the
-      // retries. Nothing is lost, which is the entire point of the outbox.
+      // Server unreachable *or* refusing: either way keep every entry and let
+      // backoff space out the retries. Nothing is lost, which is the entire
+      // point of the outbox — but a refusal is reported so it can be shown as
+      // a fault rather than as ordinary offline.
       const reason = error instanceof Error ? error.message : String(error);
       for (const entry of ready) await this.options.outbox.fail(entry.id, reason);
-      return { pushed: 0, rejected: 0, audit: [], offline: true };
+
+      return isServerError(error)
+        ? { pushed: 0, rejected: 0, audit: [], offline: false, problem: reason }
+        : { pushed: 0, rejected: 0, audit: [], offline: true };
     }
 
     await this.options.outbox.ack(result.accepted);
@@ -137,7 +150,11 @@ export class SyncEngine<T extends BaseRecord> {
    * longest, which is exactly the one that needs to catch up. Each round
    * advances the cursors, so a round that returns nothing new terminates it.
    */
-  async pull(): Promise<{ readonly pulled: number; readonly offline: boolean }> {
+  async pull(): Promise<{
+    readonly pulled: number;
+    readonly offline: boolean;
+    readonly problem?: string | undefined;
+  }> {
     const entities = [...this.options.repositories.keys()];
     if (entities.length === 0) return { pulled: 0, offline: false };
 
@@ -147,10 +164,12 @@ export class SyncEngine<T extends BaseRecord> {
       let pages: readonly PullPage<T>[];
       try {
         pages = await this.options.transport.pull(this.cursors, entities);
-      } catch {
+      } catch (error) {
         // Whatever earlier rounds wrote is kept — the cursors moved with it,
         // so the next sync resumes rather than starting over.
-        return { pulled, offline: true };
+        return isServerError(error)
+          ? { pulled, offline: false, problem: error.message }
+          : { pulled, offline: true };
       }
 
       let written = 0;
@@ -188,7 +207,14 @@ export class SyncEngine<T extends BaseRecord> {
     const pushed = await this.push();
     const pulled = await this.pull();
 
-    return { ...pushed, pulled: pulled.pulled, offline: pushed.offline || pulled.offline };
+    const problem = pushed.problem ?? pulled.problem;
+
+    return {
+      ...pushed,
+      pulled: pulled.pulled,
+      offline: pushed.offline || pulled.offline,
+      ...(problem === undefined ? {} : { problem }),
+    };
   }
 
   /** Cursor for one entity, for diagnostics and for persisting across restarts. */

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { fixedClock, type BaseRecord, type Ulid } from "@galaxy-farm/core";
+import { fixedClock, SyncServerError, type BaseRecord, type Ulid } from "@galaxy-farm/core";
 import { InMemoryRepository } from "@galaxy-farm/core/testing";
 
 import { InMemoryOutbox } from "../src/outbox.js";
@@ -436,5 +436,63 @@ describe("sync", () => {
     await engine.sync();
 
     expect(await engine.pendingCount()).toBe(0);
+  });
+});
+
+describe("a server that answers and refuses", () => {
+  /**
+   * Written after a deploy went out ahead of its migrations. Both a missing
+   * signal and a 500 keep the outbox — nothing is lost either way — but only
+   * one of them is a fault somebody has to go and fix, and reporting the
+   * second as "offline" hid a broken deploy behind a state everybody ignores.
+   */
+  const refusing = (error: unknown): Partial<SyncTransport<Cow>> => ({
+    push: async () => {
+      throw error;
+    },
+    pull: async () => {
+      throw error;
+    },
+  });
+
+  it("reports a refusal as a problem rather than as offline", async () => {
+    const { engine } = harness(refusing(new SyncServerError(500, "boom")));
+    await engine.enqueue("update", patch("01ARZ3NDEKTSV4RRFFQ69G5FS1"));
+
+    const outcome = await engine.sync();
+
+    expect(outcome.offline).toBe(false);
+    expect(outcome.problem).toBe("boom");
+  });
+
+  it("carries the server's explanation, which is the actionable part", async () => {
+    const { engine } = harness(
+      refusing(new SyncServerError(503, "Run `pnpm db:migrate` against it.", "schema-drift")),
+    );
+    await engine.enqueue("update", patch("01ARZ3NDEKTSV4RRFFQ69G5FS2"));
+
+    expect((await engine.sync()).problem).toMatch(/pnpm db:migrate/);
+  });
+
+  it("still keeps the work queued", async () => {
+    // The outbox promise does not weaken because the failure is nameable.
+    const { engine, outbox } = harness(refusing(new SyncServerError(503, "behind")));
+    await engine.enqueue("update", patch("01ARZ3NDEKTSV4RRFFQ69G5FS3"));
+
+    await engine.sync();
+
+    expect(await outbox.size()).toBe(1);
+  });
+
+  it("keeps calling an unreachable server offline", async () => {
+    // A TypeError is what `fetch` throws with no signal, and that is the state
+    // a barn is in half the time. It must stay calm.
+    const { engine } = harness(refusing(new TypeError("Failed to fetch")));
+    await engine.enqueue("update", patch("01ARZ3NDEKTSV4RRFFQ69G5FS4"));
+
+    const outcome = await engine.sync();
+
+    expect(outcome.offline).toBe(true);
+    expect(outcome.problem).toBeUndefined();
   });
 });

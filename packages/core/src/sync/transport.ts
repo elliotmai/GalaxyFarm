@@ -42,3 +42,30 @@ export interface SyncTransport<T extends BaseRecord> {
   push(entries: readonly OutboxEntry[]): Promise<PushResult>;
   pull(cursors: CursorSet, entities: readonly string[]): Promise<readonly PullPage<T>[]>;
 }
+
+/**
+ * The server answered, and the answer was no.
+ *
+ * Distinct from an unreachable server on purpose. Both leave the outbox
+ * intact, but they mean opposite things to the person holding the phone: no
+ * signal in a pasture is normal and self-correcting, while a server returning
+ * 500 is a fault that will still be there tomorrow. Rendering the second as
+ * "Offline" — which is what happened — hides a broken deploy behind a state
+ * everyone has learned to ignore.
+ */
+export class SyncServerError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    /** Set when the server named the cause, e.g. schema drift. */
+    readonly kind?: string,
+  ) {
+    super(message);
+    this.name = "SyncServerError";
+  }
+}
+
+/** Did the server answer, or was it simply not there? */
+export function isServerError(error: unknown): error is SyncServerError {
+  return error instanceof SyncServerError;
+}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { pullSince, syncedEntities } from "@galaxy-farm/infra-db";
 
+import { syncErrorResponse } from "@/lib/api-errors";
 import { currentActor } from "@/lib/auth";
 import { database } from "@/lib/credential-store";
 import { reviveCursors } from "@/lib/sync-payload";
@@ -43,13 +44,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const pages = await pullSince(database(), {
-    propertyId: actor.propertyId,
-    cursors: body.cursors,
-    // An unrecognised entity is skipped rather than refused, so a device on an
-    // older build still syncs everything else it knows about.
-    entities: body.entities ?? syncedEntities(),
-  });
+  try {
+    const pages = await pullSince(database(), {
+      propertyId: actor.propertyId,
+      cursors: body.cursors,
+      // An unrecognised entity is skipped rather than refused, so a device on
+      // an older build still syncs everything else it knows about.
+      entities: body.entities ?? syncedEntities(),
+    });
 
-  return NextResponse.json({ pages });
+    return NextResponse.json({ pages });
+  } catch (error) {
+    // Never a bare 500. A device whose sync is failing keeps working from its
+    // local store, so nobody finds out unless the response says so.
+    return syncErrorResponse(error, "pull");
+  }
 }
