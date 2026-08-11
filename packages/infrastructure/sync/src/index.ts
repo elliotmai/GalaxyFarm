@@ -9,3 +9,4 @@ export * from "./patch.js";
 export * from "./outbox.js";
 export * from "./merge.js";
 export * from "./cursors.js";
+export * from "./engine.js";
