@@ -7,7 +7,12 @@ export default defineConfig({
     environment: "node",
     // Only the design system needs a DOM. Everything else stays on node, which
     // is faster and keeps the domain honest about having no browser.
-    environmentMatchGlobs: [["packages/ui/**", "jsdom"]],
+    environmentMatchGlobs: [
+      ["packages/ui/**", "jsdom"],
+      // Dexie needs structuredClone and an IndexedDB-shaped global; jsdom
+      // supplies the former and fake-indexeddb is injected for the latter.
+      ["packages/infrastructure/local/**", "jsdom"],
+    ],
     setupFiles: ["./tests/setup/dom.ts"],
     reporters: process.env["CI"] ? ["default", "github-actions"] : ["default"],
     coverage: {

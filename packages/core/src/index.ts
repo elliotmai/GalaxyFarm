@@ -13,3 +13,4 @@ export * from "./events/index.js";
 export * from "./ports/index.js";
 export * from "./crud/index.js";
 export * from "./testing/in-memory-repository.js";
+export * from "./testing/repository-conformance.js";
