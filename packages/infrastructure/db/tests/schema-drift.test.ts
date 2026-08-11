@@ -6,6 +6,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, it } from "vitest";
 
 import { describeDrift, isDrifted, schemaDrift } from "../src/schema-drift.js";
+import { migrationAdvice } from "../src/migrate.js";
 import { pullSince } from "../src/sync/pull.js";
 import { SYNCED_ENTITIES } from "../src/sync/entities.js";
 import type { Database } from "../src/repositories/postgres-repository.js";
@@ -130,4 +131,53 @@ describe("the failure it was written for", () => {
       }),
     ).resolves.toBeDefined();
   }, 60_000);
+});
+
+describe("migrationAdvice", () => {
+  const drifted = {
+    missingTables: ["feeding_plans"],
+    missingColumns: [{ table: "properties", column: "safety_level_labels" }],
+  };
+
+  it("says nothing when the schema matches", () => {
+    expect(
+      migrationAdvice({
+        applied: [],
+        found: ["0000_initial_schema.sql"],
+        drift: { missingTables: [], missingColumns: [] },
+      }),
+    ).toBeUndefined();
+  });
+
+  it("blames the checkout when nothing was applied and the schema is still short", () => {
+    // The exact case that happened: `pnpm db:migrate` said "already up to
+    // date" against a clone that did not yet contain 0003 and 0004, while the
+    // deployed build was selecting columns they add.
+    const advice = migrationAdvice({
+      applied: [],
+      found: ["0000_initial_schema.sql"],
+      drift: drifted,
+    });
+
+    expect(advice).toMatch(/not in this checkout/);
+    expect(advice).toMatch(/git pull/);
+    expect(advice).toMatch(/feeding_plans/);
+  });
+
+  it("still warns when something was applied and the schema is short anyway", () => {
+    const advice = migrationAdvice({
+      applied: ["0003_pasture_feeding_calendar.sql"],
+      found: ["0003_pasture_feeding_calendar.sql"],
+      drift: drifted,
+    });
+
+    expect(advice).toMatch(/still missing after applying/);
+    expect(advice).toMatch(/git pull/);
+  });
+
+  it("counts the migrations it found, so an empty directory cannot read as success", () => {
+    // `pendingMigrations` over an empty list is an empty list, which the
+    // runner would otherwise report as "already up to date".
+    expect(migrationAdvice({ applied: [], found: [], drift: drifted })).toMatch(/\(0 found\)/);
+  });
 });

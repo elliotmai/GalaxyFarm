@@ -5,6 +5,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import postgres from "postgres";
 
 import { describeConnection } from "./client.js";
+import {
+  compareSchema,
+  describeDrift,
+  isDrifted,
+  LIVE_COLUMNS_SQL,
+  type LiveColumn,
+  type SchemaDrift,
+} from "./schema-drift.js";
 
 /**
  * Apply pending migrations.
@@ -53,9 +61,27 @@ export function splitStatements(sql: string): string[] {
     .filter((statement) => statement !== "");
 }
 
-export async function migrate(databaseUrl: string): Promise<string[]> {
+export interface MigrationOutcome {
+  /** Files applied by this run. */
+  readonly applied: readonly string[];
+  /** Migration files found in this checkout. */
+  readonly found: readonly string[];
+  /**
+   * What the schema is still missing afterwards.
+   *
+   * Checked because the ledger only knows about the files on *this* disk. A
+   * checkout that predates a migration reports "already up to date" while the
+   * database is behind the deployed code — which is exactly how a sync outage
+   * survived a `pnpm db:migrate` that said everything was fine.
+   */
+  readonly drift: SchemaDrift;
+}
+
+export async function migrate(databaseUrl: string): Promise<MigrationOutcome> {
   const sql = postgres(databaseUrl, { max: 1, onnotice: () => {} });
   const applied: string[] = [];
+  let found: string[] = [];
+  let drift: SchemaDrift = { missingTables: [], missingColumns: [] };
 
   try {
     await sql`
@@ -69,7 +95,10 @@ export async function migrate(databaseUrl: string): Promise<string[]> {
       (await sql<{ name: string }[]>`select name from _migrations`).map((r) => r.name),
     );
 
-    const pending = pendingMigrations(readdirSync(MIGRATIONS_DIR), done);
+    found = readdirSync(MIGRATIONS_DIR)
+      .filter((file) => file.endsWith(".sql"))
+      .sort();
+    const pending = pendingMigrations(found, done);
 
     for (const file of pending) {
       const statements = splitStatements(readFileSync(join(MIGRATIONS_DIR, file), "utf8"));
@@ -83,11 +112,36 @@ export async function migrate(databaseUrl: string): Promise<string[]> {
 
       applied.push(file);
     }
+
+    const live = await sql<LiveColumn[]>`${sql.unsafe(LIVE_COLUMNS_SQL)}`;
+    drift = compareSchema(live);
   } finally {
     await sql.end();
   }
 
-  return applied;
+  return { applied, found, drift };
+}
+
+/**
+ * What to tell somebody after a run.
+ *
+ * Pulled out of the CLI block because that block is unreachable from a test —
+ * and the sentence it prints is the whole value of the check. The case it
+ * exists for: a checkout that predates a migration reports "already up to
+ * date" while the database is short of what the deployed code selects, and the
+ * only useful advice is `git pull`.
+ */
+export function migrationAdvice(outcome: MigrationOutcome): string | undefined {
+  if (!isDrifted(outcome.drift)) return undefined;
+
+  const explanation = describeDrift(outcome.drift) as string;
+
+  return outcome.applied.length === 0
+    ? `${explanation}\nNothing was applied and the schema is still short, so the missing ` +
+        `migrations are not in this checkout (${outcome.found.length} found). ` +
+        `Run \`git pull\` and try again.`
+    : `${explanation}\nSome of what the code expects is still missing after applying. ` +
+        `This checkout may be behind — run \`git pull\` and try again.`;
 }
 
 /**
@@ -122,10 +176,23 @@ if (isEntryPoint(import.meta.url, process.argv[1])) {
     );
   }
 
-  const applied = await migrate(url);
+  const { applied, found, drift } = await migrate(url);
   console.log(
     applied.length === 0
-      ? "Already up to date — nothing to apply."
+      ? `Already up to date — nothing to apply (${found.length} migrations in this checkout).`
       : `Applied ${applied.length}: ${applied.join(", ")}`,
   );
+
+  // The ledger only knows about the files on *this* disk. A checkout that
+  // predates a migration reports "already up to date" while the database is
+  // behind the deployed code — which is how a sync outage survived a run of
+  // this command that said everything was fine.
+  const advice = migrationAdvice({ applied, found, drift });
+  if (advice !== undefined) {
+    console.error(`\n${advice}`);
+    // Non-zero, so a deploy script or a CI step notices. A migration command
+    // that exits 0 having left the schema short is the failure this whole
+    // check exists to stop.
+    process.exit(1);
+  }
 }

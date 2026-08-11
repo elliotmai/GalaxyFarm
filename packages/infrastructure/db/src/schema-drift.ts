@@ -30,24 +30,27 @@ export function isDrifted(drift: SchemaDrift): boolean {
   return drift.missingTables.length > 0 || drift.missingColumns.length > 0;
 }
 
+/** One row of `information_schema.columns`, however it was fetched. */
+export interface LiveColumn {
+  readonly table_name: string;
+  readonly column_name: string;
+}
+
+export const LIVE_COLUMNS_SQL =
+  "select table_name, column_name from information_schema.columns where table_schema = 'public'";
+
 /**
- * Compare the live schema to the one this build compiles against.
+ * Compare a live schema to the one this build compiles against.
+ *
+ * Pure, and takes rows rather than a connection, so the migration runner —
+ * which holds a raw postgres-js client, not a drizzle instance — reuses the
+ * same comparison instead of growing a second one that can disagree with it.
  *
  * Only reports things the database is *missing*. Extra tables and columns are
  * not drift: a migration that has run ahead of a rolled-back deploy is fine,
  * and so is anything somebody added by hand for their own reasons.
  */
-export async function schemaDrift(db: Database): Promise<SchemaDrift> {
-  const rows = (await db.execute(
-    sql`select table_name, column_name from information_schema.columns where table_schema = 'public'`,
-  )) as unknown as
-    | { rows?: { table_name: string; column_name: string }[] }
-    | { table_name: string; column_name: string }[];
-
-  // postgres-js returns an array; PGlite returns { rows }. Both are legitimate
-  // and neither is worth a second code path anywhere else.
-  const live = Array.isArray(rows) ? rows : (rows.rows ?? []);
-
+export function compareSchema(live: readonly LiveColumn[]): SchemaDrift {
   const byTable = new Map<string, Set<string>>();
   for (const row of live) {
     const columns = byTable.get(row.table_name) ?? new Set<string>();
@@ -73,6 +76,16 @@ export async function schemaDrift(db: Database): Promise<SchemaDrift> {
   }
 
   return { missingTables, missingColumns };
+}
+
+/** The same comparison, against a drizzle connection. */
+export async function schemaDrift(db: Database): Promise<SchemaDrift> {
+  const rows = (await db.execute(sql.raw(LIVE_COLUMNS_SQL))) as unknown as
+    { rows?: LiveColumn[] } | LiveColumn[];
+
+  // postgres-js returns an array; PGlite returns `{ rows }`. Both are
+  // legitimate and neither is worth a second code path anywhere else.
+  return compareSchema(Array.isArray(rows) ? rows : (rows.rows ?? []));
 }
 
 /**
