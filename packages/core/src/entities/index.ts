@@ -12,6 +12,7 @@ export * from "./contact.js";
 export * from "./attachment.js";
 export * from "./task.js";
 export * from "./calendar-event.js";
+export * from "./notification.js";
 export * from "./roadmap.js";
 export * from "./purchase-candidate.js";
 export * from "./user.js";

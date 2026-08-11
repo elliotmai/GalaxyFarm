@@ -126,13 +126,33 @@ describe("nothing is marked built unless it is", () => {
     expect(empty).toEqual([]);
   });
 
-  it("never marks a concept built — a concept has no artifact to build", () => {
+  it("marks every concept not-applicable rather than planned", () => {
+    // A concept produces no artifact — `Pet` is an Animal with a species — so
+    // leaving them "planned" would give the backlog a floor it can never
+    // reach, and a backlog that cannot reach zero is one nobody reads.
     const wrong = allEntries
       .filter(([, entry]) => entry.kind === "concept")
-      .filter(([, entry]) => entry.declares.length > 0 || entry.note === undefined)
-      .map(([label]) => `${label} is a concept and must declare nothing, with a note saying why`);
+      .filter(
+        ([, entry]) =>
+          entry.declares.length > 0 ||
+          entry.note === undefined ||
+          entry.status !== "not-applicable",
+      )
+      .map(
+        ([label]) =>
+          `${label} is a concept: it must declare nothing, carry a note saying why, and be not-applicable`,
+      );
 
     expect(wrong).toEqual([]);
+  });
+
+  it("reserves not-applicable for concepts", () => {
+    // Otherwise it becomes the escape hatch for anything inconvenient.
+    const misused = allEntries
+      .filter(([, entry]) => entry.status === "not-applicable" && entry.kind !== "concept")
+      .map(([label]) => label);
+
+    expect(misused).toEqual([]);
   });
 
   it("assigns every entry to a build phase §11 actually has", () => {

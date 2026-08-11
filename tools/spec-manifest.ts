@@ -40,7 +40,13 @@ export interface SpecCoverageEntry {
   /** Symbols that satisfy it. For a planned entry, the ones still to write. */
   readonly declares: readonly string[];
   readonly phase: Phase;
-  readonly status: "built" | "planned";
+  /**
+   * `not-applicable` is for a concept: something the spec names that
+   * deliberately produces no artifact of its own, like `Pet` being an Animal
+   * with a species. Reporting those as "planned" forever would leave a backlog
+   * that can never reach zero, which is a backlog nobody reads.
+   */
+  readonly status: "built" | "planned" | "not-applicable";
   /** Why a concept has no code, or what a planned entry is waiting on. */
   readonly note?: string;
 }
@@ -200,7 +206,7 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     kind: "derivation",
     declares: ["NOTIFICATION_TRIGGERS", "dueNotifications", "notificationSettingSchema"],
     phase: "Phase 2",
-    status: "planned",
+    status: "built",
     note: "§6 holds the full trigger list; NOTIFICATION_COVERAGE below tracks it.",
   },
 
@@ -371,49 +377,49 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     kind: "entity",
     declares: ["bedSchema", "BED_TYPES"],
     phase: "Phase 3",
-    status: "planned",
+    status: "built",
   },
   "Crop / Variety": {
     section: "5.5",
     kind: "entity",
     declares: ["cropSchema", "varietySchema", "seedInventorySchema"],
     phase: "Phase 3",
-    status: "planned",
+    status: "built",
   },
   Planting: {
     section: "5.5",
     kind: "entity",
     declares: ["plantingSchema", "gardenCareLogSchema", "expectedHarvestDate"],
     phase: "Phase 3",
-    status: "planned",
+    status: "built",
   },
   "SeasonPlan → planting notifications": {
     section: "5.5",
     kind: "entity",
     declares: ["seasonPlanSchema", "plannedPlantingSchema", "plantingToActual"],
     phase: "Phase 3",
-    status: "planned",
+    status: "built",
   },
   "Rotation guard": {
     section: "5.5",
     kind: "derivation",
     declares: ["rotationWarning", "DEFAULT_ROTATION_YEARS"],
     phase: "Phase 3",
-    status: "planned",
+    status: "built",
   },
   HarvestLog: {
     section: "5.5",
     kind: "entity",
     declares: ["harvestLogSchema", "preservationLogSchema", "PRESERVATION_METHODS"],
     phase: "Phase 3",
-    status: "planned",
+    status: "built",
   },
   "Planting calendar": {
     section: "5.5",
     kind: "derivation",
     declares: ["plantingWindows", "frostDatesFor"],
     phase: "Phase 3",
-    status: "planned",
+    status: "built",
   },
 
   // ---------------------------------------------------------------- §5.6
@@ -449,7 +455,7 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     kind: "concept",
     declares: [],
     phase: "Phase 2",
-    status: "planned",
+    status: "not-applicable",
     note: "The generic Roadmap aggregate with `domain: equipment`; no separate entity.",
   },
 
@@ -535,7 +541,7 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     kind: "concept",
     declares: [],
     phase: "Phase 2",
-    status: "planned",
+    status: "not-applicable",
     note: "An Animal with species dog|cat, reusing HealthRecord and FeedingPlan — no new entity, by §2's one-animal-model rule.",
   },
 
@@ -545,7 +551,7 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     kind: "entity",
     declares: ["careGuideSchema", "guideSectionSchema", "composeGuide"],
     phase: "Phase 4",
-    status: "planned",
+    status: "built",
   },
 
   // ---------------------------------------------------------------- §5.11
@@ -590,7 +596,7 @@ export const SECTION_ONLY_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> 
     kind: "concept",
     declares: [],
     phase: "Phase 2",
-    status: "planned",
+    status: "not-applicable",
     note: "The generic Roadmap aggregate with `domain: horses`.",
   },
   HorseCandidate: {
@@ -654,7 +660,7 @@ export const NOTIFICATION_COVERAGE: Readonly<
   "planting window opening (per season plan, indoor & outdoor)": {
     derivedFrom: "plantingWindows",
     phase: "Phase 3",
-    status: "planned",
+    status: "built",
   },
   "chore overdue": { derivedFrom: "isOverdue", phase: "Phase 2", status: "built" },
   "low semen inventory": {
