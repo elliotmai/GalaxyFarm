@@ -205,6 +205,39 @@ test.describe("routing behaviour", () => {
   });
 });
 
+test.describe("the landing page", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("speaks to a customer, and offers the staff door quietly", async ({ page }) => {
+    await page.goto("/");
+
+    // The heading is about the farm, not about the app.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    // The customer-facing calls to action are the prominent ones.
+    await expect(page.getByRole("link", { name: /ask about boarding/i })).toBeVisible();
+
+    // The admin link exists and lives in the footer, not the header — visible
+    // to whoever needs it, and not one of two equal choices at the top of the
+    // page for somebody reading about the farm.
+    const staffDoor = page.locator("footer").getByRole("link", { name: /farm login/i });
+    await expect(staffDoor).toBeVisible();
+    await expect(staffDoor).toHaveAttribute("href", "/admin");
+    await expect(page.locator("header").getByRole("link", { name: /farm login/i })).toHaveCount(0);
+  });
+
+  test("the staff door leads to the admin surface, through the gate", async ({ page }) => {
+    await page.goto("/");
+    await page
+      .locator("footer")
+      .getByRole("link", { name: /farm login/i })
+      .click();
+
+    // Signed out, so §4.3 sends them to sign in first — and back to /admin
+    // afterwards rather than dropping them on the landing page again.
+    await expect(page).toHaveURL(/\/login\?next=%2Fadmin/);
+  });
+});
+
 test.describe("page metadata", () => {
   test.use({ storageState: storageStatePath("owner") });
 
