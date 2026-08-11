@@ -175,7 +175,7 @@ On a codebase this young, the valuable tests are the ones that constrain how it 
 - **`tests/architecture/spec-contract.test.ts`** — keeps the non-negotiables from quietly vanishing out of the spec, and the README from drifting from what the spec says.
 - **`tests/tools/`** — unit tests for the analysers underneath all of the above. A parser that silently missed `export … from` would turn every architecture assertion into a false pass.
 
-492 unit tests and 84 e2e tests, at 99.6% statement and 97% branch coverage.
+523 unit tests and 84 e2e tests, at 97% statement and 97% branch coverage.
 
 ### A note on the guards
 
@@ -189,6 +189,7 @@ The §4.5 guards are convention checks over source text, not type-level proofs. 
 - **`packages/ui`** — the confirmation primitive every destructive action routes through, in all three tiers. Nothing else of the design system yet.
 - **`packages/infrastructure/sync`** — field-level patches, last-write-wins per field with an audit trail, an outbox with capped exponential backoff, per-entity cursors, and the engine that drives push and pull against a transport port.
 - **`packages/infrastructure/local`** — the IndexedDB store, a device-persisted outbox that survives the app being killed, and live queries so a barn kiosk redraws when someone moves an animal from the house.
+- **`packages/infrastructure/db`** — the Drizzle schema and its first migration, verified against real PostgreSQL 18 in CI via PGlite. No extensions, integer cents, timezone-aware timestamps throughout.
 - **The logomark** — **Rocking Double Star**, in `packages/ui/src/brand/`, paired for both surface themes. No wordmark; the names are still open (#26).
 
 One repository contract is shared by the in-memory and IndexedDB implementations, and Postgres will run it too. A disagreement between the local store and the server store shows up as data appearing on one device and not another, which is the hardest class of bug to notice here.
@@ -196,19 +197,39 @@ One repository contract is shared by the in-memory and IndexedDB implementations
 ### Not built
 
 - **No screen is wired to the domain.** All 55 routes from spec §7 resolve and render `PagePlaceholder`.
-- **No database.** `infrastructure/db` is empty; `/api/sync/push` and `/api/sync/pull` still answer 501, so nothing syncs to a server yet. The engine's transport port is the seam they plug into.
+- **No Postgres repository yet**, so nothing reads or writes the database — the schema exists and applies, but `/api/sync/push` and `/api/sync/pull` still answer 501. The engine's transport port is the seam they plug into.
+- **The migration has never run against Neon.** It is verified against real Postgres, but the managed database is unreachable from CI; see below.
 - **No auth**, no PWA service worker, no kiosk pairing.
 - **No design system** beyond the confirmation dialog. The §8 tokens live in `packages/config/tailwind.preset.ts`; the components that consume them do not exist.
 - The kernel entities have no use cases yet, so they appear in the CRUD guard's "not started" list. That is deliberate — see [the note on the guards](#a-note-on-the-guards).
 
 ### Next steps
 
-1. **Drizzle schema and the Postgres repository** (#5), run against the shared repository contract before anything bespoke is written.
+1. **The Postgres repository** (#5), run against the shared repository contract before anything bespoke is written.
 2. **Wire the sync API routes**, replacing the 501s. The transport port is already the seam.
 3. **Auth.js and roles** (#7), then Property/Zones and the SpatialEditor (#8).
 4. Then Phase 1 cattle — the cow is already bred, so that phase races a real due date.
 
 Raise the coverage thresholds in `vitest.config.ts` as the domain packages fill in. Never lower them to make a red build green.
+
+### Running migrations
+
+```bash
+cp .env.example .env.local     # then fill in DATABASE_URL
+pnpm db:migrate
+```
+
+Needs Node 22+ and pnpm 10. On Windows, `corepack enable` is the reliable way
+to get pnpm — it reads the pinned version from `package.json` rather than
+installing a global that may not be on PATH.
+
+The runner applies the numbered SQL files in order, once each, inside a
+transaction, and prints what it applied. It is deliberately not `drizzle-kit
+push`, which diffs the schema and applies whatever it decides — fine on a
+laptop, not against a database holding calving records.
+
+CI verifies the migrations against PostgreSQL 18 running in-process through
+PGlite, so the SQL is known to apply before it ever reaches a real server.
 
 ### Environment
 

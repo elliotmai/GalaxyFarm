@@ -165,6 +165,9 @@ export default tseslint.config(
       "tests/**/*",
       "**/*.test.ts",
       "**/*.test.tsx",
+      // CLI entry points. A migration runner that cannot say what it applied
+      // is worse than one that can.
+      "**/src/migrate.ts",
     ],
     rules: { "no-console": "off" },
   },
