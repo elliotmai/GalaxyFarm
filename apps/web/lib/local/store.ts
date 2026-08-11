@@ -27,17 +27,35 @@ export const LOCAL_STORES = [
   "brandingConfigs",
   "waterSources",
   "zones",
+  "pastureCareLogs",
   "animals",
   "zoneAssignments",
+  "feedingPlans",
   "contacts",
   "attachments",
   "choreTemplates",
   "tasks",
+  "calendarEvents",
   "roadmapItems",
   "purchaseCandidates",
 ] as const;
 
 export type LocalStoreName = (typeof LOCAL_STORES)[number];
+
+/**
+ * Bump this whenever `LOCAL_STORES` changes.
+ *
+ * IndexedDB creates object stores only during a version upgrade, so a device
+ * that has opened the app before keeps exactly the tables it had. Adding an
+ * entity without moving this number means the first write to it throws
+ * `InvalidTableError` — on the returning devices only, which are the ones with
+ * unsynced work on them. `tests/local-schema.test.ts` fails the build if the
+ * list changes and this does not.
+ *
+ * 2 — the outbox arrived.
+ * 3 — pasture care logs, feeding plans, calendar events (spec §5.1).
+ */
+export const LOCAL_SCHEMA_VERSION = 3;
 
 /**
  * Which fields each entity's search box looks at.
@@ -52,12 +70,15 @@ const SEARCHABLE: Readonly<Record<LocalStoreName, readonly string[]>> = {
   brandingConfigs: ["farmName", "businessName", "tagline"],
   waterSources: ["name", "notes"],
   zones: ["name", "customInstructions"],
+  pastureCareLogs: ["product", "notes"],
   animals: ["name", "tagNumber", "notes"],
   zoneAssignments: [],
+  feedingPlans: ["name", "specialNotes"],
   contacts: ["name", "company", "address", "notes"],
   attachments: ["filename", "caption"],
   choreTemplates: ["title", "detail"],
   tasks: ["title", "detail"],
+  calendarEvents: ["title", "detail"],
   roadmapItems: ["title", "detail"],
   purchaseCandidates: ["title", "location", "notes"],
 };
@@ -99,7 +120,10 @@ export function deviceId(): string {
 export function localStore(): LocalStore {
   if (store !== undefined) return store;
 
-  const db = new FarmDatabase({ stores: [...LOCAL_STORES] });
+  const db = new FarmDatabase({
+    stores: [...LOCAL_STORES],
+    schemaVersion: LOCAL_SCHEMA_VERSION,
+  });
   const outbox = new DexieOutbox(db);
 
   const repositories = new Map<string, Repository<StoredRecord>>(

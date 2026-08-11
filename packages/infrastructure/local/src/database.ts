@@ -33,10 +33,24 @@ export const RECORD_INDEXES = "id, propertyId, updatedAt, deletedAt, [propertyId
 export const OUTBOX_STORE = "outbox";
 export const OUTBOX_INDEXES = "id, queuedAt, attempts";
 
+/**
+ * The last version whose schema this file describes on its own.
+ *
+ * IndexedDB will not create an object store for a database it has already
+ * opened unless the version number goes up. So adding an entity to the store
+ * list is not enough — a browser that has run the app before keeps the tables
+ * it had, and the first write to a new one throws `InvalidTableError`, which is
+ * exactly how the outbox went missing in v1. Callers pass `schemaVersion` and
+ * bump it whenever they change `stores`.
+ */
+export const BASE_SCHEMA_VERSION = 2;
+
 export interface FarmDatabaseOptions {
   readonly name?: string;
   /** Entity names to create tables for. */
   readonly stores: readonly string[];
+  /** Bump whenever `stores` changes. See `BASE_SCHEMA_VERSION`. */
+  readonly schemaVersion?: number;
   /**
    * Injected so tests can supply an isolated fake-indexeddb instance.
    *
@@ -68,8 +82,15 @@ export class FarmDatabase extends Dexie {
     // history, not just the destination. Declaring both is what upgrades an
     // existing device in place instead of asking somebody to clear site data,
     // which on this app means throwing away work that has not synced yet.
+    const withOutbox = { ...records, [OUTBOX_STORE]: OUTBOX_INDEXES };
     this.version(1).stores(records);
-    this.version(2).stores({ ...records, [OUTBOX_STORE]: OUTBOX_INDEXES });
+    this.version(2).stores(withOutbox);
+
+    // Later versions carry the same *shape* — the difference is which entities
+    // are in `records`, which is why the version has to move for a device that
+    // has opened the database before to gain the new tables.
+    const version = options.schemaVersion ?? BASE_SCHEMA_VERSION;
+    if (version > BASE_SCHEMA_VERSION) this.version(version).stores(withOutbox);
   }
 
   /**

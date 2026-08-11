@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { safetyLabelOverridesSchema } from "../value-objects/safety-level.js";
 import { baseRecordSchema, type BaseRecord } from "./record.js";
 
 /**
@@ -17,6 +18,14 @@ export interface Property extends BaseRecord {
   readonly longitude?: number | undefined;
   /** R2 key for the cached NAIP aerial used offline and on kiosks (§8). */
   readonly offlineImageryKey?: string | undefined;
+  /**
+   * Renamed safety levels (§5.1: "five levels with configurable labels").
+   *
+   * Keys are the level as a string because this is stored as JSON, where an
+   * object key is a string whatever it started as. `resolveSafetyLabels` reads
+   * it; nothing else should index it directly.
+   */
+  readonly safetyLevelLabels?: Record<string, string> | undefined;
 }
 
 export const propertySchema = baseRecordSchema.extend({
@@ -30,6 +39,7 @@ export const propertySchema = baseRecordSchema.extend({
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   offlineImageryKey: z.string().optional(),
+  safetyLevelLabels: safetyLabelOverridesSchema.optional(),
 }) as unknown as z.ZodType<Property>;
 
 /** Weather and calving watch need coordinates; nothing else does (§6). */

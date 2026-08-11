@@ -38,6 +38,42 @@ export const SAFETY_LEVEL_DEFAULTS: Readonly<Record<SafetyLevel, SafetyLevelDefi
 };
 
 /**
+ * Per-property label overrides (spec §5.1: "five levels with configurable
+ * labels, defaults").
+ *
+ * Partial on purpose — renaming level 4 to "Dad only" should not require
+ * retyping the other four, and a property that has never touched settings gets
+ * the defaults without storing a copy of them that will not track future
+ * wording changes.
+ */
+export type SafetyLabelOverrides = Partial<Record<SafetyLevel, string>>;
+
+export const safetyLabelOverridesSchema = z.record(
+  z.enum(["1", "2", "3", "4", "5"]),
+  z.string().min(1, "A safety level needs a label").max(60),
+);
+
+/** The five definitions with any overrides applied. */
+export function resolveSafetyLabels(
+  overrides: SafetyLabelOverrides | undefined,
+): Readonly<Record<SafetyLevel, SafetyLevelDefinition>> {
+  if (overrides === undefined) return SAFETY_LEVEL_DEFAULTS;
+
+  const resolved = {} as Record<SafetyLevel, SafetyLevelDefinition>;
+  for (const level of SAFETY_LEVELS) {
+    const base = SAFETY_LEVEL_DEFAULTS[level];
+    const override = overrides[level];
+    resolved[level] = override === undefined ? base : { ...base, label: override };
+  }
+  return resolved;
+}
+
+/** One level's label, defaults included. */
+export function safetyLabel(level: SafetyLevel, overrides?: SafetyLabelOverrides): string {
+  return overrides?.[level] ?? SAFETY_LEVEL_DEFAULTS[level].label;
+}
+
+/**
  * A zone's effective level is the worst thing about it: its own hazards, or the
  * most dangerous animal standing in it.
  *

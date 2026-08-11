@@ -123,16 +123,28 @@ describe("migrations", () => {
     expect(sql).not.toMatch(/vector|postgis|timescale/i);
   });
 
-  it("stores money as integer cents, never floating point", async () => {
+  it("never stores money as a floating-point type", async () => {
     // Floating-point dollars drift, and these columns add up into a per-animal
     // P&L someone makes decisions on.
-    const rows = await db.query<{ column_name: string; data_type: string }>(
-      `select column_name, data_type from information_schema.columns
-       where table_schema = 'public' and column_name like '%_cents'`,
+    //
+    // Money is jsonb holding the domain's `{ cents }` rather than an integer
+    // column — see the note at the top of the schema. The invariant this test
+    // exists for is unchanged and is the one worth stating: whole cents, never
+    // a float. What changed is only where the cents sit.
+    const rows = await db.query<{ table_name: string; column_name: string; data_type: string }>(
+      `select table_name, column_name, data_type from information_schema.columns
+       where table_schema = 'public'
+         and (column_name like '%price%' or column_name like '%cost%'
+              or column_name like '%budget%' or column_name like '%_cents')`,
     );
 
     expect(rows.rows.length).toBeGreaterThan(0);
-    expect(rows.rows.every((r) => r.data_type === "integer")).toBe(true);
+
+    const floats = rows.rows
+      .filter((r) => !["jsonb", "integer", "bigint"].includes(r.data_type))
+      .map((r) => `${r.table_name}.${r.column_name} is ${r.data_type}`);
+
+    expect(floats).toEqual([]);
   });
 
   it("keeps timestamps timezone-aware", async () => {

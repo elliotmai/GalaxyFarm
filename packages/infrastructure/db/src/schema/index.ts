@@ -1,5 +1,6 @@
 import {
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -32,6 +33,16 @@ import { baseColumns, baseIndexes } from "./columns";
  *   (§4.2). `water_source_ids` as a `text[]` is one field and syncs naturally;
  *   the same relationship as a join table has no representation in a
  *   field-level patch at all.
+ * - **A column key is the entity's field name, exactly.** The repository maps
+ *   the two by identity, so `budget_estimate_cents` against a `budgetEstimate`
+ *   field is not a naming preference — it is a value that never arrives.
+ *   `tests/schema-conformance.test.ts` fails the build on any mismatch.
+ *
+ * Money is `jsonb` holding the domain's `{ cents }` rather than an integer
+ * column, for that last reason: `Money` is an object, and the alternative is a
+ * per-field codec on every one of the forty-odd money fields §5 asks for —
+ * forty chances to forget one. Whole cents either way, so nothing drifts; a
+ * report that wants to aggregate reads `(col->>'cents')::int`.
  */
 
 export const properties = pgTable(
@@ -42,9 +53,11 @@ export const properties = pgTable(
     address: text("address"),
     timezone: text("timezone").notNull(),
     growingZone: text("growing_zone"),
-    latitude: text("latitude"),
-    longitude: text("longitude"),
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
     offlineImageryKey: text("offline_imagery_key"),
+    /** Per-property renaming of the five safety levels (§5.1). */
+    safetyLevelLabels: jsonb("safety_level_labels").$type<Record<string, string>>(),
   },
   baseIndexes("properties"),
 );
@@ -94,6 +107,30 @@ export const zones = pgTable(
   baseIndexes("zones"),
 );
 
+/**
+ * Land upkeep per zone (§5.1, added v0.7).
+ *
+ * A log rather than fields on `zones`, because "when did we last overseed" is
+ * the question the fall reminder is built on and that is a history.
+ */
+export const pastureCareLogs = pgTable(
+  "pasture_care_logs",
+  {
+    ...baseColumns,
+    zoneId: text("zone_id").notNull(),
+    action: text("action").notNull(),
+    performedOn: timestamp("performed_on", { withTimezone: true, mode: "date" }).notNull(),
+    product: text("product"),
+    ratePerAcre: jsonb("rate_per_acre").$type<{ amount: number; unit: string }>(),
+    acres: doublePrecision("acres"),
+    cost: jsonb("cost").$type<{ cents: number }>(),
+    /** The supplies-module stock this drew from (§5.11). */
+    supplyItemId: text("supply_item_id"),
+    notes: text("notes"),
+  },
+  baseIndexes("pasture_care_logs"),
+);
+
 export const animals = pgTable(
   "animals",
   {
@@ -128,6 +165,42 @@ export const zoneAssignments = pgTable(
     slot: text("slot").notNull(),
   },
   baseIndexes("zone_assignments"),
+);
+
+/**
+ * What something gets fed (§5.1), across all three scopes.
+ *
+ * One table for animal-, zone-, and group-targeted plans, because §5.1 makes a
+ * per-cow mixture "an animal-targeted plan that overrides/extends the group
+ * plan" — three tables would need the override rule written three times, and
+ * §5.3's daily-demand sum would have to union them.
+ *
+ * `lines` is jsonb rather than a child table for the §4.2 reason above: the
+ * sync engine patches fields, and a plan's lines change as a unit.
+ */
+export const feedingPlans = pgTable(
+  "feeding_plans",
+  {
+    ...baseColumns,
+    name: text("name").notNull(),
+    target: text("target").notNull(),
+    targetId: text("target_id").notNull(),
+    lines: jsonb("lines")
+      .$type<
+        {
+          feedTypeId: string;
+          amount: { amount: number; unit: string };
+          frequency: string;
+          timeOfDay: string;
+          notes?: string;
+        }[]
+      >()
+      .notNull()
+      .default([]),
+    active: boolean("active").notNull(),
+    specialNotes: text("special_notes"),
+  },
+  baseIndexes("feeding_plans"),
 );
 
 export const contacts = pgTable(
@@ -194,6 +267,28 @@ export const tasks = pgTable(
   baseIndexes("tasks"),
 );
 
+/**
+ * The hand-entered half of the calendar (§5.1).
+ *
+ * Only this half is stored. Calving windows, withdrawal ends, run-outs and
+ * maintenance due dates are projections over records that already exist, and
+ * storing them would give a corrected breeding date two answers.
+ */
+export const calendarEvents = pgTable(
+  "calendar_events",
+  {
+    ...baseColumns,
+    title: text("title").notNull(),
+    detail: text("detail"),
+    at: timestamp("at", { withTimezone: true, mode: "date" }).notNull(),
+    endAt: timestamp("end_at", { withTimezone: true, mode: "date" }),
+    allDay: boolean("all_day").notNull(),
+    zoneId: text("zone_id"),
+    animalId: text("animal_id"),
+  },
+  baseIndexes("calendar_events"),
+);
+
 export const roadmapItems = pgTable(
   "roadmap_items",
   {
@@ -206,7 +301,7 @@ export const roadmapItems = pgTable(
     targetSeason: text("target_season"),
     priority: text("priority").notNull(),
     /** Whole cents. Floating-point dollars drift; per-animal P&L cannot. */
-    budgetEstimateCents: integer("budget_estimate_cents"),
+    budgetEstimate: jsonb("budget_estimate").$type<{ cents: number }>(),
     status: text("status").notNull(),
   },
   baseIndexes("roadmap_items"),
@@ -220,7 +315,7 @@ export const purchaseCandidates = pgTable(
     roadmapItemId: text("roadmap_item_id"),
     title: text("title").notNull(),
     status: text("status").notNull(),
-    askingPriceCents: integer("asking_price_cents").notNull(),
+    askingPrice: jsonb("asking_price").$type<{ cents: number }>().notNull(),
     /** Hauling, inspection, repairs — the costs that decide the purchase. */
     additionalCosts: jsonb("additional_costs")
       .$type<{ label: string; amount: { cents: number } }[]>()
@@ -229,7 +324,8 @@ export const purchaseCandidates = pgTable(
     listingUrl: text("listing_url"),
     sellerId: text("seller_id"),
     location: text("location"),
-    distanceMiles: integer("distance_miles"),
+    /** Fractional: "12.4 miles" is a real answer and integer miles would round it. */
+    distanceMiles: doublePrecision("distance_miles"),
     listedDate: timestamp("listed_date", { withTimezone: true, mode: "date" }),
     firstSeen: timestamp("first_seen", { withTimezone: true, mode: "date" }).notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }),
@@ -368,12 +464,15 @@ export const allTables = {
   brandingConfigs,
   waterSources,
   zones,
+  pastureCareLogs,
   animals,
   zoneAssignments,
+  feedingPlans,
   contacts,
   attachments,
   choreTemplates,
   tasks,
+  calendarEvents,
   roadmapItems,
   purchaseCandidates,
   users,

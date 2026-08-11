@@ -22,6 +22,20 @@
       "when": 1786464093417,
       "tag": "0002_users_and_kiosk_devices",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786474035197,
+      "tag": "0003_pasture_feeding_calendar",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786474049360,
+      "tag": "0004_money_as_jsonb",
+      "breakpoints": true
     }
   ]
 }
