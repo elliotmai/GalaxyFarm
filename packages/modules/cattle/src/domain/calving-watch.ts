@@ -4,9 +4,11 @@ import {
   isColdSnap,
   isNearFullMoon,
   steepestPressureFall,
+  WATCH_SIGNALS,
   type DailyWeather,
   type Forecast,
   type Ulid,
+  type WatchSignal,
 } from "@galaxy-farm/core";
 
 import {
@@ -31,8 +33,15 @@ import {
  * only reason a card appears, only ever an addition to one.
  */
 
-export const WATCH_SIGNALS = ["cold_snap", "pressure_fall", "full_moon"] as const;
-export type WatchSignal = (typeof WATCH_SIGNALS)[number];
+/**
+ * Re-exported, not redeclared.
+ *
+ * The names live in the kernel beside the watch settings, because the poller
+ * that reads those settings is not cattle code and §4.1 keeps it from
+ * importing this module. A caller holding a watch card should not have to know
+ * that, so the names are still reachable from here.
+ */
+export { WATCH_SIGNALS, type WatchSignal };
 
 export interface WatchSignalDetail {
   readonly signal: WatchSignal;

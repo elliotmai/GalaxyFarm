@@ -29,9 +29,22 @@ export interface SourceFile {
   source: string;
 }
 
-/** Call expressions that mutate or destroy user data. */
+/**
+ * Call expressions that mutate or destroy user data.
+ *
+ * `void` is handled separately from the rest, and the reason is that it is not
+ * a function — it is a JavaScript operator, so `void (async () => {...})()`,
+ * the ordinary way to start a promise you are deliberately not awaiting, read
+ * as a call to something named `void` and got flagged. There is no way to
+ * write a bare call to `void`, so requiring a capitalised suffix loses
+ * nothing: `voidInvoice()` is still caught, and the operator no longer is.
+ *
+ * Worth doing here rather than annotating each site. A guard that cries wolf
+ * teaches people to reach for the opt-out comment, and the opt-out comment is
+ * the one thing standing between this check and a genuine unconfirmed delete.
+ */
 const DESTRUCTIVE_CALL =
-  /\b(delete|remove|destroy|purge|revoke|terminate|discard|void|archive|wipe|clear)([A-Z]\w*)?\s*\(/g;
+  /\b(?:(delete|remove|destroy|purge|revoke|terminate|discard|archive|wipe|clear)([A-Z]\w*)?|(void)([A-Z]\w*))\s*\(/g;
 
 /** Helpers that satisfy the confirmation requirement. */
 const CONFIRMATION_HELPERS = [
@@ -52,6 +65,15 @@ const CONFIRMATION_HELPERS = [
  * followed by a semicolon and nothing else — a call cannot end that way.
  */
 const METHOD_SIGNATURE = /^\s*(readonly\s+)?\w+(<[^>]*>)?\s*\([^)]*\)\s*:\s*[^;]+;\s*$/;
+
+/**
+ * A function being defined, not called.
+ *
+ * `export function purgeTrash(id: Ulid)` is the declaration of the thing that
+ * needs a confirmation at its call sites; asking the definition to import a
+ * dialog is asking the wrong file. Every real call to it is still caught.
+ */
+const FUNCTION_DECLARATION = /\b(?:export\s+)?(?:async\s+)?function\s*\*?\s*$/;
 
 /**
  * Opt-out marker. A reason is mandatory: `// crud-guard: allow-unconfirmed —
@@ -106,7 +128,10 @@ export function findUnconfirmedDestructiveCalls(files: readonly SourceFile[]): G
     DESTRUCTIVE_CALL.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = DESTRUCTIVE_CALL.exec(source)) !== null) {
-      const symbol = `${match[1]}${match[2] ?? ""}`;
+      // Two alternations: the ordinary verbs in groups 1–2, `void` plus its
+      // required suffix in 3–4.
+      const symbol =
+        match[1] === undefined ? `${match[3]}${match[4] ?? ""}` : `${match[1]}${match[2] ?? ""}`;
       if (FALSE_FRIENDS.has(symbol)) continue;
 
       const line = lineOf(source, match.index);
@@ -116,6 +141,8 @@ export function findUnconfirmedDestructiveCalls(files: readonly SourceFile[]): G
       // A declaration is not an action. The confirmation belongs at the call
       // site, and this is not one.
       if (METHOD_SIGNATURE.test(lineText)) continue;
+      // Nor is a function definition. What precedes the name is the tell.
+      if (FUNCTION_DECLARATION.test(source.slice(0, match.index))) continue;
 
       findings.push({
         file: path,

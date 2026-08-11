@@ -57,6 +57,13 @@
       "when": 1786483889338,
       "tag": "0007_calving_and_weights",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786484513857,
+      "tag": "0008_watch_settings",
+      "breakpoints": true
     }
   ]
 }

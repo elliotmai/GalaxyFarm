@@ -82,11 +82,25 @@ describe("schemaDrift", () => {
     );
     const present = new Set(live.rows.map((row) => row.table_name));
     expect(drift.missingTables.filter((table) => present.has(table))).toEqual([]);
-    expect(drift.missingColumns.map((entry) => `${entry.table}.${entry.column}`).sort()).toEqual([
+    // Named individually for the same reason as the tables above: the set
+    // grows with every column added after 0002.
+    const missing = drift.missingColumns.map((entry) => `${entry.table}.${entry.column}`);
+    for (const column of [
       "properties.safety_level_labels",
       "purchase_candidates.asking_price",
       "roadmap_items.budget_estimate",
-    ]);
+    ]) {
+      expect(missing).toContain(column);
+    }
+
+    // And no column that is actually there is reported missing.
+    const liveColumns = await pg.query<{ table_name: string; column_name: string }>(
+      "select table_name, column_name from information_schema.columns where table_schema = 'public'",
+    );
+    const presentColumns = new Set(
+      liveColumns.rows.map((row) => `${row.table_name}.${row.column_name}`),
+    );
+    expect(missing.filter((column) => presentColumns.has(column))).toEqual([]);
   }, 60_000);
 
   it("says what to do about it", async () => {

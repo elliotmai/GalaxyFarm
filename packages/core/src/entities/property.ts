@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { safetyLabelOverridesSchema } from "../value-objects/safety-level.js";
+import { watchSettingsSchema, type WatchSettings } from "../weather/watch-settings.js";
 import { baseRecordSchema, type BaseRecord } from "./record.js";
 
 /**
@@ -26,6 +27,14 @@ export interface Property extends BaseRecord {
    * it; nothing else should index it directly.
    */
   readonly safetyLevelLabels?: Record<string, string> | undefined;
+  /**
+   * §6's watch thresholds, per-trigger opt-out and lead time.
+   *
+   * Stored partial and merged over the defaults by `resolveWatchSettings`, so
+   * adding a threshold in a later version does not reset the ones somebody had
+   * already tuned.
+   */
+  readonly watchSettings?: WatchSettings | undefined;
 }
 
 export const propertySchema = baseRecordSchema.extend({
@@ -40,6 +49,7 @@ export const propertySchema = baseRecordSchema.extend({
   longitude: z.number().min(-180).max(180).optional(),
   offlineImageryKey: z.string().optional(),
   safetyLevelLabels: safetyLabelOverridesSchema.optional(),
+  watchSettings: watchSettingsSchema.optional(),
 }) as unknown as z.ZodType<Property>;
 
 /** Weather and calving watch need coordinates; nothing else does (§6). */

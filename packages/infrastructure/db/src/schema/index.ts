@@ -58,6 +58,8 @@ export const properties = pgTable(
     offlineImageryKey: text("offline_imagery_key"),
     /** Per-property renaming of the five safety levels (§5.1). */
     safetyLevelLabels: jsonb("safety_level_labels").$type<Record<string, string>>(),
+    /** §6 thresholds, per-trigger opt-out and lead time. Merged over defaults. */
+    watchSettings: jsonb("watch_settings").$type<Record<string, unknown>>(),
   },
   baseIndexes("properties"),
 );

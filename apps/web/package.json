@@ -2,7 +2,7 @@
   "name": "@galaxy-farm/web",
   "version": "0.0.0",
   "private": true,
-  "description": "Next.js app — presentation and composition root",
+  "description": "Next.js app \u2014 presentation and composition root",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -17,6 +17,8 @@
     "@galaxy-farm/infra-db": "workspace:*",
     "@galaxy-farm/infra-local": "workspace:*",
     "@galaxy-farm/infra-sync": "workspace:*",
+    "@galaxy-farm/infra-weather": "workspace:*",
+    "@galaxy-farm/module-cattle": "workspace:*",
     "@galaxy-farm/ui": "workspace:*",
     "dexie": "^4.4.4",
     "drizzle-orm": "^0.38.4",
@@ -24,8 +26,7 @@
     "next-auth": "5.0.0-beta.32",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zod": "^3.24.1",
-    "@galaxy-farm/module-cattle": "workspace:*"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",

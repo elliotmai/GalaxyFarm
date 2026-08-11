@@ -14,6 +14,7 @@ import {
   type ZoneAssignment,
 } from "@galaxy-farm/core";
 
+import { CalvingWatchCard } from "@/app/(admin)/admin/_components/calving-watch-card";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -52,6 +53,13 @@ export function Dashboard({ propertyId }: { readonly propertyId: Ulid }) {
   return (
     <div className="flex flex-col gap-density">
       <h1 className="font-heading text-2xl font-semibold text-ink">Today</h1>
+
+      {/*
+        First, above the pen board. §12 decision 5 pulled the calving watch
+        into Phase 1 because there is a pregnancy already underway, and a
+        card that has to be scrolled to is a card nobody reads at 2am.
+      */}
+      <CalvingWatchCard propertyId={propertyId} />
 
       <div className="grid gap-density md:grid-cols-2">
         <PenBoard zones={zones} animals={animals} assignments={assignments} />

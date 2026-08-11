@@ -68,6 +68,53 @@ describe("clause 3 — confirmation before destructive actions", () => {
     expect(findings.map((f) => f.symbol)).toContain(symbol);
   });
 
+  it("does not flag a function definition, which is not a call", () => {
+    // The confirmation belongs at every call site of `purgeTrash`, not in the
+    // file that defines it. Asking the definition to import a dialog is asking
+    // the wrong file, and the calls are all still caught.
+    const findings = findUnconfirmedDestructiveCalls([
+      file(
+        "apps/web/lib/trash.ts",
+        `export function purgeTrash(id: string) {
+           return repository.hardDelete(id);
+         }
+         async function removeDraft() {}`,
+      ),
+    ]);
+
+    expect(findings).toEqual([]);
+  });
+
+  it("still catches a call to a function defined elsewhere", () => {
+    const findings = findUnconfirmedDestructiveCalls([
+      file("apps/web/app/(admin)/admin/thing.tsx", `const go = () => purgeTrash(id);`),
+    ]);
+
+    expect(findings.map((f) => f.symbol)).toEqual(["purgeTrash"]);
+  });
+
+  it("does not flag the void operator, which is not a call at all", () => {
+    // `void (async () => {...})()` is the ordinary way to start a promise you
+    // are deliberately not awaiting, and it appeared in every screen that
+    // loads something in an effect. `void` is a JavaScript operator — there is
+    // no way to write a bare call to it — so matching it flagged correct code
+    // and pushed people toward the opt-out comment, which is the one thing
+    // standing between this guard and a real unconfirmed delete.
+    const findings = findUnconfirmedDestructiveCalls([
+      file(
+        "apps/web/app/(admin)/admin/thing.tsx",
+        `useEffect(() => {
+           void (async () => {
+             await load();
+           })();
+         }, []);
+         void refresh();`,
+      ),
+    ]);
+
+    expect(findings).toEqual([]);
+  });
+
   it("does not flag DOM and timer APIs that merely sound destructive", () => {
     const findings = findUnconfirmedDestructiveCalls([
       file(
