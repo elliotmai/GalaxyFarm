@@ -200,10 +200,14 @@ export const SEED_ANIMALS = [
     sex: "female" as const,
     dobIsEstimate: true,
     status: "active" as const,
-    ownership: "owned" as const,
+    ownership: "own" as const,
     safetyLevel: 2 as const,
     notes: 'Called "Andy". Bred 14 Feb 2026 by AI to ZNT Montego Bay.',
     zoneKey: "pasture",
+    // "primary" is the slot every animal has. The second and third exist for
+    // client calves, which hold an inside and an outside assignment at once
+    // (§5.1) — this cow is neither.
+    slot: "primary" as const,
   },
 ];
 

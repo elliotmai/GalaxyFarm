@@ -415,6 +415,7 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/housesitter              guide builder + PDF + access management
 /admin/settings                 branding (farm & business names), users/roles, property & zones,
                                 feed types, breeds/gestation, notification prefs, kiosk devices, integrations
+/admin/settings/trash           deleted records, restore, owner-only purge (§4.5 clause 4)
 
 /account                        customer portal (scaffold): animals, milestones, forms, invoices, shows
 /sitter                         housesitter view

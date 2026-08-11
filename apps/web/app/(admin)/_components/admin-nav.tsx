@@ -82,6 +82,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/admin/housesitter", label: "Housesitter" },
       { href: "/admin/reports", label: "Reports" },
       { href: "/admin/settings", label: "Settings" },
+      { href: "/admin/settings/trash", label: "Trash" },
     ],
   },
 ];

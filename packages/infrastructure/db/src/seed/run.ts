@@ -145,10 +145,19 @@ export async function seed(db: Database, options: SeedOptions): Promise<SeedSumm
       })
       .onConflictDoUpdate({
         target: animals.id,
-        // Name and notes only. Status, safety level, and everything else are
-        // facts about the animal today, and a re-run must not undo a change
-        // somebody made because the animal changed.
-        set: { name: animal.name, updatedAt: now },
+        // Identity, not state. Species, sex and ownership are what the animal
+        // *is* — a seeded cow does not become somebody else's — so the seed
+        // may assert them, and asserting them is how a bad value written by an
+        // earlier version of this file gets corrected. Status, safety level
+        // and the rest are facts about today that somebody set in the app, and
+        // a re-run must not undo those.
+        set: {
+          name: animal.name,
+          species: animal.species,
+          sex: animal.sex,
+          ownership: animal.ownership,
+          updatedAt: now,
+        },
       });
 
     await db
@@ -159,7 +168,7 @@ export async function seed(db: Database, options: SeedOptions): Promise<SeedSumm
         animalId: id,
         zoneId: zoneIds.get(animal.zoneKey)!,
         periodFrom: now,
-        slot: "resident",
+        slot: animal.slot,
       })
       .onConflictDoNothing({ target: zoneAssignments.id });
   }
