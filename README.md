@@ -235,14 +235,18 @@ PGlite, so the SQL is known to apply before it ever reaches a real server.
 
 Copy `.env.example` to `.env.local` and fill it in. It covers `DATABASE_URL` (Neon), the Auth.js secret, Cloudflare R2 credentials, the Resend API key, the Google Maps browser key, and the `NEXT_PUBLIC_FARM_NAME` / business-name branding fallbacks. `.env.local` is gitignored and must stay that way — no real value belongs in `.env.example`.
 
-### A note on node_modules
+### A note on where the working copy lives
 
-`.npmrc` pins `node-linker=hoisted`, because the working copy lives on an
-exFAT volume and pnpm's default layout needs symlinks. Hoisting flattens
-`node_modules`, so a package can import something it never declared and still
-run — `tests/architecture/boundaries.test.ts` fails the build on exactly that,
-for third-party and workspace imports alike. The guarantee moved from the
-installer to the test suite; it was not given up.
+It needs a filesystem with symlinks. pnpm links the 21 workspace packages to
+each other that way, and `node-linker=hoisted` does not change that — it
+covers third-party packages only. exFAT has no reparse points at all, so a
+checkout there cannot install. NTFS is fine; pnpm uses junctions on Windows,
+which need no elevation.
+
+Avoid OneDrive-synced folders. `node_modules` is hundreds of thousands of
+small files, Files On-Demand can dehydrate them into placeholders that fail a
+build with "file not found" on something visibly present, and a sync conflict
+inside `.git/objects` corrupts the repository.
 
 ## License
 
