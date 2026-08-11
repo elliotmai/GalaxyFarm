@@ -16,6 +16,10 @@ import { createDatabase, describeConnection, seed } from "@galaxy-farm/infra-db"
  * adapters — the database and the password hashing — and §4.1 says only the
  * composition root does that. A seed script is a composition root; it just
  * happens to be one with no UI.
+ *
+ * `.mts`, not `.ts`. A Next app has no `"type": "module"` in its manifest, so
+ * tsx compiles a plain `.ts` as CommonJS and every top-level `await` below
+ * fails to parse. The extension is the only thing that says otherwise.
  */
 
 const url = process.env["DATABASE_URL"];

@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import postgres from "postgres";
 
@@ -80,7 +81,21 @@ export async function migrate(databaseUrl: string): Promise<string[]> {
   return applied;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+/**
+ * Was this module run directly, or imported?
+ *
+ * Comparing `import.meta.url` to `file://${process.argv[1]}` by hand is wrong
+ * on Windows and silently so: argv holds `C:\\GalaxyFarm\\...` while
+ * `import.meta.url` is `file:///C:/GalaxyFarm/...`. They never match, the CLI
+ * body never runs, and `pnpm db:migrate` exits successfully having applied
+ * nothing — which is the worst possible way for a migration runner to fail.
+ */
+export function isEntryPoint(moduleUrl: string, argv1: string | undefined): boolean {
+  if (argv1 === undefined || argv1 === "") return false;
+  return moduleUrl === pathToFileURL(argv1).href;
+}
+
+if (isEntryPoint(import.meta.url, process.argv[1])) {
   const url = process.env["DATABASE_URL"];
   if (url === undefined || url === "") {
     console.error("DATABASE_URL is not set. Copy .env.example to .env.local and fill it in.");

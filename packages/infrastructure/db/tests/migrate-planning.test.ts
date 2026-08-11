@@ -1,6 +1,8 @@
+import { pathToFileURL } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
-import { pendingMigrations, splitStatements } from "../src/migrate.js";
+import { isEntryPoint, pendingMigrations, splitStatements } from "../src/migrate.js";
 
 /**
  * The decidable half of the migration runner.
@@ -72,5 +74,36 @@ describe("splitStatements", () => {
   it("handles an empty file", () => {
     expect(splitStatements("")).toEqual([]);
     expect(splitStatements("   \n  ")).toEqual([]);
+  });
+});
+
+describe("isEntryPoint", () => {
+  it("recognises the module it was asked to run", () => {
+    expect(isEntryPoint(pathToFileURL("/repo/src/migrate.ts").href, "/repo/src/migrate.ts")).toBe(
+      true,
+    );
+  });
+
+  it("recognises a Windows path, which a hand-built file:// URL does not", () => {
+    // The bug this exists for: `file://${argv[1]}` gives `file://C:\repo\...`,
+    // `import.meta.url` gives `file:///C:/repo/...`, they never match, and
+    // `pnpm db:migrate` exits 0 having applied nothing. A migration runner
+    // that silently does nothing is worse than one that crashes.
+    const windowsPath = "C:\\GalaxyFarm\\packages\\infrastructure\\db\\src\\migrate.ts";
+    const href = pathToFileURL(windowsPath).href;
+
+    expect(isEntryPoint(href, windowsPath)).toBe(true);
+    expect(href === `file://${windowsPath}`).toBe(false);
+  });
+
+  it("says no when the module was imported rather than run", () => {
+    expect(isEntryPoint(pathToFileURL("/repo/src/migrate.ts").href, "/repo/src/other.ts")).toBe(
+      false,
+    );
+  });
+
+  it("says no when there is no argv at all", () => {
+    expect(isEntryPoint("file:///repo/src/migrate.ts", undefined)).toBe(false);
+    expect(isEntryPoint("file:///repo/src/migrate.ts", "")).toBe(false);
   });
 });
