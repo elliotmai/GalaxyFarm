@@ -6,7 +6,7 @@ It manages registered cattle (Maine-Anjou, Chianina, Shorthorn), laying flocks, 
 
 > **Status: scaffolding.** The workspace builds, lints, typechecks, and tests green, and every route in the spec resolves — but the routes render placeholders and no domain logic exists yet. See [Current state](#current-state).
 
-The full product and architecture specification lives in [`docs/galaxy-farm-spec.md`](docs/galaxy-farm-spec.md) (v1.0), with UI mockups in [`docs/galaxy-farm-mockups-complete.html`](docs/galaxy-farm-mockups-complete.html). The spec is the source of truth; this README is the map.
+The full product and architecture specification lives in [`docs/galaxy-farm-spec.md`](docs/galaxy-farm-spec.md) (v1.1), with UI mockups in [`docs/galaxy-farm-mockups-complete.html`](docs/galaxy-farm-mockups-complete.html). The spec is the source of truth; this README is the map.
 
 ---
 
@@ -122,6 +122,10 @@ The payoff: when the database moves home, only `infrastructure/db`'s connection 
 
 **Safety levels.** A farm-wide five-level handling scale (green → red, always numbered) on every animal, with notes explaining _why_. Every zone carries a baseline level, and its effective level derives as `max(zone baseline, highest-level animal currently inside)` — so a green pen turns red the moment the bull is moved into it, everywhere at once.
 
+**Planned becomes actual in one tap.** Three surfaces share this pattern, and it is worth recognising as a pattern rather than reinventing it each time: a `PlannedMating` converts to a `BreedingRecord`, a `PlannedPlanting` converts to a `Planting`, and a `PurchaseCandidate` marked _purchased_ converts to the real `Equipment` or `Animal` — carrying the price, the seller, the photos, and the paperwork across. Nothing is typed twice, and the record of what you considered survives alongside what you chose.
+
+**Purchase candidates decide on true cost, not sticker price.** A wishlist item says "truck, need, ASAP"; a candidate is a specific 2018 F-250 with 96k miles and a link. Costs are itemised — hauling, inspection, immediate repairs — so the comparison sorts on **total acquisition cost**. Equipment candidates derive price per mile and per hour; cattle candidates carry registration, EPDs, and sale dates that land on the calendar, because an auction lot is a deadline. Spec §5.1.
+
 **The Pen Board is the heart of the app.** The property map with live animal positions, merged care instructions, halter-color swatches, and safety-level color coding is what gets glanced at ten times a day and what barn screens show by default.
 
 **Design language — "Midnight Nebula / Bluebonnet Linen."** One brand, two modes sharing hue anchors. `/admin` and `/kiosk` render dark (Midnight Nebula); `/account`, `/book`, `/sitter`, and public pages render light (Bluebonnet Linen). Bluebonnet blue drives every primary action, nebula purple marks brand and identity moments, sage green signals calm states. Zilla Slab for headings, Inter for UI, tabular figures wherever numbers carry meaning. Signature elements: the star logomark and pedigrees drawn as constellations. Full token table in §8 of the spec.
@@ -130,14 +134,14 @@ The payoff: when the database moves home, only `infrastructure/db`'s connection 
 
 ## Build roadmap
 
-| Phase                    | Scope                                                                                                                                                                                                         |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **0 — Foundation**       | Monorepo + module skeletons, design system, Auth.js + roles, PWA shell, **sync engine**, Property + Zones + SpatialEditor, base Animal + photos, kiosk pairing                                                |
-| **1 — Cattle core**      | Profiles + registrations, pedigree, breeding + due-date projection, calving flow, health + withdrawal tracking, weights, feed module, pen board, herd roadmap, semen inventory, sync protocols, calving watch |
-| **2 — The daily farm**   | Chickens + egg logs, equipment + maintenance, supplies, contacts CRM, pets, chores, unified calendar, email notifications, tank-freeze alerts, pasture care, sales & processing                               |
-| **3 — Garden**           | Layout designer, seeds, plantings + care logs, rotation guard, harvest + preservation, planting calendar, season plan notifications, frost warnings                                                           |
-| **4 — Sharing the farm** | Housesitter guide (PDF + `/sitter` + kiosk mode), reports suite, settings polish, push notifications                                                                                                          |
-| **5 — Business launch**  | Booking flow + approval, customer portal, e-signature liability forms, training milestones UI, show entries, invoicing + QuickBooks OAuth                                                                     |
+| Phase                    | Scope                                                                                                                                                                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **0 — Foundation**       | Monorepo + module skeletons, design system, Auth.js + roles, PWA shell, **sync engine**, Property + Zones + SpatialEditor, base Animal + photos, kiosk pairing                                                                     |
+| **1 — Cattle core**      | Profiles + registrations, pedigree, breeding + due-date projection, calving flow, health + withdrawal tracking, weights, feed module, pen board, herd roadmap, purchase candidates, semen inventory, sync protocols, calving watch |
+| **2 — The daily farm**   | Chickens + egg logs, equipment + maintenance, equipment & horse purchase candidates, supplies, contacts CRM, pets, chores, unified calendar, email notifications, tank-freeze alerts, pasture care, sales & processing             |
+| **3 — Garden**           | Layout designer, seeds, plantings + care logs, rotation guard, harvest + preservation, planting calendar, season plan notifications, frost warnings                                                                                |
+| **4 — Sharing the farm** | Housesitter guide (PDF + `/sitter` + kiosk mode), reports suite, settings polish, push notifications                                                                                                                               |
+| **5 — Business launch**  | Booking flow + approval, customer portal, e-signature liability forms, training milestones UI, show entries, invoicing + QuickBooks OAuth                                                                                          |
 
 Phase 1 races a real due date — the cow is already bred — which is why calving watch was pulled forward from Phase 3.
 
@@ -185,6 +189,7 @@ The workspace is real and the pipeline is green, but **no domain logic exists ye
 - All 55 routes from spec §7 resolve and render `PagePlaceholder`. They exist so navigation, permissions, and the route-map gate are real from day one.
 - API handlers return **501 Not Implemented** rather than 404 — an unbuilt endpoint should be distinguishable from a routing bug.
 - The design tokens from §8 live in `packages/config/tailwind.preset.ts`; the components that use them do not exist yet.
+- The logomark is chosen and committed — **Rocking Double Star**, in `packages/ui/src/brand/`, paired for both surface themes. No wordmark yet; the names are still open.
 
 ### Next steps
 

@@ -1,6 +1,6 @@
 # Galaxy Farm — Product & Architecture Specification
 
-**Version 1.0 · August 2026 · Status: Approved for build — decision log in §12**
+**Version 1.1 · August 2026 · Status: Approved for build — decision log in §12**
 
 ---
 
@@ -200,6 +200,18 @@ Every animal carries a level plus **safetyNotes** stating *why* ("kicks when cor
 
 **Roadmap** (generic aggregate) — used by cattle, horses (active now), and equipment. Items: `type: goal | milestone | wishlist | planned_action`, title, detail, targetDate/season, priority, budgetEstimate, status. Cattle adds structured PlannedMatings (§5.2); equipment adds wishlist costing (§5.6).
 
+**PurchaseCandidate** (generic aggregate, added v1.1) — the specific thing you are *actually looking at*, as opposed to the wishlist item saying you want one. A Roadmap wishlist entry says "truck, need, ASAP"; a PurchaseCandidate is "2018 F-250, 96k miles, $34,500, listed here." Many candidates hang off one wishlist item, and the point of the aggregate is to line them up next to each other when a large amount of money is about to move.
+
+Shared fields, identical across every domain: `roadmapItemId` (optional — the want this would satisfy), title, **status** (`watching | contacted | inspected | offer_made | purchased | passed | gone`), askingPrice, **listingUrl**, seller → **Contact** (the CRM already holds vendors, sale barns, and private sellers), location + one-way distance, listedDate, firstSeen, expiresAt or sale date, photos[], attachments[] (listing snapshot, inspection report, papers), **pros[] / cons[]**, notes.
+
+**Costs are itemised, not guessed.** `additionalCosts[]` of `{label, amount}` covers hauling, inspection, immediate repairs, commission, and anything else that only shows up after you say yes. **Total acquisition cost = askingPrice + Σ additionalCosts** is derived and is the number the comparison view sorts on, because the sticker price is the one number that never decides anything. Against the parent wishlist item's `budgetEstimate` the app shows over/under.
+
+**Comparison view** — the real feature. Candidates for one wishlist item side by side as a table: the shared fields, the domain-specific fields below (§5.2, §5.6, §5.9), total acquisition cost, distance, days on market, and your own pros and cons. Sortable, exportable, printable — a decision this size gets discussed away from the screen.
+
+**Planned → actual.** Marking a candidate `purchased` converts it into the real record — an `Equipment` (§5.6) or an `Animal` (§5.1) — carrying over the price, seller contact, photos, and attachments as the acquisition record. Same pattern as PlannedMating → BreedingRecord and PlannedPlanting → Planting: the plan becomes the fact in one tap, and nothing is typed twice. Marking one `passed` keeps it, with the reason — the record of what you turned down and why is worth as much next year as the record of what you bought.
+
+**Notifications** — sale or auction date approaching, listing expiring, a candidate sitting in `watching` past a configurable age, and total acquisition cost crossing the wishlist item's budget.
+
 ### 5.2 Cattle module
 
 **CattleProfile** extends Animal — breed composition as percentages (e.g., ½ Maine-Anjou ¼ Chi ¼ Shorthorn — show cattle are rarely purebred), polled/horned, color/markings, **registrations[]**: `{association: AMAA | ACA | ASA | other, regNumber, tattoo, registeredName, epdSnapshot?}` — an animal can be papered in multiple associations.
@@ -227,6 +239,8 @@ Every animal carries a level plus **safetyNotes** stating *why* ("kicks when cor
 **ProcessingRecord** (packer) — processor contact, dates, **liveScaleWeight, hangingWeight (HCW), computed dressing %**, processing cost, payment received, and **CutLine[]**: `{cut, pounds, disposition: kept | sold, pricePerLb?, buyer?, total}`. Rolls up: revenue from sold cuts, pounds kept for the freezer, and full per-animal picture.
 
 **Per-animal P&L** (read model) — acquisition/breeding costs + allocated feed (§5.3) + health costs + processing costs vs. sale/packer/cut revenue. Herd-level rollups feed Reports.
+
+**CattleCandidate** (extends PurchaseCandidate, §5.1) — breeding stock and show prospects under consideration. Adds: breed composition, sex, DOB or age, **registration status** (association + number, or "unpapered"), EPD snapshot where published, pedigree reference — which may point at an existing **ExternalAnimal**, so a sire you already track in someone else's pedigree resolves without re-entry — bred/open and service sire if bred, sale type (`private | sale barn | auction | online sale | production sale`), lot number, and sale date. Sale dates project onto the calendar; auction lots are a deadline, not a browse.
 
 **HerdRoadmap** — Roadmap + **GeneticGoal** (trait, direction, notes), target herd-size milestones by year (1 → 20 over 5 years), and **PlannedMating**: `{dam or dam-criteria, planned sire (semen inventory link), target season, rationale, status}` — one tap converts a planned mating into a real BreedingRecord when it happens.
 
@@ -272,7 +286,9 @@ Hatching/incubation: not built; the module boundary leaves a clean seam if that 
 
 **MaintenanceRule** — per equipment: trigger `every N engine-hours | N miles | N months` (any combination), task, parts. **MeterReading** — hours/miles logs drive due calculations. **MaintenanceLog** — date, task, cost, parts, meter snapshot. **FuelLog** — date, gallons, cost, meter → consumption and cost-of-operation stats.
 
-**EquipmentRoadmap** — Roadmap items with priority + budgetEstimate. Seeded: truck (**need, ASAP**), tractor (want), ATV (want).
+**EquipmentCandidate** (extends PurchaseCandidate, §5.1) — a specific unit you are evaluating. Adds: category, make, model, **year**, **mileage** and/or **engine hours**, VIN/serial, condition, title status (`clean | rebuilt | lien | bill of sale only`), service history available, warranty remaining, known faults, and tyre/track or implement condition where it matters. Where both mileage and hours are known the comparison view shows **price per mile and per hour**, which is the only honest way to compare a low-hour expensive unit against a high-hour cheap one.
+
+**EquipmentRoadmap** — Roadmap items with priority + budgetEstimate. Seeded: truck (**need, ASAP**), tractor (want), ATV (want). Candidates hang off these items, so the truck wishlist entry accumulates the actual trucks you looked at.
 
 ### 5.7 Business module (scaffold — full schema + rules now, UI in Phase 5)
 
@@ -314,7 +330,7 @@ Hatching/incubation: not built; the module boundary leaves a clean seam if that 
 
 ### 5.9 Horses module (placeholder)
 
-Module skeleton with stub routes for herd / pens / feeding / breeding ("coming soon" shells so navigation and permissions are already real), plus an **active HorseRoadmap** now — same Roadmap aggregate as cattle, so goals, target acquisitions, and budget planning start today. When horses arrive, the build is filling in a prepared module, not designing one.
+Module skeleton with stub routes for herd / pens / feeding / breeding ("coming soon" shells so navigation and permissions are already real), plus an **active HorseRoadmap** and **HorseCandidate** now — the latter extending PurchaseCandidate (§5.1) with breed, age, sex, height, training level and discipline, soundness and vet-check status, temperament notes, and registration. Horses are the purchase furthest out and the one most worth researching slowly, so the shopping surface is live long before the module is — same Roadmap aggregate as cattle, so goals, target acquisitions, and budget planning start today. When horses arrive, the build is filling in a prepared module, not designing one.
 
 ### 5.10 Housesitting module
 
@@ -340,7 +356,7 @@ Route: `/admin/supplies`. Builds in Phase 2.
 
 **Chores** — cross-farm daily checklist generated from templates; kiosk check-off; overdue escalation.
 
-**Notifications** — email now (Resend), web push later behind the same `Notifier` port. Default triggers: vaccine/booster due · withdrawal ending · preg check due · calving window opening · sync-protocol step today · feed run-out approaching · med expiring · maintenance due (hours/miles/date) · bull ring due · bull/heifer/steer departure approaching · new booking request · liability form unsigned near drop-off · drop-off/pickup reminders · planting window opening (per season plan, indoor & outdoor) · chore overdue · low semen inventory · supply low-stock · frost warning · tank-freeze warning · calving watch (pressure drop / full moon / cold snap inside a due window). Per-trigger opt-out and lead-time settings.
+**Notifications** — email now (Resend), web push later behind the same `Notifier` port. Default triggers: vaccine/booster due · withdrawal ending · preg check due · calving window opening · sync-protocol step today · feed run-out approaching · med expiring · maintenance due (hours/miles/date) · bull ring due · bull/heifer/steer departure approaching · new booking request · liability form unsigned near drop-off · drop-off/pickup reminders · planting window opening (per season plan, indoor & outdoor) · chore overdue · low semen inventory · supply low-stock · purchase-candidate sale date approaching · candidate listing expiring · frost warning · tank-freeze warning · calving watch (pressure drop / full moon / cold snap inside a due window). Per-trigger opt-out and lead-time settings.
 
 **Weather, moon phases & calving watch** — a `WeatherProvider` port with two adapters: **Open-Meteo** (free for non-commercial use, no API key, hourly forecasts including surface pressure) as primary and the **National Weather Service API** (free, official US watches/warnings) for alerts. A scheduled function polls forecasts for the property's coordinates and projects onto the calendar and notifications:
 
@@ -349,7 +365,7 @@ Route: `/admin/supplies`. Builds in Phase 2.
 - **Calving watch:** for every cow inside her calving window (due date ± 14 days, configurable), the dashboard shows a watch card and notifications fire when the window coincides with a **full moon** (± 1 day — computed locally with an astronomy library, so moon phases render on the calendar indefinitely and offline), a **rapid barometric fall** (default ≥ 4 hPa / ~0.12 inHg within 24 h) or forecast low-pressure trough, or a **cold snap** (calf-chill threshold, default 20 °F). Example alert: *"Front arriving Thursday night + full moon Friday — Dolly is at day 279."*
 - Licensing seam: Open-Meteo's free tier is non-commercial; when the boarding business launches, its inexpensive commercial plan or a full switch to NWS closes the gap — both sit behind the same port.
 
-**Reports** — cost per head · per-animal & herd P&L · feed spend and consumption trends · **supply spend by category & whole-farm operating cost** · egg production trends (by coop/color/size) · herd inventory growth vs. roadmap targets · processing yields (dressing %, $/lb realized) · equipment cost of ownership · business revenue (Phase 5). All exportable to CSV.
+**Reports** — cost per head · per-animal & herd P&L · feed spend and consumption trends · **supply spend by category & whole-farm operating cost** · egg production trends (by coop/color/size) · herd inventory growth vs. roadmap targets · processing yields (dressing %, $/lb realized) · equipment cost of ownership · **capital planning — open wishlist items, their budgets, and the candidates under consideration against them** · business revenue (Phase 5). All exportable to CSV.
 
 ## 7. Route map
 
@@ -377,6 +393,7 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/cattle/feed              feeding plans per animal & group
 /admin/cattle/sales             acquisitions, sales, processing records
 /admin/cattle/roadmap           genetic goals, target size, planned matings
+/admin/cattle/candidates        breeding stock & show prospects under consideration
 
 /admin/feed                     inventory, purchases, run-out projections, cost per head
 /admin/supplies                 ranch supply inventory: consumables, show/fitting gear, hardware
@@ -387,8 +404,10 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/garden/seeds
 /admin/garden/harvest           + preservation
 /admin/equipment                fleet · /admin/equipment/[id] · /admin/equipment/roadmap
+/admin/equipment/candidates     purchase candidates: compare units, true cost, links, decision log
 /admin/pets
 /admin/horses                   placeholder shells · /admin/horses/roadmap (active)
+/admin/horses/candidates        horses under consideration (active)
 /admin/business/*               scaffold: bookings · clients · program roster (own + client,
                                 halter colors) · day schedule · forms · invoices
 /admin/housesitter              guide builder + PDF + access management
@@ -449,9 +468,9 @@ Prices verified August 2026; treat as estimates and re-verify before committing.
 
 **Phase 0 — Foundation (build first).** Monorepo + module skeletons, design system, Auth.js + roles, PWA shell, **sync engine** (the hard part — built and tested before features pile onto it), Property + Zones + SpatialEditor property mode, base Animal + photos, kiosk pairing.
 
-**Phase 1 — Cattle core.** *Your cow is bred — this phase races her due date.* Cattle profiles + registrations, pedigree (incl. external ancestors), breeding records + due-date projection + calving-window alerts, calving flow (creates the calf), health + withdrawal tracking + med inventory, weights, feed module (types, purchases, plans, run-out, cost/head), pen board with live assignments, herd roadmap + planned matings, semen inventory, sync protocols, **calving watch** (weather + moon monitoring for cows in a due window — pulled forward from Phase 3 because it applies to this pregnancy).
+**Phase 1 — Cattle core.** *Your cow is bred — this phase races her due date.* Cattle profiles + registrations, pedigree (incl. external ancestors), breeding records + due-date projection + calving-window alerts, calving flow (creates the calf), health + withdrawal tracking + med inventory, weights, feed module (types, purchases, plans, run-out, cost/head), pen board with live assignments, herd roadmap + planned matings, **purchase candidates** (the shared aggregate plus the cattle extension), semen inventory, sync protocols, **calving watch** (weather + moon monitoring for cows in a due window — pulled forward from Phase 3 because it applies to this pregnancy).
 
-**Phase 2 — The rest of the daily farm.** Chickens (flocks, egg logs, kiosk egg entry), equipment (fleet, maintenance rules, fuel, roadmap — get the truck on the wishlist), **supplies inventory**, **contacts CRM**, pets, chores, unified calendar, email notifications, **tank-freeze alerts** (rides on the Phase 1 weather service, lands before winter), **pasture care logs** (in time for fall overseeding), sales/processing records.
+**Phase 2 — The rest of the daily farm.** Chickens (flocks, egg logs, kiosk egg entry), equipment (fleet, maintenance rules, fuel, roadmap — get the truck on the wishlist — and **equipment purchase candidates**, so the trucks you are actually looking at line up against each other), **horse candidates**, **supplies inventory**, **contacts CRM**, pets, chores, unified calendar, email notifications, **tank-freeze alerts** (rides on the Phase 1 weather service, lands before winter), **pasture care logs** (in time for fall overseeding), sales/processing records.
 
 **Phase 3 — Garden.** Layout designer, seeds, plantings + care logs, rotation guard, harvest + preservation, zone-aware planting calendar, **season plan + planting notifications**, frost-warning notifications.
 
@@ -524,3 +543,8 @@ The point of expressing §4.1 and §4.5 as *executable* checks rather than prose
 
 19. **Data operations contract made non-negotiable** (§4.5) — full CRUD on every entity against a small, closed list of exceptions (derived read models, immutable legal/audit records, system-owned rows); one shared Zod schema per entity validating client forms, sync payloads, and API handlers alike; a three-tier confirmation requirement on every destructive action, naming the record and its dependents; soft delete with a restorable Trash and an owner-only purge; and a declared delete behavior on every relationship. Applies retroactively to every entity in §5 and forward to every entity added later.
 20. **Quality gates are blocking** (§11.1) — lint, typecheck, architecture-boundary checks, route-map conformance against §7, data-operations conformance against §4.5, unit tests with coverage thresholds, production build, and Playwright e2e all run on every push and pull request, and all of them block. The §4.1 and §4.5 rules are expressed as executable checks rather than prose specifically so they cannot decay.
+
+**v1.1 additions:**
+
+21. **Purchase candidates** (§5.1, §5.2, §5.6, §5.9) — a generic aggregate for tracking the specific things under consideration before a large purchase, separate from the Roadmap wishlist item that says one is wanted. Shared fields (status pipeline, asking price, listing URL, seller from the CRM, distance, dates, photos, attachments, pros and cons) plus itemised `additionalCosts[]` so the comparison sorts on **total acquisition cost**, not sticker price. Extended per domain: equipment adds year, mileage, hours, VIN, title status and derived price-per-mile/hour; cattle adds breed composition, registration, EPDs, pedigree reference and sale/lot dates; horses add training level and soundness. Marking a candidate `purchased` converts it into the real Equipment or Animal record, the same planned→actual pattern used by PlannedMating and PlannedPlanting. Routes at `/admin/equipment/candidates`, `/admin/cattle/candidates`, `/admin/horses/candidates`.
+22. **Logomark chosen: Rocking Double Star** (§8) — a large star and a small one on a rocker, read as a cow and a calf on shared ground. Drawn in livestock-brand grammar, mono-tone in both variants, with the stars carrying the identity colour and the rocker the surface's action colour. Admin and customer variants live in `packages/ui/src/brand/`. The wordmark still waits on the farm and business names.
