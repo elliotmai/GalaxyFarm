@@ -1,0 +1,53 @@
+import type { BaseRecord } from "@galaxy-farm/core";
+
+import { allTables } from "../schema/index.js";
+import { PostgresRepository, type Database, type RecordTable } from "./postgres-repository.js";
+
+export * from "./postgres-repository.js";
+
+/**
+ * What `ListQuery.search` looks at, per table.
+ *
+ * Kept in one list rather than at each call site because "search finds nothing"
+ * is a bug nobody reports — they assume the record is not there and enter it
+ * again. A table missing from this map fails a test, so the choice has to be
+ * made deliberately, including the choice that a table has nothing worth
+ * searching.
+ *
+ * `syncAudit` is absent on purpose: it is append-only and on the §4.5 exception
+ * list, so it is not a `Repository` at all.
+ */
+export const SEARCHABLE_FIELDS = {
+  properties: ["name", "address"],
+  brandingConfigs: ["farmName", "businessName", "tagline"],
+  waterSources: ["name", "notes"],
+  zones: ["name", "customInstructions"],
+  animals: ["name", "tagNumber", "notes"],
+  // Assignments are found through the animal or the zone, never by typing.
+  zoneAssignments: [],
+  contacts: ["name", "company", "address", "notes"],
+  attachments: ["filename", "caption"],
+  choreTemplates: ["title", "detail"],
+  tasks: ["title", "detail"],
+  roadmapItems: ["title", "detail"],
+  purchaseCandidates: ["title", "location", "notes"],
+} as const satisfies Partial<Record<keyof typeof allTables, readonly string[]>>;
+
+export type RepositoryName = keyof typeof SEARCHABLE_FIELDS;
+
+/**
+ * A repository for one table, with its searchable fields already applied.
+ *
+ * The entity type is supplied by the caller — the schema states the storage and
+ * the kernel states the domain type, and this is the one place they meet.
+ */
+export function repositoryFor<T extends BaseRecord>(
+  db: Database,
+  name: RepositoryName,
+): PostgresRepository<T> {
+  return new PostgresRepository<T>(
+    db,
+    allTables[name] as RecordTable,
+    SEARCHABLE_FIELDS[name] as readonly (keyof T & string)[],
+  );
+}

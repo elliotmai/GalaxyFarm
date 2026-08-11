@@ -3,6 +3,7 @@ import { describe, it } from "vitest";
 import { InMemoryRepository } from "../src/testing/in-memory-repository.js";
 import {
   repositoryConformanceCases,
+  unsearchableRepositoryCases,
   type ConformanceRecord,
 } from "../src/testing/repository-conformance.js";
 
@@ -14,6 +15,12 @@ describe("InMemoryRepository — repository contract", () => {
   for (const testCase of repositoryConformanceCases) {
     it(testCase.name, async () => {
       await testCase.run(new InMemoryRepository<ConformanceRecord>(["name"]));
+    });
+  }
+
+  for (const testCase of unsearchableRepositoryCases) {
+    it(testCase.name, async () => {
+      await testCase.run(new InMemoryRepository<ConformanceRecord>([]));
     });
   }
 });

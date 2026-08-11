@@ -6,7 +6,7 @@ It manages registered cattle (Maine-Anjou, Chianina, Shorthorn), laying flocks, 
 
 > **Status: Phase 0 in progress.** The shared kernel, the confirmation primitive, the sync engine, and the local store are built and tested. The routes still render placeholders — no screen is wired to the domain yet. See [Current state](#current-state).
 
-The full product and architecture specification lives in [`docs/galaxy-farm-spec.md`](docs/galaxy-farm-spec.md) (v1.1), with UI mockups in [`docs/galaxy-farm-mockups-complete.html`](docs/galaxy-farm-mockups-complete.html). The spec is the source of truth; this README is the map.
+The full product and architecture specification lives in [`docs/galaxy-farm-spec.md`](docs/galaxy-farm-spec.md) (v1.3), with UI mockups in [`docs/galaxy-farm-mockups-complete.html`](docs/galaxy-farm-mockups-complete.html). The spec is the source of truth; this README is the map.
 
 ---
 

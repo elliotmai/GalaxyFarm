@@ -203,6 +203,25 @@ export const repositoryConformanceCases: readonly ConformanceCase[] = [
     },
   },
   {
+    name: "treats SQL wildcards in a search as literal characters",
+    async run(repository) {
+      // The in-memory and IndexedDB stores search with String.includes, where
+      // `%` is an ordinary character; Postgres `ilike` would read it as "match
+      // anything". Without escaping, a search for "50%" returns one record on
+      // the phone and every record on the server.
+      await repository.save(record(ID_1, { name: "50% clover mix" }));
+      await repository.save(record(ID_2, { name: "Mineral tub" }));
+
+      const found = await repository.list(query({ search: "50%" }));
+      assert.deepEqual(
+        found.map((r) => r.id),
+        [ID_1],
+      );
+      assert.equal((await repository.list(query({ search: "%" }))).length, 1);
+      assert.equal((await repository.list(query({ search: "_" }))).length, 0);
+    },
+  },
+  {
     name: "treats an empty search as no filter",
     async run(repository) {
       await repository.saveMany([record(ID_1), record(ID_2)]);
@@ -232,6 +251,30 @@ export const repositoryConformanceCases: readonly ConformanceCase[] = [
       await repository.saveMany([]);
 
       assert.equal(await repository.count(query()), 0);
+    },
+  },
+];
+
+/**
+ * Cases for a repository configured with **no** searchable fields.
+ *
+ * A separate list because it needs a differently-built repository, and the
+ * behaviour is worth pinning: a zone assignment is found through its animal,
+ * never by typing. The in-memory and IndexedDB stores return nothing for free —
+ * `[].some(...)` is false — while a SQL store that simply omits the clause
+ * returns *everything*. Opposite answers to the same question is exactly the
+ * drift this suite exists to catch.
+ */
+export const unsearchableRepositoryCases: readonly ConformanceCase[] = [
+  {
+    name: "matches nothing rather than everything when there is nothing to search",
+    async run(repository) {
+      await repository.saveMany([record(ID_1), record(ID_2)]);
+
+      assert.equal((await repository.list(query({ search: "spear" }))).length, 0);
+      assert.equal(await repository.count(query({ search: "spear" })), 0);
+      // An empty search is still no filter, not an empty result.
+      assert.equal((await repository.list(query({ search: "  " }))).length, 2);
     },
   },
 ];

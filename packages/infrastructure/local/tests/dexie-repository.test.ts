@@ -1,7 +1,11 @@
 import { IDBFactory, IDBKeyRange as FakeIDBKeyRange } from "fake-indexeddb";
 import { afterEach, describe, it } from "vitest";
 
-import { repositoryConformanceCases, type ConformanceRecord } from "@galaxy-farm/core";
+import {
+  repositoryConformanceCases,
+  unsearchableRepositoryCases,
+  type ConformanceRecord,
+} from "@galaxy-farm/core";
 
 import { FarmDatabase } from "../src/database.js";
 import { DexieRepository } from "../src/dexie-repository.js";
@@ -39,6 +43,12 @@ describe("DexieRepository — repository contract", () => {
         "name",
       ]);
       await testCase.run(repository);
+    });
+  }
+
+  for (const testCase of unsearchableRepositoryCases) {
+    it(testCase.name, async () => {
+      await testCase.run(new DexieRepository<ConformanceRecord>(freshDatabase(), "records", []));
     });
   }
 });

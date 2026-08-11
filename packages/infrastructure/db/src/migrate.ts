@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import postgres from "postgres";
 
+import { describeConnection } from "./client.js";
+
 /**
  * Apply pending migrations.
  *
@@ -83,6 +85,17 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   if (url === undefined || url === "") {
     console.error("DATABASE_URL is not set. Copy .env.example to .env.local and fill it in.");
     process.exit(1);
+  }
+
+  const target = describeConnection(url);
+  // Named, so nobody has to wonder afterwards which database this ran against
+  // — and without the password the URL would otherwise put in the log.
+  console.log(`Migrating ${target.database} at ${target.host}`);
+  if (target.pooled) {
+    console.warn(
+      "This is the pooled (-pooler) endpoint. DDL belongs on the direct one; " +
+        "use the connection string without '-pooler' in the host.",
+    );
   }
 
   const applied = await migrate(url);
