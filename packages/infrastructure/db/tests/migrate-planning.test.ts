@@ -1,8 +1,15 @@
+import { readdirSync } from "node:fs";
+import { isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { isEntryPoint, pendingMigrations, splitStatements } from "../src/migrate.js";
+import {
+  MIGRATIONS_DIR,
+  isEntryPoint,
+  pendingMigrations,
+  splitStatements,
+} from "../src/migrate.js";
 
 /**
  * The decidable half of the migration runner.
@@ -105,5 +112,34 @@ describe("isEntryPoint", () => {
   it("says no when there is no argv at all", () => {
     expect(isEntryPoint("file:///repo/src/migrate.ts", undefined)).toBe(false);
     expect(isEntryPoint("file:///repo/src/migrate.ts", "")).toBe(false);
+  });
+});
+
+describe("finding the migrations", () => {
+  it("resolves a directory that actually holds them", () => {
+    // The bug: `new URL(...).pathname` gives `/C:/GalaxyFarm/...` on Windows,
+    // and `readdirSync` turns that into `C:\C:\GalaxyFarm\...`. Resolving from
+    // the module's own URL is the only way to find them regardless of where
+    // the command was run from, so it has to be done correctly.
+    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql"));
+
+    expect(files.length).toBeGreaterThan(0);
+    expect(files).toContain("0000_initial_schema.sql");
+  });
+
+  it("is an absolute path a filesystem call will accept", () => {
+    expect(isAbsolute(MIGRATIONS_DIR)).toBe(true);
+    // The failure signature: a drive letter with a slash in front of it.
+    expect(MIGRATIONS_DIR).not.toMatch(/^\/[A-Za-z]:/);
+  });
+
+  it("shows why pathname cannot be used for this", () => {
+    // Documenting the trap rather than just avoiding it — the two agree on
+    // POSIX, which is why this survived review and CI both.
+    const windowsModule = "file:///C:/GalaxyFarm/packages/infrastructure/db/src/migrate.ts";
+    const viaPathname = new URL("../migrations", windowsModule).pathname;
+
+    expect(viaPathname).toBe("/C:/GalaxyFarm/packages/infrastructure/db/migrations");
+    expect(isAbsolute(viaPathname)).toBe(process.platform !== "win32");
   });
 });

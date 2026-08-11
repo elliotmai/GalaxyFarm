@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import postgres from "postgres";
 
@@ -17,7 +17,16 @@ import { describeConnection } from "./client.js";
  * §10's move to a box in the barn depends on.
  */
 
-const MIGRATIONS_DIR = new URL("../migrations", import.meta.url).pathname;
+/**
+ * Where the migration files are.
+ *
+ * `fileURLToPath`, not `.pathname`. A URL's pathname for
+ * `file:///C:/GalaxyFarm/...` is `/C:/GalaxyFarm/...` — a leading slash in
+ * front of a drive letter — and handing that to `readdirSync` produces
+ * `C:\C:\GalaxyFarm\...`. The two functions agree on POSIX and disagree on
+ * Windows, which is the whole family this file has now been caught by twice.
+ */
+export const MIGRATIONS_DIR = fileURLToPath(new URL("../migrations", import.meta.url));
 
 /**
  * Which migrations still need applying, in order.
