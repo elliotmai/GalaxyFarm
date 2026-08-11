@@ -1,0 +1,14 @@
+/*
+ * Design tokens land in @galaxy-farm/ui (spec §8, "Midnight Nebula /
+ * Bluebonnet Linen"). This file only carries the reset until then.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+}

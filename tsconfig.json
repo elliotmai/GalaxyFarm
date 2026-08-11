@@ -1,0 +1,8 @@
+{
+  "extends": "./packages/config/tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["tests/**/*", "tools/**/*", "*.config.ts", "*.config.mts", "vitest.workspace.ts"]
+}

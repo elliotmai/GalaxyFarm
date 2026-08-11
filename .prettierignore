@@ -1,0 +1,12 @@
+node_modules
+.next
+.turbo
+dist
+coverage
+playwright-report
+test-results
+pnpm-lock.yaml
+
+# The spec and mockups are authored documents, not generated code. Prettier
+# would repaginate every markdown table and bury real edits in whitespace churn.
+docs/

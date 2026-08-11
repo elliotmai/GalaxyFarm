@@ -1,0 +1,21 @@
+{
+  "name": "@galaxy-farm/module-housesitting",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Housesitting domain module — pure domain + application layers",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@galaxy-farm/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

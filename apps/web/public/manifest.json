@@ -1,0 +1,10 @@
+{
+  "name": "Galaxy Farm",
+  "short_name": "Galaxy Farm",
+  "description": "Local-first herd, homestead, and show-program management.",
+  "start_url": "/admin",
+  "display": "standalone",
+  "background_color": "#0E1026",
+  "theme_color": "#0E1026",
+  "icons": []
+}

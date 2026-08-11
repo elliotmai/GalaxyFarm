@@ -1,0 +1,13 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "packages/modules/*"
+  - "packages/infrastructure/*"
+
+# Explicit allowlist for postinstall scripts. pnpm 10 blocks them by default;
+# these three need theirs (esbuild and sharp link native binaries, and Vitest
+# and Next respectively depend on that having happened).
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - "@tailwindcss/oxide"

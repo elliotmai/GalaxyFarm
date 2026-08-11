@@ -1,6 +1,6 @@
 # Galaxy Farm — Product & Architecture Specification
 
-**Version 0.9 · August 2026 · Status: Approved for build — decision log in §12**
+**Version 1.0 · August 2026 · Status: Approved for build — decision log in §12**
 
 ---
 
@@ -23,6 +23,7 @@ The app serves three surfaces from one codebase: a full admin experience on desk
 - **One Animal model, many species.** Cattle, chickens (as flocks), pets, client calves, and future horses share a kernel (identity, location, photos, instructions, health) and extend it per species. The boarding business reuses the same entities with an `owner` attached — no parallel system.
 - **Derive, don't duplicate.** Calving due dates derive from breeding records; feed run-out dates derive from feeding plans; rule deadlines (bull ring by 8 months) derive from birth dates; the housesitter guide derives from live data. Manual entry is for facts, not for consequences of facts.
 - **Everything spatial is one component.** The property map (pens/pastures) and the garden layout designer are the same SVG editor with different palettes.
+- **Nothing is a dead end.** Every record a user can create, they can also find, edit, and remove — with validated input on the way in and a confirmation on the way out. This is a hard requirement, not a per-screen decision; the full contract is §4.5.
 
 ## 3. Stack
 
@@ -122,6 +123,38 @@ Permission checks live in the application layer (use cases declare required capa
 ### 4.4 Kiosk mode
 
 Barn screens pair via a one-time code and hold a long-lived device token. Kiosk home offers preset boards: **Pen Board** (property map + who's where + care instructions), **Calendar**, **Today's Chores**, **Egg Quick-Entry** (big +1 buttons per coop/color/size), **Program Day Sheet** (today's show-program schedule as a calf × activity grid — tap to check off rinses, exercise, and training slots as they happen), and **Housesitter Mode**. Large touch targets, high contrast, auto-refresh on sync, screen-wake hints. Any screen can be locked to a single board from settings.
+
+### 4.5 Data operations contract (non-negotiable)
+
+Every entity in this specification is subject to the following contract. It is not a per-screen design decision and not a "nice to have for v2" — a feature is not complete until it satisfies all four clauses, and CI enforces them (§11.1).
+
+**1. Full CRUD, everywhere it applies.** Every entity a user can create, they can also list/read, update, and delete. No write-only screens, no records that can only be fixed by editing the database directly. Concretely, each entity ships all of: a **list** view with search/filter appropriate to its volume, a **detail** read view, a **create** form, an **edit** form, and a **delete** action.
+
+*The applicability exceptions are enumerated, closed, and small.* Anything not on this list gets full CRUD:
+
+- **Derived read models** — projected `CalendarEvent`s, per-animal and herd P&L, feed run-out dates, a zone's effective safety level, resolved care instructions, dressing percentage, ADG. These have no CRUD of their own because they are recomputed from their sources; you edit the source record and the derivation follows. This is the "derive, don't duplicate" principle (§2) — a derived value that could be edited directly would be a second source of truth.
+- **Immutable legal and audit records** — signed liability-form PDF snapshots (§5.7), sync audit-log entries (§4.2), and the outbox history. These are create-and-read only. Corrections happen by superseding entry (a new signed version, a compensating record), never by mutation, and never by deletion.
+- **System-owned rows** — schema migration history, device pairing tokens (revocable, not editable).
+
+Everything else — every log, every record, every plan, every template, every join like `ZoneAssignment` — is fully CRUD-able by a user with the capability for it. Where an entity maintains a running total from an append-only log (flock headcount via its adjustment log, feed on-hand via purchases and consumption), the *log entries* carry the CRUD and the total re-derives; the total itself is never directly editable.
+
+**2. Validated input at every boundary.** One Zod schema per entity is the single definition of what valid data is, and it is shared by the client form, the sync payload, and the API handler — the same schema, imported, not three copies that drift. Validation runs at every boundary crossing, including the sync push handler: data arriving from a local store is not trusted just because it came from our own client. Domain invariants that Zod cannot express (a calving date cannot precede its breeding date; a `ZoneAssignment.to` cannot precede its `from`; straw count cannot go negative) live in the domain layer as pure functions and are enforced in the use case, not in the form. Errors surface per-field on the control that caused them, never as a single opaque "invalid input."
+
+**3. Confirmation before every destructive action.** No delete, anywhere, on any surface, happens on a single unconfirmed tap. The confirmation must state **what** is being deleted by name, and **what else it affects** — "Delete pen *North Trap*? 4 animals are currently assigned to it." A generic "Are you sure?" does not satisfy this clause. Three tiers:
+
+| Tier | Applies to | Interaction |
+|---|---|---|
+| Standard | Ordinary records — a log entry, a task, a photo | Confirmation dialog naming the record; undo toast afterward |
+| Elevated | Records with dependents, or anything on a kiosk | Dialog naming the record *and* listing dependents; on kiosk, PIN unlock |
+| Typed | Whole-aggregate deletes — an animal with history, a zone, a contact, a property | User types the record's name to enable the confirm button |
+
+Bulk deletes state the exact count and are always at least Elevated. The same rule governs other irreversible actions that are not technically deletes: terminating a boarding agreement, voiding an invoice, revoking a kiosk device, clearing a sync queue.
+
+**4. Soft delete, restore, and purge.** Deletes write a tombstone (§4.2) rather than removing the row: `deletedAt`, `deletedBy`, and reason where the UI collects one. Deleted records leave the normal lists and the sync read path but remain restorable from a **Trash** view for a configurable retention window (default 30 days). Permanent purge is a separate, `owner`-only, Typed-tier action. This is what makes the confirmation dialogs honest — the answer to "what if I confirm by mistake" is always "restore it from Trash," and it is what lets deletions replicate safely to kiosks and other devices instead of resurrecting on the next pull.
+
+**Referential integrity is a declared decision, never an accident.** Every relationship declares its delete behavior — `restrict` (block the delete and say what is in the way), `cascade` (delete dependents, listed in the confirmation), or `detach` (null the reference and keep the dependent). A relationship with no declared behavior is a build-time error, not a runtime surprise.
+
+**Offline behavior.** Deletes are ordinary mutations: confirmed locally, written to the local store and the outbox together, drained when signal returns. The confirmation dialog never waits on the network, and a delete performed in the barn with zero bars behaves exactly like one performed at the kitchen table.
 
 ## 5. Domain model
 
@@ -426,6 +459,23 @@ Prices verified August 2026; treat as estimates and re-verify before committing.
 
 **Phase 5 — Business launch (~1 yr+).** Booking flow + approval, customer portal, e-signature liability forms, training milestones UI, show entries, invoicing + QuickBooks OAuth. (Schema, rules, and routes already exist from Phase 0/1 scaffolding.)
 
+### 11.1 Quality gates (CI)
+
+Every push and pull request runs the full gate, and **every check blocks the merge**. Nothing here is advisory. The gate exists because this is a two-person project with a real cow on a real due date — the pipeline is the code reviewer that is always available.
+
+| Gate | What it enforces |
+|---|---|
+| Lint | Style and correctness rules across every package |
+| Typecheck | `tsc --noEmit` on the whole workspace, no `any` escape hatches in domain code |
+| **Architecture boundaries** | The §4.1 dependency rules, checked mechanically — `modules/*/domain` imports only `core`; modules never import each other; domain never reaches for infrastructure, React, or Next; only `apps/web` composes |
+| **Route-map conformance** | Every route in §7 exists in the app, and every route in the app appears in §7 — the spec and the router cannot drift apart silently |
+| **Data-operations conformance** | The §4.5 contract: every registered entity declares a Zod schema, a full CRUD surface, and a delete behavior for each relationship; every delete path routes through the confirmation wrapper. An entity that skips a clause fails the build unless it is on the enumerated exception list |
+| Unit tests + coverage | Domain and application logic under Vitest, with coverage thresholds that fail the build when they drop |
+| Build | The production Next.js build compiles |
+| E2E | Playwright smoke pass over the primary surfaces |
+
+The point of expressing §4.1 and §4.5 as *executable* checks rather than prose is that architectural rules which are merely written down decay under deadline pressure. These do not decay; they fail the build.
+
 ## 12. Decision log
 
 **v0.2 — v0.1 open questions resolved:**
@@ -469,3 +519,8 @@ Prices verified August 2026; treat as estimates and re-verify before committing.
 **v0.9 additions:**
 
 18. **Hosting decided: Option B for everything** (§9) — Netlify + Neon Launch (usage-based Postgres) + Cloudflare R2 + Resend, est. $1–8/mo, with Google Maps on its own free-tier Google Cloud account; self-host path unchanged.
+
+**v1.0 additions:**
+
+19. **Data operations contract made non-negotiable** (§4.5) — full CRUD on every entity against a small, closed list of exceptions (derived read models, immutable legal/audit records, system-owned rows); one shared Zod schema per entity validating client forms, sync payloads, and API handlers alike; a three-tier confirmation requirement on every destructive action, naming the record and its dependents; soft delete with a restorable Trash and an owner-only purge; and a declared delete behavior on every relationship. Applies retroactively to every entity in §5 and forward to every entity added later.
+20. **Quality gates are blocking** (§11.1) — lint, typecheck, architecture-boundary checks, route-map conformance against §7, data-operations conformance against §4.5, unit tests with coverage thresholds, production build, and Playwright e2e all run on every push and pull request, and all of them block. The §4.1 and §4.5 rules are expressed as executable checks rather than prose specifically so they cannot decay.

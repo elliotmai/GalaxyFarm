@@ -1,0 +1,21 @@
+{
+  "name": "@galaxy-farm/infra-quickbooks",
+  "version": "0.0.0",
+  "private": true,
+  "description": "QuickBooks Online adapter behind the InvoicingProvider port",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@galaxy-farm/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}
