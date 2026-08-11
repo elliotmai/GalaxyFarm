@@ -1,6 +1,6 @@
 # Galaxy Farm — Product & Architecture Specification
 
-**Version 1.1 · August 2026 · Status: Approved for build — decision log in §12**
+**Version 1.2 · August 2026 · Status: Approved for build — decision log in §12**
 
 ---
 
@@ -99,7 +99,7 @@ The payoff: when the database moves home, only `infrastructure/db`'s connection 
 
 - **Reads:** UI always reads from IndexedDB via live queries — instant, works with zero bars in the barn.
 - **Writes:** every mutation is a command written atomically to the local store *and* an **outbox** (ULID id, entity, field patch, timestamp, deviceId).
-- **Push:** when online, the outbox drains to `/api/sync/push`; the server applies patches with **field-level last-write-wins** and records everything in an audit log (so a rare conflict is recoverable, not silent).
+- **Push:** when online, the outbox drains to `/api/sync/push`; the server applies patches with **field-level last-write-wins** and records every superseded value in an audit log (so a rare conflict is recoverable, not silent). Ties on an identical timestamp break on the higher deviceId — arbitrary, but deterministic, which is what matters when every device has to reach the same answer without talking to the others. The audit is a **field-level change log rather than a conflict-only log**: see decision 23.
 - **Pull:** per-entity `updatedAt` cursors via `/api/sync/pull`; deletions ship as tombstones.
 - **Photos/documents:** compressed client-side, queued, uploaded to R2 via presigned URLs when online; records store the key immediately and render a placeholder until synced.
 - **Conflict reality check:** two writers (you two) plus kiosks, mostly appending records — real conflicts will be vanishingly rare. LWW-per-field + audit log is the right amount of machinery.
@@ -548,3 +548,7 @@ The point of expressing §4.1 and §4.5 as *executable* checks rather than prose
 
 21. **Purchase candidates** (§5.1, §5.2, §5.6, §5.9) — a generic aggregate for tracking the specific things under consideration before a large purchase, separate from the Roadmap wishlist item that says one is wanted. Shared fields (status pipeline, asking price, listing URL, seller from the CRM, distance, dates, photos, attachments, pros and cons) plus itemised `additionalCosts[]` so the comparison sorts on **total acquisition cost**, not sticker price. Extended per domain: equipment adds year, mileage, hours, VIN, title status and derived price-per-mile/hour; cattle adds breed composition, registration, EPDs, pedigree reference and sale/lot dates; horses add training level and soundness. Marking a candidate `purchased` converts it into the real Equipment or Animal record, the same planned→actual pattern used by PlannedMating and PlannedPlanting. Routes at `/admin/equipment/candidates`, `/admin/cattle/candidates`, `/admin/horses/candidates`.
 22. **Logomark chosen: Rocking Double Star** (§8) — a large star and a small one on a rocker, read as a cow and a calf on shared ground. Drawn in livestock-brand grammar, mono-tone in both variants, with the stars carrying the identity colour and the rocker the surface's action colour. Admin and customer variants live in `packages/ui/src/brand/`. The wordmark still waits on the farm and business names.
+
+**v1.2 additions:**
+
+23. **The sync audit is a field-level change log, not a conflict-only log** (§4.2). Given only timestamps there is no way to distinguish a sequential edit from a concurrent one — that would need vector clocks or a server-assigned version per field, neither of which this design carries. Rather than invent a concurrency signal the data does not have, every superseded value is written down. A genuine conflict is therefore always recoverable, which is what the clause asks for, and any field's history can be reconstructed as a side benefit. The cost is a larger log than a conflict-only one would be; at two writers and a handful of kiosks that is not a meaningful cost. Revisit only if the log's volume ever becomes a problem, at which point vector clocks are the upgrade path.
