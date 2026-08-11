@@ -23,8 +23,10 @@ import {
 
 import {
   breedingRecordSchema,
+  calvingRecordSchema,
   cattleProfileSchema,
   externalAnimalSchema,
+  weightRecordSchema,
 } from "@galaxy-farm/module-cattle";
 
 import { allTables } from "../src/schema/index.js";
@@ -58,6 +60,8 @@ const SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   cattleProfiles: cattleProfileSchema,
   externalAnimals: externalAnimalSchema,
   breedingRecords: breedingRecordSchema,
+  calvingRecords: calvingRecordSchema,
+  weightRecords: weightRecordSchema,
   zoneAssignments: zoneAssignmentSchema,
   feedingPlans: feedingPlanSchema,
   contacts: contactSchema,

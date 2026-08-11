@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Ulid } from "@galaxy-farm/core";
+import { animalSchema, type Ulid } from "@galaxy-farm/core";
 
 import {
   DEFAULT_GESTATION_DAYS,
@@ -19,6 +19,7 @@ import {
   calvingInterval,
   calvingRecordSchema,
   producedLiveCalf,
+  suggestedCalfTag,
   type CalvingRecord,
 } from "../src/domain/calving-record.js";
 
@@ -249,7 +250,7 @@ describe("calvingRecordSchema", () => {
 });
 
 describe("calfFromCalving", () => {
-  const context = { propertyId: id(0), ownership: "own" as const };
+  const context = { propertyId: id(0), ownership: "own" as const, tagNumber: "Andromeda-26" };
 
   it("creates the calf with the dam's calving date as its birthday", () => {
     const draft = calfFromCalving(calving(), { externalId: id(3) }, context);
@@ -273,11 +274,30 @@ describe("calfFromCalving", () => {
     expect(calfFromCalving(calving(), {}, context)?.animal.safetyLevel).toBe(1);
   });
 
-  it("leaves the calf unnamed", () => {
-    // Forcing a name at birth produces a herd of "Calf 3"s nobody renames.
+  it("tags the calf but does not name it", () => {
+    // Forcing a name at birth produces a herd of "Calf 3"s nobody renames. A
+    // tag is different — it is what actually goes in the ear.
     const draft = calfFromCalving(calving(), {}, context);
     expect(draft?.animal.name).toBeUndefined();
-    expect(draft?.animal.tagNumber).toBeUndefined();
+    expect(draft?.animal.tagNumber).toBe("Andromeda-26");
+  });
+
+  it("produces a calf the animal schema will actually accept", () => {
+    // The test that was missing. Every assertion above reads a field off the
+    // draft, so none of them noticed that the draft had neither a name nor a
+    // tag and `animalSchema` requires one — the calf was unsaveable, and the
+    // first real calving would have been what discovered it.
+    const draft = calfFromCalving(calving(), { externalId: id(3) }, context);
+    const now = new Date("2026-11-22T05:00:00Z");
+
+    const parsed = animalSchema.safeParse({
+      ...draft?.animal,
+      id: id(50),
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    expect(parsed.success).toBe(true);
   });
 
   it("creates nothing for a stillbirth", () => {
@@ -299,6 +319,7 @@ describe("calfFromCalving", () => {
         propertyId: id(0),
         ownership: "client",
         ownerId: id(40),
+        tagNumber: "Andromeda-26",
       },
     );
 
@@ -332,5 +353,26 @@ describe("calvingInterval", () => {
 
   it("says nothing for a first-calf heifer", () => {
     expect(calvingInterval([calving()], id(2))).toBeUndefined();
+  });
+});
+
+describe("suggestedCalfTag", () => {
+  const bornOn = new Date("2026-11-22T04:00:00Z");
+
+  it("uses the dam's tag and the birth year, which is what goes in the ear", () => {
+    expect(suggestedCalfTag({ tagNumber: "14", name: "Andromeda" }, bornOn)).toBe("14-26");
+  });
+
+  it("falls back to the dam's name when she has no tag", () => {
+    expect(suggestedCalfTag({ tagNumber: undefined, name: "Andromeda" }, bornOn)).toBe(
+      "Andromeda-26",
+    );
+  });
+
+  it("still produces something findable for an unknown dam", () => {
+    // Never returns an empty string: an animal with no tag and no name fails
+    // `animalSchema`, and the fallback is the last thing standing between a
+    // calving and an unsaveable calf.
+    expect(suggestedCalfTag(undefined, bornOn)).toBe("Calf 2026-11-22");
   });
 });

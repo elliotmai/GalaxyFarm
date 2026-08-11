@@ -32,6 +32,10 @@ export const SEARCHABLE_FIELDS = {
   cattleProfiles: ["colour", "markings"],
   externalAnimals: ["name", "regNumber"],
   breedingRecords: ["notes", "embryoCode"],
+  calvingRecords: ["notes", "assistDetail"],
+  // A weight is found through its animal. Searching "800" across every weight
+  // on the property returns a list nobody can act on.
+  weightRecords: ["notes"],
   // Assignments are found through the animal or the zone, never by typing.
   zoneAssignments: [],
   feedingPlans: ["name", "specialNotes"],

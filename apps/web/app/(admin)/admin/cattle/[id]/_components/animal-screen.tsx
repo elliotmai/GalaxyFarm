@@ -128,6 +128,19 @@ export function AnimalScreen({
           </span>
         }
         title={animalTitle(animal)}
+        actions={
+          // Two taps from her profile, which is what issue #13 asks for: this
+          // link, then Record. The dam arrives prefilled, so nothing about the
+          // cow has to be chosen again by somebody standing in a pen with her.
+          animal.sex === "female" && animal.status === "active" ? (
+            <Link
+              href={`/admin/cattle/calving?dam=${animal.id}`}
+              className="rounded-density border border-edge px-density py-2 text-sm font-medium text-ink hover:border-action"
+            >
+              Record a calving
+            </Link>
+          ) : undefined
+        }
         subtitle={
           profile === undefined || profile.breedComposition.length === 0
             ? undefined

@@ -50,6 +50,13 @@
       "when": 1786483343508,
       "tag": "0006_breeding_records",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786483889338,
+      "tag": "0007_calving_and_weights",
+      "breakpoints": true
     }
   ]
 }

@@ -14,3 +14,4 @@
 export * from "./domain/feed-type.js";
 export * from "./domain/inventory.js";
 export * from "./domain/allocation.js";
+export * from "./domain/creep-plan.js";

@@ -75,6 +75,30 @@ export function producedLiveCalf(record: Pick<CalvingRecord, "vigour">): boolean
   return record.vigour !== "stillborn";
 }
 
+/**
+ * The tag to put in the calf's ear, suggested.
+ *
+ * `calfFromCalving` used to leave the calf with neither a name nor a tag, on
+ * the reasoning that a tag goes on at working and forcing a name at birth
+ * produces a herd of "Calf 3"s nobody renames. That reasoning is right about
+ * names and wrong about the consequence: `animalSchema` requires one or the
+ * other — "An animal needs a name or a tag number to be findable" — so the
+ * draft was unsaveable, and the first real calving would have been the thing
+ * that discovered it.
+ *
+ * Dam plus year is what actually gets written on the tag, so that is what this
+ * suggests. It is a starting value in a field somebody can overwrite before
+ * saving, not a decision made on their behalf.
+ */
+export function suggestedCalfTag(
+  dam: Pick<Animal, "tagNumber" | "name"> | undefined,
+  bornOn: Date,
+): string {
+  const year = String(bornOn.getFullYear()).slice(2);
+  const stem = dam?.tagNumber ?? dam?.name;
+  return stem === undefined ? `Calf ${bornOn.toISOString().slice(0, 10)}` : `${stem}-${year}`;
+}
+
 export interface CalfDraft {
   readonly animal: Omit<Animal, "id" | "createdAt" | "updatedAt">;
   /** Pedigree to wire once the animal has an id. */
@@ -109,6 +133,8 @@ export function calfFromCalving(
     readonly propertyId: Ulid;
     readonly ownership: "own" | "client";
     readonly ownerId?: Ulid;
+    /** What goes in the ear. `suggestedCalfTag` prefills the field. */
+    readonly tagNumber: string;
   },
 ): CalfDraft | undefined {
   if (!producedLiveCalf(record)) return undefined;
@@ -118,9 +144,10 @@ export function calfFromCalving(
   const animal: Omit<Animal, "id" | "createdAt" | "updatedAt"> = {
     propertyId: context.propertyId,
     species: "cattle",
-    // Deliberately unnamed. A tag number goes on at working, and forcing a
-    // name at birth produces a herd of "Calf 3"s nobody renames.
-    tagNumber: undefined,
+    // Tagged, not named. A name at birth produces a herd of "Calf 3"s nobody
+    // renames; a tag is what is actually written in the ear, and `animalSchema`
+    // requires one or the other for the calf to be findable at all.
+    tagNumber: context.tagNumber,
     sex: record.calfSex ?? "unknown",
     dob: record.date,
     dobIsEstimate: false,

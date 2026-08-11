@@ -16,6 +16,7 @@ export * from "./domain/calving-record.js";
 export * from "./domain/calving-watch.js";
 export * from "./domain/cattle-candidate.js";
 export * from "./domain/cattle-profile.js";
+export * from "./domain/events.js";
 export * from "./domain/health-record.js";
 export * from "./domain/heat-record.js";
 export * from "./domain/herd-roadmap.js";

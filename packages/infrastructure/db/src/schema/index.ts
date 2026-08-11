@@ -249,6 +249,54 @@ export const breedingRecords = pgTable(
   baseIndexes("breeding_records"),
 );
 
+/**
+ * Calving (§5.2).
+ *
+ * `calf_animal_id` is what stops the flow producing twins. Recording a calving
+ * creates the calf, and a device that syncs the calving before the animal — or
+ * a person who taps save twice on a slow phone — would otherwise create a
+ * second one. With the id on the record, the second run has nothing to do.
+ */
+export const calvingRecords = pgTable(
+  "calving_records",
+  {
+    ...baseColumns,
+    damId: text("dam_id").notNull(),
+    /** The breeding this answers, so the sire resolves without being asked. */
+    breedingRecordId: text("breeding_record_id"),
+    date: timestamp("date", { withTimezone: true, mode: "date" }).notNull(),
+    calvingEase: integer("calving_ease").notNull(),
+    vigour: text("vigour").notNull(),
+    calfSex: text("calf_sex"),
+    birthWeightLb: doublePrecision("birth_weight_lb"),
+    assisted: boolean("assisted").notNull(),
+    assistDetail: text("assist_detail"),
+    calfAnimalId: text("calf_animal_id"),
+    notes: text("notes"),
+  },
+  baseIndexes("calving_records"),
+);
+
+/**
+ * Weights (§5.2).
+ *
+ * A birth weight is a WeightRecord in the `birth` context rather than a field
+ * on the calving record, so the growth chart, the ADG and the 205-day figure
+ * all read one series instead of special-casing the first point.
+ */
+export const weightRecords = pgTable(
+  "weight_records",
+  {
+    ...baseColumns,
+    animalId: text("animal_id").notNull(),
+    date: timestamp("date", { withTimezone: true, mode: "date" }).notNull(),
+    weightLb: doublePrecision("weight_lb").notNull(),
+    context: text("context").notNull(),
+    notes: text("notes"),
+  },
+  baseIndexes("weight_records"),
+);
+
 export const zoneAssignments = pgTable(
   "zone_assignments",
   {
@@ -565,6 +613,8 @@ export const allTables = {
   cattleProfiles,
   externalAnimals,
   breedingRecords,
+  calvingRecords,
+  weightRecords,
   zoneAssignments,
   feedingPlans,
   contacts,
