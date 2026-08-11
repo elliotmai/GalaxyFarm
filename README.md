@@ -1,1 +1,209 @@
-# GalaxyFarm
+# Galaxy Farm
+
+A local-first progressive web app for running a family beef-cattle operation and homestead near Fort Worth, TX — built to grow into a show-calf boarding and training business.
+
+It manages registered cattle (Maine-Anjou, Chianina, Shorthorn), laying flocks, a garden, farm equipment, pets, ranch supplies, and — later — client calves and horses. One codebase serves three surfaces: a full admin experience on desktop and mobile, touch-first kiosk screens mounted in the barn, and a scaffolded customer portal for the boarding business.
+
+> **Status: scaffolding.** The workspace builds, lints, typechecks, and tests green, and every route in the spec resolves — but the routes render placeholders and no domain logic exists yet. See [Current state](#current-state).
+
+The full product and architecture specification lives in [`docs/galaxy-farm-spec.md`](docs/galaxy-farm-spec.md) (v1.1), with UI mockups in [`docs/galaxy-farm-mockups-complete.html`](docs/galaxy-farm-mockups-complete.html). The spec is the source of truth; this README is the map.
+
+---
+
+## Non-negotiables
+
+These three qualities drive nearly every technical decision in the project, in priority order:
+
+1. **Local-first / offline-capable.** Barn connectivity is spotty. Every read and write hits an on-device store instantly; a sync engine reconciles with the server when signal returns.
+2. **Clean architecture with obsessive modularization.** Each farm domain is an isolated module with pure domain logic, so new domains (horses, quail, a second property) bolt on without touching existing ones.
+3. **Portability.** Cloud-hosted frontend forever; cloud-hosted Postgres now, migrating to a self-hosted box at the farm later — with zero application code changes.
+
+Corollaries worth stating outright:
+
+- **The domain layer knows nothing about the web, the database, or the cloud.** Entities and use cases are pure TypeScript, testable without any infrastructure.
+- **Speak only standard Postgres.** No provider-proprietary APIs, no vendor auth. That is what makes the eventual move home a `pg_dump | pg_restore`, not a rewrite.
+- **One Animal model, many species.** Cattle, flocks, pets, client calves, and future horses share a kernel and extend per species. The boarding business reuses the same entities with an owner attached — no parallel system.
+- **Derive, don't duplicate.** Due dates derive from breeding records, feed run-out from feeding plans, rule deadlines from birth dates, the housesitter guide from live data. Manual entry is for facts, not for the consequences of facts.
+- **Nothing is a dead end.** Every record you can create, you can find, edit, and remove — validated on the way in, confirmed on the way out. See [the data operations contract](#the-data-operations-contract) below.
+
+## The data operations contract
+
+**Non-negotiable, and enforced by CI** — spec §4.5. A feature is not done until it satisfies all four clauses.
+
+**1. Full CRUD, everywhere it applies.** Every entity gets a list view, a detail view, a create form, an edit form, and a delete action. No write-only screens; no record that can only be fixed by opening a SQL client. The exceptions are enumerated and closed — derived read models (calendar projections, P&L, run-out dates, effective safety level), immutable legal and audit records (signed liability PDFs, the sync audit log), and system-owned rows (migrations, device tokens). Anything not on that list gets the full surface.
+
+**2. Validated input at every boundary.** One Zod schema per entity, imported by the client form, the sync payload, and the API handler — the same schema, not three that drift. The sync push handler re-validates: data is not trusted just because it came from our own client. Invariants Zod can't express (a calving date can't precede its breeding date, straw count can't go negative) live in the domain layer and are enforced in the use case. Errors surface per field.
+
+**3. Confirmation before every destructive action.** No delete happens on a single unconfirmed tap, on any surface. The dialog names the record _and_ its dependents — "Delete pen _North Trap_? 4 animals are currently assigned to it," never a bare "Are you sure?" Three tiers: **Standard** (dialog + undo toast), **Elevated** (dependents listed; PIN on kiosk), **Typed** (type the record's name — for whole-aggregate deletes like an animal, zone, or contact). The same rule covers irreversible non-deletes: voiding an invoice, terminating an agreement, revoking a kiosk device.
+
+**4. Soft delete, restore, purge.** Deletes write a tombstone, not a `DELETE`. Records leave the lists but stay restorable from Trash for a retention window (default 30 days); permanent purge is a separate owner-only, Typed-tier action. This is what makes the confirmations honest — the answer to "what if I misclick" is always "restore it" — and it's what lets deletions replicate to kiosks instead of resurrecting on the next sync pull.
+
+Every relationship additionally declares its delete behavior — `restrict`, `cascade`, or `detach`. A relationship without one is a build error, not a runtime surprise.
+
+## Stack
+
+| Concern              | Choice                                                                        |
+| -------------------- | ----------------------------------------------------------------------------- |
+| Framework            | Next.js 15+ (App Router) + TypeScript                                         |
+| Monorepo             | pnpm workspaces + Turborepo                                                   |
+| Database             | PostgreSQL — Neon Launch now, self-hosted later                               |
+| ORM / migrations     | Drizzle (SQL-first, plain migration SQL)                                      |
+| Local store          | Dexie (IndexedDB) + a custom sync engine                                      |
+| Validation           | Zod — one schema per entity, shared by forms, sync payloads, and API handlers |
+| Auth                 | Auth.js v5, credentials + Postgres adapter (users live in _our_ database)     |
+| PWA / service worker | Serwist                                                                       |
+| Photos & documents   | Cloudflare R2 via presigned URLs (S3-compatible)                              |
+| Email                | Resend                                                                        |
+| UI                   | Tailwind + shadcn/ui on top of a custom design system package                 |
+| Charts               | Recharts                                                                      |
+| PDF                  | @react-pdf/renderer + print stylesheets                                       |
+| Testing              | Vitest (domain / use cases) + Playwright (smoke e2e)                          |
+| Hosting              | Netlify frontend · Neon Postgres · Cloudflare R2 · Resend (~$1–8/mo)          |
+
+## Repository layout
+
+```
+galaxy-farm/
+├── apps/
+│   └── web/                        Next.js — presentation + composition root ONLY
+│       ├── app/
+│       │   ├── (public)/           landing, /book, /login
+│       │   ├── (admin)/admin/      full management UI
+│       │   ├── (account)/account/  customer portal (scaffold)
+│       │   ├── (sitter)/sitter/    housesitter limited view
+│       │   ├── (kiosk)/kiosk/      barn touch screens
+│       │   └── api/                sync push/pull, auth, storage presign, weather cron
+│       └── e2e/                    Playwright smoke tests
+├── packages/
+│   ├── core/                       shared kernel: base Animal, Zone, Task, value objects,
+│   │                               domain events, ports, Result type
+│   ├── modules/                    one isolated package per farm domain, each containing
+│   │   ├── cattle/                   src/domain/       entities, services, ports
+│   │   ├── feed/                     src/application/  use cases, queries, DTOs
+│   │   ├── poultry/                  tests/
+│   │   ├── garden/
+│   │   ├── equipment/
+│   │   ├── supplies/
+│   │   ├── business/               scaffold — schema + rules now, UI in Phase 5
+│   │   ├── pets/
+│   │   ├── horses/                 placeholder module, roadmap active
+│   │   └── housesitting/
+│   ├── infrastructure/
+│   │   ├── db/                     Drizzle schema, migrations, Postgres repositories
+│   │   ├── local/                  Dexie schema, IndexedDB repositories
+│   │   ├── sync/                   outbox, cursors, conflict resolution
+│   │   ├── storage/                Cloudflare R2 adapter
+│   │   ├── email/                  Resend adapter
+│   │   ├── weather/                Open-Meteo + NWS adapters (frost, freeze, calving watch)
+│   │   ├── auth/                   Auth.js wiring against our own Postgres
+│   │   └── quickbooks/             port defined now, adapter in Phase 5
+│   ├── ui/                         design system, SpatialEditor, charts, kiosk kit, PDF
+│   └── config/                     shared tsconfig / eslint / tailwind presets
+└── docs/                           specification and mockups
+```
+
+### Dependency rules (to be lint-enforced)
+
+These are the rules that keep the modularization real rather than aspirational:
+
+- `modules/*/domain` imports only `core`. Nothing else. Ever.
+- `modules/*/application` imports its own domain + `core`.
+- Modules never import each other. They communicate through IDs and domain events — `CalvingRecorded` prompts the feed module to offer a creep plan; the business module listens for `AnimalAgeThresholdReached`.
+- `infrastructure/*` implements repository ports defined in the domain layers.
+- `apps/web` is the only place everything meets — dependency injection happens at the route level.
+
+The payoff: when the database moves home, only `infrastructure/db`'s connection string changes. If the API moves home too, the application packages lift into a standalone Node service unchanged.
+
+## Architecture notes
+
+**Sync engine (`infrastructure/sync`).** The UI always reads from IndexedDB via live queries, so it works with zero bars in the barn. Every mutation writes atomically to the local store _and_ an outbox (ULID, entity, field patch, timestamp, deviceId). When online the outbox drains to `/api/sync/push`, where the server applies field-level last-write-wins and records an audit log so a rare conflict is recoverable rather than silent. Pulls use per-entity `updatedAt` cursors; deletions ship as tombstones. Photos are compressed client-side, queued, and uploaded to R2 via presigned URLs — the record stores the key immediately and renders a placeholder until it syncs.
+
+**Roles.** `owner` · `member` · `customer` (`/account` only) · `housesitter` (`/sitter`, time-boxed) · `kiosk` (device token, whitelisted quick actions, PIN for anything else). Permission checks live in the application layer — use cases declare the capability they need — not in UI conditionals.
+
+**Safety levels.** A farm-wide five-level handling scale (green → red, always numbered) on every animal, with notes explaining _why_. Every zone carries a baseline level, and its effective level derives as `max(zone baseline, highest-level animal currently inside)` — so a green pen turns red the moment the bull is moved into it, everywhere at once.
+
+**Planned becomes actual in one tap.** Three surfaces share this pattern, and it is worth recognising as a pattern rather than reinventing it each time: a `PlannedMating` converts to a `BreedingRecord`, a `PlannedPlanting` converts to a `Planting`, and a `PurchaseCandidate` marked _purchased_ converts to the real `Equipment` or `Animal` — carrying the price, the seller, the photos, and the paperwork across. Nothing is typed twice, and the record of what you considered survives alongside what you chose.
+
+**Purchase candidates decide on true cost, not sticker price.** A wishlist item says "truck, need, ASAP"; a candidate is a specific 2018 F-250 with 96k miles and a link. Costs are itemised — hauling, inspection, immediate repairs — so the comparison sorts on **total acquisition cost**. Equipment candidates derive price per mile and per hour; cattle candidates carry registration, EPDs, and sale dates that land on the calendar, because an auction lot is a deadline. Spec §5.1.
+
+**The Pen Board is the heart of the app.** The property map with live animal positions, merged care instructions, halter-color swatches, and safety-level color coding is what gets glanced at ten times a day and what barn screens show by default.
+
+**Design language — "Midnight Nebula / Bluebonnet Linen."** One brand, two modes sharing hue anchors. `/admin` and `/kiosk` render dark (Midnight Nebula); `/account`, `/book`, `/sitter`, and public pages render light (Bluebonnet Linen). Bluebonnet blue drives every primary action, nebula purple marks brand and identity moments, sage green signals calm states. Zilla Slab for headings, Inter for UI, tabular figures wherever numbers carry meaning. Signature elements: the star logomark and pedigrees drawn as constellations. Full token table in §8 of the spec.
+
+**Branding is configuration, not strings.** The farm name and business name are undecided; both live in settings with env-var fallbacks and inject into every page title, header, email, PDF, kiosk board, and portal page. Set them once whenever they're chosen. The one exception: signed liability PDFs keep the business name as it read at signing, because those are immutable legal records.
+
+## Build roadmap
+
+| Phase                    | Scope                                                                                                                                                                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **0 — Foundation**       | Monorepo + module skeletons, design system, Auth.js + roles, PWA shell, **sync engine**, Property + Zones + SpatialEditor, base Animal + photos, kiosk pairing                                                                     |
+| **1 — Cattle core**      | Profiles + registrations, pedigree, breeding + due-date projection, calving flow, health + withdrawal tracking, weights, feed module, pen board, herd roadmap, purchase candidates, semen inventory, sync protocols, calving watch |
+| **2 — The daily farm**   | Chickens + egg logs, equipment + maintenance, equipment & horse purchase candidates, supplies, contacts CRM, pets, chores, unified calendar, email notifications, tank-freeze alerts, pasture care, sales & processing             |
+| **3 — Garden**           | Layout designer, seeds, plantings + care logs, rotation guard, harvest + preservation, planting calendar, season plan notifications, frost warnings                                                                                |
+| **4 — Sharing the farm** | Housesitter guide (PDF + `/sitter` + kiosk mode), reports suite, settings polish, push notifications                                                                                                                               |
+| **5 — Business launch**  | Booking flow + approval, customer portal, e-signature liability forms, training milestones UI, show entries, invoicing + QuickBooks OAuth                                                                                          |
+
+Phase 1 races a real due date — the cow is already bred — which is why calving watch was pulled forward from Phase 3.
+
+## Testing and CI
+
+Every gate below runs on each push and pull request, and **every one of them blocks the merge** (spec §11.1). Point branch protection at the single `CI` check — it aggregates the rest, so adding a gate later needs no reconfiguration.
+
+```bash
+pnpm install
+pnpm verify        # format + lint + typecheck + tests with coverage + build
+pnpm test:e2e      # Playwright, run separately (it builds and serves the app)
+```
+
+| Command              | Gate                                                                 |
+| -------------------- | -------------------------------------------------------------------- |
+| `pnpm format:check`  | Prettier                                                             |
+| `pnpm lint`          | ESLint, including the §4.1 layering rules as `no-restricted-imports` |
+| `pnpm typecheck`     | `tsc --noEmit` across all 21 packages, via Turborepo                 |
+| `pnpm test`          | Vitest — architecture, conformance, and guard suites                 |
+| `pnpm test:coverage` | The same, with thresholds that fail the build                        |
+| `pnpm build`         | Production Next.js build                                             |
+| `pnpm test:e2e`      | Playwright smoke pass over every surface                             |
+
+### What the tests actually check
+
+On a codebase this young, the valuable tests are the ones that constrain how it grows. These do:
+
+- **`tests/architecture/boundaries.test.ts`** — builds the real import graph (via TypeScript's own pre-processor, so it sees `import type`, re-exports, and dynamic `import()`) and asserts the §4.1 rules: domain imports only `core`, modules never import each other, `core` depends on nothing, infrastructure never reaches into module internals, and only `apps/web` composes infrastructure. It also fails if a package imports a workspace dependency it never declared.
+- **`tests/architecture/route-map.test.ts`** — parses the route map out of spec §7 and diffs it against the filesystem **in both directions**. A route in the spec that nobody built is a missing feature; a route in the app the spec never mentioned is an undocumented surface with undefined permissions. It also asserts each surface pins the theme §8 assigns it.
+- **`tests/guards/`** — the executable form of the [data operations contract](#the-data-operations-contract). One suite applies the guards to the repo; the other proves the guards themselves work, against fixtures, so they are known to bite before there is anything to catch.
+- **`tests/architecture/spec-contract.test.ts`** — keeps the non-negotiables from quietly vanishing out of the spec, and the README from drifting from what the spec says.
+- **`tests/tools/`** — unit tests for the analysers underneath all of the above. A parser that silently missed `export … from` would turn every architecture assertion into a false pass.
+
+143 unit tests and 26 e2e tests, at 98% statement and 94% branch coverage of the tooling they exercise.
+
+### A note on the guards
+
+The §4.5 guards are convention checks over source text, not type-level proofs. That is deliberate: they cost nothing, they work on a codebase that is still mostly unwritten, and they fail loudly the moment someone adds a delete button with no dialog behind it. They are not a substitute for component tests asserting that a _specific_ dialog naming the _right_ dependents appears — write those too, as the screens land.
+
+## Current state
+
+The workspace is real and the pipeline is green, but **no domain logic exists yet**. Concretely:
+
+- All 21 packages install, typecheck, and lint. `packages/core`, every module, and every infrastructure adapter is an empty `src/index.ts`.
+- All 55 routes from spec §7 resolve and render `PagePlaceholder`. They exist so navigation, permissions, and the route-map gate are real from day one.
+- API handlers return **501 Not Implemented** rather than 404 — an unbuilt endpoint should be distinguishable from a routing bug.
+- The design tokens from §8 live in `packages/config/tailwind.preset.ts`; the components that use them do not exist yet.
+- The logomark is chosen and committed — **Rocking Double Star**, in `packages/ui/src/brand/`, paired for both surface themes. No wordmark yet; the names are still open.
+
+### Next steps
+
+1. Build `packages/core` — base `Animal`, `Zone`, `Task`, value objects, domain events, `Result`, and the shared CRUD contracts from §4.5.
+2. Build the design system in `packages/ui`, starting with the confirmation dialog every destructive action routes through.
+3. Build the sync engine before features pile onto it. It is the hard part, and everything else assumes it works.
+4. Then Phase 1 cattle — the cow is already bred, so that phase races a real due date.
+
+Raise the coverage thresholds in `vitest.config.ts` as the domain packages fill in. Never lower them to make a red build green.
+
+### Environment
+
+`.env.example` is still a placeholder. It will cover `DATABASE_URL` (Neon), Auth.js secrets, Cloudflare R2 credentials, the Resend API key, the Google Maps browser key, and the `NEXT_PUBLIC_FARM_NAME` / business-name branding fallbacks.
+
+## License
+
+See [LICENSE](LICENSE).

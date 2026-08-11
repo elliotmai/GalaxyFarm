@@ -1,6 +1,6 @@
 # Galaxy Farm — Product & Architecture Specification
 
-**Version 0.9 · August 2026 · Status: Approved for build — decision log in §12**
+**Version 1.1 · August 2026 · Status: Approved for build — decision log in §12**
 
 ---
 
@@ -23,6 +23,7 @@ The app serves three surfaces from one codebase: a full admin experience on desk
 - **One Animal model, many species.** Cattle, chickens (as flocks), pets, client calves, and future horses share a kernel (identity, location, photos, instructions, health) and extend it per species. The boarding business reuses the same entities with an `owner` attached — no parallel system.
 - **Derive, don't duplicate.** Calving due dates derive from breeding records; feed run-out dates derive from feeding plans; rule deadlines (bull ring by 8 months) derive from birth dates; the housesitter guide derives from live data. Manual entry is for facts, not for consequences of facts.
 - **Everything spatial is one component.** The property map (pens/pastures) and the garden layout designer are the same SVG editor with different palettes.
+- **Nothing is a dead end.** Every record a user can create, they can also find, edit, and remove — with validated input on the way in and a confirmation on the way out. This is a hard requirement, not a per-screen decision; the full contract is §4.5.
 
 ## 3. Stack
 
@@ -123,6 +124,38 @@ Permission checks live in the application layer (use cases declare required capa
 
 Barn screens pair via a one-time code and hold a long-lived device token. Kiosk home offers preset boards: **Pen Board** (property map + who's where + care instructions), **Calendar**, **Today's Chores**, **Egg Quick-Entry** (big +1 buttons per coop/color/size), **Program Day Sheet** (today's show-program schedule as a calf × activity grid — tap to check off rinses, exercise, and training slots as they happen), and **Housesitter Mode**. Large touch targets, high contrast, auto-refresh on sync, screen-wake hints. Any screen can be locked to a single board from settings.
 
+### 4.5 Data operations contract (non-negotiable)
+
+Every entity in this specification is subject to the following contract. It is not a per-screen design decision and not a "nice to have for v2" — a feature is not complete until it satisfies all four clauses, and CI enforces them (§11.1).
+
+**1. Full CRUD, everywhere it applies.** Every entity a user can create, they can also list/read, update, and delete. No write-only screens, no records that can only be fixed by editing the database directly. Concretely, each entity ships all of: a **list** view with search/filter appropriate to its volume, a **detail** read view, a **create** form, an **edit** form, and a **delete** action.
+
+*The applicability exceptions are enumerated, closed, and small.* Anything not on this list gets full CRUD:
+
+- **Derived read models** — projected `CalendarEvent`s, per-animal and herd P&L, feed run-out dates, a zone's effective safety level, resolved care instructions, dressing percentage, ADG. These have no CRUD of their own because they are recomputed from their sources; you edit the source record and the derivation follows. This is the "derive, don't duplicate" principle (§2) — a derived value that could be edited directly would be a second source of truth.
+- **Immutable legal and audit records** — signed liability-form PDF snapshots (§5.7), sync audit-log entries (§4.2), and the outbox history. These are create-and-read only. Corrections happen by superseding entry (a new signed version, a compensating record), never by mutation, and never by deletion.
+- **System-owned rows** — schema migration history, device pairing tokens (revocable, not editable).
+
+Everything else — every log, every record, every plan, every template, every join like `ZoneAssignment` — is fully CRUD-able by a user with the capability for it. Where an entity maintains a running total from an append-only log (flock headcount via its adjustment log, feed on-hand via purchases and consumption), the *log entries* carry the CRUD and the total re-derives; the total itself is never directly editable.
+
+**2. Validated input at every boundary.** One Zod schema per entity is the single definition of what valid data is, and it is shared by the client form, the sync payload, and the API handler — the same schema, imported, not three copies that drift. Validation runs at every boundary crossing, including the sync push handler: data arriving from a local store is not trusted just because it came from our own client. Domain invariants that Zod cannot express (a calving date cannot precede its breeding date; a `ZoneAssignment.to` cannot precede its `from`; straw count cannot go negative) live in the domain layer as pure functions and are enforced in the use case, not in the form. Errors surface per-field on the control that caused them, never as a single opaque "invalid input."
+
+**3. Confirmation before every destructive action.** No delete, anywhere, on any surface, happens on a single unconfirmed tap. The confirmation must state **what** is being deleted by name, and **what else it affects** — "Delete pen *North Trap*? 4 animals are currently assigned to it." A generic "Are you sure?" does not satisfy this clause. Three tiers:
+
+| Tier | Applies to | Interaction |
+|---|---|---|
+| Standard | Ordinary records — a log entry, a task, a photo | Confirmation dialog naming the record; undo toast afterward |
+| Elevated | Records with dependents, or anything on a kiosk | Dialog naming the record *and* listing dependents; on kiosk, PIN unlock |
+| Typed | Whole-aggregate deletes — an animal with history, a zone, a contact, a property | User types the record's name to enable the confirm button |
+
+Bulk deletes state the exact count and are always at least Elevated. The same rule governs other irreversible actions that are not technically deletes: terminating a boarding agreement, voiding an invoice, revoking a kiosk device, clearing a sync queue.
+
+**4. Soft delete, restore, and purge.** Deletes write a tombstone (§4.2) rather than removing the row: `deletedAt`, `deletedBy`, and reason where the UI collects one. Deleted records leave the normal lists and the sync read path but remain restorable from a **Trash** view for a configurable retention window (default 30 days). Permanent purge is a separate, `owner`-only, Typed-tier action. This is what makes the confirmation dialogs honest — the answer to "what if I confirm by mistake" is always "restore it from Trash," and it is what lets deletions replicate safely to kiosks and other devices instead of resurrecting on the next pull.
+
+**Referential integrity is a declared decision, never an accident.** Every relationship declares its delete behavior — `restrict` (block the delete and say what is in the way), `cascade` (delete dependents, listed in the confirmation), or `detach` (null the reference and keep the dependent). A relationship with no declared behavior is a build-time error, not a runtime surprise.
+
+**Offline behavior.** Deletes are ordinary mutations: confirmed locally, written to the local store and the outbox together, drained when signal returns. The confirmation dialog never waits on the network, and a delete performed in the barn with zero bars behaves exactly like one performed at the kitchen table.
+
 ## 5. Domain model
 
 Field lists below are the significant ones, not exhaustive schemas. All entities carry `id (ULID)`, `propertyId`, `createdAt`, `updatedAt`, soft-delete tombstones, and audit metadata. Everything hangs off `propertyId` so multiple locations later is a query filter, not a migration.
@@ -167,6 +200,18 @@ Every animal carries a level plus **safetyNotes** stating *why* ("kicks when cor
 
 **Roadmap** (generic aggregate) — used by cattle, horses (active now), and equipment. Items: `type: goal | milestone | wishlist | planned_action`, title, detail, targetDate/season, priority, budgetEstimate, status. Cattle adds structured PlannedMatings (§5.2); equipment adds wishlist costing (§5.6).
 
+**PurchaseCandidate** (generic aggregate, added v1.1) — the specific thing you are *actually looking at*, as opposed to the wishlist item saying you want one. A Roadmap wishlist entry says "truck, need, ASAP"; a PurchaseCandidate is "2018 F-250, 96k miles, $34,500, listed here." Many candidates hang off one wishlist item, and the point of the aggregate is to line them up next to each other when a large amount of money is about to move.
+
+Shared fields, identical across every domain: `roadmapItemId` (optional — the want this would satisfy), title, **status** (`watching | contacted | inspected | offer_made | purchased | passed | gone`), askingPrice, **listingUrl**, seller → **Contact** (the CRM already holds vendors, sale barns, and private sellers), location + one-way distance, listedDate, firstSeen, expiresAt or sale date, photos[], attachments[] (listing snapshot, inspection report, papers), **pros[] / cons[]**, notes.
+
+**Costs are itemised, not guessed.** `additionalCosts[]` of `{label, amount}` covers hauling, inspection, immediate repairs, commission, and anything else that only shows up after you say yes. **Total acquisition cost = askingPrice + Σ additionalCosts** is derived and is the number the comparison view sorts on, because the sticker price is the one number that never decides anything. Against the parent wishlist item's `budgetEstimate` the app shows over/under.
+
+**Comparison view** — the real feature. Candidates for one wishlist item side by side as a table: the shared fields, the domain-specific fields below (§5.2, §5.6, §5.9), total acquisition cost, distance, days on market, and your own pros and cons. Sortable, exportable, printable — a decision this size gets discussed away from the screen.
+
+**Planned → actual.** Marking a candidate `purchased` converts it into the real record — an `Equipment` (§5.6) or an `Animal` (§5.1) — carrying over the price, seller contact, photos, and attachments as the acquisition record. Same pattern as PlannedMating → BreedingRecord and PlannedPlanting → Planting: the plan becomes the fact in one tap, and nothing is typed twice. Marking one `passed` keeps it, with the reason — the record of what you turned down and why is worth as much next year as the record of what you bought.
+
+**Notifications** — sale or auction date approaching, listing expiring, a candidate sitting in `watching` past a configurable age, and total acquisition cost crossing the wishlist item's budget.
+
 ### 5.2 Cattle module
 
 **CattleProfile** extends Animal — breed composition as percentages (e.g., ½ Maine-Anjou ¼ Chi ¼ Shorthorn — show cattle are rarely purebred), polled/horned, color/markings, **registrations[]**: `{association: AMAA | ACA | ASA | other, regNumber, tattoo, registeredName, epdSnapshot?}` — an animal can be papered in multiple associations.
@@ -194,6 +239,8 @@ Every animal carries a level plus **safetyNotes** stating *why* ("kicks when cor
 **ProcessingRecord** (packer) — processor contact, dates, **liveScaleWeight, hangingWeight (HCW), computed dressing %**, processing cost, payment received, and **CutLine[]**: `{cut, pounds, disposition: kept | sold, pricePerLb?, buyer?, total}`. Rolls up: revenue from sold cuts, pounds kept for the freezer, and full per-animal picture.
 
 **Per-animal P&L** (read model) — acquisition/breeding costs + allocated feed (§5.3) + health costs + processing costs vs. sale/packer/cut revenue. Herd-level rollups feed Reports.
+
+**CattleCandidate** (extends PurchaseCandidate, §5.1) — breeding stock and show prospects under consideration. Adds: breed composition, sex, DOB or age, **registration status** (association + number, or "unpapered"), EPD snapshot where published, pedigree reference — which may point at an existing **ExternalAnimal**, so a sire you already track in someone else's pedigree resolves without re-entry — bred/open and service sire if bred, sale type (`private | sale barn | auction | online sale | production sale`), lot number, and sale date. Sale dates project onto the calendar; auction lots are a deadline, not a browse.
 
 **HerdRoadmap** — Roadmap + **GeneticGoal** (trait, direction, notes), target herd-size milestones by year (1 → 20 over 5 years), and **PlannedMating**: `{dam or dam-criteria, planned sire (semen inventory link), target season, rationale, status}` — one tap converts a planned mating into a real BreedingRecord when it happens.
 
@@ -239,7 +286,9 @@ Hatching/incubation: not built; the module boundary leaves a clean seam if that 
 
 **MaintenanceRule** — per equipment: trigger `every N engine-hours | N miles | N months` (any combination), task, parts. **MeterReading** — hours/miles logs drive due calculations. **MaintenanceLog** — date, task, cost, parts, meter snapshot. **FuelLog** — date, gallons, cost, meter → consumption and cost-of-operation stats.
 
-**EquipmentRoadmap** — Roadmap items with priority + budgetEstimate. Seeded: truck (**need, ASAP**), tractor (want), ATV (want).
+**EquipmentCandidate** (extends PurchaseCandidate, §5.1) — a specific unit you are evaluating. Adds: category, make, model, **year**, **mileage** and/or **engine hours**, VIN/serial, condition, title status (`clean | rebuilt | lien | bill of sale only`), service history available, warranty remaining, known faults, and tyre/track or implement condition where it matters. Where both mileage and hours are known the comparison view shows **price per mile and per hour**, which is the only honest way to compare a low-hour expensive unit against a high-hour cheap one.
+
+**EquipmentRoadmap** — Roadmap items with priority + budgetEstimate. Seeded: truck (**need, ASAP**), tractor (want), ATV (want). Candidates hang off these items, so the truck wishlist entry accumulates the actual trucks you looked at.
 
 ### 5.7 Business module (scaffold — full schema + rules now, UI in Phase 5)
 
@@ -281,7 +330,7 @@ Hatching/incubation: not built; the module boundary leaves a clean seam if that 
 
 ### 5.9 Horses module (placeholder)
 
-Module skeleton with stub routes for herd / pens / feeding / breeding ("coming soon" shells so navigation and permissions are already real), plus an **active HorseRoadmap** now — same Roadmap aggregate as cattle, so goals, target acquisitions, and budget planning start today. When horses arrive, the build is filling in a prepared module, not designing one.
+Module skeleton with stub routes for herd / pens / feeding / breeding ("coming soon" shells so navigation and permissions are already real), plus an **active HorseRoadmap** and **HorseCandidate** now — the latter extending PurchaseCandidate (§5.1) with breed, age, sex, height, training level and discipline, soundness and vet-check status, temperament notes, and registration. Horses are the purchase furthest out and the one most worth researching slowly, so the shopping surface is live long before the module is — same Roadmap aggregate as cattle, so goals, target acquisitions, and budget planning start today. When horses arrive, the build is filling in a prepared module, not designing one.
 
 ### 5.10 Housesitting module
 
@@ -307,7 +356,7 @@ Route: `/admin/supplies`. Builds in Phase 2.
 
 **Chores** — cross-farm daily checklist generated from templates; kiosk check-off; overdue escalation.
 
-**Notifications** — email now (Resend), web push later behind the same `Notifier` port. Default triggers: vaccine/booster due · withdrawal ending · preg check due · calving window opening · sync-protocol step today · feed run-out approaching · med expiring · maintenance due (hours/miles/date) · bull ring due · bull/heifer/steer departure approaching · new booking request · liability form unsigned near drop-off · drop-off/pickup reminders · planting window opening (per season plan, indoor & outdoor) · chore overdue · low semen inventory · supply low-stock · frost warning · tank-freeze warning · calving watch (pressure drop / full moon / cold snap inside a due window). Per-trigger opt-out and lead-time settings.
+**Notifications** — email now (Resend), web push later behind the same `Notifier` port. Default triggers: vaccine/booster due · withdrawal ending · preg check due · calving window opening · sync-protocol step today · feed run-out approaching · med expiring · maintenance due (hours/miles/date) · bull ring due · bull/heifer/steer departure approaching · new booking request · liability form unsigned near drop-off · drop-off/pickup reminders · planting window opening (per season plan, indoor & outdoor) · chore overdue · low semen inventory · supply low-stock · purchase-candidate sale date approaching · candidate listing expiring · frost warning · tank-freeze warning · calving watch (pressure drop / full moon / cold snap inside a due window). Per-trigger opt-out and lead-time settings.
 
 **Weather, moon phases & calving watch** — a `WeatherProvider` port with two adapters: **Open-Meteo** (free for non-commercial use, no API key, hourly forecasts including surface pressure) as primary and the **National Weather Service API** (free, official US watches/warnings) for alerts. A scheduled function polls forecasts for the property's coordinates and projects onto the calendar and notifications:
 
@@ -316,7 +365,7 @@ Route: `/admin/supplies`. Builds in Phase 2.
 - **Calving watch:** for every cow inside her calving window (due date ± 14 days, configurable), the dashboard shows a watch card and notifications fire when the window coincides with a **full moon** (± 1 day — computed locally with an astronomy library, so moon phases render on the calendar indefinitely and offline), a **rapid barometric fall** (default ≥ 4 hPa / ~0.12 inHg within 24 h) or forecast low-pressure trough, or a **cold snap** (calf-chill threshold, default 20 °F). Example alert: *"Front arriving Thursday night + full moon Friday — Dolly is at day 279."*
 - Licensing seam: Open-Meteo's free tier is non-commercial; when the boarding business launches, its inexpensive commercial plan or a full switch to NWS closes the gap — both sit behind the same port.
 
-**Reports** — cost per head · per-animal & herd P&L · feed spend and consumption trends · **supply spend by category & whole-farm operating cost** · egg production trends (by coop/color/size) · herd inventory growth vs. roadmap targets · processing yields (dressing %, $/lb realized) · equipment cost of ownership · business revenue (Phase 5). All exportable to CSV.
+**Reports** — cost per head · per-animal & herd P&L · feed spend and consumption trends · **supply spend by category & whole-farm operating cost** · egg production trends (by coop/color/size) · herd inventory growth vs. roadmap targets · processing yields (dressing %, $/lb realized) · equipment cost of ownership · **capital planning — open wishlist items, their budgets, and the candidates under consideration against them** · business revenue (Phase 5). All exportable to CSV.
 
 ## 7. Route map
 
@@ -344,6 +393,7 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/cattle/feed              feeding plans per animal & group
 /admin/cattle/sales             acquisitions, sales, processing records
 /admin/cattle/roadmap           genetic goals, target size, planned matings
+/admin/cattle/candidates        breeding stock & show prospects under consideration
 
 /admin/feed                     inventory, purchases, run-out projections, cost per head
 /admin/supplies                 ranch supply inventory: consumables, show/fitting gear, hardware
@@ -354,8 +404,10 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/garden/seeds
 /admin/garden/harvest           + preservation
 /admin/equipment                fleet · /admin/equipment/[id] · /admin/equipment/roadmap
+/admin/equipment/candidates     purchase candidates: compare units, true cost, links, decision log
 /admin/pets
 /admin/horses                   placeholder shells · /admin/horses/roadmap (active)
+/admin/horses/candidates        horses under consideration (active)
 /admin/business/*               scaffold: bookings · clients · program roster (own + client,
                                 halter colors) · day schedule · forms · invoices
 /admin/housesitter              guide builder + PDF + access management
@@ -416,15 +468,32 @@ Prices verified August 2026; treat as estimates and re-verify before committing.
 
 **Phase 0 — Foundation (build first).** Monorepo + module skeletons, design system, Auth.js + roles, PWA shell, **sync engine** (the hard part — built and tested before features pile onto it), Property + Zones + SpatialEditor property mode, base Animal + photos, kiosk pairing.
 
-**Phase 1 — Cattle core.** *Your cow is bred — this phase races her due date.* Cattle profiles + registrations, pedigree (incl. external ancestors), breeding records + due-date projection + calving-window alerts, calving flow (creates the calf), health + withdrawal tracking + med inventory, weights, feed module (types, purchases, plans, run-out, cost/head), pen board with live assignments, herd roadmap + planned matings, semen inventory, sync protocols, **calving watch** (weather + moon monitoring for cows in a due window — pulled forward from Phase 3 because it applies to this pregnancy).
+**Phase 1 — Cattle core.** *Your cow is bred — this phase races her due date.* Cattle profiles + registrations, pedigree (incl. external ancestors), breeding records + due-date projection + calving-window alerts, calving flow (creates the calf), health + withdrawal tracking + med inventory, weights, feed module (types, purchases, plans, run-out, cost/head), pen board with live assignments, herd roadmap + planned matings, **purchase candidates** (the shared aggregate plus the cattle extension), semen inventory, sync protocols, **calving watch** (weather + moon monitoring for cows in a due window — pulled forward from Phase 3 because it applies to this pregnancy).
 
-**Phase 2 — The rest of the daily farm.** Chickens (flocks, egg logs, kiosk egg entry), equipment (fleet, maintenance rules, fuel, roadmap — get the truck on the wishlist), **supplies inventory**, **contacts CRM**, pets, chores, unified calendar, email notifications, **tank-freeze alerts** (rides on the Phase 1 weather service, lands before winter), **pasture care logs** (in time for fall overseeding), sales/processing records.
+**Phase 2 — The rest of the daily farm.** Chickens (flocks, egg logs, kiosk egg entry), equipment (fleet, maintenance rules, fuel, roadmap — get the truck on the wishlist — and **equipment purchase candidates**, so the trucks you are actually looking at line up against each other), **horse candidates**, **supplies inventory**, **contacts CRM**, pets, chores, unified calendar, email notifications, **tank-freeze alerts** (rides on the Phase 1 weather service, lands before winter), **pasture care logs** (in time for fall overseeding), sales/processing records.
 
 **Phase 3 — Garden.** Layout designer, seeds, plantings + care logs, rotation guard, harvest + preservation, zone-aware planting calendar, **season plan + planting notifications**, frost-warning notifications.
 
 **Phase 4 — Sharing the farm.** Housesitter guide (PDF + `/sitter` login + kiosk mode), reports suite, settings polish, push notifications.
 
 **Phase 5 — Business launch (~1 yr+).** Booking flow + approval, customer portal, e-signature liability forms, training milestones UI, show entries, invoicing + QuickBooks OAuth. (Schema, rules, and routes already exist from Phase 0/1 scaffolding.)
+
+### 11.1 Quality gates (CI)
+
+Every push and pull request runs the full gate, and **every check blocks the merge**. Nothing here is advisory. The gate exists because this is a two-person project with a real cow on a real due date — the pipeline is the code reviewer that is always available.
+
+| Gate | What it enforces |
+|---|---|
+| Lint | Style and correctness rules across every package |
+| Typecheck | `tsc --noEmit` on the whole workspace, no `any` escape hatches in domain code |
+| **Architecture boundaries** | The §4.1 dependency rules, checked mechanically — `modules/*/domain` imports only `core`; modules never import each other; domain never reaches for infrastructure, React, or Next; only `apps/web` composes |
+| **Route-map conformance** | Every route in §7 exists in the app, and every route in the app appears in §7 — the spec and the router cannot drift apart silently |
+| **Data-operations conformance** | The §4.5 contract: every registered entity declares a Zod schema, a full CRUD surface, and a delete behavior for each relationship; every delete path routes through the confirmation wrapper. An entity that skips a clause fails the build unless it is on the enumerated exception list |
+| Unit tests + coverage | Domain and application logic under Vitest, with coverage thresholds that fail the build when they drop |
+| Build | The production Next.js build compiles |
+| E2E | Playwright smoke pass over the primary surfaces |
+
+The point of expressing §4.1 and §4.5 as *executable* checks rather than prose is that architectural rules which are merely written down decay under deadline pressure. These do not decay; they fail the build.
 
 ## 12. Decision log
 
@@ -469,3 +538,13 @@ Prices verified August 2026; treat as estimates and re-verify before committing.
 **v0.9 additions:**
 
 18. **Hosting decided: Option B for everything** (§9) — Netlify + Neon Launch (usage-based Postgres) + Cloudflare R2 + Resend, est. $1–8/mo, with Google Maps on its own free-tier Google Cloud account; self-host path unchanged.
+
+**v1.0 additions:**
+
+19. **Data operations contract made non-negotiable** (§4.5) — full CRUD on every entity against a small, closed list of exceptions (derived read models, immutable legal/audit records, system-owned rows); one shared Zod schema per entity validating client forms, sync payloads, and API handlers alike; a three-tier confirmation requirement on every destructive action, naming the record and its dependents; soft delete with a restorable Trash and an owner-only purge; and a declared delete behavior on every relationship. Applies retroactively to every entity in §5 and forward to every entity added later.
+20. **Quality gates are blocking** (§11.1) — lint, typecheck, architecture-boundary checks, route-map conformance against §7, data-operations conformance against §4.5, unit tests with coverage thresholds, production build, and Playwright e2e all run on every push and pull request, and all of them block. The §4.1 and §4.5 rules are expressed as executable checks rather than prose specifically so they cannot decay.
+
+**v1.1 additions:**
+
+21. **Purchase candidates** (§5.1, §5.2, §5.6, §5.9) — a generic aggregate for tracking the specific things under consideration before a large purchase, separate from the Roadmap wishlist item that says one is wanted. Shared fields (status pipeline, asking price, listing URL, seller from the CRM, distance, dates, photos, attachments, pros and cons) plus itemised `additionalCosts[]` so the comparison sorts on **total acquisition cost**, not sticker price. Extended per domain: equipment adds year, mileage, hours, VIN, title status and derived price-per-mile/hour; cattle adds breed composition, registration, EPDs, pedigree reference and sale/lot dates; horses add training level and soundness. Marking a candidate `purchased` converts it into the real Equipment or Animal record, the same planned→actual pattern used by PlannedMating and PlannedPlanting. Routes at `/admin/equipment/candidates`, `/admin/cattle/candidates`, `/admin/horses/candidates`.
+22. **Logomark chosen: Rocking Double Star** (§8) — a large star and a small one on a rocker, read as a cow and a calf on shared ground. Drawn in livestock-brand grammar, mono-tone in both variants, with the stars carrying the identity colour and the rocker the surface's action colour. Admin and customer variants live in `packages/ui/src/brand/`. The wordmark still waits on the farm and business names.
