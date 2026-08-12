@@ -306,7 +306,9 @@ function AnimalTabs({
           );
         }
         if (active === "pedigree") {
-          return <Pedigree animal={animal} profile={profile} propertyId={propertyId} />;
+          return (
+            <Pedigree animal={animal} profile={profile} propertyId={propertyId} actorId={actorId} />
+          );
         }
         if (active === "breeding") return <BreedingTab animal={animal} propertyId={propertyId} />;
         if (active === "health") return <HealthTab animal={animal} propertyId={propertyId} />;

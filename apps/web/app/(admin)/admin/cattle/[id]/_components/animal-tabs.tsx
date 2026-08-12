@@ -5,17 +5,21 @@ import { useState } from "react";
 
 import {
   Button,
+  Callout,
   Card,
+  Constellation,
   DataTable,
   DetailList,
   EmptyState,
   Meter,
   Pill,
   Section,
+  Select,
   TextInput,
   useConfirmDelete,
   useToast,
   type Column,
+  type ConstellationNode,
 } from "@galaxy-farm/ui";
 import { displayName, formatMoney, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -30,7 +34,11 @@ import {
   healthHistoryFor,
   isUnderWithdrawal,
   lifetimeGain,
+  MAX_PEDIGREE_GENERATIONS,
+  pedigreeDepth,
   projectedDueDate,
+  repeatedAncestors,
+  wouldCreateCycle,
   compositionTotal,
   isCompositionComplete,
   unadjusted205DayWeight,
@@ -46,12 +54,14 @@ import {
   type HealthRecord,
   type ParentRef,
   type PedigreeNode,
+  type PedigreeSource,
   type ProcessingRecord,
   type SaleRecord,
   type WeightRecord,
 } from "@galaxy-farm/module-cattle";
 
 import { useMutations } from "@/lib/local/mutations";
+import { usePedigreeSource } from "@/lib/pedigree-source";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -227,95 +237,302 @@ export function BreedComposition({
 /* ---------------------------------------------------------------- pedigree */
 
 /**
- * The pedigree, as a tree (issue #16).
+ * The pedigree, drawn as a constellation (issue #16, §8).
  *
  * Depth-limited for two reasons and the second is not theoretical: §5.2 asks
  * for a 3/4/5-generation view, and a pedigree can genuinely contain a cycle
  * once somebody mistypes a registration number and makes an animal its own
  * great-grandsire. `buildPedigree` bounds the walk; this only draws it.
  *
- * Rendered as nested lists rather than a canvas: it stays readable on a phone,
- * it is navigable by keyboard, and a screen reader can announce the
- * relationships. The constellation drawing §8 wants is a later pass over this
- * same data.
+ * Two renderings of one tree, and both are load-bearing. The chart is what §8
+ * asks for and what somebody hands a buyer. The nested list underneath is what
+ * a screen reader reads, what survives a page break in print, and what anybody
+ * checking a registration number against a certificate will actually use — a
+ * chart is a poor place to compare sixteen numbers.
  */
 export function Pedigree({
   animal,
   profile,
   propertyId,
+  actorId,
 }: {
   readonly animal: Animal;
   readonly profile: CattleProfile | undefined;
   readonly propertyId: Ulid;
+  readonly actorId: Ulid;
 }) {
-  const { records: animals } = useRecords<Animal>("animals", { propertyId });
-  const { records: profiles } = useRecords<CattleProfile>("cattleProfiles", { propertyId });
-  const { records: outsiders } = useRecords<ExternalAnimal>("externalAnimals", { propertyId });
+  const query = { propertyId };
+  const { records: animals } = useRecords<Animal>("animals", query);
+  const { records: profiles } = useRecords<CattleProfile>("cattleProfiles", query);
+  const { records: outsiders } = useRecords<ExternalAnimal>("externalAnimals", query);
   const [generations, setGenerations] = useState(4);
 
-  const source = {
-    parentsOf(ref: ParentRef) {
-      if (ref.kind === "animal") {
-        const found = profiles.find((entry) => entry.animalId === ref.id);
-        if (found === undefined) return undefined;
-        return {
-          ...(found.sire === undefined ? {} : { sire: found.sire }),
-          ...(found.dam === undefined ? {} : { dam: found.dam }),
-        };
-      }
-      const outsider = outsiders.find((entry) => entry.id === ref.id);
-      if (outsider === undefined) return undefined;
-      return {
-        ...(outsider.sire === undefined ? {} : { sire: outsider.sire }),
-        ...(outsider.dam === undefined ? {} : { dam: outsider.dam }),
-      };
-    },
-    describe(ref: ParentRef) {
-      if (ref.kind === "animal") {
-        const found = animals.find((entry) => entry.id === ref.id);
-        if (found === undefined) return undefined;
-        const reg = profiles.find((entry) => entry.animalId === ref.id)?.registrations[0]
-          ?.regNumber;
-        return { name: displayName(found), ...(reg === undefined ? {} : { regNumber: reg }) };
-      }
-      const outsider = outsiders.find((entry) => entry.id === ref.id);
-      if (outsider === undefined) return undefined;
-      return {
-        name: outsider.name,
-        ...(outsider.regNumber === undefined ? {} : { regNumber: outsider.regNumber }),
-      };
-    },
-  };
+  const source = usePedigreeSource({ animals, profiles, outsiders });
+  const self: ParentRef = { kind: "animal", id: animal.id };
 
-  const tree = buildPedigree({ kind: "animal", id: animal.id }, source, generations);
+  const tree = buildPedigree(self, source, generations);
   const hasParents = profile?.sire !== undefined || profile?.dam !== undefined;
+  // Repeats are counted over the full depth, not the displayed one, so
+  // switching from 5 generations to 3 does not make line breeding vanish.
+  const repeats = repeatedAncestors(buildPedigree(self, source, MAX_PEDIGREE_GENERATIONS));
+  const depth = pedigreeDepth(buildPedigree(self, source, MAX_PEDIGREE_GENERATIONS));
+
+  return (
+    <div className="flex flex-col gap-density">
+      <Section
+        title="Pedigree"
+        description="As far back as the papers go. Ancestors that are not ours are held as external animals — a five-generation tree has thirty of them and this farm owns two."
+        actions={
+          <span className="gf-no-print flex flex-wrap items-center gap-2">
+            {[3, 4, 5].map((n) => (
+              <Button
+                key={n}
+                variant={n === generations ? "primary" : "ghost"}
+                onClick={() => setGenerations(n)}
+              >
+                {n} gen
+              </Button>
+            ))}
+            {/*
+              A pedigree is something you hand to a buyer (#16). The browser's
+              own print is the right mechanism — it already knows about paper
+              sizes and margins — so this triggers it and the print stylesheet
+              in the theme drops the navigation and the buttons.
+            */}
+            <Button variant="ghost" onClick={() => window.print()}>
+              Print
+            </Button>
+          </span>
+        }
+      >
+        {!hasParents || tree === undefined ? (
+          <EmptyState
+            title="No pedigree recorded"
+            detail="Set her sire and dam below, and everything above them follows from the ancestors already on file."
+          />
+        ) : (
+          <div className="flex flex-col gap-density">
+            <Constellation
+              root={toConstellation(tree, repeats)}
+              generations={generations}
+              caption={
+                <>
+                  {depth === 0
+                    ? "No ancestors recorded."
+                    : `Papers go back ${depth} generation${depth === 1 ? "" : "s"}.`}{" "}
+                  Filled stars are ours, hollow ones are on paper only
+                  {repeats.size === 0 ? "" : ", and the coloured ones appear more than once"}.
+                </>
+              }
+            />
+
+            {repeats.size === 0 ? null : (
+              <Callout tone="identity" title="Line breeding in this pedigree">
+                {repeats.size} ancestor{repeats.size === 1 ? "" : "s"} appear
+                {repeats.size === 1 ? "s" : ""} more than once. That is ordinary in show cattle —
+                but it is also how a mistyped registration number shows itself, so it is worth a
+                look at the numbers.
+              </Callout>
+            )}
+
+            {/*
+              The same tree as a nested list. Not a fallback nobody sees: it is
+              what a screen reader reads, what the print stylesheet keeps when
+              the chart is cut off by a page break, and what somebody checks a
+              registration number against.
+            */}
+            <details className="rounded-density border border-edge bg-panel p-density">
+              <summary className="cursor-pointer text-density font-medium text-ink">
+                Read it as a list
+              </summary>
+              <div className="pt-density">
+                <PedigreeBranch node={tree} />
+              </div>
+            </details>
+          </div>
+        )}
+      </Section>
+
+      <Parents
+        animal={animal}
+        profile={profile}
+        animals={animals}
+        outsiders={outsiders}
+        source={source}
+        propertyId={propertyId}
+        actorId={actorId}
+      />
+    </div>
+  );
+}
+
+/** The module's tree, flattened into the shape the chart draws. */
+function toConstellation(
+  node: PedigreeNode,
+  repeats: ReadonlyMap<string, number>,
+): ConstellationNode {
+  const key = `${node.ref.kind}:${node.ref.id}`;
+  return {
+    id: key,
+    label: node.name,
+    ...(node.regNumber === undefined ? {} : { sublabel: node.regNumber }),
+    outside: node.ref.kind === "external",
+    repeated: repeats.has(key),
+    ...(node.sire === undefined ? {} : { sire: toConstellation(node.sire, repeats) }),
+    ...(node.dam === undefined ? {} : { dam: toConstellation(node.dam, repeats) }),
+  };
+}
+
+/**
+ * Setting a sire and a dam (issue #16).
+ *
+ * Either parent can be one of ours or a name off a certificate, which is why
+ * both dropdowns list the herd and the ancestors together rather than making
+ * somebody pick a category first. A loop is refused here rather than survived
+ * by the chart — `wouldCreateCycle` is the same function the ancestors screen
+ * calls, so the two cannot disagree about what a loop is.
+ */
+function Parents({
+  animal,
+  profile,
+  animals,
+  outsiders,
+  source,
+  propertyId,
+  actorId,
+}: {
+  readonly animal: Animal;
+  readonly profile: CattleProfile | undefined;
+  readonly animals: readonly Animal[];
+  readonly outsiders: readonly ExternalAnimal[];
+  readonly source: PedigreeSource;
+  readonly propertyId: Ulid;
+  readonly actorId: Ulid;
+}) {
+  const api = useMutations<CattleProfile>(
+    "cattleProfiles",
+    "cattleProfiles",
+    cattleProfileSchema,
+    propertyId,
+    actorId,
+  );
+  const { show } = useToast();
+
+  const refKey = (ref: ParentRef | undefined) => (ref === undefined ? "" : `${ref.kind}:${ref.id}`);
+  const [sire, setSire] = useState(refKey(profile?.sire));
+  const [dam, setDam] = useState(refKey(profile?.dam));
+  const [error, setError] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
+
+  const options = (sex: "male" | "female") => [
+    ...animals
+      .filter(
+        (entry) =>
+          entry.species === "cattle" &&
+          entry.id !== animal.id &&
+          (entry.sex === sex || entry.sex === "unknown"),
+      )
+      .map((entry) => ({ value: `animal:${entry.id}`, label: `${displayName(entry)} (ours)` })),
+    // External animals carry no sex — a certificate names a sire and a dam, so
+    // the position in the pedigree is the only claim being made about either.
+    ...[...outsiders]
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((entry) => ({ value: `external:${entry.id}`, label: entry.name })),
+  ];
+
+  function parse(value: string): ParentRef | undefined {
+    if (value === "") return undefined;
+    const [kind, id] = value.split(":");
+    return kind === "animal" || kind === "external" ? { kind, id: id as Ulid } : undefined;
+  }
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    setError(undefined);
+
+    const self: ParentRef = { kind: "animal", id: animal.id };
+    const next = { sire: parse(sire), dam: parse(dam) };
+
+    for (const [role, ref] of Object.entries(next)) {
+      if (ref !== undefined && wouldCreateCycle(self, ref, source)) {
+        setError(
+          `${displayName(animal)} already appears above that animal, so it cannot also be her ${role}.`,
+        );
+        return;
+      }
+    }
+
+    setBusy(true);
+    try {
+      const result =
+        profile === undefined
+          ? await api.create({
+              animalId: animal.id,
+              breedComposition: [],
+              registrations: [],
+              ...(next.sire === undefined ? {} : { sire: next.sire }),
+              ...(next.dam === undefined ? {} : { dam: next.dam }),
+            } as never)
+          : // Sent explicitly rather than omitted, so clearing a parent clears it.
+            await api.update(profile.id, next as Partial<CattleProfile>);
+
+      if (!result.ok) {
+        setError(
+          result.error.kind === "validation"
+            ? (result.error.issues[0]?.message ?? "That is not valid")
+            : "Could not save that",
+        );
+        return;
+      }
+      show({ message: "Parents saved", tone: "success" });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <Section
-      title="Pedigree"
-      description="As far back as the papers go. Ancestors that are not ours are held as external animals — a five-generation tree has thirty of them and this farm owns two."
+      title="Sire and dam"
+      description="Either can be one of ours or a name off a certificate. Everything above them is already on file."
       actions={
-        <span className="flex gap-2">
-          {[3, 4, 5].map((n) => (
-            <Button
-              key={n}
-              variant={n === generations ? "primary" : "ghost"}
-              onClick={() => setGenerations(n)}
-            >
-              {n} gen
-            </Button>
-          ))}
-        </span>
+        <Link
+          href="/admin/cattle/ancestors"
+          className="text-sm text-action underline underline-offset-2"
+        >
+          Manage ancestors
+        </Link>
       }
     >
-      {!hasParents || tree === undefined ? (
-        <EmptyState
-          title="No pedigree recorded"
-          detail="Set her sire and dam on the registrations tab, and everything above them follows from the external animals already on file."
-        />
-      ) : (
-        <PedigreeBranch node={tree} />
-      )}
+      <form onSubmit={(event) => void save(event)} className="flex flex-col gap-density">
+        <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+          <Select
+            label="Sire"
+            value={sire}
+            placeholder="Unknown"
+            options={options("male")}
+            onChange={(event) => setSire(event.target.value)}
+          />
+          <Select
+            label="Dam"
+            value={dam}
+            placeholder="Unknown"
+            options={options("female")}
+            onChange={(event) => setDam(event.target.value)}
+          />
+        </div>
+
+        {error === undefined ? null : (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
+
+        <div>
+          <Button type="submit" busy={busy}>
+            Save parents
+          </Button>
+        </div>
+      </form>
     </Section>
   );
 }

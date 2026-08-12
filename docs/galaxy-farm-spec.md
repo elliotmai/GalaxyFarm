@@ -398,6 +398,7 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/cattle/sales             acquisitions, sales, processing records
 /admin/cattle/roadmap           genetic goals, target size, planned matings
 /admin/cattle/candidates        breeding stock & show prospects under consideration
+/admin/cattle/ancestors         external animals: ancestors on paper that are not ours
 
 /admin/feed                     inventory, purchases, run-out projections, cost per head
 /admin/supplies                 ranch supply inventory: consumables, show/fitting gear, hardware

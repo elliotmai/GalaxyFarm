@@ -57,6 +57,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/admin/cattle/sales", label: "Sales" },
       { href: "/admin/cattle/roadmap", label: "Roadmap" },
       { href: "/admin/cattle/candidates", label: "Candidates" },
+      { href: "/admin/cattle/ancestors", label: "Ancestors" },
     ],
   },
   {

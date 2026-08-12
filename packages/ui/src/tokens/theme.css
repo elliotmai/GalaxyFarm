@@ -221,3 +221,72 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Paper (spec §8, issue #16).
+ *
+ * A pedigree is something you hand to a buyer, and the browser's own print is
+ * the right mechanism for that — it already knows about paper sizes, margins
+ * and page breaks, which is a great deal of work not to redo in a PDF library.
+ *
+ * What it needs from us is that the page stop being an application on paper:
+ * no navigation to a site the reader is holding, no buttons they cannot press,
+ * and dark themes rendered as ink on white rather than as a solid black sheet
+ * that empties a cartridge.
+ */
+@media print {
+  [data-theme] {
+    --gf-canvas: #ffffff;
+    --gf-panel: #ffffff;
+    --gf-ink: #111111;
+    --gf-muted: #444444;
+    --gf-edge: #999999;
+  }
+
+  .gf-no-print,
+  nav,
+  aside {
+    display: none !important;
+  }
+
+  /* Scroll containers have no meaning on paper — let the content run. */
+  .gf-print-open,
+  .gf-print-open * {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /*
+   * A collapsed disclosure on paper is a paragraph the reader cannot open.
+   * The modern hook is `::details-content`; the older one is the child rule.
+   * Both are set because which one applies depends on the browser doing the
+   * printing, and neither does any harm where it is not understood.
+   */
+  details > summary {
+    display: none;
+  }
+
+  details::details-content {
+    content-visibility: visible !important;
+    block-size: auto !important;
+  }
+
+  details:not([open]) > *:not(summary) {
+    display: block !important;
+  }
+
+  /*
+   * Keep a card whole rather than splitting a name from its number, and never
+   * strand a heading at the foot of a page.
+   */
+  h1,
+  h2,
+  h3 {
+    break-after: avoid-page;
+  }
+
+  figure,
+  table {
+    break-inside: avoid-page;
+  }
+}

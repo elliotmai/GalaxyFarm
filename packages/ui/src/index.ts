@@ -7,6 +7,7 @@
  */
 
 export * from "./confirm/index.js";
+export * from "./charts/index.js";
 export * from "./primitives/index.js";
 export * from "./tokens/contrast.js";
 export * from "./safety/safety-badge.js";
