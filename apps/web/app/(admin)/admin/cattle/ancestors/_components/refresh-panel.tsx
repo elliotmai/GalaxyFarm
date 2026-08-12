@@ -12,8 +12,8 @@ import {
   externalAnimalSchema,
   parseDigitalBeefPage,
   parseDigitalBeefUrl,
+  pedigreeChanges,
   refreshChanges,
-  refreshDefects,
   type ExternalAnimal,
   type FieldChange,
 } from "@galaxy-farm/module-cattle";
@@ -38,11 +38,14 @@ import { useMutations } from "@/lib/local/mutations";
 
 export function RefreshFromAssociation({
   animal,
+  everyone,
   propertyId,
   actorId,
   onDone,
 }: {
   readonly animal: ExternalAnimal;
+  /** Everything on file, so the page's chart can update the ancestors on it. */
+  readonly everyone: readonly ExternalAnimal[];
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
   readonly onDone: () => void;
@@ -64,6 +67,10 @@ export function RefreshFromAssociation({
   const [error, setError] = useState<string | undefined>();
   const [html, setHtml] = useState("");
   const [changes, setChanges] = useState<readonly FieldChange[] | undefined>();
+  /** What the page's chart says about the other animals on it. */
+  const [others, setOthers] = useState<
+    readonly { animal: ExternalAnimal; changes: readonly FieldChange[] }[]
+  >([]);
   const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
 
   const [association, regNumber] = which.split(":");
@@ -74,12 +81,21 @@ export function RefreshFromAssociation({
 
   function present(page: string, ref: { association: string; registration: string; url: string }) {
     const read = parseDigitalBeefPage(page, ref as never);
-    const found = [...refreshChanges(animal, read)];
-    const defects = refreshDefects(animal, read);
-    if (defects !== undefined) found.push(defects);
+    const found = refreshChanges(animal, read);
+
+    // The chart on this page carries the defect results, colours and birth
+    // dates of the *ancestors* — Digital Beef never prints an animal's own
+    // genetic tests on its own page, only beside it on its descendants'.
+    const chart = pedigreeChanges(read, everyone).filter((entry) => entry.animal.id !== animal.id);
 
     setChanges(found);
-    setAccepted(defaultAccepted(found));
+    setOthers(chart);
+
+    const ticked = new Set<string>(defaultAccepted(found));
+    for (const entry of chart) {
+      for (const change of entry.changes) ticked.add(`${entry.animal.id}:${change.field}`);
+    }
+    setAccepted(ticked);
   }
 
   async function check() {
@@ -141,24 +157,36 @@ export function RefreshFromAssociation({
 
   async function save() {
     if (changes === undefined) return;
-    const patch = applyChanges(changes, accepted);
-
-    if (Object.keys(patch).length === 0) {
-      show({ message: "Nothing ticked, so nothing changed", tone: "info" });
-      onDone();
-      return;
-    }
 
     setBusy(true);
     try {
-      const result = await api.update(animal.id, patch);
-      if (!result.ok) {
-        setError("Could not save that.");
-        return;
+      let touched = 0;
+
+      const patch = applyChanges(changes, accepted);
+      if (Object.keys(patch).length > 0) {
+        const result = await api.update(animal.id, patch);
+        if (!result.ok) {
+          setError("Could not save that.");
+          return;
+        }
+        touched += 1;
       }
+
+      for (const entry of others) {
+        const ticked = new Set(
+          entry.changes
+            .map((change) => change.field)
+            .filter((field) => accepted.has(`${entry.animal.id}:${field}`)),
+        );
+        const theirs = applyChanges(entry.changes, ticked);
+        if (Object.keys(theirs).length === 0) continue;
+        const result = await api.update(entry.animal.id, theirs);
+        if (result.ok) touched += 1;
+      }
+
       show({
-        message: `${animal.name} updated — ${Object.keys(patch).length} field(s)`,
-        tone: "success",
+        message: touched === 0 ? "Nothing ticked, so nothing changed" : `${touched} record(s) updated`,
+        tone: touched === 0 ? "info" : "success",
       });
       onDone();
     } finally {
@@ -281,6 +309,42 @@ export function RefreshFromAssociation({
               </span>
             </label>
           ))}
+
+          {others.length === 0 ? null : (
+            <div className="flex flex-col gap-2 border-t border-edge pt-density">
+              <p className="text-density text-ink">
+                This page&apos;s pedigree also says something about {others.length} ancestor
+                {others.length === 1 ? "" : "s"} already on file.
+              </p>
+              <p className="text-sm text-muted">
+                Digital Beef never prints an animal&apos;s own genetic tests on its own page — it
+                prints them beside it on the chart of everything descended from it. This is the only
+                place they can be read from.
+              </p>
+              {others.map((entry) => (
+                <div key={entry.animal.id} className="flex flex-col gap-1 pt-2">
+                  <span className="text-density font-medium text-ink">{entry.animal.name}</span>
+                  {entry.changes.map((change) => {
+                    const key = `${entry.animal.id}:${change.field}`;
+                    return (
+                      <label key={key} className="flex items-start gap-2 text-density">
+                        <input
+                          type="checkbox"
+                          checked={accepted.has(key)}
+                          onChange={() => toggle(key)}
+                          className="mt-1.5"
+                        />
+                        <span className="flex flex-wrap items-baseline gap-2">
+                          <span className="text-ink">{change.label}</span>
+                          <span className="text-sm text-muted">{change.after}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2 pt-density">
             <Button onClick={() => void save()} busy={busy}>

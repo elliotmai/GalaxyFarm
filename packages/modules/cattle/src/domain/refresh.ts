@@ -1,5 +1,9 @@
 import type { ImportedAnimal } from "./digital-beef.js";
-import { allRegistrations, type ExternalAnimal } from "./pedigree.js";
+import {
+  allRegistrations,
+  normaliseRegistration,
+  type ExternalAnimal,
+} from "./pedigree.js";
 
 /**
  * Checking an animal against the association again (spec §5.2).
@@ -164,35 +168,95 @@ export function refreshChanges(
 }
 
 /**
- * Which defect results the page reports that the record does not have.
+ * What a page says about the *other* animals on it.
  *
- * Held apart from the field diff because these merge rather than replace: a
- * hair card typed in here for TH must survive a page that only prints PHA, and
- * a straight field comparison would drop it.
+ * This is where the defect results actually live, and getting it wrong cost a
+ * whole feature. Digital Beef does not print an animal's genetic tests on its
+ * own page — it prints them **on the pedigree chart**, beside each ancestor.
+ * `PHAF THF` next to a bull means that bull is free of both, and it is written
+ * on the page of every animal descended from him rather than on his own.
+ *
+ * So a refresh that only reads the detail panel can never learn a defect
+ * result. The first attempt at this looked for the subject's flags among its
+ * own ancestors, found nothing every single time, and reported no changes
+ * without ever saying it had looked in a place they could not be.
+ *
+ * Reading a page therefore updates the *ancestors on it*, matched by
+ * registration within the association whose page it is — the only comparison
+ * that is safe, since two registries number the same animal differently.
+ *
+ * Colour and date of birth come the same way. Shorthorn prints both beneath
+ * every chart entry, going back to bulls born in the 1950s, and that is the
+ * only record of either that exists anywhere.
  */
-export function refreshDefects(
-  existing: ExternalAnimal,
+export function pedigreeChanges(
   imported: ImportedAnimal,
-): FieldChange | undefined {
-  // The page carries flags per *ancestor*, not for the animal it is about, so
-  // this reads the row the chart gives for the subject itself when there is
-  // one. Nothing to propose when there is not.
-  const fresh = imported.ancestors.find((entry) => entry.position === undefined)?.geneticTests ?? [];
-  if (fresh.length === 0) return undefined;
+  existing: readonly ExternalAnimal[],
+): { animal: ExternalAnimal; changes: FieldChange[] }[] {
+  const index = new Map<string, ExternalAnimal>();
+  for (const animal of existing) {
+    for (const registration of allRegistrations(animal)) {
+      index.set(
+        `${registration.association}:${normaliseRegistration(registration.regNumber)}`,
+        animal,
+      );
+    }
+  }
 
-  const current = existing.geneticTests ?? [];
-  const added = fresh.filter((test) => !current.some((held) => held.defect === test.defect));
-  if (added.length === 0) return undefined;
+  const found: { animal: ExternalAnimal; changes: FieldChange[] }[] = [];
+  const seen = new Set<string>();
 
-  const next = [...current, ...added];
-  return {
-    field: "geneticTests",
-    label: LABELS["geneticTests"] as string,
-    kind: "fill",
-    before: show(current),
-    after: show(next),
-    value: next,
-  };
+  for (const ancestor of [...imported.ancestors, ...imported.unplacedAncestors]) {
+    if (ancestor.regNumber === undefined) continue;
+
+    const key = `${imported.association}:${normaliseRegistration(ancestor.regNumber)}`;
+    const match = index.get(key);
+    if (match === undefined || seen.has(match.id)) continue;
+    seen.add(match.id);
+
+    const changes: FieldChange[] = [];
+    const add = (field: string, value: unknown) => {
+      const current = (match as unknown as Record<string, unknown>)[field];
+      if (current !== undefined || value === undefined) return;
+      changes.push({
+        field,
+        label: LABELS[field] ?? field,
+        kind: "fill",
+        after: show(value),
+        value,
+      });
+    };
+
+    add("tattoo", ancestor.tattoo);
+    add("colour", ancestor.colour);
+    add("dob", asDate(ancestor.dob));
+    if (ancestor.position !== undefined) {
+      add("sex", /(^|\s)sire$/.test(ancestor.position) ? "male" : /(^|\s)dam$/.test(ancestor.position) ? "female" : undefined);
+    }
+
+    // Defect results merge rather than replace. A hair card typed in here for
+    // TH has to survive a page that only prints PHA, and a straight field
+    // comparison would drop it.
+    const held = match.geneticTests ?? [];
+    const fresh = ancestor.geneticTests.filter(
+      (test) => !held.some((known) => known.defect === test.defect),
+    );
+    if (fresh.length > 0) {
+      const next = [...held, ...fresh];
+      changes.push({
+        field: "geneticTests",
+        label: LABELS["geneticTests"] as string,
+        kind: "fill",
+        ...(held.length === 0 ? {} : { before: show(held) }),
+        after: show(next),
+        value: next,
+      });
+    }
+
+    if (changes.length > 0) found.push({ animal: match, changes });
+  }
+
+  return found;
 }
 
 /** The changes somebody ticked, as a patch. */

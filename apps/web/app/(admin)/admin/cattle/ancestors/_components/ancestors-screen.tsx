@@ -530,6 +530,7 @@ export function AncestorsScreen({
         >
           <RefreshFromAssociation
             animal={checking}
+            everyone={outsiders}
             propertyId={propertyId}
             actorId={actorId}
             onDone={() => setChecking(undefined)}

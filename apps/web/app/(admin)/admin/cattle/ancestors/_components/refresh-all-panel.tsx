@@ -7,12 +7,12 @@ import type { Ulid } from "@galaxy-farm/core";
 import {
   allRegistrations,
   applyChanges,
-  defaultAccepted,
   digitalBeefUrl,
   externalAnimalSchema,
   IMPORTABLE_ASSOCIATIONS,
   parseDigitalBeefPage,
   parseDigitalBeefUrl,
+  pedigreeChanges,
   refreshChanges,
   type ExternalAnimal,
   type FieldChange,
@@ -40,8 +40,9 @@ import { useMutations } from "@/lib/local/mutations";
 
 interface Finding {
   readonly animal: ExternalAnimal;
+  /** The page it came off. An animal papered twice has two, and they differ. */
   readonly registration: { association: string; regNumber: string };
-  readonly changes: readonly FieldChange[];
+  changes: readonly FieldChange[];
 }
 
 interface Failure {
@@ -100,40 +101,77 @@ export function RefreshAllAncestors({
     const failed: Failure[] = [];
     const ticked = new Set<string>();
 
+    /** Merge a change into what is already proposed for an animal. */
+    const record = (
+      animal: ExternalAnimal,
+      registration: { association: string; regNumber: string },
+      changes: readonly FieldChange[],
+    ) => {
+      if (changes.length === 0) return;
+      const existing = found.find((entry) => entry.animal.id === animal.id);
+      if (existing === undefined) {
+        found.push({ animal, registration, changes });
+      } else {
+        // A field already proposed off another registry's page wins — the
+        // first page to carry it is as good an answer as the second, and two
+        // rows for one field is a question nobody can answer from a checkbox.
+        const known = new Set(existing.changes.map((change) => change.field));
+        existing.changes = [
+          ...existing.changes,
+          ...changes.filter((change) => !known.has(change.field)),
+        ];
+      }
+      for (const change of changes) {
+        if (change.kind === "fill") ticked.add(`${animal.id}:${change.field}`);
+      }
+    };
+
     for (const animal of queue) {
-      const registration = allRegistrations(animal).find((entry) =>
+      // *Every* registry the animal is papered in, not just the first. Only
+      // Chianina prints a breed makeup; a Maine-Anjou page carries none at all,
+      // so checking the first number and stopping is why a dual-registered
+      // animal came back with nothing to say about its breeding.
+      const registrations = allRegistrations(animal).filter((entry) =>
         (IMPORTABLE_ASSOCIATIONS as readonly string[]).includes(entry.association),
       );
-      if (registration === undefined) continue;
 
-      const url = digitalBeefUrl(registration.association as never, registration.regNumber);
-      const parsed = url === undefined ? undefined : parseDigitalBeefUrl(url);
+      let read = false;
+      for (const registration of registrations) {
+        const url = digitalBeefUrl(registration.association as never, registration.regNumber);
+        const parsed = url === undefined ? undefined : parseDigitalBeefUrl(url);
+        if (url === undefined || parsed === undefined || !parsed.ok) continue;
 
-      if (url === undefined || parsed === undefined || !parsed.ok) {
-        failed.push({ animal, reason: "No page could be built for that registry." });
-        setDone((count) => count + 1);
-        continue;
+        try {
+          const response = await fetch("/api/import/digital-beef", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ url, raw: true }),
+          });
+          const payload = (await response.json()) as { page?: string; error?: string };
+
+          if (!response.ok || payload.page === undefined) {
+            failed.push({ animal, reason: payload.error ?? "Could not read that page." });
+            continue;
+          }
+
+          read = true;
+          const page = parseDigitalBeefPage(payload.page, parsed.ref);
+          record(animal, registration, refreshChanges(animal, page));
+
+          // The chart on this page carries the defect results of the ancestors
+          // above it — Digital Beef never prints an animal's own tests on its
+          // own page, only beside it on its descendants'. Skipping this is why
+          // a whole herd came back with no genetics.
+          for (const entry of pedigreeChanges(page, animals)) {
+            record(entry.animal, registration, entry.changes);
+          }
+        } catch {
+          failed.push({ animal, reason: "Could not reach the server." });
+        }
       }
 
-      try {
-        const response = await fetch("/api/import/digital-beef", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ url, raw: true }),
-        });
-        const payload = (await response.json()) as { page?: string; error?: string };
-
-        if (!response.ok || payload.page === undefined) {
-          failed.push({ animal, reason: payload.error ?? "Could not read that page." });
-        } else {
-          const changes = refreshChanges(animal, parseDigitalBeefPage(payload.page, parsed.ref));
-          if (changes.length > 0) {
-            found.push({ animal, registration, changes });
-            for (const field of defaultAccepted(changes)) ticked.add(`${animal.id}:${field}`);
-          }
-        }
-      } catch {
-        failed.push({ animal, reason: "Could not reach the server." });
+      if (!read && registrations.length === 0) {
+        failed.push({ animal, reason: "No page could be built for that registry." });
       }
 
       setDone((count) => count + 1);

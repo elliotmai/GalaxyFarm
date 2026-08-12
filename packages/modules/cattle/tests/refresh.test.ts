@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { parseDigitalBeefPage } from "../src/domain/digital-beef.js";
-import { applyChanges, defaultAccepted, refreshChanges } from "../src/domain/refresh.js";
+import {
+  applyChanges,
+  defaultAccepted,
+  pedigreeChanges,
+  refreshChanges,
+} from "../src/domain/refresh.js";
 import type { ExternalAnimal } from "../src/domain/pedigree.js";
-import { MAINE_ANJOU_PAGE } from "./fixtures/digital-beef-pages.js";
+import {
+  CHIANINA_PAGE,
+  MAINE_ANJOU_PAGE,
+  SHORTHORN_PAGE,
+} from "./fixtures/digital-beef-pages.js";
 
 /**
  * Checking an animal against its association again (spec §5.2).
@@ -156,5 +165,150 @@ describe("what gets ticked", () => {
 
   it("writes nothing when nothing is ticked", () => {
     expect(applyChanges(changes, new Set())).toEqual({});
+  });
+});
+
+describe("what a page says about the other animals on it", () => {
+  const chianina = () =>
+    parseDigitalBeefPage(CHIANINA_PAGE, { association: "ACA", registration: "359968" });
+
+  it("finds the defect results, which are only ever on a descendant's chart", () => {
+    // The bug this covers: Digital Beef never prints an animal's own genetic
+    // tests on its own page. It prints them beside it on the pedigree of
+    // everything descended from it. A refresh that only read the detail panel
+    // reported "nothing has changed" for a whole herd, every time, without
+    // ever saying it had looked somewhere they could not be.
+    const tyson = external({ name: "CMAC TYSON ET", regNumber: "MA364424", association: "ACA" });
+
+    const [finding] = pedigreeChanges(chianina(), [tyson]);
+    const defects = finding?.changes.find((change) => change.field === "geneticTests");
+
+    expect(defects?.after).toContain("PHA free");
+    expect(defects?.after).toContain("TH free");
+    expect(defects?.after).toContain("AM suspect");
+  });
+
+  it("matches on the registry whose page it is, not on the number alone", () => {
+    // 337003 is ZNT JENNA's *Chianina* number. The same digits under
+    // Maine-Anjou would be a different animal entirely.
+    const wrongRegistry = external({
+      name: "ZNT JENNA 707T",
+      regNumber: "337003",
+      association: "AMAA",
+    });
+
+    expect(pedigreeChanges(chianina(), [wrongRegistry])).toEqual([]);
+  });
+
+  it("keeps a result already on file and adds only what is new", () => {
+    // A hair card typed in here for TH has to survive a page that says
+    // something about PHA.
+    const tested = external({
+      name: "CMAC TYSON ET",
+      regNumber: "MA364424",
+      association: "ACA",
+      geneticTests: [{ defect: "TH", status: "carrier" }],
+    });
+
+    const [finding] = pedigreeChanges(chianina(), [tested]);
+    const defects = finding?.changes.find((change) => change.field === "geneticTests");
+
+    expect(defects?.after).toContain("TH carrier");
+    expect(defects?.after).not.toContain("TH free");
+  });
+
+  it("proposes nothing for an animal whose results are all already recorded", () => {
+    const complete = external({
+      name: "COWAN'S ALI 4M",
+      regNumber: "MA307184",
+      association: "ACA",
+      tattoo: "COWN4M",
+      geneticTests: [
+        { defect: "PHA", status: "free" },
+        { defect: "TH", status: "free" },
+      ],
+      sex: "male",
+    });
+
+    expect(pedigreeChanges(chianina(), [complete])).toEqual([]);
+  });
+
+  it("takes the tattoo and the sex off the slot as well", () => {
+    const thin = external({ name: "COWAN'S ALI 4M", regNumber: "MA307184", association: "ACA" });
+    const [finding] = pedigreeChanges(chianina(), [thin]);
+    const fields = (finding?.changes ?? []).map((change) => change.field);
+
+    expect(fields).toEqual(expect.arrayContaining(["tattoo", "sex", "geneticTests"]));
+    // `sire's sire` ends in "sire", so he is a bull.
+    expect(finding?.changes.find((change) => change.field === "sex")?.after).toBe("male");
+  });
+
+  it("reads colour and birth date off a Shorthorn chart", () => {
+    // Shorthorn prints both under every entry, going back to a roan bull born
+    // in 1955 — the only record of either that exists anywhere.
+    const shorthorn = parseDigitalBeefPage(SHORTHORN_PAGE, {
+      association: "ASA",
+      registration: "4219133",
+    });
+    const leader = external({
+      name: "CORONET MAX LEADER",
+      regNumber: "x2887446",
+      association: "ASA",
+    });
+
+    const [finding] = pedigreeChanges(shorthorn, [leader]);
+
+    expect(finding?.changes.find((change) => change.field === "colour")?.after).toBe("Roan");
+    expect(finding?.changes.find((change) => change.field === "dob")).toBeDefined();
+  });
+
+  it("never proposes overwriting something already recorded", () => {
+    const corrected = external({
+      name: "CORONET MAX LEADER",
+      regNumber: "x2887446",
+      association: "ASA",
+      colour: "Roan with a white face",
+    });
+    const shorthorn = parseDigitalBeefPage(SHORTHORN_PAGE, {
+      association: "ASA",
+      registration: "4219133",
+    });
+
+    const [finding] = pedigreeChanges(shorthorn, [corrected]);
+
+    expect(finding?.changes.some((change) => change.field === "colour")).toBe(false);
+  });
+});
+
+describe("the breed makeup a refresh can actually find", () => {
+  it("comes off a Chianina page, which is the only one that prints it", () => {
+    const montego = external({
+      name: "ZNT MONTEGO BAY 901W",
+      regNumber: "359968",
+      association: "ACA",
+    });
+    const changes = refreshChanges(
+      montego,
+      parseDigitalBeefPage(CHIANINA_PAGE, { association: "ACA", registration: "359968" }),
+    );
+
+    expect(changes.find((change) => change.field === "breedComposition")?.after).toContain(
+      "79.57% MA",
+    );
+  });
+
+  it("is absent from a Maine-Anjou page, so checking only that one finds none", () => {
+    // Which is why the bulk check reads *every* registry an animal is papered
+    // in rather than stopping at the first: a dual-registered animal whose
+    // Maine-Anjou number happened to be first came back with no breeding.
+    const montego = external({
+      name: "ZNT MONTEGO BAY 901W",
+      regNumber: "402303",
+      association: "AMAA",
+    });
+
+    expect(
+      refreshChanges(montego, page()).some((change) => change.field === "breedComposition"),
+    ).toBe(false);
   });
 });
