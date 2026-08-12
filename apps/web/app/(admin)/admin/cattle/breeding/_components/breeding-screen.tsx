@@ -39,6 +39,7 @@ import {
   type PregCheckResult,
 } from "@galaxy-farm/module-cattle";
 
+import { PairingPlanner } from "@/app/(admin)/admin/cattle/breeding/_components/pairing-planner";
 import { animalHref } from "@/lib/animal-slug";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
@@ -262,6 +263,15 @@ export function BreedingScreen({
           })}
         </Section>
       )}
+
+      {/*
+        The planner sits above the form on purpose. The questions it answers —
+        what the calf will be, what colour, how close these two are, and what
+        the pairing could carry — are the ones somebody wishes they had asked
+        *before* the straw was pulled, and a panel underneath the form is a
+        panel nobody scrolls to.
+      */}
+      <PairingPlanner animals={animals} propertyId={propertyId} />
 
       <Section title="Record a breeding">
         <AddBreeding dams={dams} api={breedingsApi} />

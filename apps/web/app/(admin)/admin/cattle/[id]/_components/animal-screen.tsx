@@ -55,6 +55,7 @@ import {
   Pedigree,
   WeightsTab,
 } from "@/app/(admin)/admin/cattle/[id]/_components/animal-tabs";
+import { GeneticsPanel } from "@/app/(admin)/admin/cattle/[id]/_components/genetics-panel";
 import { animalSlug, animalTitle, resolveAnimalSlug } from "@/lib/animal-slug";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
@@ -250,6 +251,7 @@ export function AnimalScreen({
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "registrations", label: "Registrations" },
+  { id: "genetics", label: "Genetics" },
   { id: "pedigree", label: "Pedigree" },
   { id: "breeding", label: "Breeding" },
   { id: "health", label: "Health" },
@@ -303,6 +305,16 @@ function AnimalTabs({
                 actorId={actorId}
               />
             </>
+          );
+        }
+        if (active === "genetics") {
+          return (
+            <GeneticsPanel
+              profile={profile}
+              animalId={animal.id}
+              propertyId={propertyId}
+              actorId={actorId}
+            />
           );
         }
         if (active === "pedigree") {
