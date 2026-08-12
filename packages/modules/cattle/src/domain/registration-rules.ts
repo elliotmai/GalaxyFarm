@@ -1,4 +1,12 @@
 import type { Association, BreedShare } from "./cattle-profile.js";
+import {
+  MAINE_ANGUS_NOTE,
+  MAINE_CLASS_LABELS,
+  maineClassFor,
+  mainePaper,
+  mainePercent,
+  meetsMaineMinimum,
+} from "./maine-upgrade.js";
 
 /**
  * What an animal is eligible to be registered as (spec §5.2).
@@ -12,12 +20,12 @@ import type { Association, BreedShare } from "./cattle-profile.js";
  * could be papered Purebred" are the same fact stated twice, and two places
  * computing it is two places to disagree.
  *
- * **What is here is what the owner supplied, and nothing else.** The Chianina
- * and Shorthorn rules below are transcribed from the association text he
- * pasted. The Maine-Anjou upgrade chart is a PDF this environment cannot
- * reach, so AMAA returns "rules not on file" rather than a guess. A
- * confidently wrong eligibility class is worse than a blank one: it is the
- * sort of thing that gets quoted in a sale catalogue.
+ * **What is here is what the associations publish, and nothing else.** All
+ * three are transcribed from their own text: the Chianina and Shorthorn rules
+ * from the rulebook extracts, the Maine-Anjou classes from the AMAA upgrading
+ * chart. Nothing is inferred — a confidently wrong eligibility class is worse
+ * than a blank one, because it is the sort of thing that gets quoted in a sale
+ * catalogue.
  *
  * Percentages are compared with a small tolerance, because an association's
  * arithmetic and ours will not agree to the last decimal — 87.5% and 87.49%
@@ -134,6 +142,44 @@ function chianina(composition: readonly BreedShare[]): RegistrationClass[] {
   return found;
 }
 
+/**
+ * Maine-Anjou, per the AMAA upgrading chart.
+ *
+ * The paper classification follows from the fraction — MaineTainer on green
+ * from 1/4 to 5/8, High Maine on brown from 3/4 up — and the floor is a
+ * quarter, below which the association registers nothing at all.
+ */
+function maine(composition: readonly BreedShare[]): RegistrationClass[] {
+  const percent = mainePercent(composition);
+  if (percent <= 0) return [];
+
+  if (!meetsMaineMinimum(percent)) {
+    return [
+      {
+        association: "AMAA",
+        name: "Not eligible",
+        because: `${Math.round(percent * 100) / 100}% Maine-Anjou — under the quarter that is the least the AMAA will register.`,
+      },
+    ];
+  }
+
+  const maineClass = maineClassFor(percent);
+  const paper = mainePaper(maineClass);
+  const alsoRequires = [
+    "The sire registered Maine-Anjou, or with a commercial number on file with the AMAA",
+    ...(paper === "MaineTainer" ? [MAINE_ANGUS_NOTE] : []),
+  ];
+
+  return [
+    {
+      association: "AMAA",
+      name: `${paper ?? "Maine-Anjou"} — ${MAINE_CLASS_LABELS[maineClass]}`,
+      because: `${Math.round(percent * 100) / 100}% Maine-Anjou.`,
+      alsoRequires,
+    },
+  ];
+}
+
 /** Shorthorn, per the ASA text the owner supplied. */
 function shorthorn(composition: readonly BreedShare[]): RegistrationClass[] {
   const shorthorn = percentOf(composition, "SH", "SHORTHORN");
@@ -165,20 +211,5 @@ export function registrationClasses(composition: readonly BreedShare[]): Eligibi
     return { classes: [], unknownRules: "No breed makeup on file, so nothing can be worked out." };
   }
 
-  const classes = [...chianina(composition), ...shorthorn(composition)];
-  const maine = percentOf(composition, "MA", "MAINE", "MAINE-ANJOU");
-
-  return {
-    classes,
-    // Named rather than guessed at. The Maine-Anjou upgrade chart is a PDF
-    // this could not read, and inventing a threshold for it would put a wrong
-    // class on a sale sheet.
-    ...(maine > 0
-      ? {
-          unknownRules:
-            `${Math.round(maine * 100) / 100}% Maine-Anjou. The AMAA upgrade chart is not on ` +
-            `file here, so what that qualifies for is not worked out — check maine-anjou.org.`,
-        }
-      : {}),
-  };
+  return { classes: [...chianina(composition), ...maine(composition), ...shorthorn(composition)] };
 }

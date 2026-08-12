@@ -26,6 +26,7 @@ export * from "./domain/health-record.js";
 export * from "./domain/import-identity.js";
 export * from "./domain/heat-record.js";
 export * from "./domain/herd-roadmap.js";
+export * from "./domain/maine-upgrade.js";
 export * from "./domain/mating-analysis.js";
 export * from "./domain/med-inventory.js";
 export * from "./domain/pedigree.js";

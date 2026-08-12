@@ -21,12 +21,16 @@ import {
   DEFECT_NAMES,
   HOUSE_RULE_DEFECTS,
   expectedComposition,
+  maineClassFor,
+  mainePercent,
+  maineProgeny,
   inferAncestorSexes,
   resolveCompositionFor,
   matingAllowed,
   matingDefectRisk,
   predictColour,
   relatedness,
+  registrationClasses,
   relatednessVerdict,
   RELATEDNESS_GENERATIONS,
   writeExtension,
@@ -120,6 +124,25 @@ export function PairingPlanner({
     sireBreeding === undefined || damBreeding === undefined
       ? []
       : expectedComposition(sireBreeding.composition, damBreeding.composition);
+
+  /**
+   * What the calf could be papered as.
+   *
+   * Two answers, and they are not the same question. `registrationClasses`
+   * reads the calf's makeup against each association's thresholds; the AMAA
+   * *upgrading chart* is a lookup on the parents' own classes and is
+   * deliberately more generous than halving in places — a Fullblood bull on a
+   * 3/8 cow gives 11/16 by arithmetic and registers as 3/4. Where the two
+   * disagree, the chart is what papers get issued on.
+   */
+  const upgrade =
+    sireBreeding === undefined || damBreeding === undefined
+      ? undefined
+      : maineProgeny(
+          maineClassFor(mainePercent(sireBreeding.composition)),
+          maineClassFor(mainePercent(damBreeding.composition)),
+        );
+  const eligibility = registrationClasses(composition);
 
   const colour =
     sireProfile?.coatGenotype === undefined || damProfile?.coatGenotype === undefined
@@ -302,6 +325,65 @@ export function PairingPlanner({
                       <Meter value={share.percent / 100} tone="identity" />
                     </div>
                   ))}
+                </div>
+              </Card>
+            )}
+
+            {composition.length === 0 ? null : (
+              <Card title="What it could be papered as">
+                <div className="flex flex-col gap-3">
+                  {eligibility.classes.map((entry) => (
+                    <div key={`${entry.association}-${entry.name}`} className="flex flex-col gap-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <Pill tone="identity">{entry.association}</Pill>
+                        <span className="text-density font-medium text-ink">{entry.name}</span>
+                      </span>
+                      <span className="text-sm text-muted">{entry.because}</span>
+                      {entry.alsoRequires === undefined
+                        ? null
+                        : entry.alsoRequires.map((condition) => (
+                            <span key={condition} className="text-sm text-muted">
+                              · also needs: {condition}
+                            </span>
+                          ))}
+                    </div>
+                  ))}
+
+                  {upgrade === undefined ? null : (
+                    <div className="flex flex-col gap-1 border-t border-edge pt-3">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <Pill tone="identity">AMAA</Pill>
+                        <span className="text-density font-medium text-ink">
+                          Upgrading chart: {upgrade.label}
+                        </span>
+                        {upgrade.paper === undefined ? null : (
+                          <Pill tone={upgrade.paper === "High Maine" ? "calm" : "neutral"}>
+                            {upgrade.paper} papers
+                          </Pill>
+                        )}
+                      </span>
+                      {/*
+                        The chart is a lookup on the parents' registered
+                        classes, not a calculation on the calf's percentage,
+                        and it is more generous than halving in places — a
+                        Fullblood bull on a 3/8 cow gives 11/16 by arithmetic
+                        and registers as 3/4. Shown beside the percentage
+                        rather than instead of it, because a breeder needs
+                        both: one is what the calf is, the other is what the
+                        association will paper it as.
+                      */}
+                      <span className="text-sm text-muted">
+                        Off the AMAA upgrading chart, which is a lookup on both parents&apos;
+                        classes rather than a sum — it is more generous than halving in places, and
+                        it is what papers actually get issued on.
+                      </span>
+                      {upgrade.conditions.map((condition) => (
+                        <span key={condition} className="text-sm text-muted">
+                          · {condition}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </Card>
             )}

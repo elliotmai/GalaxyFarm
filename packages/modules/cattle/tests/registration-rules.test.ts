@@ -75,12 +75,16 @@ describe("Chianina", () => {
   });
 
   it("falls back to Percentage Chianina", () => {
-    // Maine on the other side rather than Shorthorn, because 60% Shorthorn
-    // would also be ShorthornPlus — which is right, and would make this test
-    // about two things.
-    expect(names([{ breed: "CA", percent: 40 }, { breed: "MA", percent: 60 }])).toEqual([
-      "Percentage Chianina",
-    ]);
+    // Twenty per cent Shorthorn in it, so it is over the Chiangus ceiling and
+    // under the ShorthornPlus floor — Chianina genetics meeting no composite's
+    // terms, which is exactly what the fallback class is for.
+    expect(
+      names([
+        { breed: "CA", percent: 40 },
+        { breed: "AN", percent: 40 },
+        { breed: "SH", percent: 20 },
+      ]),
+    ).toEqual(["Percentage Chianina"]);
   });
 });
 
@@ -102,19 +106,38 @@ describe("Shorthorn", () => {
   });
 });
 
-describe("what is not on file", () => {
-  it("says the Maine-Anjou chart is missing rather than guessing at it", () => {
-    // The upgrade chart is a PDF this could not read. A confidently wrong
-    // class is worse than a blank one — it gets quoted in a catalogue.
-    const verdict = registrationClasses([
-      { breed: "MA", percent: 79.57 },
-      { breed: "AN", percent: 20.43 },
-    ]);
-
-    expect(verdict.unknownRules).toMatch(/AMAA upgrade chart is not on file/);
-    expect(verdict.classes).toEqual([]);
+describe("Maine-Anjou", () => {
+  it("puts 3/4 and over on High Maine brown papers", () => {
+    expect(
+      names([{ breed: "MA", percent: 79.57 }, { breed: "AN", percent: 20.43 }]).join(" "),
+    ).toMatch(/High Maine — 3\/4/);
   });
 
+  it("puts a half on MaineTainer green", () => {
+    expect(names([{ breed: "MA", percent: 50 }, { breed: "AN", percent: 50 }]).join(" ")).toMatch(
+      /MaineTainer — 1\/2/,
+    );
+  });
+
+  it("mentions Maine Angus on the fractions it can apply to", () => {
+    // The blue paper covers 3/8 to 5/8 and the AMAA judges it on more than
+    // the fraction, so it is named rather than claimed.
+    const half = registrationClasses([
+      { breed: "MA", percent: 50 },
+      { breed: "AN", percent: 50 },
+    ]).classes.find((entry) => entry.association === "AMAA");
+
+    expect(half?.alsoRequires?.join(" ")).toMatch(/Maine Angus/);
+  });
+
+  it("refuses anything under a quarter", () => {
+    expect(names([{ breed: "MA", percent: 12.5 }, { breed: "AN", percent: 87.5 }])).toContain(
+      "Not eligible",
+    );
+  });
+});
+
+describe("what is not on file", () => {
   it("says so when there is no makeup at all", () => {
     expect(registrationClasses([]).unknownRules).toMatch(/No breed makeup/);
   });
