@@ -38,10 +38,13 @@ import {
   ASSOCIATIONS,
   cattleProfileSchema,
   describeComposition,
+  describeCompositionSource,
   HORN_STATUSES,
   isPapered,
   type Association,
   type CattleProfile,
+  type ExternalAnimal,
+  type ResolvedComposition,
   type HealthRecord,
   type HornStatus,
   type Registration,
@@ -57,6 +60,7 @@ import {
 } from "@/app/(admin)/admin/cattle/[id]/_components/animal-tabs";
 import { GeneticsPanel } from "@/app/(admin)/admin/cattle/[id]/_components/genetics-panel";
 import { animalSlug, animalTitle, resolveAnimalSlug } from "@/lib/animal-slug";
+import { compositionLookup, compositionOfAnimal } from "@/lib/composition";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -86,6 +90,7 @@ export function AnimalScreen({
   const router = useRouter();
   const { records: animals, loading } = useRecords<Animal>("animals", { propertyId });
   const { records: profiles } = useRecords<CattleProfile>("cattleProfiles", { propertyId });
+  const { records: outsiders } = useRecords<ExternalAnimal>("externalAnimals", { propertyId });
   const { records: zones } = useRecords<Zone>("zones", { propertyId });
   const { records: placements } = useRecords<ZoneAssignment>("zoneAssignments", { propertyId });
   const { records: health } = useRecords<HealthRecord>("healthRecords", { propertyId });
@@ -120,6 +125,15 @@ export function AnimalScreen({
 
   const animal = found.animal;
   const profile = profiles.find((entry) => entry.animalId === animal.id);
+
+  /**
+   * What breed she is, and where that answer came from.
+   *
+   * The papers win. Where there are none it is worked out from the parents,
+   * walked back until something *is* papered — so a commercial cow out of two
+   * registered animals still gets a real makeup rather than a blank.
+   */
+  const breeding = compositionOfAnimal(animal.id, compositionLookup(profiles, outsiders));
   // Both slots, not just one. `currentAssignment` defaults to the legacy
   // `primary` slot, so a cow standing in the barn — an `inside` assignment —
   // read as unassigned on her own page while the pen board showed her in it.
@@ -178,9 +192,9 @@ export function AnimalScreen({
           ) : undefined
         }
         subtitle={
-          profile === undefined || profile.breedComposition.length === 0
+          breeding.composition.length === 0
             ? undefined
-            : describeComposition(profile.breedComposition)
+            : `${describeComposition(breeding.composition)}${breeding.source === "parents" ? " (from her parents)" : ""}`
         }
         meta={
           <>
@@ -241,6 +255,7 @@ export function AnimalScreen({
         animal={animal}
         profile={profile}
         zone={zone}
+        breeding={breeding}
         propertyId={propertyId}
         actorId={actorId}
       />
@@ -274,12 +289,14 @@ function AnimalTabs({
   animal,
   profile,
   zone,
+  breeding,
   propertyId,
   actorId,
 }: {
   readonly animal: Animal;
   readonly profile: CattleProfile | undefined;
   readonly zone: Zone | undefined;
+  readonly breeding: ResolvedComposition;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
 }) {
@@ -287,7 +304,7 @@ function AnimalTabs({
     <Tabs label="Animal profile" tabs={[...TABS]}>
       {(active) => {
         if (active === "overview")
-          return <Overview animal={animal} profile={profile} zone={zone} />;
+          return <Overview animal={animal} profile={profile} zone={zone} breeding={breeding} />;
         if (active === "registrations") {
           return (
             <>
@@ -338,10 +355,12 @@ function Overview({
   animal,
   profile,
   zone,
+  breeding,
 }: {
   readonly animal: Animal;
   readonly profile: CattleProfile | undefined;
   readonly zone: Zone | undefined;
+  readonly breeding: ResolvedComposition;
 }) {
   return (
     <div className="flex flex-col gap-density pt-density">
@@ -370,7 +389,17 @@ function Overview({
             {
               label: "Breed composition",
               value:
-                profile === undefined ? undefined : describeComposition(profile.breedComposition),
+                breeding.composition.length === 0
+                  ? undefined
+                  : describeComposition(breeding.composition),
+            },
+            {
+              // Said out loud, because "79.57% Maine, off the AMAA papers" and
+              // "roughly three-quarters Maine, worked out from her parents"
+              // are different claims, and the first is the one a buyer checks.
+              label: "Where that comes from",
+              value: describeCompositionSource(breeding),
+              wide: true,
             },
             { label: "Horns", value: profile?.hornStatus },
             { label: "Colour", value: profile?.colour },

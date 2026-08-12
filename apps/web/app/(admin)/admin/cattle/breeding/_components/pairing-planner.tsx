@@ -3,12 +3,26 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { Callout, Card, EmptyState, Meter, Pill, Section, Select, Tile } from "@galaxy-farm/ui";
+import {
+  Callout,
+  Card,
+  EmptyState,
+  Meter,
+  Pill,
+  SearchSelect,
+  Section,
+  Tile,
+  type SearchOption,
+} from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
+  allRegistrations,
+  canBe,
   DEFECT_NAMES,
   HOUSE_RULE_DEFECTS,
   expectedComposition,
+  inferAncestorSexes,
+  resolveCompositionFor,
   matingAllowed,
   matingDefectRisk,
   predictColour,
@@ -23,6 +37,7 @@ import {
 } from "@galaxy-farm/module-cattle";
 
 import { animalHref } from "@/lib/animal-slug";
+import { compositionLookup } from "@/lib/composition";
 import { usePedigreeSource } from "@/lib/pedigree-source";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -90,10 +105,21 @@ export function PairingPlanner({
 
   const chosen = sireRef !== undefined && damRef !== undefined;
 
+  /**
+   * What the calf would be.
+   *
+   * Resolved through the pedigree rather than off one field, so a bull out of
+   * the tank — an ancestor record with a makeup off his own papers — counts
+   * the same as a bull in the pasture, and an unpapered cow's makeup comes up
+   * from her parents.
+   */
+  const lookup = compositionLookup(profiles, outsiders);
+  const sireBreeding = sireRef === undefined ? undefined : resolveCompositionFor(sireRef, lookup);
+  const damBreeding = damRef === undefined ? undefined : resolveCompositionFor(damRef, lookup);
   const composition =
-    sireProfile === undefined || damProfile === undefined
+    sireBreeding === undefined || damBreeding === undefined
       ? []
-      : expectedComposition(sireProfile.breedComposition, damProfile.breedComposition);
+      : expectedComposition(sireBreeding.composition, damBreeding.composition);
 
   const colour =
     sireProfile?.coatGenotype === undefined || damProfile?.coatGenotype === undefined
@@ -116,14 +142,47 @@ export function PairingPlanner({
       ? []
       : matingDefectRisk(sireProfile.geneticTests, damProfile.geneticTests);
 
-  const sireOptions = [
+  /**
+   * Bulls only.
+   *
+   * The list used to be every ancestor on file, cows included — and a cow
+   * picked as a sire produces a colour prediction, a relatedness figure and a
+   * breed makeup that all look perfectly ordinary and are all nonsense.
+   */
+  const sexes = inferAncestorSexes(outsiders, [...profiles, ...outsiders]);
+
+  const sireOptions: SearchOption[] = [
     ...animals
       .filter((animal) => animal.sex === "male" && animal.status === "active")
-      .map((animal) => ({ value: `animal:${animal.id}`, label: `${displayName(animal)} (ours)` })),
+      .map((animal) => ({
+        value: `animal:${animal.id}`,
+        label: displayName(animal),
+        ...(animal.tagNumber === undefined ? {} : { detail: animal.tagNumber }),
+        group: "Ours",
+      })),
     ...[...outsiders]
+      .filter((entry) => canBe(sexes.get(entry.id), "male"))
       .sort((left, right) => left.name.localeCompare(right.name))
-      .map((entry) => ({ value: `external:${entry.id}`, label: entry.name })),
+      .map((entry) => {
+        const papers = allRegistrations(entry)
+          .map((registration) => `${registration.association} ${registration.regNumber}`)
+          .join(" · ");
+        return {
+          value: `external:${entry.id}`,
+          label: entry.name,
+          ...(papers === "" ? {} : { detail: papers }),
+          group: sexes.get(entry.id)?.sex === undefined ? "Not yet placed" : "On the papers",
+        };
+      }),
   ];
+
+  const damOptions: SearchOption[] = animals
+    .filter((animal) => animal.sex === "female" && animal.status === "active")
+    .map((animal) => ({
+      value: animal.id,
+      label: displayName(animal),
+      ...(animal.tagNumber === undefined ? {} : { detail: animal.tagNumber }),
+    }));
 
   return (
     <div className="flex flex-col gap-density">
@@ -132,21 +191,21 @@ export function PairingPlanner({
         description="Nothing here is saved. It is the look you take before you pull the straw."
       >
         <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
-          <Select
+          <SearchSelect
             label="Sire"
+            hint="Bulls only — ours and the ones on the papers. Type any part of a name or a number."
             value={sireKey}
             placeholder="Choose a bull"
             options={sireOptions}
-            onChange={(event) => setSireKey(event.target.value)}
+            onChange={setSireKey}
           />
-          <Select
+          <SearchSelect
             label="Dam"
+            hint="Active cows here."
             value={damId}
             placeholder="Choose a cow"
-            options={animals
-              .filter((animal) => animal.sex === "female" && animal.status === "active")
-              .map((animal) => ({ value: animal.id, label: displayName(animal) }))}
-            onChange={(event) => setDamId(event.target.value)}
+            options={damOptions}
+            onChange={setDamId}
           />
         </div>
       </Section>

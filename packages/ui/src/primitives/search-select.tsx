@@ -51,6 +51,17 @@ export interface SearchSelectProps {
   readonly placeholder?: string | undefined;
   /** Offered as the first row, so a parent can be cleared. */
   readonly clearLabel?: string | undefined;
+  /**
+   * Let a value that is not on the list be used, as an explicit last row.
+   *
+   * Off by default and deliberately so: a parent field that quietly accepts a
+   * name nobody has on file is how a pedigree ends up pointing at a bull that
+   * does not exist. It is switched on for the fields where an outside name is
+   * genuinely the answer — a straw from a bull this farm will never own — and
+   * even then the row has to be *chosen*, so nothing is created by typing and
+   * walking away.
+   */
+  readonly allowCustom?: ((typed: string) => string) | undefined;
   readonly disabled?: boolean | undefined;
   readonly className?: string | undefined;
 }
@@ -105,6 +116,7 @@ export function SearchSelect({
   onChange,
   placeholder,
   clearLabel,
+  allowCustom,
   disabled,
   className,
 }: SearchSelectProps) {
@@ -123,8 +135,14 @@ export function SearchSelect({
     if (search.trim() === "") {
       return clearLabel === undefined ? [...options] : [{ value: "", label: clearLabel }, ...options];
     }
-    return options.filter((option) => matchesSearch(option, search));
-  }, [options, search, clearLabel]);
+    const found = options.filter((option) => matchesSearch(option, search));
+    if (allowCustom === undefined) return found;
+    // Last, never first: the list is what somebody is looking for, and a
+    // "use what I typed" row above it would be picked by a hurried Enter.
+    const typed = search.trim();
+    const exact = found.some((option) => option.label.toLowerCase() === typed.toLowerCase());
+    return exact ? found : [...found, { value: typed, label: allowCustom(typed) }];
+  }, [options, search, clearLabel, allowCustom]);
 
   // Clicking away closes without changing anything. A picker that swallowed
   // the click that dismissed it is a picker that eats a keystroke every time.
@@ -204,8 +222,9 @@ export function SearchSelect({
             // Showing the chosen label when closed and the search when open is
             // what makes one box do both jobs. Clearing the search on close is
             // what stops a half-typed name reading as a selection.
-            value={open ? search : (chosen?.label ?? "")}
-            placeholder={chosen === undefined ? (placeholder ?? "Search…") : chosen.label}
+            // A custom value has no option to look up, so it shows as itself.
+            value={open ? search : (chosen?.label ?? value)}
+            placeholder={placeholder ?? "Search…"}
             onChange={(event) => {
               setSearch(event.target.value);
               setActive(0);

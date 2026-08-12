@@ -40,6 +40,7 @@ import {
 
 import { DigitalBeefImport } from "@/app/(admin)/admin/cattle/ancestors/_components/import-panel";
 import { MergeAncestors } from "@/app/(admin)/admin/cattle/ancestors/_components/merge-panel";
+import { checkable, RefreshAllAncestors } from "@/app/(admin)/admin/cattle/ancestors/_components/refresh-all-panel";
 import { RefreshFromAssociation } from "@/app/(admin)/admin/cattle/ancestors/_components/refresh-panel";
 import { useMutations } from "@/lib/local/mutations";
 import { usePedigreeSource } from "@/lib/pedigree-source";
@@ -126,6 +127,8 @@ export function AncestorsScreen({
   const [checking, setChecking] = useState<ExternalAnimal | undefined>();
   /** The one being kept, when two records for one animal are being joined. */
   const [merging, setMerging] = useState<ExternalAnimal | undefined>();
+  /** Whether the check-them-all dialog is open. */
+  const [checkingAll, setCheckingAll] = useState(false);
   const [draft, setDraft] = useState<Draft | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -500,9 +503,16 @@ export function AncestorsScreen({
         title="Ancestors"
         subtitle="Animals on the papers that are not ours. Entered by hand, because no association exposes them any other way."
         actions={
-          <Button variant="primary" onClick={startCreate}>
-            Add an ancestor
-          </Button>
+          <span className="flex flex-wrap gap-2">
+            {checkable(outsiders).length === 0 ? null : (
+              <Button variant="ghost" onClick={() => setCheckingAll(true)}>
+                Check all against the associations
+              </Button>
+            )}
+            <Button variant="primary" onClick={startCreate}>
+              Add an ancestor
+            </Button>
+          </span>
         }
       />
 
@@ -523,6 +533,22 @@ export function AncestorsScreen({
             propertyId={propertyId}
             actorId={actorId}
             onDone={() => setChecking(undefined)}
+          />
+        </Modal>
+      )}
+
+      {!checkingAll ? null : (
+        <Modal
+          size="wide"
+          title="Check every papered ancestor"
+          description="For a herd whose papers were read months ago and have been quietly going stale since."
+          onClose={() => setCheckingAll(false)}
+        >
+          <RefreshAllAncestors
+            animals={outsiders}
+            propertyId={propertyId}
+            actorId={actorId}
+            onDone={() => setCheckingAll(false)}
           />
         </Modal>
       )}

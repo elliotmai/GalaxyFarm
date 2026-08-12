@@ -13,6 +13,7 @@ import {
   PageBody,
   PageHeader,
   Section,
+  SearchSelect,
   Select,
   Stat,
   StatRow,
@@ -20,12 +21,16 @@ import {
   useConfirmDelete,
   useToast,
   type Column,
+  type SearchOption,
 } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
+  allRegistrations,
   BREEDING_METHODS,
-  DEFAULT_GESTATION_DAYS,
   breedingRecordSchema,
+  canBe,
+  DEFAULT_GESTATION_DAYS,
+  inferAncestorSexes,
   calvingWindow,
   daysBred,
   isInCalvingWindow,
@@ -35,6 +40,8 @@ import {
   projectedDueDate,
   type BreedingMethod,
   type BreedingRecord,
+  type CattleProfile,
+  type ExternalAnimal,
   type PregCheckMethod,
   type PregCheckResult,
 } from "@galaxy-farm/module-cattle";
@@ -72,6 +79,8 @@ export function BreedingScreen({
   readonly actorId: Ulid;
 }) {
   const { records: animals } = useRecords<Animal>("animals", { propertyId });
+  const { records: outsiders } = useRecords<ExternalAnimal>("externalAnimals", { propertyId });
+  const { records: profiles } = useRecords<CattleProfile>("cattleProfiles", { propertyId });
   const { records: breedings, loading } = useRecords<BreedingRecord>("breedingRecords", {
     propertyId,
   });
@@ -95,6 +104,49 @@ export function BreedingScreen({
   const dams = animals.filter(
     (animal) =>
       animal.species === "cattle" && animal.sex === "female" && animal.status === "active",
+  );
+
+  /**
+   * Every bull worth offering: ours, and the ones on the papers.
+   *
+   * The sire on a breeding record is a *name* rather than a reference — a
+   * straw can come from a bull nobody will ever own — so this is a list to
+   * pick from rather than a list to be held to. A cow in it, though, is how a
+   * cow gets recorded as somebody's sire, so the same bulls-only rule applies.
+   */
+  const sexes = useMemo(
+    () => inferAncestorSexes(outsiders, [...profiles, ...outsiders]),
+    [outsiders, profiles],
+  );
+  const sires: SearchOption[] = useMemo(
+    () => [
+      ...animals
+        .filter(
+          (animal) =>
+            animal.species === "cattle" && animal.sex === "male" && animal.status === "active",
+        )
+        .map((animal) => ({
+          value: displayName(animal),
+          label: displayName(animal),
+          ...(animal.tagNumber === undefined ? {} : { detail: animal.tagNumber }),
+          group: "Ours",
+        })),
+      ...[...outsiders]
+        .filter((entry) => canBe(sexes.get(entry.id), "male"))
+        .sort((left, right) => left.name.localeCompare(right.name))
+        .map((entry) => {
+          const papers = allRegistrations(entry)
+            .map((registration) => `${registration.association} ${registration.regNumber}`)
+            .join(" · ");
+          return {
+            value: entry.name,
+            label: entry.name,
+            ...(papers === "" ? {} : { detail: papers }),
+            group: "On the papers",
+          };
+        }),
+    ],
+    [animals, outsiders, sexes],
   );
 
   const watched = breedings.filter((record) => isInCalvingWindow(record, now));
@@ -274,7 +326,7 @@ export function BreedingScreen({
       <PairingPlanner animals={animals} propertyId={propertyId} />
 
       <Section title="Record a breeding">
-        <AddBreeding dams={dams} api={breedingsApi} />
+        <AddBreeding dams={dams} sires={sires} api={breedingsApi} />
       </Section>
 
       <Section title="Every breeding">
@@ -305,7 +357,15 @@ export function BreedingScreen({
 
 type Api = ReturnType<typeof useMutations<BreedingRecord>>;
 
-function AddBreeding({ dams, api }: { readonly dams: readonly Animal[]; readonly api: Api }) {
+function AddBreeding({
+  dams,
+  sires,
+  api,
+}: {
+  readonly dams: readonly Animal[];
+  readonly sires: readonly SearchOption[];
+  readonly api: Api;
+}) {
   const { show } = useToast();
   const [damId, setDamId] = useState("");
   const [method, setMethod] = useState<BreedingMethod>("AI");
@@ -372,12 +432,16 @@ function AddBreeding({ dams, api }: { readonly dams: readonly Animal[]; readonly
   return (
     <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
       <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-        <Select
+        <SearchSelect
           label="Dam"
           value={damId}
-          onChange={(event) => setDamId(event.target.value)}
+          onChange={setDamId}
           placeholder="Choose a cow"
-          options={dams.map((animal) => ({ value: animal.id, label: displayName(animal) }))}
+          options={dams.map((animal) => ({
+            value: animal.id,
+            label: displayName(animal),
+            ...(animal.tagNumber === undefined ? {} : { detail: animal.tagNumber }),
+          }))}
           required
         />
         <Select
@@ -386,11 +450,17 @@ function AddBreeding({ dams, api }: { readonly dams: readonly Animal[]; readonly
           onChange={(event) => setMethod(event.target.value as BreedingMethod)}
           options={BREEDING_METHODS.map((value) => ({ value, label: value }))}
         />
-        <TextInput
+        <SearchSelect
           label="Sire"
-          hint="Bull or straw. A picker arrives with the semen tank (#20)."
+          hint="Bulls here and on the papers. A straw from a bull nobody has on file can be typed in."
           value={sire}
-          onChange={(event) => setSire(event.target.value)}
+          placeholder="Choose or type a bull"
+          options={sires}
+          // The one field where an outside name is genuinely the answer: a
+          // straw from a bull this farm will never own. The row still has to
+          // be picked, so nothing is recorded by typing and walking away.
+          allowCustom={(typed) => `Use "${typed}" — not on file`}
+          onChange={setSire}
           required
         />
         <TextInput

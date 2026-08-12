@@ -8,6 +8,8 @@ import {
   expectedComposition,
   relatedness,
   relatednessVerdict,
+  resolveComposition,
+  resolveCompositionFor,
 } from "../src/domain/mating-analysis.js";
 
 /**
@@ -255,5 +257,101 @@ describe("what to say about a coefficient", () => {
   it("names the relationship rather than only the number", () => {
     expect(relatednessVerdict(0.125).summary).toMatch(/half-sibling/i);
     expect(relatednessVerdict(0.25).summary).toMatch(/parent-offspring|full-sibling/i);
+  });
+});
+
+describe("where a breed makeup comes from", () => {
+  const maine = [{ breed: "MA", percent: 100 }];
+  const chi = [{ breed: "CH", percent: 100 }];
+
+  it("takes the papers when there are papers", () => {
+    // A registered animal's makeup is what the association computed off a
+    // pedigree going back further than anything on this farm, and it is the
+    // number a buyer checks. Recomputing it here would give a subtly different
+    // figure, and the two disagreeing on a sale sheet is worse than either.
+    const papered = [{ breed: "MA", percent: 79.57 }, { breed: "AN", percent: 20.43 }];
+
+    expect(resolveComposition(papered, maine, chi)).toEqual({
+      composition: papered,
+      source: "papers",
+    });
+  });
+
+  it("halves each parent when there are none", () => {
+    expect(resolveComposition(undefined, maine, chi)).toEqual({
+      composition: [
+        { breed: "MA", percent: 50 },
+        { breed: "CH", percent: 50 },
+      ],
+      source: "parents",
+      fromBothParents: true,
+    });
+  });
+
+  it("says when only one parent is known", () => {
+    // Half a pedigree gives half an answer, and printing "50% Shorthorn" as a
+    // complete makeup is a lie the screen can avoid telling.
+    const half = resolveComposition(undefined, undefined, chi);
+
+    expect(half.source).toBe("parents");
+    expect(half.fromBothParents).toBe(false);
+    expect(half.composition).toEqual([{ breed: "CH", percent: 50 }]);
+  });
+
+  it("gives up rather than guessing when nothing is known", () => {
+    expect(resolveComposition(undefined, undefined, undefined)).toEqual({
+      composition: [],
+      source: "unknown",
+    });
+  });
+
+  it("treats an empty makeup as no makeup", () => {
+    expect(resolveComposition([], maine, chi).source).toBe("parents");
+  });
+});
+
+describe("resolving a makeup off the pedigree", () => {
+  const ref = (id: string) => ({ kind: "external" as const, id: id as Ulid });
+
+  /** Grandparents papered, parents not, subject not. */
+  const lookup = {
+    papersOf(target: { id: string }) {
+      if (target.id === "grandsire") return [{ breed: "MA", percent: 100 }];
+      if (target.id === "granddam") return [{ breed: "CH", percent: 100 }];
+      if (target.id === "damside") return [{ breed: "SH", percent: 100 }];
+      return undefined;
+    },
+    parentsOf(target: { id: string }) {
+      if (target.id === "calf") return { sire: ref("sire"), dam: ref("damside") };
+      if (target.id === "sire") return { sire: ref("grandsire"), dam: ref("granddam") };
+      return undefined;
+    },
+  };
+
+  it("walks up until it finds papers", () => {
+    // A commercial cow with registered grandparents still gets a real answer.
+    expect(resolveCompositionFor(ref("calf"), lookup).composition).toEqual([
+      { breed: "SH", percent: 50 },
+      { breed: "MA", percent: 25 },
+      { breed: "CH", percent: 25 },
+    ]);
+  });
+
+  it("stops at an animal's own papers rather than recomputing them", () => {
+    expect(resolveCompositionFor(ref("grandsire"), lookup)).toEqual({
+      composition: [{ breed: "MA", percent: 100 }],
+      source: "papers",
+    });
+  });
+
+  it("gives up at the depth bound rather than walking a loop forever", () => {
+    // A mistyped registration number can make an animal its own grandsire, and
+    // an unbounded walk on a screen somebody opened by accident is a hung tab.
+    const circular = {
+      papersOf: () => undefined,
+      parentsOf: (target: { id: string }) => ({ sire: ref(target.id) }),
+    };
+
+    expect(resolveCompositionFor(ref("x"), circular).source).toBe("unknown");
   });
 });

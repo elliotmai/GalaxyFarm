@@ -265,3 +265,107 @@ export function relatednessVerdict(coefficient: number): {
   }
   return { level: "clear", summary: "No common ancestors in the generations on file." };
 }
+
+/* ------------------------------------------------- where a makeup comes from */
+
+export type CompositionOrigin = "papers" | "parents" | "unknown";
+
+export interface ResolvedComposition {
+  readonly composition: readonly BreedShare[];
+  readonly source: CompositionOrigin;
+  /**
+   * When it came from the parents, whether both were known.
+   *
+   * Half a pedigree gives half an answer: a calf out of a 100% Shorthorn cow
+   * by an unknown bull is at most "50% Shorthorn and 50% something", and
+   * printing that as a complete makeup is a lie the screen can avoid telling.
+   */
+  readonly fromBothParents?: boolean | undefined;
+}
+
+/**
+ * What breed an animal is (spec §5.2).
+ *
+ * **The papers win.** A registered animal's makeup is a fact the association
+ * computed from a pedigree that goes back further than anything on this farm,
+ * and it is the number a buyer will check. Recomputing it here from two
+ * parents would produce a subtly different figure — the association rounds,
+ * carries fractions of a percent, and knows generations we do not — and the
+ * two disagreeing on a sale sheet is worse than either.
+ *
+ * **Otherwise it is half of each parent's**, which is what breeding is. A calf
+ * out of a half-Maine cow by a purebred Chi is a quarter Maine and half Chi
+ * whether or not anybody has papered her.
+ *
+ * The source travels with the answer, because "79.57% Maine, off the AMAA
+ * papers" and "roughly three-quarters Maine, worked out from her parents" are
+ * different claims and a screen that showed them identically would let the
+ * second be quoted as the first.
+ */
+export function resolveComposition(
+  own: readonly BreedShare[] | undefined,
+  sire: readonly BreedShare[] | undefined,
+  dam: readonly BreedShare[] | undefined,
+): ResolvedComposition {
+  if (own !== undefined && own.length > 0) return { composition: own, source: "papers" };
+
+  const sireKnown = sire !== undefined && sire.length > 0;
+  const damKnown = dam !== undefined && dam.length > 0;
+  if (!sireKnown && !damKnown) return { composition: [], source: "unknown" };
+
+  return {
+    composition: expectedComposition(sire ?? [], dam ?? []),
+    source: "parents",
+    fromBothParents: sireKnown && damKnown,
+  };
+}
+
+/** How to say where the makeup came from, on a screen. */
+export function describeCompositionSource(resolved: ResolvedComposition): string | undefined {
+  if (resolved.source === "papers") return "Off the papers.";
+  if (resolved.source === "unknown") return undefined;
+  return resolved.fromBothParents === true
+    ? "Worked out from the sire and dam — nothing on the papers says otherwise."
+    : "Worked out from the one parent on file, so this only accounts for half of it.";
+}
+
+/** What resolving a makeup off a pedigree needs to be able to look up. */
+export interface CompositionLookup {
+  /** The makeup on this animal's own papers, if it has any. */
+  papersOf(ref: ParentRef): readonly BreedShare[] | undefined;
+  parentsOf(ref: ParentRef): { sire?: ParentRef; dam?: ParentRef } | undefined;
+}
+
+/**
+ * An animal's makeup, walking back as far as it has to.
+ *
+ * The papers win at every level. Only where an animal has none does this go up
+ * to its parents — and only where *they* have none does it go up again. A
+ * commercial cow with a registered sire and a registered dam gets a real
+ * answer; so does her unpapered daughter.
+ *
+ * Bounded, because a pedigree can contain a loop once somebody mistypes a
+ * registration number, and an unbounded walk on a screen somebody opened by
+ * accident is a hung tab.
+ */
+export function resolveCompositionFor(
+  ref: ParentRef,
+  lookup: CompositionLookup,
+  depth = RELATEDNESS_GENERATIONS,
+): ResolvedComposition {
+  const papers = lookup.papersOf(ref);
+  if (papers !== undefined && papers.length > 0) return { composition: papers, source: "papers" };
+  if (depth <= 0) return { composition: [], source: "unknown" };
+
+  const parents = lookup.parentsOf(ref);
+  const sire =
+    parents?.sire === undefined
+      ? undefined
+      : resolveCompositionFor(parents.sire, lookup, depth - 1).composition;
+  const dam =
+    parents?.dam === undefined
+      ? undefined
+      : resolveCompositionFor(parents.dam, lookup, depth - 1).composition;
+
+  return resolveComposition(undefined, sire, dam);
+}
