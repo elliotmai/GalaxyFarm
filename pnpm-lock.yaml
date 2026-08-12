@@ -86,6 +86,9 @@ importers:
       '@galaxy-farm/module-cattle':
         specifier: workspace:*
         version: link:../../packages/modules/cattle
+      '@galaxy-farm/module-feed':
+        specifier: workspace:*
+        version: link:../../packages/modules/feed
       '@galaxy-farm/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -186,6 +189,9 @@ importers:
       '@galaxy-farm/module-cattle':
         specifier: workspace:*
         version: link:../../modules/cattle
+      '@galaxy-farm/module-feed':
+        specifier: workspace:*
+        version: link:../../modules/feed
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1

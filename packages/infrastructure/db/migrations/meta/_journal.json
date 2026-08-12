@@ -71,6 +71,13 @@
       "when": 1786493755608,
       "tag": "0009_cattle_records",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786494602368,
+      "tag": "0010_feed_types",
+      "breakpoints": true
     }
   ]
 }

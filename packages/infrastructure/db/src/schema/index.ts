@@ -528,6 +528,32 @@ export const zoneAssignments = pgTable(
  * `lines` is jsonb rather than a child table for the §4.2 reason above: the
  * sync engine patches fields, and a plan's lines change as a unit.
  */
+/**
+ * The feed catalogue (§5.3).
+ *
+ * Cross-species on purpose: the same round bale feeds cattle and the same
+ * scratch feeds chickens, so this is one list rather than one per animal type.
+ * A feeding plan's lines name an entry here, which is what makes "40 lb a head
+ * a day" and "three bales" comparable at all.
+ */
+export const feedTypes = pgTable(
+  "feed_types",
+  {
+    ...baseColumns,
+    name: text("name").notNull(),
+    category: text("category").notNull(),
+    unit: text("unit").notNull(),
+    /** A round bale is 800 to 1,400 lb depending on who baled it. */
+    estWeightLbPerUnit: doublePrecision("est_weight_lb_per_unit"),
+    currentUnitCost: jsonb("current_unit_cost").$type<{ cents: number }>(),
+    reorderLeadDays: integer("reorder_lead_days").notNull(),
+    reorderThreshold: doublePrecision("reorder_threshold"),
+    active: boolean("active").notNull(),
+    notes: text("notes"),
+  },
+  baseIndexes("feed_types"),
+);
+
 export const feedingPlans = pgTable(
   "feeding_plans",
   {
@@ -843,6 +869,7 @@ export const allTables = {
   geneticGoals,
   plannedMatings,
   zoneAssignments,
+  feedTypes,
   feedingPlans,
   contacts,
   attachments,

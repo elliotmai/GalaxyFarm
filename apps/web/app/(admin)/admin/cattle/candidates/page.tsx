@@ -1,13 +1,13 @@
-import { PagePlaceholder } from "../../../../_components/page-placeholder";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Purchase Candidates" };
+import { CattleCandidatesScreen } from "@/app/(admin)/admin/cattle/candidates/_components/candidates-screen";
+import { currentActor } from "@/lib/auth";
 
-export default function AdminCattleCandidatesPage() {
-  return (
-    <PagePlaceholder
-      title={"Purchase Candidates"}
-      route={"/admin/cattle/candidates"}
-      phase={"Phase 1"}
-    />
-  );
+export const metadata = { title: "Purchase candidates" };
+
+export default async function AdminCattleCandidatesPage() {
+  const actor = await currentActor();
+  if (actor === undefined) redirect("/login?next=/admin/cattle/candidates");
+
+  return <CattleCandidatesScreen propertyId={actor.propertyId} actorId={actor.id} />;
 }

@@ -29,6 +29,13 @@ export interface FieldProps {
   /** Set to show the field as failed. Replaces the hint while present. */
   readonly error?: string;
   readonly required?: boolean;
+  /**
+   * Hide the label visually where a heading or a column already says what the
+   * control is — a table row of selects each captioned "Status" is noise. The
+   * label is still rendered and still associated; it moves to `sr-only`, so
+   * nothing is taken away from anyone reading with a screen reader.
+   */
+  readonly hideLabel?: boolean;
   readonly children: (ids: FieldIds) => ReactNode;
   readonly className?: string;
 }
@@ -39,7 +46,15 @@ export interface FieldIds {
   readonly invalid: boolean;
 }
 
-export function Field({ label, hint, error, required = false, children, className }: FieldProps) {
+export function Field({
+  label,
+  hint,
+  error,
+  required = false,
+  hideLabel = false,
+  children,
+  className,
+}: FieldProps) {
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
@@ -50,7 +65,7 @@ export function Field({ label, hint, error, required = false, children, classNam
 
   return (
     <div className={["flex flex-col gap-1", className ?? ""].filter(Boolean).join(" ")}>
-      <label htmlFor={id} className="text-density font-medium text-ink">
+      <label htmlFor={id} className={hideLabel ? "sr-only" : "text-density font-medium text-ink"}>
         {label}
         {required ? (
           <>
@@ -101,6 +116,7 @@ export function TextInput({
   hint,
   error,
   required,
+  hideLabel,
   numeric = false,
   className,
   ...rest
@@ -111,6 +127,7 @@ export function TextInput({
       {...(hint === undefined ? {} : { hint })}
       {...(error === undefined ? {} : { error })}
       {...(required === undefined ? {} : { required })}
+      {...(hideLabel === undefined ? {} : { hideLabel })}
       {...(className === undefined ? {} : { className })}
     >
       {({ id, describedBy, invalid }) => (
@@ -134,13 +151,22 @@ export interface TextAreaProps
     Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "id" | "className" | "required">,
     Omit<FieldProps, "children"> {}
 
-export function TextArea({ label, hint, error, required, className, ...rest }: TextAreaProps) {
+export function TextArea({
+  label,
+  hint,
+  error,
+  required,
+  hideLabel,
+  className,
+  ...rest
+}: TextAreaProps) {
   return (
     <Field
       label={label}
       {...(hint === undefined ? {} : { hint })}
       {...(error === undefined ? {} : { error })}
       {...(required === undefined ? {} : { required })}
+      {...(hideLabel === undefined ? {} : { hideLabel })}
       {...(className === undefined ? {} : { className })}
     >
       {({ id, describedBy, invalid }) => (
@@ -176,6 +202,7 @@ export function Select({
   hint,
   error,
   required,
+  hideLabel,
   options,
   placeholder,
   className,
@@ -187,6 +214,7 @@ export function Select({
       {...(hint === undefined ? {} : { hint })}
       {...(error === undefined ? {} : { error })}
       {...(required === undefined ? {} : { required })}
+      {...(hideLabel === undefined ? {} : { hideLabel })}
       {...(className === undefined ? {} : { className })}
     >
       {({ id, describedBy, invalid }) => (

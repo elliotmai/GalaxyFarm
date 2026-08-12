@@ -134,6 +134,18 @@ describe("form controls", () => {
     expect(screen.getByRole("option", { name: "Choose a pen" })).toBeDisabled();
   });
 
+  it("hides a label from the eye without hiding it from a screen reader", () => {
+    // A table column already headed "Status" does not need the word repeated
+    // above every select in it. What it must not do is drop the label —
+    // that would leave the control nameless to anyone not looking at it.
+    render(
+      <Select label="Status" hideLabel options={[{ value: "watching", label: "watching" }]} />,
+    );
+
+    expect(screen.getByLabelText("Status")).toBeInTheDocument();
+    expect(screen.getByText("Status")).toHaveClass("sr-only");
+  });
+
   it("makes the whole checkbox row the target, not the 16px box", async () => {
     // One-thumb logging in a barn does not tolerate a 16px hit area.
     render(<Checkbox label="Treated today" />);
