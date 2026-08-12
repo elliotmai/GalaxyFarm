@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { parseDigitalBeefPage, parseDigitalBeefUrl } from "@galaxy-farm/module-cattle";
+import { parseAnimalPage, parseAnimalUrl } from "@galaxy-farm/module-cattle";
 
 import { currentActor } from "@/lib/auth";
 import { pedigreeDocuments } from "@/lib/digital-beef-panels";
@@ -66,7 +66,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Send the animal's web address." }, { status: 400 });
   }
 
-  const parsed = parseDigitalBeefUrl(body.url);
+  // Angus is not Digital Beef — a different site, a different page, its own
+  // reader. Recognised here rather than in a second route because everything
+  // around the parse is identical: the same fetch, the same allow-list, the
+  // same paste-the-page fallback when a host will not talk to a datacenter IP.
+  const parsed = parseAnimalUrl(body.url);
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.reason }, { status: 400 });
   }
@@ -101,10 +105,15 @@ export async function POST(request: Request) {
     html = await response.text();
 
     // The tabs, fetched from whatever URLs the page itself names. Same host
-    // only — this validated the animal's URL against the three known hosts
-    // before fetching, and following an arbitrary link out of a page's markup
-    // would hand that guarantee straight back.
-    for (const extra of pedigreeDocuments(html, parsed.ref.url).slice(0, MAX_SUB_DOCUMENTS)) {
+    // only — this validated the animal's URL against the known hosts before
+    // fetching, and following an arbitrary link out of a page's markup would
+    // hand that guarantee straight back.
+    //
+    // Angus needs none of this: its pedigree is on the animal's own page.
+    const subDocuments = parsed.ref.association === "AAA"
+      ? []
+      : pedigreeDocuments(html, parsed.ref.url).slice(0, MAX_SUB_DOCUMENTS);
+    for (const extra of subDocuments) {
       try {
         const panel = await fetch(extra, {
           headers: {
@@ -141,7 +150,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const animal = parseDigitalBeefPage(html, parsed.ref);
+  const animal = parseAnimalPage(html, parsed.ref);
 
   return NextResponse.json({
     animal,

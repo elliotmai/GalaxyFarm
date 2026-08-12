@@ -8,10 +8,12 @@ import {
   allRegistrations,
   applyChanges,
   defaultAccepted,
-  digitalBeefUrl,
+  canRefresh,
+  registrationUrl,
+  registryFor,
   externalAnimalSchema,
-  parseDigitalBeefPage,
-  parseDigitalBeefUrl,
+  parseAnimalPage,
+  parseAnimalUrl,
   pedigreeChanges,
   unknownOnChart,
   refreshChanges,
@@ -82,10 +84,10 @@ export function RefreshFromAssociation({
   const url =
     association === undefined || regNumber === undefined
       ? undefined
-      : digitalBeefUrl(association as never, regNumber);
+      : registrationUrl(association, regNumber);
 
   function present(page: string, ref: { association: string; registration: string; url: string }) {
-    const read = parseDigitalBeefPage(page, ref as never);
+    const read = parseAnimalPage(page, ref as never);
     const found = refreshChanges(animal, read, everyone);
     setChartMissing(read.ancestors.length === 0);
     setStrangers(unknownOnChart(read, everyone));
@@ -113,7 +115,19 @@ export function RefreshFromAssociation({
       setError("This one has no registration number on file, so there is no page to check.");
       return;
     }
-    const parsed = parseDigitalBeefUrl(url);
+    // A registry can have a page worth opening and still not be one this app
+    // knows how to read. Saying which is far more use than a failed parse: the
+    // link is right there, and a person can copy what they find into the
+    // record by hand.
+    if (association !== undefined && !canRefresh(association)) {
+      const registry = registryFor(association);
+      setError(
+        `${registry?.name ?? association} is not a site this app can read. Its page for ` +
+          `${regNumber as string} is at ${url} — open it and fill anything in by hand.`,
+      );
+      return;
+    }
+    const parsed = parseAnimalUrl(url);
     if (!parsed.ok) {
       setError(parsed.reason);
       return;
@@ -150,7 +164,7 @@ export function RefreshFromAssociation({
       setError("Pick which registration to check against first.");
       return;
     }
-    const parsed = parseDigitalBeefUrl(url);
+    const parsed = parseAnimalUrl(url);
     if (!parsed.ok) {
       setError(parsed.reason);
       return;

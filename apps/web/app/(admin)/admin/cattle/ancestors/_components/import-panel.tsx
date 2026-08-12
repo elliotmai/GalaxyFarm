@@ -17,12 +17,13 @@ import {
 import type { Ulid } from "@galaxy-farm/core";
 import {
   allRegistrations,
-  digitalBeefUrl,
+  registrationUrl,
   externalAnimalSchema,
-  IMPORTABLE_ASSOCIATIONS,
+  READABLE_REGISTRIES,
+  registryFor,
   mergeRegistration,
-  parseDigitalBeefPage,
-  parseDigitalBeefUrl,
+  parseAnimalPage,
+  parseAnimalUrl,
   planImport,
   sexFromPosition,
   type ExternalAnimal,
@@ -73,7 +74,7 @@ export function DigitalBeefImport({
   );
   const { show } = useToast();
 
-  const [association, setAssociation] = useState<string>(IMPORTABLE_ASSOCIATIONS[0] ?? "AMAA");
+  const [association, setAssociation] = useState<string>(READABLE_REGISTRIES[0] ?? "AMAA");
   const [registration, setRegistration] = useState("");
   /** An address typed in whole, for the day one of the three changes its shape. */
   const [pasted, setPasted] = useState("");
@@ -134,7 +135,7 @@ export function DigitalBeefImport({
   const url =
     pasted.trim() !== ""
       ? pasted.trim()
-      : (digitalBeefUrl(association as never, registration.trim()) ?? "");
+      : (registrationUrl(association, registration.trim()) ?? "");
 
   async function fetchByUrl() {
     setError(undefined);
@@ -145,7 +146,7 @@ export function DigitalBeefImport({
       return;
     }
 
-    const parsed = parseDigitalBeefUrl(url);
+    const parsed = parseAnimalUrl(url);
     if (!parsed.ok) {
       setError(parsed.reason);
       return;
@@ -176,7 +177,7 @@ export function DigitalBeefImport({
     setError(undefined);
     setPreview(undefined);
 
-    const parsed = parseDigitalBeefUrl(url);
+    const parsed = parseAnimalUrl(url);
     if (!parsed.ok) {
       setError(
         `${parsed.reason} The address is still needed — it says which registry the numbers belong to.`,
@@ -188,7 +189,7 @@ export function DigitalBeefImport({
       return;
     }
 
-    show_(parseDigitalBeefPage(html, parsed.ref));
+    show_(parseAnimalPage(html, parsed.ref));
   }
 
   /**
@@ -301,7 +302,10 @@ export function DigitalBeefImport({
               label="Association"
               hint="Which registry issued the number."
               value={association}
-              options={IMPORTABLE_ASSOCIATIONS.map((value) => ({ value, label: value }))}
+              options={READABLE_REGISTRIES.map((value) => ({
+                value,
+                label: registryFor(value)?.name ?? value,
+              }))}
               onChange={(event) => setAssociation(event.target.value)}
             />
             <TextInput
@@ -561,7 +565,17 @@ function Row({
               {carries.map((test) => test.defect).join(", ")} carrier
             </Pill>
           )}
-          {row.regNumber === undefined ? null : <Pill>{row.regNumber}</Pill>}
+          {row.regNumber === undefined ? null : (
+            // The registry is named whenever it is not the site being read.
+            // `AN13054003` on a Maine-Anjou pedigree is an Angus number, and a
+            // bare "13054003" would leave somebody looking for it in the wrong
+            // herdbook.
+            <Pill tone={row.citedOn === undefined ? "neutral" : "identity"}>
+              {row.citedOn === undefined
+                ? row.regNumber
+                : `${row.association} ${row.regNumber}`}
+            </Pill>
+          )}
           <Pill tone="identity">{row.position ?? row.ancestor?.branch ?? "this animal"}</Pill>
         </span>
       </div>

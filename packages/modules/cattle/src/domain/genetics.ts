@@ -29,7 +29,25 @@ import { z } from "zod";
  * DS — developmental duplication, the polymelia gene, mostly Angus but it
  * crosses in. The rest are the other recessives a commercial bull might carry.
  */
-export const GENETIC_DEFECTS = ["TH", "PHA", "DS", "DD", "NH", "AM", "CA", "OS", "MSUD"] as const;
+export const GENETIC_DEFECTS = [
+  "TH",
+  "PHA",
+  "DS",
+  "DD",
+  "NH",
+  "AM",
+  "CA",
+  "OS",
+  "MSUD",
+  // Angus prints a fuller strip than the three Digital Beef sites do — a bull's
+  // page carries `[ AMF-CAF-D2F-DDF-M1F-NHF-OHF-OSF ]`. These three are the
+  // ones that were not already here. They are listed rather than ignored
+  // because an unlisted code is *dropped*, and a dropped `M1C` is a carrier
+  // that never appears on any screen.
+  "M1",
+  "OH",
+  "D2",
+] as const;
 export type GeneticDefect = (typeof GENETIC_DEFECTS)[number];
 
 /** What each abbreviation is, for a screen that should not assume anyone knows. */
@@ -46,6 +64,14 @@ export const DEFECT_NAMES: Record<GeneticDefect, string> = {
   CA: "Contractural arachnodactyly",
   OS: "Osteopetrosis",
   MSUD: "Maple syrup urine disease",
+  M1: "Mulefoot — syndactyly, in the American Angus Association's code",
+  OH: "Oculocutaneous hypopigmentation",
+  // Deliberately not spelled out. It is on every Angus page in the strip of
+  // condition codes, and what it abbreviates is not written on the pages read
+  // here. A confident wrong expansion on a sale sheet is worse than the code
+  // itself, which is at least what the association prints and what its own
+  // "Genetic Condition Codes" page will settle.
+  D2: "D2 — an American Angus condition code, expansion not on file",
 };
 
 /**

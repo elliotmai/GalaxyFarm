@@ -22,7 +22,7 @@ import {
   DEFECT_NAMES,
   describeComposition,
   describeCompositionSource,
-  digitalBeefUrl,
+  registrationUrl,
   GENETIC_DEFECTS,
   herdRuleVerdict,
   HOUSE_RULE_DEFECTS,
@@ -170,7 +170,7 @@ export function AncestorDetail({
           </Pill>
         )}
         {papers.map((entry) => {
-          const url = digitalBeefUrl(entry.association as never, entry.regNumber);
+          const url = registrationUrl(entry.association, entry.regNumber);
           return url === undefined ? (
             <Pill key={`${entry.association}-${entry.regNumber}`} tone="identity">
               {entry.association} {entry.regNumber}

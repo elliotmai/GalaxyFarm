@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseDigitalBeefPage } from "../src/domain/digital-beef.js";
 import { matchCandidate, mergeRegistration, planImport } from "../src/domain/import-identity.js";
 import { allRegistrations, type ExternalAnimal } from "../src/domain/pedigree.js";
+import { splitRegistration } from "../src/domain/registries.js";
 import { CHIANINA_PAGE, MAINE_ANJOU_PAGE } from "./fixtures/digital-beef-pages.js";
 
 /**
@@ -120,18 +121,39 @@ describe("planning an import", () => {
     const animal = maine();
     const onFile = [
       external({ name: animal.name as string, regNumber: "402303", association: "AMAA" }),
-      ...animal.ancestors.map((ancestor) =>
-        external({
+      // Filed the way the importer files them: under whichever registry issued
+      // the number. This page cites three Chianina numbers — `CA240047` and
+      // friends — and storing those under AMAA is the duplicate this is meant
+      // to prevent.
+      ...animal.ancestors.map((ancestor) => {
+        const issued =
+          ancestor.regNumber === undefined
+            ? undefined
+            : splitRegistration(ancestor.regNumber, "AMAA");
+        return external({
           name: ancestor.name as string,
-          ...(ancestor.regNumber === undefined ? {} : { regNumber: ancestor.regNumber }),
-          association: "AMAA",
-        }),
-      ),
+          ...(issued === undefined ? {} : { regNumber: issued.regNumber }),
+          association: issued?.association ?? "AMAA",
+        });
+      }),
     ];
 
     const plan = planImport(animal, onFile);
 
     expect(plan.rows.every((row) => row.match?.confidence === "certain")).toBe(true);
+  });
+
+  it("files a cited number under the registry that issued it, not the page it was on", () => {
+    // The Maine-Anjou page for ZNT MONTEGO BAY cites his dam's dam's sire as
+    // `CA240047`. That is a Chianina number printed on a Maine-Anjou page, and
+    // filing it under AMAA makes a second copy of a bull the Chianina import
+    // already knows as 240047.
+    const plan = planImport(maine(), []);
+    const cited = plan.rows.find((row) => row.regNumber === "240047");
+
+    expect(cited?.association).toBe("ACA");
+    expect(cited?.citedOn).toBe("AMAA");
+    expect(plan.rows.some((row) => row.regNumber === "CA240047")).toBe(false);
   });
 
   it("joins the second association's page onto the first, slot by slot", () => {

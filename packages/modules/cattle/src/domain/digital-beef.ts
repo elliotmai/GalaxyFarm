@@ -299,7 +299,7 @@ const looksLikeRegistration = (token: string): boolean => REGISTRATION.test(toke
  * must not happen is a code nobody recognised being rounded down to "fine" on
  * a page where the house rule is that no carrier comes onto the place.
  */
-const DEFECT_CODE = /^(MSUD|PHA|TH|DS|DD|AM|NH|CA|OS)(FT|FP|CT|AT|F|C|A|P|S|H)?$/;
+const DEFECT_CODE = /^(MSUD|PHA|TH|DS|DD|D2|M1|OH|AM|NH|CA|OS)(FT|FP|CT|AT|F|C|A|P|S|H)?$/;
 
 const CODE_STATUS: Record<string, DefectStatus> = {
   F: "free",
@@ -312,9 +312,25 @@ const CODE_STATUS: Record<string, DefectStatus> = {
   H: "affected",
 };
 
-/** Read one flag. Unknown suffixes are suspect, never free. */
-export function parseDefectCode(code: string): GeneticTest | undefined {
-  const match = DEFECT_CODE.exec(code.trim().toUpperCase());
+/** The same, with any suffix at all — for a token already known to be a code. */
+const LOOSE_DEFECT_CODE = /^(MSUD|PHA|TH|DS|DD|D2|M1|OH|AM|NH|CA|OS)([A-Z]{1,2})?$/;
+
+/**
+ * Read one flag. Unknown suffixes are suspect, never free.
+ *
+ * `certain` says the token came from somewhere that holds nothing but codes —
+ * the bracket on an Angus page. Then an unrecognised suffix is *suspect*
+ * rather than discarded, which matters: `AMZ` dropped is a result nobody sees,
+ * and the one thing that must not happen is an animal reading as clear because
+ * a code went unrecognised.
+ *
+ * Off a page where codes sit among words, the strict list applies instead. A
+ * bull called `RED CAP` ends in a word that a loose reading calls "CA, free by
+ * parentage", and inventing a clear test result is the same failure from the
+ * other end.
+ */
+export function parseDefectCode(code: string, certain = false): GeneticTest | undefined {
+  const match = (certain ? LOOSE_DEFECT_CODE : DEFECT_CODE).exec(code.trim().toUpperCase());
   if (match === null) return undefined;
 
   const defect = match[1] as GeneticDefect;
@@ -843,7 +859,14 @@ export interface ImportedParent {
 }
 
 export interface ImportedAnimal {
-  readonly association: Association;
+  /**
+   * Whoever issued the number.
+   *
+   * A string rather than the four this farm registers with, because the Angus
+   * reader produces this shape too and `AAA` is a real answer that no amount
+   * of narrowing makes wrong.
+   */
+  readonly association: string;
   readonly registration: string;
   readonly sourceUrl?: string | undefined;
   readonly name?: string | undefined;
@@ -871,6 +894,15 @@ export interface ImportedAnimal {
    */
   readonly classification?: string | undefined;
   readonly breedComposition: readonly { breed: string; percent: number }[];
+  /**
+   * The animal's own defect results, when the page prints them.
+   *
+   * Digital Beef never does — it prints an animal's tests only beside it on a
+   * *descendant's* chart, which is why the chart has to be read at all. Angus
+   * prints the whole strip on the animal's own page, so this is the one place
+   * a subject's genetics arrive without a descendant.
+   */
+  readonly geneticTests?: readonly GeneticTest[] | undefined;
   /** Sire and dam off the detail panel, which is more reliable than the chart. */
   readonly sire?: ImportedParent | undefined;
   readonly dam?: ImportedParent | undefined;

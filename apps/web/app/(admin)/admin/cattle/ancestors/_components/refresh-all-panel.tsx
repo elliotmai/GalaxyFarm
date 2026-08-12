@@ -7,11 +7,11 @@ import type { Ulid } from "@galaxy-farm/core";
 import {
   allRegistrations,
   applyChanges,
-  digitalBeefUrl,
+  registrationUrl,
   externalAnimalSchema,
-  IMPORTABLE_ASSOCIATIONS,
-  parseDigitalBeefPage,
-  parseDigitalBeefUrl,
+  canRefresh,
+  parseAnimalPage,
+  parseAnimalUrl,
   cattleProfileSchema,
   pedigreeChanges,
   profileChanges,
@@ -57,7 +57,7 @@ interface Failure {
 export function checkable(animals: readonly ExternalAnimal[]): ExternalAnimal[] {
   return animals.filter((animal) =>
     allRegistrations(animal).some((entry) =>
-      (IMPORTABLE_ASSOCIATIONS as readonly string[]).includes(entry.association),
+      canRefresh(entry.association),
     ),
   );
 }
@@ -169,13 +169,13 @@ export function RefreshAllAncestors({
       // so checking the first number and stopping is why a dual-registered
       // animal came back with nothing to say about its breeding.
       const registrations = allRegistrations(animal).filter((entry) =>
-        (IMPORTABLE_ASSOCIATIONS as readonly string[]).includes(entry.association),
+        canRefresh(entry.association),
       );
 
       let read = false;
       for (const registration of registrations) {
-        const url = digitalBeefUrl(registration.association as never, registration.regNumber);
-        const parsed = url === undefined ? undefined : parseDigitalBeefUrl(url);
+        const url = registrationUrl(registration.association, registration.regNumber);
+        const parsed = url === undefined ? undefined : parseAnimalUrl(url);
         if (url === undefined || parsed === undefined || !parsed.ok) continue;
 
         try {
@@ -192,7 +192,7 @@ export function RefreshAllAncestors({
           }
 
           read = true;
-          const page = parseDigitalBeefPage(payload.page, parsed.ref);
+          const page = parseAnimalPage(payload.page, parsed.ref);
           // A page without its chart carries no defect results at all — they
           // are printed beside each ancestor and nowhere else — so this is
           // counted and said out loud rather than passing as "no changes".
@@ -225,8 +225,8 @@ export function RefreshAllAncestors({
     // what the charts say about the ancestors above them — nothing on this
     // screen edits an animal of ours.
     for (const ours of ourRegistrations) {
-      const url = digitalBeefUrl(ours.association as never, ours.regNumber);
-      const parsed = url === undefined ? undefined : parseDigitalBeefUrl(url);
+      const url = registrationUrl(ours.association, ours.regNumber);
+      const parsed = url === undefined ? undefined : parseAnimalUrl(url);
       if (url === undefined || parsed === undefined || !parsed.ok) {
         setDone((count) => count + 1);
         continue;
@@ -246,7 +246,7 @@ export function RefreshAllAncestors({
             reason: payload.error ?? "Could not read that page.",
           });
         } else {
-          const page = parseDigitalBeefPage(payload.page, parsed.ref);
+          const page = parseAnimalPage(payload.page, parsed.ref);
           if (page.ancestors.length === 0) setChartless((count) => count + 1);
 
           // The animal's own breed makeup, colour and horn status. This is the

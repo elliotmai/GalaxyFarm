@@ -2,6 +2,7 @@ import type { Ulid } from "@galaxy-farm/core";
 
 import type { ImportedAncestor, ImportedAnimal } from "./digital-beef.js";
 import { allRegistrations, normaliseRegistration, type ExternalAnimal } from "./pedigree.js";
+import { splitRegistration } from "./registries.js";
 
 /**
  * Deciding when two pedigree pages are describing the same animal (spec §5.2).
@@ -54,7 +55,15 @@ export interface ImportRow {
   readonly key: string;
   readonly name: string;
   readonly regNumber?: string | undefined;
+  /** Whoever issued the number — which is not always the site it was read on. */
   readonly association: string;
+  /**
+   * The page this number was cited on, when that is a different registry.
+   *
+   * Worth showing: "AAA 13054003, cited on the Maine-Anjou page" tells
+   * somebody both where it came from and where to go and check it.
+   */
+  readonly citedOn?: string | undefined;
   /** "sire", "dam's dam's sire", or undefined for the animal itself. */
   readonly position?: string | undefined;
   readonly generation?: number | undefined;
@@ -229,16 +238,26 @@ export function planImport(
     subject === undefined || pedigreeOf === undefined ? undefined : pedigreeOf(subject);
 
   const row = (ancestor: ImportedAncestor, fallbackKey: string): ImportRow => {
-    const name = ancestor.name ?? `${association} ${ancestor.regNumber ?? "?"}`;
+    // The number decides which registry it belongs to, not the page it was
+    // read off. A Chianina pedigree cites `MA364424` for a bull whose own
+    // Maine-Anjou page calls him 364424, and filing the first under ACA makes
+    // a second copy of him that no amount of later matching undoes.
+    const issued =
+      ancestor.regNumber === undefined
+        ? undefined
+        : splitRegistration(ancestor.regNumber, association);
+    const registry = issued?.association ?? association;
+
+    const name = ancestor.name ?? `${registry} ${issued?.regNumber ?? "?"}`;
     const match = matchCandidate(
       {
         name,
-        ...(ancestor.regNumber === undefined ? {} : { regNumber: ancestor.regNumber }),
+        ...(issued === undefined ? {} : { regNumber: issued.regNumber }),
         ...(ancestor.tattoo === undefined ? {} : { tattoo: ancestor.tattoo }),
         ...(ancestor.dob === undefined ? {} : { dob: ancestor.dob }),
         ...(ancestor.position === undefined ? {} : { position: ancestor.position }),
       },
-      association,
+      registry,
       existing,
       index,
       positional,
@@ -247,8 +266,9 @@ export function planImport(
     return {
       key: ancestor.position ?? fallbackKey,
       name,
-      ...(ancestor.regNumber === undefined ? {} : { regNumber: ancestor.regNumber }),
-      association,
+      ...(issued === undefined ? {} : { regNumber: issued.regNumber }),
+      association: registry,
+      ...(issued?.foreignTo === undefined ? {} : { citedOn: issued.foreignTo }),
       ...(ancestor.position === undefined ? {} : { position: ancestor.position }),
       ...(ancestor.generation === undefined ? {} : { generation: ancestor.generation }),
       ancestor,
