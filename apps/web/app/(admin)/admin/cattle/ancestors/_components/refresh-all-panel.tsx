@@ -51,6 +51,22 @@ interface Finding {
 interface Failure {
   readonly animal: ExternalAnimal;
   readonly reason: string;
+  /**
+   * The page that could not be read.
+   *
+   * Carried so the screen can hand it over as a link rather than as a count.
+   * "Four could not be read" is a dead end; four names you can click through
+   * to the association, copy, and paste back in is the way the job gets
+   * finished — and these hosts refuse a datacenter IP often enough that this
+   * is the ordinary path, not the exception.
+   */
+  readonly url?: string | undefined;
+}
+
+/** A page that answered but had no pedigree chart on it. */
+interface Chartless {
+  readonly label: string;
+  readonly url?: string | undefined;
 }
 
 /** Only the ones there is actually a page to look up. */
@@ -107,6 +123,30 @@ export function RefreshAllAncestors({
   const { show } = useToast();
 
   const queue = checkable(animals);
+  /**
+   * The ones with no page at all, and why.
+   *
+   * They were being dropped by `checkable` and never mentioned again, so
+   * "twenty-eight of thirty-four" left six animals unaccounted for with
+   * nothing on screen saying which six or what to do about them. Most have no
+   * registration number; the rest hold one from a registry with no reader.
+   */
+  const unreachable = animals
+    .filter((animal) => !queue.includes(animal))
+    .map((animal) => {
+      const papers = allRegistrations(animal);
+      const linkable = papers
+        .map((entry) => ({ entry, url: registrationUrl(entry.association, entry.regNumber) }))
+        .find((candidate) => candidate.url !== undefined);
+      return {
+        label: animal.name,
+        ...(linkable?.url === undefined ? {} : { url: linkable.url }),
+        why:
+          papers.length === 0
+            ? "no registration number on file"
+            : `${papers.map((entry) => entry.association).join(", ")} — not a site this app can read`,
+      };
+    });
   const pages = queue.length + ourRegistrations.length;
   const [done, setDone] = useState(0);
   const [running, setRunning] = useState(false);
@@ -114,7 +154,7 @@ export function RefreshAllAncestors({
   const [findings, setFindings] = useState<readonly Finding[]>([]);
   const [failures, setFailures] = useState<readonly Failure[]>([]);
   /** Pages that came back with a detail panel but no pedigree chart. */
-  const [chartless, setChartless] = useState(0);
+  const [chartless, setChartless] = useState<readonly Chartless[]>([]);
   /** What the farm's own animals' pages would change on their profiles. */
   const [ourFindings, setOurFindings] = useState<
     readonly { label: string; profile: CattleProfile; changes: readonly FieldChange[] }[]
@@ -129,13 +169,14 @@ export function RefreshAllAncestors({
     setDone(0);
     setFindings([]);
     setFailures([]);
-    setChartless(0);
+    setChartless([]);
     setOurFindings([]);
     setAccepted(new Set());
 
     const found: Finding[] = [];
     const ourResults: { label: string; profile: CattleProfile; changes: readonly FieldChange[] }[] = [];
     const failed: Failure[] = [];
+    const noChart: Chartless[] = [];
     const ticked = new Set<string>();
 
     /** Merge a change into what is already proposed for an animal. */
@@ -197,7 +238,7 @@ export function RefreshAllAncestors({
           const payload = (await response.json()) as { page?: string; error?: string };
 
           if (!response.ok || payload.page === undefined) {
-            failed.push({ animal, reason: payload.error ?? "Could not read that page." });
+            failed.push({ animal, reason: payload.error ?? "Could not read that page.", url });
             continue;
           }
 
@@ -206,7 +247,7 @@ export function RefreshAllAncestors({
           // A page without its chart carries no defect results at all — they
           // are printed beside each ancestor and nowhere else — so this is
           // counted and said out loud rather than passing as "no changes".
-          if (page.ancestors.length === 0) setChartless((count) => count + 1);
+          if (page.ancestors.length === 0) noChart.push({ label: animal.name, url });
           record(animal, registration, refreshChanges(animal, page, animals));
 
           // The chart on this page carries the defect results of the ancestors
@@ -217,7 +258,7 @@ export function RefreshAllAncestors({
             record(entry.animal, registration, entry.changes);
           }
         } catch {
-          failed.push({ animal, reason: "Could not reach the server." });
+          failed.push({ animal, reason: "Could not reach the server.", url });
         }
       }
 
@@ -228,6 +269,7 @@ export function RefreshAllAncestors({
       setDone((count) => count + 1);
       setFindings([...found]);
       setFailures([...failed]);
+      setChartless([...noChart]);
       setAccepted(new Set(ticked));
     }
 
@@ -254,10 +296,11 @@ export function RefreshAllAncestors({
           failed.push({
             animal: { id: ours.label, name: ours.label } as ExternalAnimal,
             reason: payload.error ?? "Could not read that page.",
+            url,
           });
         } else {
           const page = parseAnimalPage(payload.page, parsed.ref);
-          if (page.ancestors.length === 0) setChartless((count) => count + 1);
+          if (page.ancestors.length === 0) noChart.push({ label: ours.label, url });
 
           // The animal's own breed makeup, colour and horn status. This is the
           // one place the farm's own cattle get a composition off the papers —
@@ -279,6 +322,7 @@ export function RefreshAllAncestors({
         failed.push({
           animal: { id: ours.label, name: ours.label } as ExternalAnimal,
           reason: "Could not reach the server.",
+          url,
         });
       }
 
@@ -380,6 +424,36 @@ export function RefreshAllAncestors({
             nobody is waiting on the difference.
           </p>
 
+          {unreachable.length === 0 ? null : (
+            <Callout
+              tone="neutral"
+              title={`${unreachable.length} have no page this can check`}
+            >
+              <p>
+                Not a failure — there is simply nowhere to look. Anything with a link is on a site
+                this app cannot read; open it and fill the record in by hand.
+              </p>
+              <ul className="mt-2 flex flex-col gap-1">
+                {unreachable.map((entry) => (
+                  <li key={entry.label} className="flex flex-wrap items-baseline gap-2">
+                    <span className="text-density text-ink">{entry.label}</span>
+                    <span className="text-sm text-muted">{entry.why}</span>
+                    {entry.url === undefined ? null : (
+                      <a
+                        href={entry.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-action underline decoration-edge underline-offset-4 hover:decoration-action"
+                      >
+                        open the page ↗
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Callout>
+          )}
+
           {!running && !stopped ? (
             <>
               <p className="text-sm text-muted">
@@ -403,22 +477,36 @@ export function RefreshAllAncestors({
         </>
       )}
 
-      {chartless === 0 ? null : (
-        <Callout tone="action" title={`${chartless} pages came back without a pedigree chart`}>
-          Digital Beef renders the details on the page and loads the pedigree tab separately, so a
-          server fetch can come back with names and colors and no ancestors.{" "}
-          <strong>Defect results only exist on the chart</strong> — printed beside each ancestor,
-          never on the animal&apos;s own page — so those pages had none to give. Check those
-          animals one at a time and paste the page; a select-all in a browser copies what the tabs
-          loaded.
+      {chartless.length === 0 ? null : (
+        <Callout
+          tone="action"
+          title={`${chartless.length} pages came back without a pedigree chart`}
+        >
+          <p>
+            Digital Beef renders the details on the page and loads the pedigree tab separately, so
+            a server fetch can come back with names and colors and no ancestors.{" "}
+            <strong>Defect results only exist on the chart</strong> — printed beside each ancestor,
+            never on the animal&apos;s own page — so those pages had none to give. Open one, select
+            all, and paste it into that animal&apos;s own check: a browser has already run the tab
+            requests, so a select-all copies what they produced.
+          </p>
+          <PageLinks entries={chartless} />
         </Callout>
       )}
 
       {failures.length === 0 ? null : (
         <Callout tone="action" title={`${failures.length} could not be read`}>
-          {[...new Set(failures.map((failure) => failure.reason))].join(" ")} Those ancestors are
-          untouched — check them one at a time and paste the page if the site will not talk to the
-          server.
+          <p>
+            {[...new Set(failures.map((failure) => failure.reason))].join(" ")} Those records are
+            untouched. Open the page yourself and paste it into that animal&apos;s own check — that
+            path works regardless of what the host thinks of this server, and behind a login.
+          </p>
+          <PageLinks
+            entries={failures.map((failure) => ({
+              label: failure.animal.name,
+              url: failure.url,
+            }))}
+          />
         </Callout>
       )}
 
@@ -528,5 +616,51 @@ export function RefreshAllAncestors({
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * The pages behind a list of names, as links.
+ *
+ * A count of what failed is a dead end. A name somebody can click through to
+ * the association, copy, and paste back in is the way the job actually gets
+ * finished — and with hosts that refuse a datacenter IP, that is the ordinary
+ * path rather than the exception.
+ *
+ * A row with no address still appears, greyed. "We could not build a page for
+ * this one" is a different problem from "the site would not answer", and
+ * hiding the first would leave somebody counting names that do not add up.
+ */
+function PageLinks({
+  entries,
+}: {
+  readonly entries: readonly { label: string; url?: string | undefined }[];
+}) {
+  if (entries.length === 0) return null;
+
+  // One row per animal, not per attempt: a dual-registered animal that failed
+  // on both its pages is still one animal to go and look at.
+  const rows = [...new Map(entries.map((entry) => [entry.label, entry])).values()];
+
+  return (
+    <ul className="mt-2 flex flex-col gap-1">
+      {rows.map((entry) => (
+        <li key={entry.label} className="flex flex-wrap items-baseline gap-2">
+          <span className="text-density text-ink">{entry.label}</span>
+          {entry.url === undefined ? (
+            <span className="text-sm text-muted">no page could be built for its registry</span>
+          ) : (
+            <a
+              href={entry.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-action underline decoration-edge underline-offset-4 hover:decoration-action"
+            >
+              open the page ↗
+            </a>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -122,8 +122,8 @@ export function RefreshFromAssociation({
     if (association !== undefined && !canRefresh(association, regNumber)) {
       const registry = registryFor(association);
       setError(
-        `${registry?.name ?? association} is not a site this app can read. Its page for ` +
-          `${regNumber as string} is at ${url} — open it and fill anything in by hand.`,
+        `${registry?.name ?? association} is not a site this app can read. Open its page below ` +
+          `and fill anything in by hand.`,
       );
       return;
     }
@@ -287,19 +287,45 @@ export function RefreshFromAssociation({
       )}
 
       {error === undefined ? null : (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
+        <div role="alert" className="flex flex-col gap-1">
+          <p className="text-sm text-danger">{error}</p>
+          {url === undefined ? null : (
+            // The way out, one click away. These hosts refuse a datacenter IP
+            // often enough that opening the page and pasting it is the
+            // ordinary path, and making somebody rebuild the address by hand
+            // from a registration number is how they give up instead.
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-action underline decoration-edge underline-offset-4 hover:decoration-action"
+            >
+              Open {association} {regNumber} at the association ↗
+            </a>
+          )}
+        </div>
       )}
 
       {!chartMissing ? null : (
         <Callout tone="action" title="That page came back without its pedigree chart">
-          Digital Beef renders the animal&apos;s details on the page and loads the pedigree tab
-          separately, so a fetch can come back with the name and the color and no ancestors at
-          all. <strong>Defect results only exist on the chart</strong> — they are printed beside
-          each ancestor, never on the animal&apos;s own page — so without it there are none to
-          read. Open the page in a browser and paste it below; a select-all copies what the tabs
-          loaded.
+          <p>
+            Digital Beef renders the animal&apos;s details on the page and loads the pedigree tab
+            separately, so a fetch can come back with the name and the color and no ancestors at
+            all. <strong>Defect results only exist on the chart</strong> — they are printed beside
+            each ancestor, never on the animal&apos;s own page — so without it there are none to
+            read. Open the page in a browser and paste it below; a select-all copies what the tabs
+            loaded.
+          </p>
+          {url === undefined ? null : (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-block text-sm text-action underline decoration-edge underline-offset-4 hover:decoration-action"
+            >
+              Open {association} {regNumber} at the association ↗
+            </a>
+          )}
         </Callout>
       )}
 
