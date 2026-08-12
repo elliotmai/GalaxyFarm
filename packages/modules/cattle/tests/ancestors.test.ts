@@ -6,6 +6,7 @@ import {
   filterAncestors,
   inferAncestorSexes,
   NO_FILTER,
+  planAncestorMerge,
   sexFromPosition,
 } from "../src/domain/ancestors.js";
 import type { ExternalAnimal } from "../src/domain/pedigree.js";
@@ -254,5 +255,85 @@ describe("animals registered in more than one place", () => {
   it("finds one by the number the other registry does not use", () => {
     expect(ancestorMatches(both, "359968")).toBe(true);
     expect(ancestorMatches(both, "402303")).toBe(true);
+  });
+});
+
+describe("folding two records for one animal into one", () => {
+  const keep = animal({
+    name: "ZNT JENNA 707T",
+    regNumber: "378987",
+    association: "AMAA",
+    colour: "Black",
+  });
+  const drop = animal({
+    name: "ZNT JENNA 707T",
+    regNumber: "337003",
+    association: "ACA",
+    tattoo: "707T",
+    colour: "Black",
+  });
+
+  it("keeps both registration numbers", () => {
+    // The whole point: one cow, two registries, and until now two records
+    // each holding half her descendants.
+    expect(planAncestorMerge(keep, drop, [], []).patch.registrations).toEqual([
+      { association: "AMAA", regNumber: "378987" },
+      { association: "ACA", regNumber: "337003" },
+    ]);
+  });
+
+  it("fills in what the kept record does not have", () => {
+    expect(planAncestorMerge(keep, drop, [], []).patch.tattoo).toBe("707T");
+  });
+
+  it("never overwrites a value the kept record already has", () => {
+    // A merge cannot be undone, and quietly preferring one of two hand-typed
+    // values is the kind of thing nobody would notice going wrong.
+    const different = animal({ name: "ZNT JENNA 707T", colour: "Red" });
+    const plan = planAncestorMerge(keep, different, [], []);
+
+    expect(plan.patch.colour).toBeUndefined();
+    expect(plan.warnings.some((warning) => warning.includes("colour"))).toBe(true);
+  });
+
+  it("says so when the two are named differently", () => {
+    const other = animal({ name: "JENNA" });
+
+    expect(planAncestorMerge(keep, other, [], []).warnings.join(" ")).toMatch(/named differently/);
+  });
+
+  it("merges defect results rather than replacing them", () => {
+    // A hair card typed against one copy has to survive.
+    const tested = animal({
+      name: "ZNT JENNA 707T",
+      geneticTests: [{ defect: "TH", status: "free" }],
+    });
+    const alsoTested = animal({
+      name: "ZNT JENNA 707T",
+      geneticTests: [{ defect: "PHA", status: "carrier" }],
+    });
+
+    expect(planAncestorMerge(tested, alsoTested, [], []).patch.geneticTests).toEqual([
+      { defect: "TH", status: "free" },
+      { defect: "PHA", status: "carrier" },
+    ]);
+  });
+
+  it("finds everything that has to be repointed", () => {
+    const calf = animal({ name: "HER CALF", dam: { kind: "external", id: drop.id } });
+    const plan = planAncestorMerge(keep, drop, [
+      { id: "01ARZ3NDEKTSV4RRFFQ69G5FZZ" as Ulid, label: "Star", dam: { kind: "external", id: drop.id } },
+    ], [calf]);
+
+    expect(plan.repoint).toEqual([
+      { kind: "profile", id: "01ARZ3NDEKTSV4RRFFQ69G5FZZ", label: "Star", role: "dam" },
+      { kind: "external", id: calf.id, label: "HER CALF", role: "dam" },
+    ]);
+  });
+
+  it("does not list the record being dropped as pointing at itself", () => {
+    const selfRef = { ...drop, dam: { kind: "external" as const, id: drop.id } };
+
+    expect(planAncestorMerge(keep, selfRef, [], [selfRef]).repoint).toEqual([]);
   });
 });

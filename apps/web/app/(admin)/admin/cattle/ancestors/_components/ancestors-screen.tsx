@@ -8,6 +8,7 @@ import {
   Card,
   DataTable,
   EmptyState,
+  Modal,
   PageBody,
   PageHeader,
   Pill,
@@ -38,6 +39,7 @@ import {
 } from "@galaxy-farm/module-cattle";
 
 import { DigitalBeefImport } from "@/app/(admin)/admin/cattle/ancestors/_components/import-panel";
+import { MergeAncestors } from "@/app/(admin)/admin/cattle/ancestors/_components/merge-panel";
 import { RefreshFromAssociation } from "@/app/(admin)/admin/cattle/ancestors/_components/refresh-panel";
 import { useMutations } from "@/lib/local/mutations";
 import { usePedigreeSource } from "@/lib/pedigree-source";
@@ -122,6 +124,8 @@ export function AncestorsScreen({
   const [filter, setFilter] = useState<AncestorFilter>(NO_FILTER);
   /** The one being checked against its association, if any. */
   const [checking, setChecking] = useState<ExternalAnimal | undefined>();
+  /** The one being kept, when two records for one animal are being joined. */
+  const [merging, setMerging] = useState<ExternalAnimal | undefined>();
   const [draft, setDraft] = useState<Draft | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -474,6 +478,9 @@ export function AncestorsScreen({
               Refresh
             </Button>
           )}
+          <Button variant="ghost" onClick={() => setMerging(row)}>
+            Merge
+          </Button>
           <Button variant="ghost" onClick={() => void remove(row)}>
             Delete
           </Button>
@@ -499,6 +506,47 @@ export function AncestorsScreen({
         }
       />
 
+      {checking === undefined ? null : (
+        <Modal
+          // Keyed, so picking a second animal rebuilds it. Without it React
+          // reuses the instance and the "check against" dropdown keeps the
+          // *previous* animal's registration number — which would quietly
+          // compare one animal against another animal's page.
+          key={checking.id}
+          size="wide"
+          title={`Check ${checking.name} against the association`}
+          description="A registry is not a snapshot. This reads the page again and shows what has moved."
+          onClose={() => setChecking(undefined)}
+        >
+          <RefreshFromAssociation
+            animal={checking}
+            propertyId={propertyId}
+            actorId={actorId}
+            onDone={() => setChecking(undefined)}
+          />
+        </Modal>
+      )}
+
+      {merging === undefined ? null : (
+        <Modal
+          key={merging.id}
+          size="wide"
+          title={`Merge another record into ${merging.name}`}
+          description="For when one animal was imported from two associations before anything could join them — two records, two numbers, half her descendants on each."
+          onClose={() => setMerging(undefined)}
+        >
+          <MergeAncestors
+            keep={merging}
+            others={outsiders.filter((entry) => entry.id !== merging.id)}
+            profiles={profiles}
+            animalNames={new Map(animals.map((entry) => [entry.id, displayName(entry)]))}
+            propertyId={propertyId}
+            actorId={actorId}
+            onDone={() => setMerging(undefined)}
+          />
+        </Modal>
+      )}
+
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile label="On file" value={outsiders.length} tone="identity" />
         <Tile label="Bulls" value={sireCount} />
@@ -522,7 +570,13 @@ export function AncestorsScreen({
       )}
 
       {draft === undefined ? null : (
-        <Card title={editing === undefined ? "New ancestor" : `Editing ${editing.name}`}>
+        <Modal
+          key={editing?.id ?? "new"}
+          size="wide"
+          title={editing === undefined ? "New ancestor" : `Editing ${editing.name}`}
+          description="Off the certificate. Everything here is optional except the name."
+          onClose={() => setDraft(undefined)}
+        >
           <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
             <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
               <TextInput
@@ -615,7 +669,7 @@ export function AncestorsScreen({
               </p>
             )}
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 border-t border-edge pt-density">
               <Button type="submit" busy={busy}>
                 {editing === undefined ? "Add ancestor" : "Save ancestor"}
               </Button>
@@ -624,16 +678,7 @@ export function AncestorsScreen({
               </Button>
             </div>
           </form>
-        </Card>
-      )}
-
-      {checking === undefined ? null : (
-        <RefreshFromAssociation
-          animal={checking}
-          propertyId={propertyId}
-          actorId={actorId}
-          onDone={() => setChecking(undefined)}
-        />
+        </Modal>
       )}
 
       <DigitalBeefImport existing={outsiders} propertyId={propertyId} actorId={actorId} />

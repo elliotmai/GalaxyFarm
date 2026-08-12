@@ -1,7 +1,7 @@
 import type { Ulid } from "@galaxy-farm/core";
 
 import type { ParentRef } from "./cattle-profile.js";
-import { allRegistrations, type ExternalAnimal } from "./pedigree.js";
+import { allRegistrations, normaliseRegistration, type ExternalAnimal } from "./pedigree.js";
 
 /**
  * Which of an outside animal's ancestors is a bull and which is a cow
@@ -215,4 +215,134 @@ export function filterAncestors(
       return true;
     })
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/* --------------------------------------------------- joining two into one */
+
+export interface MergeReference {
+  /** Which store the record lives in. */
+  readonly kind: "profile" | "external";
+  readonly id: Ulid;
+  readonly label: string;
+  readonly role: "sire" | "dam";
+}
+
+export interface AncestorMergePlan {
+  /** What to write on the record being kept. */
+  readonly patch: Partial<ExternalAnimal>;
+  /** Everything pointing at the one being dropped, which has to be repointed. */
+  readonly repoint: readonly MergeReference[];
+  /**
+   * Disagreements between the two.
+   *
+   * Not blockers. Two registries genuinely record different names for one cow,
+   * and one of two records may simply be better. But a merge is not reversible
+   * and these are what somebody should read before agreeing to it.
+   */
+  readonly warnings: readonly string[];
+}
+
+/**
+ * Fold one ancestor record into another (spec §4.5 clause 3).
+ *
+ * The situation: the same cow was imported from two associations before the
+ * matcher could join them — different registries, different numbers, nothing
+ * connecting the two — so she is on file twice, each copy holding half her
+ * descendants and neither showing the whole line.
+ *
+ * The kept record gains every registration number, and every field it does not
+ * already have. It never loses anything: where both records hold a value, the
+ * kept one wins and the difference is reported rather than resolved. A merge
+ * cannot be undone, and quietly preferring the newer of two hand-typed values
+ * is the kind of thing nobody would ever notice going wrong.
+ */
+export function planAncestorMerge(
+  keep: ExternalAnimal,
+  drop: ExternalAnimal,
+  profiles: readonly {
+    readonly id: Ulid;
+    readonly label: string;
+    readonly sire?: ParentRef | undefined;
+    readonly dam?: ParentRef | undefined;
+  }[],
+  outsiders: readonly ExternalAnimal[],
+): AncestorMergePlan {
+  const warnings: string[] = [];
+
+  const registrations = [...allRegistrations(keep)];
+  for (const entry of allRegistrations(drop)) {
+    const held = registrations.some(
+      (known) =>
+        known.association === entry.association &&
+        normaliseRegistration(known.regNumber) === normaliseRegistration(entry.regNumber),
+    );
+    if (!held) registrations.push(entry);
+  }
+
+  const patch: Record<string, unknown> = { registrations };
+
+  const FIELDS = [
+    "tattoo",
+    "sex",
+    "dob",
+    "colour",
+    "hornStatus",
+    "breedComposition",
+    "coi",
+    "status",
+    "disposedOn",
+    "serviceType",
+    "sourceUrl",
+    "sire",
+    "dam",
+  ] as const;
+
+  const held = keep as unknown as Record<string, unknown>;
+  const other = drop as unknown as Record<string, unknown>;
+
+  for (const field of FIELDS) {
+    if (other[field] === undefined) continue;
+    if (held[field] === undefined) {
+      patch[field] = other[field];
+      continue;
+    }
+    if (JSON.stringify(held[field]) !== JSON.stringify(other[field])) {
+      warnings.push(`Both records have a ${field}, and they differ. The kept one is unchanged.`);
+    }
+  }
+
+  // Defect results merge rather than replace: a hair card typed against one
+  // copy has to survive, and a straight field comparison would drop it.
+  const heldTests = keep.geneticTests ?? [];
+  const added = (drop.geneticTests ?? []).filter(
+    (test) => !heldTests.some((known) => known.defect === test.defect),
+  );
+  if (added.length > 0) patch["geneticTests"] = [...heldTests, ...added];
+
+  if (keep.name.trim().toUpperCase() !== drop.name.trim().toUpperCase()) {
+    warnings.push(
+      `The two are named differently — "${keep.name}" and "${drop.name}". Only the first survives.`,
+    );
+  }
+
+  const repoint: MergeReference[] = [];
+  for (const profile of profiles) {
+    if (profile.sire?.kind === "external" && profile.sire.id === drop.id) {
+      repoint.push({ kind: "profile", id: profile.id, label: profile.label, role: "sire" });
+    }
+    if (profile.dam?.kind === "external" && profile.dam.id === drop.id) {
+      repoint.push({ kind: "profile", id: profile.id, label: profile.label, role: "dam" });
+    }
+  }
+  for (const outsider of outsiders) {
+    if (outsider.id === drop.id) continue;
+    if (outsider.sire?.kind === "external" && outsider.sire.id === drop.id) {
+      repoint.push({ kind: "external", id: outsider.id, label: outsider.name, role: "sire" });
+    }
+    if (outsider.dam?.kind === "external" && outsider.dam.id === drop.id) {
+      repoint.push({ kind: "external", id: outsider.id, label: outsider.name, role: "dam" });
+    }
+  }
+
+  return { patch: patch as Partial<ExternalAnimal>, repoint, warnings };
 }

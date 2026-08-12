@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Button, Callout, Card, Pill, Select, TextArea, useToast } from "@galaxy-farm/ui";
+import { Button, Callout, Pill, Select, TextArea, useToast } from "@galaxy-farm/ui";
 import type { Ulid } from "@galaxy-farm/core";
 import {
   allRegistrations,
@@ -176,124 +176,122 @@ export function RefreshFromAssociation({
     });
 
   return (
-    <Card title={`Check ${animal.name} against the association`}>
-      <div className="flex flex-col gap-density">
-        {papers.length === 0 ? (
-          <Callout tone="action" title="No registration number on file">
-            There is nothing to look up. Add the association and the number first and this can go
-            and read the page.
-          </Callout>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-[1fr_auto] sm:items-end">
-              <Select
-                label="Check against"
-                hint={
-                  papers.length > 1
-                    ? "This animal is papered twice. Each registry holds its own record, and they do not always agree."
-                    : undefined
-                }
-                value={which}
-                options={papers.map((entry) => ({
-                  value: `${entry.association}:${entry.regNumber}`,
-                  label: `${entry.association} ${entry.regNumber}`,
-                }))}
-                onChange={(event) => setWhich(event.target.value)}
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={() => void check()} busy={busy}>
-                  Check for changes
-                </Button>
-                {url === undefined ? null : (
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="self-center text-sm text-action underline underline-offset-2"
-                  >
-                    Open the page
-                  </a>
-                )}
-              </div>
-            </div>
-
-            <details className="rounded-density border border-edge p-density">
-              <summary className="cursor-pointer text-density font-medium text-ink">
-                Or paste the page — works when the site will not talk to our server
-              </summary>
-              <div className="flex flex-col gap-density pt-density">
-                <TextArea
-                  label="The page"
-                  rows={5}
-                  value={html}
-                  onChange={(event) => setHtml(event.target.value)}
-                />
-                <div>
-                  <Button variant="ghost" onClick={checkPasted}>
-                    Compare what I pasted
-                  </Button>
-                </div>
-              </div>
-            </details>
-          </>
-        )}
-
-        {error === undefined ? null : (
-          <p role="alert" className="text-sm text-danger">
-            {error}
-          </p>
-        )}
-
-        {changes === undefined ? null : changes.length === 0 ? (
-          <Callout tone="calm" title="Nothing has changed">
-            Everything on the page matches what is on file. Worth knowing — it means the record has
-            not gone stale, which is not the same as nobody having looked.
-          </Callout>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted">
-              Blanks being filled in are ticked. A value being <em>changed</em> is not — what is on
-              file may have been corrected by hand, and a re-read of the page is not evidence
-              against that.
-            </p>
-            {changes.map((change) => (
-              <label
-                key={change.field}
-                className="flex items-start gap-2 border-t border-edge pt-2 text-density"
-              >
-                <input
-                  type="checkbox"
-                  checked={accepted.has(change.field)}
-                  onChange={() => toggle(change.field)}
-                  className="mt-1.5"
-                />
-                <span className="flex flex-col gap-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-ink">{change.label}</span>
-                    <Pill tone={change.kind === "fill" ? "calm" : "action"}>
-                      {change.kind === "fill" ? "was blank" : "would change"}
-                    </Pill>
-                  </span>
-                  <span className="text-sm text-muted">
-                    {change.before === undefined ? null : <s>{change.before}</s>}
-                    {change.before === undefined ? null : " → "}
-                    <span className="text-ink">{change.after}</span>
-                  </span>
-                </span>
-              </label>
-            ))}
-
-            <div className="flex flex-wrap gap-2 pt-density">
-              <Button onClick={() => void save()} busy={busy}>
-                Apply the ticked ones
+    <div className="flex flex-col gap-density">
+      {papers.length === 0 ? (
+        <Callout tone="action" title="No registration number on file">
+          There is nothing to look up. Add the association and the number first and this can go and
+          read the page.
+        </Callout>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-density sm:grid-cols-[1fr_auto] sm:items-end">
+            <Select
+              label="Check against"
+              hint={
+                papers.length > 1
+                  ? "This animal is papered twice. Each registry holds its own record, and they do not always agree."
+                  : undefined
+              }
+              value={which}
+              options={papers.map((entry) => ({
+                value: `${entry.association}:${entry.regNumber}`,
+                label: `${entry.association} ${entry.regNumber}`,
+              }))}
+              onChange={(event) => setWhich(event.target.value)}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => void check()} busy={busy}>
+                Check for changes
               </Button>
-              <Button variant="ghost" onClick={onDone}>
-                Leave it alone
-              </Button>
+              {url === undefined ? null : (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="self-center text-sm text-action underline underline-offset-2"
+                >
+                  Open the page
+                </a>
+              )}
             </div>
           </div>
-        )}
-      </div>
-    </Card>
+
+          <details className="rounded-density border border-edge p-density">
+            <summary className="cursor-pointer text-density font-medium text-ink">
+              Or paste the page — works when the site will not talk to our server
+            </summary>
+            <div className="flex flex-col gap-density pt-density">
+              <TextArea
+                label="The page"
+                rows={5}
+                value={html}
+                onChange={(event) => setHtml(event.target.value)}
+              />
+              <div>
+                <Button variant="ghost" onClick={checkPasted}>
+                  Compare what I pasted
+                </Button>
+              </div>
+            </div>
+          </details>
+        </>
+      )}
+
+      {error === undefined ? null : (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
+
+      {changes === undefined ? null : changes.length === 0 ? (
+        <Callout tone="calm" title="Nothing has changed">
+          Everything on the page matches what is on file. Worth knowing — it means the record has
+          not gone stale, which is not the same as nobody having looked.
+        </Callout>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-muted">
+            Blanks being filled in are ticked. A value being <em>changed</em> is not — what is on
+            file may have been corrected by hand, and a re-read of the page is not evidence against
+            that.
+          </p>
+          {changes.map((change) => (
+            <label
+              key={change.field}
+              className="flex items-start gap-2 border-t border-edge pt-2 text-density"
+            >
+              <input
+                type="checkbox"
+                checked={accepted.has(change.field)}
+                onChange={() => toggle(change.field)}
+                className="mt-1.5"
+              />
+              <span className="flex flex-col gap-1">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-ink">{change.label}</span>
+                  <Pill tone={change.kind === "fill" ? "calm" : "action"}>
+                    {change.kind === "fill" ? "was blank" : "would change"}
+                  </Pill>
+                </span>
+                <span className="text-sm text-muted">
+                  {change.before === undefined ? null : <s>{change.before}</s>}
+                  {change.before === undefined ? null : " → "}
+                  <span className="text-ink">{change.after}</span>
+                </span>
+              </span>
+            </label>
+          ))}
+
+          <div className="flex flex-wrap gap-2 pt-density">
+            <Button onClick={() => void save()} busy={busy}>
+              Apply the ticked ones
+            </Button>
+            <Button variant="ghost" onClick={onDone}>
+              Leave it alone
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -10,6 +10,7 @@
 export * from "./button.js";
 export * from "./field.js";
 export * from "./layout.js";
+export * from "./modal.js";
 export * from "./pull-to-refresh.js";
 export * from "./search-select.js";
 export * from "./surfaces.js";
