@@ -158,6 +158,50 @@ export function suggestedCalfTag(
   return calfTag(year, nextCalfSequence(existingTags, year));
 }
 
+/**
+ * The farm's herd prefix (§5.2).
+ *
+ * Every association wants a registered name, and every registered name on this
+ * place starts the same way — a herd prefix is how a buyer three states away
+ * knows two animals came from the same programme. `GLXY` is short enough to
+ * survive the character limits the associations impose on a registered name,
+ * which longer prefixes do not.
+ */
+export const HERD_PREFIX = "GLXY";
+
+/**
+ * The registration number to put on the papers, suggested.
+ *
+ * `GLXY` and the ear tag, so the number on the certificate and the number in
+ * the ear are the same number twice. That is worth more than it sounds: at a
+ * show or a sale barn, somebody is reading a tag off an animal and looking for
+ * her paperwork, and every step between those two is a chance to get the wrong
+ * heifer's papers.
+ *
+ * A suggestion, not a rule. An animal registered by somebody else arrives with
+ * whatever number they used.
+ */
+export function suggestedRegistrationNumber(tagNumber: string): string {
+  return `${HERD_PREFIX}${tagNumber.trim()}`;
+}
+
+/**
+ * The registered name, suggested.
+ *
+ * `GLXY <name> <tag>` — prefix, the name she is actually called, and the tag.
+ * The tag on the end is what makes the name unique when two good heifers four
+ * years apart both end up called Andromeda, which is the thing associations
+ * reject a registration for.
+ *
+ * A calf with no barn name yet gets `GLXY 601P`, and the space where the name
+ * would go simply is not there rather than being filled with a placeholder.
+ */
+export function suggestedRegisteredName(name: string | undefined, tagNumber: string): string {
+  return [HERD_PREFIX, name?.trim(), tagNumber.trim()]
+    .filter((part) => part !== undefined && part !== "")
+    .join(" ");
+}
+
 export interface CalfDraft {
   readonly animal: Omit<Animal, "id" | "createdAt" | "updatedAt">;
   /** Pedigree to wire once the animal has an id. */

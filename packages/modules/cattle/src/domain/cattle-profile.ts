@@ -2,6 +2,9 @@ import { z } from "zod";
 
 import { baseRecordSchema, ulidSchema, type BaseRecord, type Ulid } from "@galaxy-farm/core";
 
+import { coatGenotypeSchema, type CoatGenotype } from "./coat-colour.js";
+import { geneticTestSchema, type GeneticTest } from "./genetics.js";
+
 /**
  * What makes a cattle animal a *cattle* animal (spec §5.2).
  *
@@ -52,6 +55,15 @@ export interface ParentRef {
 export interface CattleProfile extends BaseRecord {
   readonly animalId: Ulid;
   readonly breedComposition: readonly BreedShare[];
+  /**
+   * Hair-card results, one per defect tested.
+   *
+   * Held here rather than on `Animal` because they are a cattle fact — the
+   * kernel has no business knowing what tibial hemimelia is (§4.1).
+   */
+  readonly geneticTests: readonly GeneticTest[];
+  /** What the coat-colour test came back as, for predicting a calf's colour. */
+  readonly coatGenotype?: CoatGenotype | undefined;
   readonly hornStatus?: HornStatus | undefined;
   readonly colour?: string | undefined;
   readonly markings?: string | undefined;
@@ -112,6 +124,11 @@ export const cattleProfileSchema = baseRecordSchema
   .extend({
     animalId: ulidSchema,
     breedComposition: z.array(breedShareSchema),
+    // Defaulted rather than optional: a profile with no `geneticTests` and one
+    // with an empty array both mean "nothing tested", and two spellings of
+    // that would each need handling everywhere the list is read.
+    geneticTests: z.array(geneticTestSchema).default([]),
+    coatGenotype: coatGenotypeSchema.optional(),
     hornStatus: z.enum(HORN_STATUSES).optional(),
     colour: z.string().max(120).optional(),
     markings: z.string().max(500).optional(),

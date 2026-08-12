@@ -84,6 +84,7 @@ const profile = (over: Partial<CattleProfile> = {}): CattleProfile => ({
   id: id(1),
   ...base,
   animalId: id(2),
+  geneticTests: [],
   breedComposition: [
     { breed: "Maine-Anjou", percent: 50 },
     { breed: "Chianina", percent: 25 },

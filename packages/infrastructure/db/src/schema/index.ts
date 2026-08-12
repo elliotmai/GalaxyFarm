@@ -175,6 +175,24 @@ export const cattleProfiles = pgTable(
     hornStatus: text("horn_status"),
     colour: text("colour"),
     markings: text("markings"),
+    /** Hair-card results — TH, PHA, DS and the rest (§5.2). */
+    geneticTests: jsonb("genetic_tests")
+      .$type<
+        {
+          defect: string;
+          status: string;
+          testedOn?: string;
+          lab?: string;
+          notes?: string;
+        }[]
+      >()
+      .notNull()
+      .default([]),
+    /** Extension and roan alleles, for predicting a calf's colour. */
+    coatGenotype: jsonb("coat_genotype").$type<{
+      extension?: [string, string];
+      roan?: [string, string];
+    }>(),
     registrations: jsonb("registrations")
       .$type<
         {
