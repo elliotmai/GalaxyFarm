@@ -27,13 +27,28 @@ export type CalvingEase = (typeof CALVING_EASE)[number];
 export const CALF_VIGOUR = ["vigorous", "slow", "weak", "stillborn"] as const;
 export type CalfVigour = (typeof CALF_VIGOUR)[number];
 
+/**
+ * How the calf came, as a category rather than as a score.
+ *
+ * `calvingEase` is the 1–5 the associations want and it feeds EPDs. This is
+ * the plainer fact underneath it, and it is the one a cow gets judged on over
+ * a lifetime: a cow that has needed a C-section is a different proposition
+ * from one that has needed a chain twice, and both are different from one that
+ * has never needed anybody there at all.
+ */
+export const BIRTH_TYPES = ["natural", "pulled", "c_section"] as const;
+export type BirthType = (typeof BIRTH_TYPES)[number];
+
 export interface CalvingRecord extends BaseRecord {
   readonly damId: Ulid;
   /** The breeding this calving answers, so the sire resolves without asking. */
   readonly breedingRecordId?: Ulid | undefined;
   readonly date: Date;
   readonly calvingEase: CalvingEase;
+  readonly birthType: BirthType;
   readonly vigour: CalfVigour;
+  /** Born early enough to be worth noticing — a risk signal on the dam. */
+  readonly premature?: boolean | undefined;
   readonly calfSex?: Sex | undefined;
   /** Pounds. The reliable weight — everything later is a scale and a guess. */
   readonly birthWeightLb?: number | undefined;
@@ -50,6 +65,8 @@ export const calvingRecordSchema = baseRecordSchema
     breedingRecordId: ulidSchema.optional(),
     date: z.coerce.date(),
     calvingEase: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
+    birthType: z.enum(BIRTH_TYPES).default("natural"),
+    premature: z.boolean().optional(),
     vigour: z.enum(CALF_VIGOUR),
     calfSex: z.enum(["male", "female", "steer", "unknown"]).optional(),
     birthWeightLb: z.number().positive().max(200, "That is not a birth weight").optional(),

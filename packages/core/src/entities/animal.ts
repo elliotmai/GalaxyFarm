@@ -21,6 +21,10 @@ export type Sex = (typeof SEXES)[number];
 
 export const ANIMAL_STATUSES = [
   "active",
+  // Still here and still fed, but out of the breeding or show programme. A
+  // retired cow is not a sold one and not a dead one, and rolling her into
+  // "active" hides her from every question about who is actually working.
+  "retired",
   "sold",
   "deceased",
   "processed",
@@ -48,6 +52,15 @@ export interface Animal extends BaseRecord {
   readonly safetyNotes?: string | undefined;
   readonly photoKeys: readonly string[];
   readonly customInstructions?: string | undefined;
+  /**
+   * When she died, and of what.
+   *
+   * Separate from `status`, because "deceased" is a state and these are the
+   * facts about how it happened — and the cause is the field that turns a herd
+   * of individual losses into a pattern somebody can act on.
+   */
+  readonly diedOn?: Date | undefined;
+  readonly causeOfDeath?: string | undefined;
   readonly notes?: string | undefined;
 }
 
@@ -66,6 +79,8 @@ export const animalSchema = baseRecordSchema
     safetyNotes: z.string().max(1000).optional(),
     photoKeys: z.array(z.string()),
     customInstructions: z.string().max(5000).optional(),
+    diedOn: z.coerce.date().optional(),
+    causeOfDeath: z.string().max(500).optional(),
     notes: z.string().max(5000).optional(),
   })
   .refine((animal) => animal.ownership !== "client" || animal.ownerId !== undefined, {
@@ -75,7 +90,18 @@ export const animalSchema = baseRecordSchema
   .refine((animal) => animal.name !== undefined || animal.tagNumber !== undefined, {
     message: "An animal needs a name or a tag number to be findable",
     path: ["tagNumber"],
-  }) as unknown as z.ZodType<Animal>;
+  })
+  .refine(
+    // A date of death on a living animal is a status somebody forgot to
+    // change, and it is the sort of mistake that quietly keeps a dead cow in
+    // the breeding rotation.
+    (animal) =>
+      animal.diedOn === undefined || animal.status === "deceased" || animal.status === "processed",
+    {
+      message: "An animal with a date of death has to be marked deceased or processed",
+      path: ["status"],
+    },
+  ) as unknown as z.ZodType<Animal>;
 
 /** Age in whole days, or undefined when the birth date is unknown. */
 export function ageInDays(animal: Pick<Animal, "dob">, now: Date): number | undefined {

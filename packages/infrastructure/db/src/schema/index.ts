@@ -150,6 +150,8 @@ export const animals = pgTable(
     safetyNotes: text("safety_notes"),
     photoKeys: text("photo_keys").array().notNull().default([]),
     customInstructions: text("custom_instructions"),
+    diedOn: timestamp("died_on", { withTimezone: true, mode: "date" }),
+    causeOfDeath: text("cause_of_death"),
     notes: text("notes"),
   },
   baseIndexes("animals"),
@@ -286,6 +288,9 @@ export const calvingRecords = pgTable(
     breedingRecordId: text("breeding_record_id"),
     date: timestamp("date", { withTimezone: true, mode: "date" }).notNull(),
     calvingEase: integer("calving_ease").notNull(),
+    /** Natural, pulled, or a C-section — the plain fact under the 1–5 score. */
+    birthType: text("birth_type").notNull().default("natural"),
+    premature: boolean("premature"),
     vigour: text("vigour").notNull(),
     calfSex: text("calf_sex"),
     birthWeightLb: doublePrecision("birth_weight_lb"),
@@ -634,6 +639,29 @@ export const feedConsumption = pgTable(
   baseIndexes("feed_consumption"),
 );
 
+/**
+ * Breeding soundness exams (§5.2).
+ *
+ * The cheapest insurance on a cattle operation and the one most often skipped
+ * — a bull that fails does not look any different in the pasture.
+ */
+export const fertilityTests = pgTable(
+  "fertility_tests",
+  {
+    ...baseColumns,
+    animalId: text("animal_id").notNull(),
+    date: timestamp("date", { withTimezone: true, mode: "date" }).notNull(),
+    verdict: text("verdict").notNull(),
+    scrotalCircumferenceCm: doublePrecision("scrotal_circumference_cm"),
+    motilityPercent: doublePrecision("motility_percent"),
+    morphologyPercent: doublePrecision("morphology_percent"),
+    vet: text("vet"),
+    retestDueOn: timestamp("retest_due_on", { withTimezone: true, mode: "date" }),
+    notes: text("notes"),
+  },
+  baseIndexes("fertility_tests"),
+);
+
 export const contacts = pgTable(
   "contacts",
   {
@@ -928,6 +956,7 @@ export const allTables = {
   feedingPlans,
   feedPurchases,
   feedConsumption,
+  fertilityTests,
   contacts,
   attachments,
   choreTemplates,

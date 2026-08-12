@@ -304,20 +304,44 @@ describe("a server whose migrations have not been run", () => {
   /**
    * The state this farm's deploy was actually in, reproduced.
    *
-   * Migrations 0006 to 0008 add `breeding_records`, `calving_records`,
-   * `weight_records` and `properties.watch_settings`. They were committed and
-   * deployed and never applied, so the tables the newest screens write to did
-   * not exist on the server.
+   * Migrations 0006 onwards add `breeding_records`, `calving_records`,
+   * `weight_records` and more besides. They were committed and deployed and
+   * never applied, so the tables the newest screens write to did not exist on
+   * the server.
    *
-   * What matters is which half of the queue that costs. The answer has to be
-   * "only the entries for the missing tables" — if a missing table could wedge
-   * the whole outbox, one unrun migration would stop a phone in a barn from
+   * What matters is which part of the queue that costs, and there are two
+   * answers rather than one. A **missing table** rejects its own entries. A
+   * table that exists but is behind — `animals` gained `died_on` in 0013 —
+   * also rejects its own entries, because the server reads every column it
+   * knows about. Neither wedges the queue: an entry for a table that is fully
+   * migrated still goes. That is the property worth protecting, because
+   * without it one unrun migration would stop a phone in a barn from
    * recording anything at all.
    */
-  it("rejects only the entries whose table is missing, and takes the rest", async () => {
+  it("rejects the entries whose table is missing or behind, and takes the rest", async () => {
     const db = await freshServer(6); // 0000..0005: no breeding_records.
     const stack = localStack(db);
 
+    // A zone: `zones` has not changed since 0005, so this one is the entry
+    // that has to go through whatever else is behind.
+    await stack.engine.enqueue("create", {
+      entity: "zones",
+      recordId: encodeUlid(29) as Ulid,
+      changes: [
+        { field: "propertyId", value: PROPERTY as never, at: now, deviceId: "test-device" },
+        { field: "createdAt", value: now as never, at: now, deviceId: "test-device" },
+        { field: "updatedAt", value: now as never, at: now, deviceId: "test-device" },
+        { field: "name", value: "North pen" as never, at: now, deviceId: "test-device" },
+        { field: "type", value: "pen" as never, at: now, deviceId: "test-device" },
+        { field: "indoor", value: false as never, at: now, deviceId: "test-device" },
+        { field: "baselineSafetyLevel", value: 2 as never, at: now, deviceId: "test-device" },
+        { field: "waterSourceIds", value: [] as never, at: now, deviceId: "test-device" },
+        { field: "resting", value: false as never, at: now, deviceId: "test-device" },
+        { field: "active", value: true as never, at: now, deviceId: "test-device" },
+      ],
+    });
+
+    // An animal: the table exists at 0005 but is two columns behind.
     const cow = animal(encodeUlid(30) as Ulid, "Andromeda");
     await stack.engine.enqueue("create", {
       entity: "animals",
@@ -344,16 +368,18 @@ describe("a server whose migrations have not been run", () => {
 
     const outcome = await stack.engine.push();
 
-    // The cow goes. The breeding does not, and says why.
+    // The zone goes. The other two do not, and each says why.
     expect(outcome.pushed).toBe(1);
-    expect(outcome.rejected).toBe(1);
+    expect(outcome.rejected).toBe(2);
 
     const left = await stack.outbox.pending();
-    expect(left).toHaveLength(1);
-    expect(left[0]?.patch.entity).toBe("breedingRecords");
-    // The reason is kept on the entry, which is what makes "3 not sent"
-    // answerable rather than a number somebody can only stare at.
-    expect(left[0]?.lastError ?? "").toMatch(/breeding_records/);
+    expect(left.map((entry) => entry.patch.entity).sort()).toEqual(["animals", "breedingRecords"]);
+    // The reason is kept on each entry, which is what makes "3 not sent"
+    // answerable rather than a number somebody can only stare at — and here
+    // the two reasons differ, which is the whole diagnosis.
+    const reasons = left.map((entry) => entry.lastError ?? "").join(" ");
+    expect(reasons).toMatch(/breeding_records/);
+    expect(reasons).toMatch(/died_on|cause_of_death/);
   }, 60_000);
 
   it("sends the held-back entries once the migration is applied", async () => {

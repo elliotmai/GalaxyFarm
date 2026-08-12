@@ -229,6 +229,7 @@ const calving = (over: Partial<CalvingRecord> = {}): CalvingRecord => ({
   breedingRecordId: id(1),
   date: new Date("2026-11-22T04:00:00Z"),
   calvingEase: 1,
+  birthType: "natural",
   vigour: "vigorous",
   calfSex: "female",
   birthWeightLb: 78,

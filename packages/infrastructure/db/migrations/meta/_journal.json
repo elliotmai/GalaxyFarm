@@ -92,6 +92,13 @@
       "when": 1786497861067,
       "tag": "0012_genetics",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786498379680,
+      "tag": "0013_fertility_and_death",
+      "breakpoints": true
     }
   ]
 }
