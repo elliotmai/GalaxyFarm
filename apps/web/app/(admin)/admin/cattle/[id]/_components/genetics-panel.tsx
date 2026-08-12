@@ -8,6 +8,7 @@ import {
   cattleProfileSchema,
   coatName,
   DEFECT_NAMES,
+  describeLocus,
   describeCarried,
   DEFECT_STATUSES,
   STATUS_LABELS,
@@ -27,6 +28,7 @@ import {
   type RoanAllele,
 } from "@galaxy-farm/module-cattle";
 
+import { coatFor } from "@/lib/coat";
 import { carriedColourFor, defectsFor } from "@/lib/inherited-genetics";
 import { useMutations } from "@/lib/local/mutations";
 
@@ -82,6 +84,19 @@ export function GeneticsPanel({
   const { show } = useToast();
 
   const tests = profile?.geneticTests ?? [];
+
+  /**
+   * What can be worked out about the coat, from everything on file.
+   *
+   * Recomputed on every render rather than stored. That is the requirement:
+   * the day a black bull is recorded as having thrown a red calf, this has to
+   * change for him *and* for everything under him, and a value written into a
+   * record at import time would not.
+   */
+  const inferred = useMemo(
+    () => coatFor({ kind: "animal", id: animalId }, { profiles, outsiders }),
+    [animalId, profiles, outsiders],
+  );
 
   const records = { profiles, outsiders };
   const parents = { sire: profile?.sire, dam: profile?.dam };
@@ -270,8 +285,58 @@ export function GeneticsPanel({
 
       <Section
         title="Coat color"
-        description="Two alleles per locus, off the test. The coat alone is not enough — a black animal can be ED/ED or ED/e, and out of a red mate those two throw entirely different calves."
+        description="Worked out from the coat, the parents and the calves, and re-worked every time you open this — so the day something new is recorded about a parent, this changes with it. A hair card, where there is one, wins outright."
       >
+        {inferred === undefined ? null : (
+          <Callout
+            tone={
+              inferred.carriesRed.verdict === "yes"
+                ? "action"
+                : inferred.carriesRed.verdict === "no"
+                  ? "calm"
+                  : "neutral"
+            }
+            title={
+              inferred.coat === undefined
+                ? "What is known so far"
+                : `Worked out: ${inferred.coat}`
+            }
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <Pill tone={inferred.extension.settled ? "identity" : "neutral"}>
+                Extension {describeLocus(inferred.extension, EXTENSION_ALLELES)}
+              </Pill>
+              <Pill tone={inferred.roan.settled ? "identity" : "neutral"}>
+                Roan {describeLocus(inferred.roan, ROAN_ALLELES)}
+              </Pill>
+            </div>
+
+            <p className="pt-2">
+              {inferred.carriesRed.verdict === "yes"
+                ? "Carries red — every calf out of a red mate can be red, and nothing about this animal's own coat will ever show it."
+                : inferred.carriesRed.verdict === "no"
+                  ? "Cannot be hiding red."
+                  : inferred.carriesRed.chance === undefined
+                    ? "It may or may not be hiding red. Its parents' coats would settle it, and so would one red calf."
+                    : `${Math.round(inferred.carriesRed.chance * 100)}% chance it is hiding red.`}
+            </p>
+
+            {inferred.extension.because.length === 0 && inferred.roan.because.length === 0 ? null : (
+              // Shown rather than hidden behind the answer. A genotype nobody
+              // tested for is only worth as much as the reasoning under it,
+              // and a person who can see the reasoning can spot the wrong coat
+              // or the wrong parent that produced it.
+              <ul className="mt-2 flex flex-col gap-1 text-sm text-muted">
+                {[...new Set([...inferred.extension.because, ...inferred.roan.because])].map(
+                  (line) => (
+                    <li key={line}>{line}</li>
+                  ),
+                )}
+              </ul>
+            )}
+          </Callout>
+        )}
+
         {carried === undefined ? null : (
           <Callout tone={carried.carriesRed > 0 ? "action" : "calm"} title="What its parents settle">
             {/*
@@ -328,7 +393,8 @@ export function GeneticsPanel({
 
             {extension === undefined && roan === undefined ? (
               <p className="text-sm text-muted">
-                Nothing recorded. Both loci are needed before a calf's color can be predicted.
+                No hair card. Nothing is lost by that — what is above was worked out without one,
+                and a test only matters where the working could not settle it.
               </p>
             ) : (
               <p className="flex flex-wrap items-center gap-2 text-density text-ink">

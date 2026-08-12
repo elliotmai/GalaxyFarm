@@ -22,6 +22,9 @@ import {
   DEFECT_NAMES,
   breedsOf,
   describeComposition,
+  describeLocus,
+  EXTENSION_ALLELES,
+  ROAN_ALLELES,
   describeCompositionSource,
   registrationUrl,
   GENETIC_DEFECTS,
@@ -41,6 +44,7 @@ import {
 } from "@galaxy-farm/module-cattle";
 
 import { animalHref } from "@/lib/animal-slug";
+import { coatFor } from "@/lib/coat";
 import { compositionLookup } from "@/lib/composition";
 
 /**
@@ -159,6 +163,10 @@ export function AncestorDetail({
   // hold a class its current makeup would not earn.
   const eligibility = registrationClasses(breeding.composition, animal.classification);
   const breeds = breedsOf({ ...animal, breedComposition: breeding.composition });
+  const coat = useMemo(
+    () => coatFor({ kind: "external", id: animal.id }, { profiles, outsiders }),
+    [animal.id, profiles, outsiders],
+  );
 
   return (
     <div className="flex flex-col gap-density">
@@ -236,6 +244,20 @@ export function AncestorDetail({
             },
             { label: "Tattoo", value: animal.tattoo },
             { label: "Color", value: animal.colour },
+            {
+              // Worked out, not stored. A red ancestor is `e/e` whether or not
+              // anybody ever tested one, and that is exactly the fact a calf's
+              // colour prediction three generations down needs.
+              label: "Coat genotype",
+              value:
+                coat === undefined
+                  ? undefined
+                  : [
+                      describeLocus(coat.extension, EXTENSION_ALLELES),
+                      describeLocus(coat.roan, ROAN_ALLELES),
+                    ].join(" · "),
+              wide: true,
+            },
             { label: "DOB", value: animal.dob?.toLocaleDateString() },
             { label: "Horns", value: animal.hornStatus },
             { label: "Class on the papers", value: animal.classification },
