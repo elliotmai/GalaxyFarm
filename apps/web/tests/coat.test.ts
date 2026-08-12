@@ -114,9 +114,26 @@ describe("crossing both stores", () => {
     );
   });
 
-  it("says nothing at all about an animal it has never heard of", () => {
-    const stranger = coatResolver({ profiles: [], outsiders: [] }).of({
+  it("answers for one of ours with no profile row, rather than vanishing", () => {
+    // A cattle profile is only written once somebody edits an animal's
+    // breeding or genetics, so plenty of the herd has none. Returning nothing
+    // for her took the whole colour prediction off the breeding form with no
+    // explanation — "nothing is known about her" is a different answer from
+    // "no such animal", and it is the one that lets a screen say why.
+    const known = coatResolver({ profiles: [], outsiders: [] }).of({
       kind: "animal",
+      id: id() as Ulid,
+    });
+
+    expect(known).toBeDefined();
+    expect(known?.extension.settled).toBe(false);
+    expect(known?.roan.settled).toBe(false);
+  });
+
+  it("still says nothing about an ancestor it has never heard of", () => {
+    // An external id that is not on file really is unknown.
+    const stranger = coatResolver({ profiles: [], outsiders: [] }).of({
+      kind: "external",
       id: id() as Ulid,
     });
 

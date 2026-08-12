@@ -410,8 +410,7 @@ function AddBreeding({
   const calfColour = useMemo(() => {
     if (damId === "" || sire.trim() === "") return undefined;
 
-    const herd = { profiles, outsiders };
-    const resolve = coatResolver(herd);
+    const resolve = coatResolver({ profiles, outsiders });
 
     const damCoat = resolve.of({ kind: "animal", id: damId as Ulid });
     const ours = animals.find((animal) => displayName(animal) === sire.trim());
@@ -423,8 +422,26 @@ function AddBreeding({
           ? resolve.of({ kind: "external", id: theirs.id })
           : undefined;
 
-    if (damCoat === undefined || sireCoat === undefined) return undefined;
-    return predictCalfColour(sireCoat, damCoat);
+    // Which side is missing, said out loud. Rendering nothing when one of them
+    // cannot be worked out leaves somebody staring at a blank space with no
+    // idea whether the app is thinking, broken, or simply has nothing — and no
+    // idea which record to go and fill in.
+    const blocked: string[] = [];
+    if (sireCoat === undefined) {
+      blocked.push(
+        theirs === undefined && ours === undefined
+          ? `${sire.trim()} is not on file — a bull typed in by hand has no pedigree to work from.`
+          : `Nothing is recorded about ${sire.trim()}'s colour, and nothing in his pedigree settles it.`,
+      );
+    }
+    if (damCoat === undefined) {
+      blocked.push(
+        "Nothing is recorded about the cow's colour, and nothing in her pedigree settles it.",
+      );
+    }
+    if (sireCoat === undefined || damCoat === undefined) return { blocked };
+
+    return { prediction: predictCalfColour(sireCoat, damCoat), blocked };
   }, [damId, sire, animals, profiles, outsiders]);
 
   // Shown before saving, because the date is the whole point of the record and
@@ -553,23 +570,32 @@ function AddBreeding({
         )}
       </div>
 
-      {calfColour === undefined || calfColour.outcomes.length === 0 ? null : (
-        <Callout tone="identity" title="What colour the calf can be">
-          <ul className="flex flex-wrap gap-2">
-            {calfColour.outcomes.map((outcome) => (
-              <li key={outcome.name}>
-                <Pill tone={outcome.chance === 1 ? "identity" : "neutral"}>
-                  {outcome.name} · {Math.round(outcome.chance * 100)}%
-                </Pill>
-              </li>
-            ))}
-          </ul>
-          {calfColour.missing.length === 0 ? null : (
-            // Half an answer, said to be half an answer. A confident-looking
-            // list that only covers one locus is worse than one that admits
-            // the other is open.
+      {calfColour === undefined ? null : (
+        <Callout
+          tone={calfColour.prediction === undefined ? "neutral" : "identity"}
+          title="What colour the calf can be"
+        >
+          {calfColour.prediction === undefined ? null : (
+            <ul className="flex flex-wrap gap-2">
+              {calfColour.prediction.outcomes.map((outcome) => (
+                <li key={outcome.name}>
+                  <Pill tone={outcome.chance === 1 ? "identity" : "neutral"}>
+                    {outcome.name} · {Math.round(outcome.chance * 100)}%
+                  </Pill>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/*
+            Half an answer said to be half an answer, and no answer said to be
+            no answer. A confident-looking list covering one locus is worse
+            than one admitting the other is open, and a blank space is worse
+            than either.
+          */}
+          {[...calfColour.blocked, ...(calfColour.prediction?.missing ?? [])].length === 0 ? null : (
             <ul className="mt-2 flex flex-col gap-1 text-sm">
-              {calfColour.missing.map((line) => (
+              {[...calfColour.blocked, ...(calfColour.prediction?.missing ?? [])].map((line) => (
                 <li key={line}>{line}</li>
               ))}
             </ul>

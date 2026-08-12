@@ -55,7 +55,14 @@ function index({ profiles, outsiders }: Herd) {
   const node = (ref: ParentRef): Node | undefined => {
     if (ref.kind === "animal") {
       const profile = byAnimal.get(ref.id);
-      if (profile === undefined) return undefined;
+      // A cattle profile is written the first time somebody edits an animal's
+      // breeding or genetics, so plenty of the herd has none — and one of ours
+      // picked out of a dropdown certainly exists whether or not that row
+      // does. Returning nothing for her made the whole colour prediction
+      // vanish with no explanation; an animal nobody has recorded anything
+      // about is "nothing known", which is a different and far more useful
+      // answer than "no such animal".
+      if (profile === undefined) return { key: keyOf(ref) };
       return {
         key: keyOf(ref),
         colour: profile.colour,

@@ -419,7 +419,13 @@ export function PairingPlanner({
             {calfColour === undefined || calfColour.outcomes.length === 0 ? (
               <EmptyState
                 title="Nothing to go on yet"
-                detail="Neither parent's coat is recorded and neither has a pedigree that settles one. A colour on each of them is usually enough — red is e/e outright, and roan is R/r."
+                detail={
+                  sireCoat === undefined
+                    ? "That bull is not on file, so there is no coat and no pedigree to work from."
+                    : damCoat === undefined
+                      ? "That cow is not on file, so there is no coat and no pedigree to work from."
+                      : "Neither parent's coat is recorded and neither has a pedigree that settles one. A colour on each of them is usually enough — red is e/e outright, and roan is R/r."
+                }
               />
             ) : (
               <div className="flex flex-col gap-density">
