@@ -21,6 +21,13 @@
 @theme inline {
   --color-canvas: var(--gf-canvas);
   --color-panel: var(--gf-panel);
+  /*
+   * A step above the panel, for a tile or a well sitting inside a card.
+   * Declared in theme.css since the first day and never mapped here, so every
+   * `bg-raised` in the codebase emitted nothing and rendered transparent —
+   * which is what a stat tile with the page text showing through it was.
+   */
+  --color-raised: var(--gf-raised);
   --color-ink: var(--gf-text);
   --color-muted: var(--gf-muted);
   --color-edge: var(--gf-border);

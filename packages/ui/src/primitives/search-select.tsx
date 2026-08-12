@@ -67,7 +67,7 @@ export interface SearchSelectProps {
 }
 
 const CONTROL =
-  "w-full rounded-density border bg-surface px-density py-density text-density text-ink " +
+  "w-full min-h-target rounded-density border bg-panel px-3 text-density text-ink " +
   "outline-none focus-visible:ring-2 focus-visible:ring-action disabled:opacity-60";
 
 /**
@@ -239,7 +239,7 @@ export function SearchSelect({
               id={listId}
               role="listbox"
               aria-label={label}
-              className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-density border border-edge bg-surface shadow-lg"
+              className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-density border border-edge bg-panel shadow-xl"
             >
               {matches.length === 0 ? (
                 <li className="px-density py-density text-density text-muted">
