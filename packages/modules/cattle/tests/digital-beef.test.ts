@@ -7,6 +7,7 @@ import {
   parseDigitalBeefPage,
   parseDigitalBeefUrl,
   parsePedigreeEntry,
+  parseShorthornPercent,
   splitParent,
   type ImportedAnimal,
 } from "../src/domain/digital-beef.js";
@@ -104,6 +105,34 @@ describe("the detail panel", () => {
     expect(read(SHORTHORN_PAGE, "ASA", "4219133").breedComposition).toEqual([
       { breed: "SH", percent: 100 },
     ]);
+  });
+
+  it("prefers the full makeup over the single-breed percentage on a page carrying both", () => {
+    // A Chianina page prints `Chianina %: 3.72` *and* `Genetic Makeup: 3.72%
+    // CA | 79.57% MA | ...`. Reading the first would file a bull who is 80%
+    // Maine-Anjou as 3.72% Chianina and nothing else.
+    const animal = read(CHIANINA_PAGE, "ACA", "359968");
+
+    expect(animal.breedComposition).toHaveLength(4);
+    expect(animal.breedComposition.map((share) => share.breed)).toContain("MA");
+  });
+
+  it("reads Shorthorn's percentage field as a Shorthorn share, not a breed called AR", () => {
+    expect(parseShorthornPercent("SH100")).toEqual({ percent: 100, register: "SH" });
+    expect(parseShorthornPercent("AR50")).toEqual({ percent: 50, register: "AR" });
+    expect(parseShorthornPercent("AR25")).toEqual({ percent: 25, register: "AR" });
+    // No prefix, and no share at all — both are real values on that field.
+    expect(parseShorthornPercent("0")).toEqual({ percent: 0 });
+    expect(parseShorthornPercent("50%")).toEqual({ percent: 50 });
+    expect(parseShorthornPercent("Purebred")).toBeUndefined();
+  });
+
+  it("keeps the class the papers state, wherever the association prints it", () => {
+    // Maine-Anjou has a field for it; Shorthorn states it as the register code
+    // in front of the percentage; Chianina's is its own code again.
+    expect(read(MAINE_ANJOU_PAGE, "AMAA", "402303").classification).toBe("PB");
+    expect(read(SHORTHORN_PAGE, "ASA", "4219133").classification).toBe("SH");
+    expect(read(CHIANINA_PAGE, "ACA", "359968").classification).toBe("1CM");
   });
 
   it("keeps the association's own inbreeding figure and the disposal date", () => {

@@ -216,6 +216,23 @@ const LABELS: readonly string[] = [
  * "Shorthorn %" — so it has to be matched as a shape rather than listed.
  */
 const HORN_LABEL = "Horn/Poll/Scur";
+
+/**
+ * The label's breed name, as the associations abbreviate it elsewhere.
+ *
+ * A Shorthorn page labels the field "Shorthorn %" and every other page writes
+ * the breed as `SH`. Using the label verbatim would leave one animal recorded
+ * as "100% Shorthorn" and its half-sibling as "50% SH", and nothing would
+ * add them together.
+ */
+const BREED_CODES: Record<string, string> = {
+  shorthorn: "SH",
+  chianina: "CA",
+  "maine-anjou": "MA",
+  maine: "MA",
+  angus: "AN",
+  hereford: "HH",
+};
 const PERCENT_LABEL = /(?<![A-Za-z])([A-Z][a-z]{2,15})\s*%\s*:/;
 
 const LABEL_ALTERNATION = [...LABELS, escape(HORN_LABEL)].map(escape).join("|");
@@ -789,13 +806,33 @@ export function parseComposition(value: string): { breed: string; percent: numbe
   }
   if (shares.length > 0) return shares;
 
-  // Shorthorn's `SH100`.
-  const joined = /^([A-Z]{2,4})\s*(\d{1,3}(?:\.\d+)?)$/.exec(value.trim());
-  if (joined !== null) {
-    return [{ breed: joined[1] as string, percent: Number(joined[2]) }];
-  }
-
   return shares;
+}
+
+/**
+ * Shorthorn's percentage field, which is a register code and a number.
+ *
+ * `SH100`, `AR50`, `AR25`, `0`. The letters are the **register** the animal
+ * sits in, not a breed — and reading them as one was a real bug: an `AR50`
+ * animal came out as "50% AR", a breed that does not exist, instead of half
+ * Shorthorn. The field is labelled *Shorthorn %*, so whatever prefix it
+ * carries, the number is the Shorthorn share.
+ *
+ * The code itself is kept verbatim rather than expanded, because what `AR`
+ * stands for is the association's business and a wrong expansion on a sale
+ * sheet is worse than the code a breeder already reads.
+ */
+export function parseShorthornPercent(
+  value: string,
+): { percent: number; register?: string } | undefined {
+  const found = /^([A-Za-z]{0,4})\s*(\d{1,3}(?:\.\d+)?)\s*%?$/.exec(value.trim());
+  if (found === null) return undefined;
+
+  const register = (found[1] ?? "").toUpperCase();
+  return {
+    percent: Number(found[2]),
+    ...(register === "" ? {} : { register }),
+  };
 }
 
 /* ------------------------------------------------------------ the animal */
@@ -906,7 +943,6 @@ export function parseDigitalBeefPage(
   const breeder = fieldValue(text, ["Breeder"]);
   const owner = fieldValue(text, ["Owner"]);
   const serviceType = fieldValue(text, ["Service Type"]);
-  const classification = fieldValue(text, ["Classification"]);
 
   const coiRaw = fieldValue(text, ["COI"]);
   const coi = coiRaw === undefined ? undefined : Number.parseFloat(coiRaw.replace("%", ""));
@@ -916,29 +952,43 @@ export function parseDigitalBeefPage(
   const sire = sireRaw === undefined ? undefined : splitParent(sireRaw);
   const dam = damRaw === undefined ? undefined : splitParent(damRaw);
 
-  // Chianina prints a full makeup; the other two print one breed's share next
-  // to a label that names the breed.
-  let compositionRaw = fieldValue(text, ["Genetic Makeup", "Breed Composition"]);
-  let compositionBreed: string | undefined;
-  if (compositionRaw === undefined) {
-    const percentLabel = PERCENT_LABEL.exec(text);
-    if (percentLabel !== null) {
-      compositionBreed = percentLabel[1];
-      compositionRaw = fieldValue(text, [`${compositionBreed as string} %`]);
-    }
-  }
+  // Two different fields answer "what breed is it", and a Chianina page has
+  // **both**: `Genetic Makeup: 6.44% CA | 69.14% MA | 23.82% AN | 0.6% XX`
+  // alongside `Chianina %: 6.44`. The makeup wins, and has to — the percentage
+  // field is only that one breed's share, so preferring it would file a bull
+  // who is 69% Maine-Anjou as 6% Chianina and nothing else.
+  const makeupRaw = fieldValue(text, ["Genetic Makeup", "Breed Composition"]);
 
-  const composition =
-    compositionRaw === undefined
-      ? []
-      : (() => {
-          const parsed = parseComposition(compositionRaw);
-          if (parsed.length > 0) return parsed;
-          const bare = Number.parseFloat(compositionRaw);
-          return compositionBreed !== undefined && Number.isFinite(bare)
-            ? [{ breed: compositionBreed, percent: bare }]
-            : [];
-        })();
+  // `Chianina %`, `Shorthorn %` — the label names the breed and the value is
+  // its share. Read even when a makeup was found, because the register code
+  // in front of the number is the only place Shorthorn states a class.
+  const percentLabel = PERCENT_LABEL.exec(text);
+  const percentBreed = percentLabel?.[1];
+  const percentRaw =
+    percentBreed === undefined ? undefined : fieldValue(text, [`${percentBreed} %`]);
+  const stated = percentRaw === undefined ? undefined : parseShorthornPercent(percentRaw);
+
+  // The class the papers state. Maine-Anjou prints it under "Classification";
+  // Shorthorn prints it as the register prefix on its percentage field
+  // (`SH100`, `AR50`), and both answer the same question — what this animal is
+  // recorded as.
+  const classification = fieldValue(text, ["Classification"]) ?? stated?.register;
+
+  const composition = ((): { breed: string; percent: number }[] => {
+    const parsed = makeupRaw === undefined ? [] : parseComposition(makeupRaw);
+    if (parsed.length > 0) return parsed;
+
+    // Falling back to the single share: whatever register code the
+    // association prefixes it with, the number is that breed's percentage.
+    // `AR50` on a Shorthorn page is half Shorthorn recorded in the AR
+    // register, not half of a breed called AR.
+    if (percentBreed === undefined || stated === undefined) return [];
+    // Zero is a real answer, and it is not a share of anything.
+    if (stated.percent === 0) return [];
+    return [
+      { breed: BREED_CODES[percentBreed.toLowerCase()] ?? percentBreed, percent: stated.percent },
+    ];
+  })();
 
   const { placed, unplaced } = parsePedigreeBlock(text);
   if (placed.length === 0 && unplaced.length === 0) missing.push("Pedigree");
