@@ -4,12 +4,14 @@ import { useMemo, useState } from "react";
 
 import {
   Button,
+  Callout,
   Card,
   DataTable,
   EmptyState,
   PageBody,
   PageHeader,
   Pill,
+  SearchSelect,
   Section,
   Select,
   TextArea,
@@ -21,9 +23,15 @@ import {
 } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
+  allRegistrations,
   ASSOCIATIONS,
+  canBe,
   externalAnimalSchema,
+  filterAncestors,
+  inferAncestorSexes,
+  NO_FILTER,
   wouldCreateCycle,
+  type AncestorFilter,
   type CattleProfile,
   type ExternalAnimal,
   type ParentRef,
@@ -62,12 +70,25 @@ interface Draft {
   readonly name: string;
   readonly regNumber: string;
   readonly association: string;
+  readonly sex: string;
+  readonly tattoo: string;
+  readonly colour: string;
   readonly sire: string;
   readonly dam: string;
   readonly notes: string;
 }
 
-const BLANK: Draft = { name: "", regNumber: "", association: "", sire: "", dam: "", notes: "" };
+const BLANK: Draft = {
+  name: "",
+  regNumber: "",
+  association: "",
+  sex: "",
+  tattoo: "",
+  colour: "",
+  sire: "",
+  dam: "",
+  notes: "",
+};
 
 export function AncestorsScreen({
   propertyId,
@@ -93,6 +114,7 @@ export function AncestorsScreen({
   const source = usePedigreeSource({ animals, profiles, outsiders });
 
   const [editing, setEditing] = useState<ExternalAnimal | undefined>();
+  const [filter, setFilter] = useState<AncestorFilter>(NO_FILTER);
   const [draft, setDraft] = useState<Draft | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -125,21 +147,70 @@ export function AncestorsScreen({
     return map;
   }, [animals, profiles, outsiders]);
 
-  /** Every animal and ancestor that could be somebody's parent, as one list. */
-  const parentOptions = useMemo(
-    () => [
+  /**
+   * Which ancestors are bulls and which are cows.
+   *
+   * Almost never typed in — it follows from where an animal sits in a
+   * pedigree, because a certificate has a sire column and a dam column rather
+   * than a sex field. Computed once for the page: the two parent pickers, the
+   * filter bar and the three lists all read it.
+   */
+  const sexes = useMemo(
+    () => inferAncestorSexes(outsiders, [...profiles, ...outsiders]),
+    [outsiders, profiles],
+  );
+
+  /**
+   * Who can be a sire, and who can be a dam.
+   *
+   * Split, because one list of four hundred names with the cows in it is how a
+   * cow gets recorded as a bull's sire — and every pedigree, relatedness figure
+   * and colour prediction drawn afterwards is wrong in a way that looks
+   * perfectly ordinary on screen. An ancestor nobody has placed yet appears in
+   * both, since hiding the animal somebody is looking for is the worse failure.
+   */
+  const parentOptions = useMemo(() => {
+    const build = (role: "male" | "female") => [
       ...animals
-        .filter((animal) => animal.species === "cattle")
+        .filter(
+          (animal) =>
+            animal.species === "cattle" && (animal.sex === role || animal.sex === "unknown"),
+        )
         .map((animal) => ({
           value: `animal:${animal.id}`,
-          label: `${displayName(animal)} (ours)`,
+          label: displayName(animal),
+          ...(animal.tagNumber === undefined ? {} : { detail: animal.tagNumber }),
+          group: "Ours",
         })),
       ...[...outsiders]
+        .filter((outsider) => canBe(sexes.get(outsider.id), role))
         .sort((left, right) => left.name.localeCompare(right.name))
-        .map((outsider) => ({ value: `external:${outsider.id}`, label: outsider.name })),
-    ],
-    [animals, outsiders],
+        .map((outsider) => {
+          const papers = allRegistrations(outsider)
+            .map((entry) => `${entry.association} ${entry.regNumber}`)
+            .join(" · ");
+          return {
+            value: `external:${outsider.id}`,
+            label: outsider.name,
+            ...(papers === "" ? {} : { detail: papers }),
+            group: sexes.get(outsider.id)?.sex === undefined ? "Not yet placed" : "On the papers",
+          };
+        }),
+    ];
+
+    return { male: build("male"), female: build("female") };
+  }, [animals, outsiders, sexes]);
+
+  /** The list the table shows, after the filter bar. */
+  const shown = useMemo(
+    () => filterAncestors(outsiders, filter, sexes, dependentsOf),
+    [outsiders, filter, sexes, dependentsOf],
   );
+
+  const bulls = shown.filter((animal) => sexes.get(animal.id)?.sex === "male");
+  const cows = shown.filter((animal) => sexes.get(animal.id)?.sex === "female");
+  const unplaced = shown.filter((animal) => sexes.get(animal.id)?.sex === undefined);
+  const conflicted = outsiders.filter((animal) => sexes.get(animal.id)?.conflict === true);
 
   function startCreate() {
     setEditing(undefined);
@@ -153,6 +224,9 @@ export function AncestorsScreen({
       name: outsider.name,
       regNumber: outsider.regNumber ?? "",
       association: outsider.association ?? "",
+      sex: outsider.sex ?? "",
+      tattoo: outsider.tattoo ?? "",
+      colour: outsider.colour ?? "",
       sire: refKey(outsider.sire),
       dam: refKey(outsider.dam),
       notes: outsider.notes ?? "",
@@ -194,6 +268,9 @@ export function AncestorsScreen({
         name: draft.name.trim(),
         ...(draft.regNumber.trim() === "" ? {} : { regNumber: draft.regNumber.trim() }),
         ...(draft.association === "" ? {} : { association: draft.association }),
+        ...(draft.sex === "" ? {} : { sex: draft.sex }),
+        ...(draft.tattoo.trim() === "" ? {} : { tattoo: draft.tattoo.trim() }),
+        ...(draft.colour.trim() === "" ? {} : { colour: draft.colour.trim() }),
         ...(sire === undefined ? {} : { sire }),
         ...(dam === undefined ? {} : { dam }),
         ...(draft.notes.trim() === "" ? {} : { notes: draft.notes.trim() }),
@@ -210,6 +287,9 @@ export function AncestorsScreen({
               dam: undefined,
               regNumber: undefined,
               association: undefined,
+              sex: undefined,
+              tattoo: undefined,
+              colour: undefined,
               notes: undefined,
               ...payload,
             } as Partial<ExternalAnimal>);
@@ -271,21 +351,46 @@ export function AncestorsScreen({
   const columns: readonly Column<ExternalAnimal>[] = [
     { key: "name", header: "Name", primary: true, render: (row) => row.name },
     {
-      key: "reg",
-      header: "Registration",
-      numeric: true,
-      render: (row) =>
-        row.regNumber === undefined ? <span className="text-muted">—</span> : row.regNumber,
-    },
-    {
       key: "association",
-      header: "Association",
-      render: (row) =>
-        row.association === undefined ? (
+      header: "Registered",
+      render: (row) => {
+        const papers = allRegistrations(row);
+        return papers.length === 0 ? (
           <span className="text-muted">—</span>
         ) : (
-          <Pill tone="identity">{row.association}</Pill>
-        ),
+          <span className="flex flex-wrap gap-1.5">
+            {papers.map((entry) => (
+              <Pill key={`${entry.association}-${entry.regNumber}`} tone="identity">
+                {entry.association} {entry.regNumber}
+              </Pill>
+            ))}
+          </span>
+        );
+      },
+    },
+    {
+      key: "sex",
+      header: "Bull or cow",
+      render: (row) => {
+        const verdict = sexes.get(row.id);
+        if (verdict?.conflict === true) {
+          // Two records disagree about this animal, so one of the pedigrees
+          // hanging off it is wrong. Said out loud rather than resolved by
+          // picking a winner, which would hide the mistake.
+          return (
+            <Pill tone="danger" dot>
+              used as both
+            </Pill>
+          );
+        }
+        if (verdict?.sex === undefined) return <span className="text-muted">not yet placed</span>;
+        return (
+          <Pill tone={verdict.inferred ? "neutral" : "calm"}>
+            {verdict.sex === "male" ? "bull" : "cow"}
+            {verdict.inferred ? " (from the pedigree)" : ""}
+          </Pill>
+        );
+      },
     },
     {
       key: "parents",
@@ -330,6 +435,8 @@ export function AncestorsScreen({
   ];
 
   const referenced = [...dependentsOf.keys()].length;
+  const sireCount = outsiders.filter((animal) => sexes.get(animal.id)?.sex === "male").length;
+  const damCount = outsiders.filter((animal) => sexes.get(animal.id)?.sex === "female").length;
 
   return (
     <PageBody>
@@ -344,15 +451,27 @@ export function AncestorsScreen({
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile label="On file" value={outsiders.length} tone="identity" />
-        <Tile label="Named by a pedigree" value={referenced} tone="calm" />
+        <Tile label="Bulls" value={sireCount} />
+        <Tile label="Cows" value={damCount} />
         <Tile
           label="Unused"
           value={outsiders.length - referenced}
           hint={outsiders.length - referenced > 0 ? "Safe to delete" : undefined}
         />
       </div>
+
+      {conflicted.length === 0 ? null : (
+        <Callout
+          tone="danger"
+          title={`${conflicted.length} used as both a sire and a dam`}
+        >
+          {conflicted.map((animal) => animal.name).join(", ")} — one record names each of these as
+          a sire and another as a dam. They cannot be both, so one of the pedigrees hanging off
+          them is wrong. Set the sex by hand to say which, then fix the record that disagrees.
+        </Callout>
+      )}
 
       {draft === undefined ? null : (
         <Card title={editing === undefined ? "New ancestor" : `Editing ${editing.name}`}>
@@ -379,22 +498,48 @@ export function AncestorsScreen({
                 onChange={(event) => setDraft({ ...draft, association: event.target.value })}
               />
               <Select
+                label="Bull or cow"
+                hint="Usually left alone — it follows from where the animal sits in a pedigree. Set it when nothing places them yet, or to settle a disagreement."
+                value={draft.sex}
+                placeholder="Work it out from the pedigree"
+                options={[
+                  { value: "male", label: "Bull" },
+                  { value: "female", label: "Cow" },
+                ]}
+                onChange={(event) => setDraft({ ...draft, sex: event.target.value })}
+              />
+              <TextInput
+                label="Tattoo"
+                value={draft.tattoo}
+                onChange={(event) => setDraft({ ...draft, tattoo: event.target.value })}
+              />
+              <TextInput
+                label="Colour"
+                hint="Feeds the calf-colour prediction, which is the only reason it is worth typing."
+                value={draft.colour}
+                onChange={(event) => setDraft({ ...draft, colour: event.target.value })}
+              />
+              <SearchSelect
                 label="Sire"
+                hint="Bulls only. Type any part of a name or a registration number."
                 value={draft.sire}
                 placeholder="Unknown"
-                options={parentOptions.filter(
+                clearLabel="Unknown"
+                options={parentOptions.male.filter(
                   (option) => option.value !== `external:${editing?.id ?? ""}`,
                 )}
-                onChange={(event) => setDraft({ ...draft, sire: event.target.value })}
+                onChange={(next) => setDraft({ ...draft, sire: next })}
               />
-              <Select
+              <SearchSelect
                 label="Dam"
+                hint="Cows only."
                 value={draft.dam}
                 placeholder="Unknown"
-                options={parentOptions.filter(
+                clearLabel="Unknown"
+                options={parentOptions.female.filter(
                   (option) => option.value !== `external:${editing?.id ?? ""}`,
                 )}
-                onChange={(event) => setDraft({ ...draft, dam: event.target.value })}
+                onChange={(next) => setDraft({ ...draft, dam: next })}
               />
             </div>
             <TextArea
@@ -424,26 +569,150 @@ export function AncestorsScreen({
 
       <DigitalBeefImport existing={outsiders} propertyId={propertyId} actorId={actorId} />
 
-      <Section title="On file">
+      <Section
+        title="On file"
+        description="Bulls and cows kept apart, because that is the distinction every question on this page turns on."
+      >
+        <Card>
+          <div className="flex flex-col gap-density">
+            <TextInput
+              label="Search"
+              hint="Name, registration number, tattoo, colour or breeder. Any part, in any order."
+              value={filter.search}
+              onChange={(event) => setFilter({ ...filter, search: event.target.value })}
+              placeholder="sull tina, or 4157771"
+            />
+            <div className="grid grid-cols-1 gap-density sm:grid-cols-4">
+              <Select
+                label="Bull or cow"
+                value={filter.sex}
+                options={[
+                  { value: "all", label: "Both" },
+                  { value: "male", label: "Bulls" },
+                  { value: "female", label: "Cows" },
+                  { value: "unknown", label: "Not yet placed" },
+                ]}
+                onChange={(event) =>
+                  setFilter({ ...filter, sex: event.target.value as AncestorFilter["sex"] })
+                }
+              />
+              <Select
+                label="Association"
+                hint="Matches any number the animal holds."
+                value={filter.association}
+                placeholder="Any"
+                options={ASSOCIATIONS.map((value) => ({ value, label: value }))}
+                onChange={(event) => setFilter({ ...filter, association: event.target.value })}
+              />
+              <Select
+                label="Used"
+                value={filter.usage}
+                options={[
+                  { value: "all", label: "Any" },
+                  { value: "used", label: "Named by a pedigree" },
+                  { value: "unused", label: "Nothing points at it" },
+                ]}
+                onChange={(event) =>
+                  setFilter({ ...filter, usage: event.target.value as AncestorFilter["usage"] })
+                }
+              />
+              <Select
+                label="Papers"
+                value={filter.papers}
+                options={[
+                  { value: "all", label: "Any" },
+                  { value: "registered", label: "Has a number" },
+                  { value: "multiple", label: "In two registries" },
+                  { value: "unregistered", label: "Name only" },
+                ]}
+                onChange={(event) =>
+                  setFilter({ ...filter, papers: event.target.value as AncestorFilter["papers"] })
+                }
+              />
+            </div>
+
+            <p className="text-sm text-muted">
+              Showing {shown.length} of {outsiders.length}.{" "}
+              {shown.length === outsiders.length ? null : (
+                <button
+                  type="button"
+                  onClick={() => setFilter(NO_FILTER)}
+                  className="text-action underline underline-offset-2"
+                >
+                  Clear the filters
+                </button>
+              )}
+            </p>
+          </div>
+        </Card>
+
         {loading ? (
           <p className="text-muted">Looking…</p>
-        ) : (
+        ) : outsiders.length === 0 ? (
           <Card>
-            <DataTable
-              caption="External animals"
-              columns={columns}
-              rows={[...outsiders].sort((left, right) => left.name.localeCompare(right.name))}
-              rowKey={(row) => row.id}
-              empty={
-                <EmptyState
-                  title="No ancestors on file"
-                  detail="Add the sire and dam off a certificate, then their parents, and the tree goes back as far as the papers do."
-                />
-              }
+            <EmptyState
+              title="No ancestors on file"
+              detail="Add the sire and dam off a certificate, then their parents, and the tree goes back as far as the papers do. Or import a Digital Beef page above and get thirty at once."
             />
           </Card>
+        ) : shown.length === 0 ? (
+          <Card>
+            <EmptyState
+              title="Nothing matches"
+              detail="Every ancestor is filtered out. Widen the search or clear the filters above."
+            />
+          </Card>
+        ) : (
+          <>
+            <Group title="Bulls" rows={bulls} columns={columns} />
+            <Group title="Cows" rows={cows} columns={columns} />
+            <Group
+              title="Not yet placed"
+              rows={unplaced}
+              columns={columns}
+              note="Nothing names these as a sire or a dam yet, so which they are is unknown. They show in both parent lists until something places them."
+            />
+          </>
         )}
       </Section>
     </PageBody>
+  );
+}
+
+/**
+ * One of the three lists.
+ *
+ * A heading with a count rather than one table with a sortable column: the
+ * question on this page is nearly always "which bull was that" or "which cow
+ * was that", and two shorter lists answer it faster than one long one sorted
+ * the right way. An empty group is not drawn at all — a heading over nothing
+ * reads as a loading failure.
+ */
+function Group({
+  title,
+  rows,
+  columns,
+  note,
+}: {
+  readonly title: string;
+  readonly rows: readonly ExternalAnimal[];
+  readonly columns: readonly Column<ExternalAnimal>[];
+  readonly note?: string;
+}) {
+  if (rows.length === 0) return null;
+
+  return (
+    <Card title={`${title} — ${rows.length}`}>
+      <div className="flex flex-col gap-density">
+        {note === undefined ? null : <p className="text-sm text-muted">{note}</p>}
+        <DataTable
+          caption={title}
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => row.id}
+          empty={null}
+        />
+      </div>
+    </Card>
   );
 }

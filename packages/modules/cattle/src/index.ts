@@ -11,6 +11,7 @@
  * which projects to 24 November, with the watch opening on the 10th.
  */
 
+export * from "./domain/ancestors.js";
 export * from "./domain/breeding-record.js";
 export * from "./domain/calving-record.js";
 export * from "./domain/calving-watch.js";

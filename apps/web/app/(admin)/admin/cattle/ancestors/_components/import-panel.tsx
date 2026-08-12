@@ -9,6 +9,7 @@ import {
   DetailList,
   Pill,
   Section,
+  Select,
   TextArea,
   TextInput,
   useToast,
@@ -16,11 +17,14 @@ import {
 import type { Ulid } from "@galaxy-farm/core";
 import {
   allRegistrations,
+  digitalBeefUrl,
   externalAnimalSchema,
+  IMPORTABLE_ASSOCIATIONS,
   mergeRegistration,
   parseDigitalBeefPage,
   parseDigitalBeefUrl,
   planImport,
+  sexFromPosition,
   type ExternalAnimal,
   type ImportedAnimal,
   type ImportPlan,
@@ -69,7 +73,10 @@ export function DigitalBeefImport({
   );
   const { show } = useToast();
 
-  const [url, setUrl] = useState("");
+  const [association, setAssociation] = useState<string>(IMPORTABLE_ASSOCIATIONS[0] ?? "AMAA");
+  const [registration, setRegistration] = useState("");
+  /** An address typed in whole, for the day one of the three changes its shape. */
+  const [pasted, setPasted] = useState("");
   const [html, setHtml] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -113,9 +120,30 @@ export function DigitalBeefImport({
     setMerging(new Set());
   }
 
+  /**
+   * The address, built rather than pasted.
+   *
+   * Nobody has the URL — they have a registration number off a certificate and
+   * they know which association issued it. The address is the same for every
+   * animal on a site bar the number on the end, so asking somebody to go and
+   * find it is asking them to do a lookup this can do.
+   *
+   * A pasted address still works and still wins, for the day one of the three
+   * changes its address shape.
+   */
+  const url =
+    pasted.trim() !== ""
+      ? pasted.trim()
+      : (digitalBeefUrl(association as never, registration.trim()) ?? "");
+
   async function fetchByUrl() {
     setError(undefined);
     setPreview(undefined);
+
+    if (registration.trim() === "" && pasted.trim() === "") {
+      setError("Type the animal's registration number, or paste its address.");
+      return;
+    }
 
     const parsed = parseDigitalBeefUrl(url);
     if (!parsed.ok) {
@@ -210,6 +238,12 @@ export function DigitalBeefImport({
             ? {}
             : { registrations: [{ association: row.association, regNumber: row.regNumber }] }),
           ...(ancestor?.tattoo === undefined ? {} : { tattoo: ancestor.tattoo }),
+          // A slot called `dam's dam's sire` ends in "sire", so that animal is
+          // a bull. Recorded at import because the chart is the only place it
+          // is ever stated — a certificate has no sex field.
+          ...(row.position === undefined || sexFromPosition(row.position) === undefined
+            ? {}
+            : { sex: sexFromPosition(row.position) }),
           ...(ancestor?.colour === undefined ? {} : { colour: ancestor.colour }),
           ...(ancestor?.breeder === undefined ? {} : { breeder: ancestor.breeder }),
           ...(ancestor?.dob === undefined || Number.isNaN(new Date(ancestor.dob).getTime())
@@ -263,7 +297,8 @@ export function DigitalBeefImport({
         tone: "success",
       });
       setPreview(undefined);
-      setUrl("");
+      setRegistration("");
+      setPasted("");
       setHtml("");
     } finally {
       setBusy(false);
@@ -277,19 +312,54 @@ export function DigitalBeefImport({
     >
       <Card>
         <div className="flex flex-col gap-density">
-          <TextInput
-            label="Animal's web address"
-            hint="From maine-anjou, chianina or shorthorn.digitalbeef.com. The address is what says which registry the numbers belong to."
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-            placeholder="https://shorthorn.digitalbeef.com/modules.php?…&animal_registration=4219133"
-          />
+          <div className="grid grid-cols-1 gap-density sm:grid-cols-[12rem_1fr]">
+            <Select
+              label="Association"
+              hint="Which registry issued the number."
+              value={association}
+              options={IMPORTABLE_ASSOCIATIONS.map((value) => ({ value, label: value }))}
+              onChange={(event) => setAssociation(event.target.value)}
+            />
+            <TextInput
+              label="Registration number"
+              hint="Off the certificate. That plus the association is the whole address."
+              numeric
+              value={registration}
+              onChange={(event) => setRegistration(event.target.value)}
+              placeholder="4219133"
+            />
+          </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => void fetchByUrl()} busy={busy}>
               Fetch and read it
             </Button>
+            {url === "" ? null : (
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm text-action underline underline-offset-2"
+              >
+                Open the page yourself
+              </a>
+            )}
           </div>
+
+          <details className="rounded-density border border-edge p-density">
+            <summary className="cursor-pointer text-density font-medium text-ink">
+              Or paste the whole address instead
+            </summary>
+            <div className="pt-density">
+              <TextInput
+                label="Animal's web address"
+                hint="Overrides the two fields above. Only needed if an association changes the shape of its addresses."
+                value={pasted}
+                onChange={(event) => setPasted(event.target.value)}
+                placeholder="https://shorthorn.digitalbeef.com/modules.php?…&animal_registration=4219133"
+              />
+            </div>
+          </details>
 
           <details className="rounded-density border border-edge p-density">
             <summary className="cursor-pointer text-density font-medium text-ink">

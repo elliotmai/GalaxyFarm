@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   Button,
@@ -13,18 +13,21 @@ import {
   EmptyState,
   Meter,
   Pill,
+  SearchSelect,
   Section,
-  Select,
   TextInput,
   useConfirmDelete,
   useToast,
   type Column,
   type ConstellationNode,
+  type SearchOption,
 } from "@galaxy-farm/ui";
 import { displayName, formatMoney, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
+  allRegistrations,
   animalProfitAndLoss,
   breedingsFor,
+  canBe,
   buildPedigree,
   calvingsFor,
   calvingInterval,
@@ -32,6 +35,7 @@ import {
   daysBred,
   describeComposition,
   healthHistoryFor,
+  inferAncestorSexes,
   isUnderWithdrawal,
   lifetimeGain,
   MAX_PEDIGREE_GENERATIONS,
@@ -356,6 +360,7 @@ export function Pedigree({
       <Parents
         animal={animal}
         profile={profile}
+        profiles={profiles}
         animals={animals}
         outsiders={outsiders}
         source={source}
@@ -395,6 +400,7 @@ function toConstellation(
 function Parents({
   animal,
   profile,
+  profiles,
   animals,
   outsiders,
   source,
@@ -403,6 +409,7 @@ function Parents({
 }: {
   readonly animal: Animal;
   readonly profile: CattleProfile | undefined;
+  readonly profiles: readonly CattleProfile[];
   readonly animals: readonly Animal[];
   readonly outsiders: readonly ExternalAnimal[];
   readonly source: PedigreeSource;
@@ -424,7 +431,21 @@ function Parents({
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
-  const options = (sex: "male" | "female") => [
+  /**
+   * Which ancestors are bulls and which are cows.
+   *
+   * A certificate has a sire column and a dam column rather than a sex field,
+   * so this is worked out from where each animal sits in the pedigrees already
+   * on file. It is what keeps a cow out of the sire list — and a cow recorded
+   * as somebody's sire makes every relatedness figure and colour prediction
+   * drawn afterwards wrong in a way that looks perfectly ordinary on screen.
+   */
+  const sexes = useMemo(
+    () => inferAncestorSexes(outsiders, [...profiles, ...outsiders]),
+    [outsiders, profiles],
+  );
+
+  const options = (sex: "male" | "female"): SearchOption[] => [
     ...animals
       .filter(
         (entry) =>
@@ -432,12 +453,26 @@ function Parents({
           entry.id !== animal.id &&
           (entry.sex === sex || entry.sex === "unknown"),
       )
-      .map((entry) => ({ value: `animal:${entry.id}`, label: `${displayName(entry)} (ours)` })),
-    // External animals carry no sex — a certificate names a sire and a dam, so
-    // the position in the pedigree is the only claim being made about either.
+      .map((entry) => ({
+        value: `animal:${entry.id}`,
+        label: displayName(entry),
+        ...(entry.tagNumber === undefined ? {} : { detail: entry.tagNumber }),
+        group: "Ours",
+      })),
     ...[...outsiders]
+      .filter((entry) => canBe(sexes.get(entry.id), sex))
       .sort((left, right) => left.name.localeCompare(right.name))
-      .map((entry) => ({ value: `external:${entry.id}`, label: entry.name })),
+      .map((entry) => {
+        const papers = allRegistrations(entry)
+          .map((registration) => `${registration.association} ${registration.regNumber}`)
+          .join(" · ");
+        return {
+          value: `external:${entry.id}`,
+          label: entry.name,
+          ...(papers === "" ? {} : { detail: papers }),
+          group: sexes.get(entry.id)?.sex === undefined ? "Not yet placed" : "On the papers",
+        };
+      }),
   ];
 
   function parse(value: string): ParentRef | undefined {
@@ -505,19 +540,23 @@ function Parents({
     >
       <form onSubmit={(event) => void save(event)} className="flex flex-col gap-density">
         <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
-          <Select
+          <SearchSelect
             label="Sire"
+            hint="Bulls only. Type any part of a name or a registration number."
             value={sire}
             placeholder="Unknown"
+            clearLabel="Unknown"
             options={options("male")}
-            onChange={(event) => setSire(event.target.value)}
+            onChange={setSire}
           />
-          <Select
+          <SearchSelect
             label="Dam"
+            hint="Cows only."
             value={dam}
             placeholder="Unknown"
+            clearLabel="Unknown"
             options={options("female")}
-            onChange={(event) => setDam(event.target.value)}
+            onChange={setDam}
           />
         </div>
 

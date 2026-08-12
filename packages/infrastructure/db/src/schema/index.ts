@@ -241,6 +241,7 @@ export const externalAnimals = pgTable(
     registrations:
       jsonb("registrations").$type<{ association: string; regNumber: string }[]>(),
     tattoo: text("tattoo"),
+    sex: text("sex"),
     dob: timestamp("dob", { withTimezone: true }),
     colour: text("colour"),
     breeder: text("breeder"),

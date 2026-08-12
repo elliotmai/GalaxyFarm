@@ -58,6 +58,14 @@ export interface ExternalAnimal extends BaseRecord {
    */
   readonly registrations?: readonly ExternalRegistration[] | undefined;
   readonly tattoo?: string | undefined;
+  /**
+   * Recorded only when somebody typed it.
+   *
+   * A certificate has no sex field — it has a sire column and a dam column —
+   * so this is usually left alone and derived from where the animal sits in a
+   * pedigree. See `inferAncestorSexes`.
+   */
+  readonly sex?: "male" | "female" | undefined;
   readonly dob?: Date | undefined;
   readonly colour?: string | undefined;
   readonly breeder?: string | undefined;
@@ -79,6 +87,7 @@ export const externalAnimalSchema = baseRecordSchema.extend({
   association: z.string().max(40).optional(),
   registrations: z.array(externalRegistrationSchema).max(8).optional(),
   tattoo: z.string().max(40).optional(),
+  sex: z.enum(["male", "female"]).optional(),
   dob: z.coerce.date().optional(),
   colour: z.string().max(120).optional(),
   breeder: z.string().max(160).optional(),
