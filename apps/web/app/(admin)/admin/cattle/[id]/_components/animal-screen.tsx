@@ -254,6 +254,8 @@ export function AnimalScreen({
       <AnimalTabs
         animal={animal}
         profile={profile}
+        profiles={profiles}
+        outsiders={outsiders}
         zone={zone}
         breeding={breeding}
         propertyId={propertyId}
@@ -288,6 +290,8 @@ const TABS = [
 function AnimalTabs({
   animal,
   profile,
+  profiles,
+  outsiders,
   zone,
   breeding,
   propertyId,
@@ -295,6 +299,9 @@ function AnimalTabs({
 }: {
   readonly animal: Animal;
   readonly profile: CattleProfile | undefined;
+  /** Everything on file, so the parents can settle what this animal is. */
+  readonly profiles: readonly CattleProfile[];
+  readonly outsiders: readonly ExternalAnimal[];
   readonly zone: Zone | undefined;
   readonly breeding: ResolvedComposition;
   readonly propertyId: Ulid;
@@ -329,6 +336,8 @@ function AnimalTabs({
             <GeneticsPanel
               profile={profile}
               animalId={animal.id}
+              profiles={profiles}
+              outsiders={outsiders}
               propertyId={propertyId}
               actorId={actorId}
             />

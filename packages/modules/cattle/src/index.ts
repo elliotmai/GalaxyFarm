@@ -24,6 +24,7 @@ export * from "./domain/fertility-test.js";
 export * from "./domain/genetics.js";
 export * from "./domain/health-record.js";
 export * from "./domain/import-identity.js";
+export * from "./domain/inherited.js";
 export * from "./domain/heat-record.js";
 export * from "./domain/herd-roadmap.js";
 export * from "./domain/maine-upgrade.js";

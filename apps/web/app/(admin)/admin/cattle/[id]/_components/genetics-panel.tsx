@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Callout, Card, Pill, Section, Select, TextInput, useToast } from "@galaxy-farm/ui";
 import type { Ulid } from "@galaxy-farm/core";
@@ -8,6 +8,7 @@ import {
   cattleProfileSchema,
   coatName,
   DEFECT_NAMES,
+  describeCarried,
   DEFECT_STATUSES,
   STATUS_LABELS,
   EXTENSION_ALLELES,
@@ -19,12 +20,14 @@ import {
   writeExtension,
   writeRoan,
   type CattleProfile,
+  type ExternalAnimal,
   type DefectStatus,
   type ExtensionAllele,
   type GeneticDefect,
   type RoanAllele,
 } from "@galaxy-farm/module-cattle";
 
+import { carriedColourFor, defectsFor } from "@/lib/inherited-genetics";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -56,11 +59,16 @@ const STATUS_TONE: Record<DefectStatus, "calm" | "danger" | "neutral" | "action"
 export function GeneticsPanel({
   profile,
   animalId,
+  profiles,
+  outsiders,
   propertyId,
   actorId,
 }: {
   readonly profile: CattleProfile | undefined;
   readonly animalId: Ulid;
+  /** Everything on file, so the parents can settle what this one is. */
+  readonly profiles: readonly CattleProfile[];
+  readonly outsiders: readonly ExternalAnimal[];
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
 }) {
@@ -74,6 +82,25 @@ export function GeneticsPanel({
   const { show } = useToast();
 
   const tests = profile?.geneticTests ?? [];
+
+  const records = { profiles, outsiders };
+  const parents = { sire: profile?.sire, dam: profile?.dam };
+
+  /**
+   * What the parents settle, where this animal has no card of its own.
+   *
+   * Free is inherited only from two tested-free parents; a carrier anywhere
+   * inside three generations makes a descendant possible. That asymmetry is
+   * the associations' own rule and getting it backwards is how a carrier gets
+   * called clean.
+   */
+  const inherited = useMemo(() => defectsFor(tests, parents, records), [tests, profile, profiles, outsiders]);
+
+  /** The red an animal can be hiding behind a black coat. */
+  const carried = useMemo(
+    () => carriedColourFor(parents, records, {}),
+    [profile, profiles, outsiders],
+  );
   const verdict = herdRuleVerdict(tests);
 
   const [busy, setBusy] = useState(false);
@@ -187,6 +214,12 @@ export function GeneticsPanel({
               const status = statusOf(tests, defect);
               const record = tests.find((test) => test.defect === defect);
               const covered = HOUSE_RULE_DEFECTS.includes(defect);
+              // What the parents settle, where this animal has no card of its
+              // own. Almost nothing on this place is hair-tested; the papered
+              // ancestors are, and a recessive an animal does not have cannot
+              // appear in it.
+              const deduced = inherited.find((entry) => entry.defect === defect);
+              const shown = deduced?.inherited === true ? deduced.status : status;
 
               return (
                 <div
@@ -197,7 +230,13 @@ export function GeneticsPanel({
                     <span className="flex flex-wrap items-center gap-2 text-density font-medium text-ink">
                       {defect}
                       {covered ? <Pill tone="identity">house rule</Pill> : null}
-                      <Pill tone={STATUS_TONE[status]}>{status.replace(/_/g, " ")}</Pill>
+                      <Pill tone={STATUS_TONE[shown]}>{STATUS_LABELS[shown]}</Pill>
+                      {deduced?.inherited !== true ? null : (
+                        // Never shown as a test result. A hair card and a
+                        // deduction are different claims and only one of them
+                        // can be quoted.
+                        <Pill tone="neutral">from the parents</Pill>
+                      )}
                     </span>
                     <span className="text-sm text-muted">
                       {DEFECT_NAMES[defect]}
@@ -206,6 +245,9 @@ export function GeneticsPanel({
                         : ` · tested ${record.testedOn.toLocaleDateString()}`}
                       {record?.lab === undefined ? "" : ` · ${record.lab}`}
                     </span>
+                    {deduced?.inherited !== true ? null : (
+                      <span className="text-sm text-muted">{deduced.because}</span>
+                    )}
                   </div>
 
                   <Select
@@ -230,6 +272,23 @@ export function GeneticsPanel({
         title="Coat colour"
         description="Two alleles per locus, off the test. The coat alone is not enough — a black animal can be ED/ED or ED/e, and out of a red mate those two throw entirely different calves."
       >
+        {carried === undefined ? null : (
+          <Callout tone={carried.carriesRed > 0 ? "action" : "calm"} title="What its parents settle">
+            {/*
+              A recessive is invisible. A black cow out of a red-carrying bull
+              looks exactly like one out of two homozygous blacks, and the two
+              throw different calves. Nobody will hair-test every heifer on the
+              place — but the parents are usually known, and the parents settle
+              it to a probability.
+            */}
+            {describeCarried(carried) ??
+              "Nothing hidden — its parents cannot have passed it a red allele."}
+            <span className="block pt-2 text-sm text-muted">
+              Possible: {carried.possible.map((entry) => `${entry.genotype} (${Math.round(entry.chance * 100)}%)`).join(", ")}
+              . Typing this animal settles it outright.
+            </span>
+          </Callout>
+        )}
         <Card>
           <div className="flex flex-col gap-density">
             <div className="grid grid-cols-2 gap-density sm:grid-cols-4">
