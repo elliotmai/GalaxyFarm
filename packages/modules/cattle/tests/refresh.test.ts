@@ -5,8 +5,11 @@ import {
   applyChanges,
   defaultAccepted,
   pedigreeChanges,
+  profileChanges,
   refreshChanges,
+  unknownOnChart,
 } from "../src/domain/refresh.js";
+import type { CattleProfile } from "../src/domain/cattle-profile.js";
 import type { ExternalAnimal } from "../src/domain/pedigree.js";
 import {
   CHIANINA_PAGE,
@@ -310,5 +313,188 @@ describe("the breed makeup a refresh can actually find", () => {
     expect(
       refreshChanges(montego, page()).some((change) => change.field === "breedComposition"),
     ).toBe(false);
+  });
+});
+
+describe("wiring the parents a page names", () => {
+  const tyson = external({ name: "CMAC TYSON ET", regNumber: "364424", association: "AMAA" });
+  const jenna = external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "AMAA" });
+
+  it("links a sire and dam the record does not have yet", () => {
+    // The detail panel names both outright. An ancestor entered by hand off a
+    // certificate has no parents linked, and its own page is where that gets
+    // fixed — until now the refresh read them and did nothing with them.
+    const orphan = external({
+      name: "ZNT MONTEGO BAY 901W",
+      regNumber: "402303",
+      association: "AMAA",
+    });
+
+    const changes = refreshChanges(orphan, page(), [tyson, jenna]);
+
+    expect(changes.find((change) => change.field === "sire")).toMatchObject({
+      kind: "fill",
+      value: { kind: "external", id: tyson.id },
+    });
+    expect(changes.find((change) => change.field === "dam")?.value).toEqual({
+      kind: "external",
+      id: jenna.id,
+    });
+  });
+
+  it("never re-points a parent that is already set", () => {
+    // Re-pointing would rewrite a pedigree somebody built by hand, on the
+    // strength of a page that may be recording the same animal under another
+    // number.
+    const wired = external({
+      name: "ZNT MONTEGO BAY 901W",
+      regNumber: "402303",
+      association: "AMAA",
+      sire: { kind: "external", id: "01ARZ3NDEKTSV4RRFFQ69G5FZZ" as never },
+    });
+
+    expect(refreshChanges(wired, page(), [tyson, jenna]).some((c) => c.field === "sire")).toBe(
+      false,
+    );
+  });
+
+  it("proposes nothing when the parent is not on file", () => {
+    const orphan = external({ name: "ZNT MONTEGO BAY 901W", regNumber: "402303", association: "AMAA" });
+
+    expect(refreshChanges(orphan, page(), []).some((c) => c.field === "sire")).toBe(false);
+  });
+
+  it("will not guess between two animals of the same name", () => {
+    // Two cows called SWEET DANDY in one county is an ordinary Tuesday, and a
+    // pedigree pointed at the wrong one looks entirely normal afterwards.
+    const one = external({ name: "CMAC TYSON ET" });
+    const two = external({ name: "CMAC TYSON ET" });
+    const orphan = external({ name: "ZNT MONTEGO BAY 901W", regNumber: "402303", association: "AMAA" });
+
+    expect(refreshChanges(orphan, page(), [one, two]).some((c) => c.field === "sire")).toBe(false);
+  });
+
+  it("matches on the registry whose page it is", () => {
+    // 364424 under Chianina is a different animal from 364424 under
+    // Maine-Anjou.
+    const wrongRegistry = external({
+      name: "SOMEBODY ELSE",
+      regNumber: "364424",
+      association: "ACA",
+    });
+    const orphan = external({ name: "ZNT MONTEGO BAY 901W", regNumber: "402303", association: "AMAA" });
+
+    expect(
+      refreshChanges(orphan, page(), [wrongRegistry]).some((c) => c.field === "sire"),
+    ).toBe(false);
+  });
+});
+
+describe("the farm's own animals", () => {
+  const profile = (over: Partial<CattleProfile> = {}): CattleProfile =>
+    ({
+      id: "01ARZ3NDEKTSV4RRFFQ69G5FP1",
+      propertyId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      createdAt: new Date("2026-01-01"),
+      updatedAt: new Date("2026-01-01"),
+      animalId: "01ARZ3NDEKTSV4RRFFQ69G5FA1",
+      breedComposition: [],
+      geneticTests: [],
+      registrations: [],
+      ...over,
+    }) as CattleProfile;
+
+  const chianina = () =>
+    parseDigitalBeefPage(CHIANINA_PAGE, { association: "ACA", registration: "359968" });
+
+  it("takes the breed makeup off the papers", () => {
+    // The gap this covers: the farm's own pages were being read only for what
+    // the chart said about the ancestors above them, so the animals whose
+    // composition matters most — the ones bred, shown and sold — were the ones
+    // a refresh never touched.
+    const change = profileChanges(profile(), chianina()).find(
+      (entry) => entry.field === "breedComposition",
+    );
+
+    expect(change?.kind).toBe("fill");
+    expect(change?.after).toContain("79.57% MA");
+  });
+
+  it("treats an empty makeup as no makeup", () => {
+    // `breedComposition` defaults to `[]`, and reading that as "already
+    // answered" is why a papered animal with none on file would never gain one.
+    expect(
+      profileChanges(profile({ breedComposition: [] }), chianina()).some(
+        (entry) => entry.field === "breedComposition",
+      ),
+    ).toBe(true);
+  });
+
+  it("reports a makeup that differs rather than replacing it", () => {
+    const change = profileChanges(
+      profile({ breedComposition: [{ breed: "MA", percent: 100 }] }),
+      chianina(),
+    ).find((entry) => entry.field === "breedComposition");
+
+    expect(change?.kind).toBe("change");
+    expect(change?.before).toContain("100% MA");
+  });
+
+  it("reads the horn status into the vocabulary the record uses", () => {
+    // The page prints "Polled"; the record stores `polled`.
+    expect(
+      profileChanges(profile(), chianina()).find((entry) => entry.field === "hornStatus")?.value,
+    ).toBe("polled");
+  });
+
+  it("says nothing when the record already agrees", () => {
+    const current = profile({
+      breedComposition: [
+        { breed: "CA", percent: 3.72 },
+        { breed: "MA", percent: 79.57 },
+        { breed: "AN", percent: 14.41 },
+        { breed: "XX", percent: 2.3 },
+      ],
+      colour: "Black",
+      hornStatus: "polled",
+    });
+
+    expect(profileChanges(current, chianina())).toEqual([]);
+  });
+
+  it("does not propose emptying a makeup the page does not carry", () => {
+    // A Maine-Anjou page prints none at all.
+    const known = profile({ breedComposition: [{ breed: "MA", percent: 79.57 }] });
+
+    expect(
+      profileChanges(known, page()).some((entry) => entry.field === "breedComposition"),
+    ).toBe(false);
+  });
+});
+
+describe("what a chart offers that is not on file", () => {
+  it("names the animals an import would add", () => {
+    // A refresh does not create records — importing does, and it shows every
+    // one for approval. But saying nothing leaves somebody thinking the page
+    // had nothing to give when it named thirty ancestors.
+    const strangers = unknownOnChart(page(), []);
+
+    expect(strangers).toContain("CMAC TYSON ET");
+    expect(strangers.length).toBeGreaterThan(20);
+  });
+
+  it("counts nothing when every one is already here", () => {
+    const read = page();
+    const herd = read.ancestors
+      .filter((entry) => entry.regNumber !== undefined)
+      .map((entry) =>
+        external({
+          name: entry.name as string,
+          regNumber: entry.regNumber as string,
+          association: "AMAA",
+        }),
+      );
+
+    expect(unknownOnChart(read, herd)).toEqual([]);
   });
 });

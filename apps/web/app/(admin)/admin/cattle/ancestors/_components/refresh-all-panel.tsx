@@ -12,8 +12,11 @@ import {
   IMPORTABLE_ASSOCIATIONS,
   parseDigitalBeefPage,
   parseDigitalBeefUrl,
+  cattleProfileSchema,
   pedigreeChanges,
+  profileChanges,
   refreshChanges,
+  type CattleProfile,
   type ExternalAnimal,
   type FieldChange,
 } from "@galaxy-farm/module-cattle";
@@ -80,6 +83,8 @@ export function RefreshAllAncestors({
     readonly label: string;
     readonly association: string;
     readonly regNumber: string;
+    /** The profile to update — breed makeup and defect results live there. */
+    readonly profile: CattleProfile;
   }[];
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
@@ -89,6 +94,13 @@ export function RefreshAllAncestors({
     "externalAnimals",
     "externalAnimals",
     externalAnimalSchema,
+    propertyId,
+    actorId,
+  );
+  const profilesApi = useMutations<CattleProfile>(
+    "cattleProfiles",
+    "cattleProfiles",
+    cattleProfileSchema,
     propertyId,
     actorId,
   );
@@ -103,6 +115,10 @@ export function RefreshAllAncestors({
   const [failures, setFailures] = useState<readonly Failure[]>([]);
   /** Pages that came back with a detail panel but no pedigree chart. */
   const [chartless, setChartless] = useState(0);
+  /** What the farm's own animals' pages would change on their profiles. */
+  const [ourFindings, setOurFindings] = useState<
+    readonly { label: string; profile: CattleProfile; changes: readonly FieldChange[] }[]
+  >([]);
   /** `${animalId}:${field}` for every change agreed to. */
   const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -114,9 +130,11 @@ export function RefreshAllAncestors({
     setFindings([]);
     setFailures([]);
     setChartless(0);
+    setOurFindings([]);
     setAccepted(new Set());
 
     const found: Finding[] = [];
+    const ourResults: { label: string; profile: CattleProfile; changes: readonly FieldChange[] }[] = [];
     const failed: Failure[] = [];
     const ticked = new Set<string>();
 
@@ -179,7 +197,7 @@ export function RefreshAllAncestors({
           // are printed beside each ancestor and nowhere else — so this is
           // counted and said out loud rather than passing as "no changes".
           if (page.ancestors.length === 0) setChartless((count) => count + 1);
-          record(animal, registration, refreshChanges(animal, page));
+          record(animal, registration, refreshChanges(animal, page, animals));
 
           // The chart on this page carries the defect results of the ancestors
           // above it — Digital Beef never prints an animal's own tests on its
@@ -230,6 +248,19 @@ export function RefreshAllAncestors({
         } else {
           const page = parseDigitalBeefPage(payload.page, parsed.ref);
           if (page.ancestors.length === 0) setChartless((count) => count + 1);
+
+          // The animal's own breed makeup, colour and horn status. This is the
+          // one place the farm's own cattle get a composition off the papers —
+          // and they are the animals whose composition matters most, being the
+          // ones bred, shown and sold.
+          const mine = profileChanges(ours.profile, page);
+          if (mine.length > 0) {
+            ourResults.push({ label: ours.label, profile: ours.profile, changes: mine });
+            for (const change of mine) {
+              if (change.kind === "fill") ticked.add(`profile:${ours.profile.id}:${change.field}`);
+            }
+          }
+
           for (const entry of pedigreeChanges(page, animals)) {
             record(entry.animal, { association: ours.association, regNumber: ours.regNumber }, entry.changes);
           }
@@ -243,6 +274,7 @@ export function RefreshAllAncestors({
 
       setDone((count) => count + 1);
       setFindings([...found]);
+      setOurFindings([...ourResults]);
       setFailures([...failed]);
       setAccepted(new Set(ticked));
     }
@@ -269,6 +301,23 @@ export function RefreshAllAncestors({
         if (result.ok) changed += 1;
       }
 
+      for (const finding of ourFindings) {
+        const patch = applyChanges(
+          finding.changes,
+          new Set(
+            finding.changes
+              .map((change) => change.field)
+              .filter((field) => accepted.has(`profile:${finding.profile.id}:${field}`)),
+          ),
+        );
+        if (Object.keys(patch).length === 0) continue;
+        const result = await profilesApi.update(
+          finding.profile.id,
+          patch as Partial<CattleProfile>,
+        );
+        if (result.ok) changed += 1;
+      }
+
       show({
         message:
           changed === 0 ? "Nothing ticked, so nothing changed" : `${changed} ancestor(s) updated`,
@@ -289,7 +338,16 @@ export function RefreshAllAncestors({
       return next;
     });
 
-  const tickedCount = findings.reduce(
+  const tickedCount =
+    ourFindings.reduce(
+      (total, finding) =>
+        total +
+        finding.changes.filter((change) =>
+          accepted.has(`profile:${finding.profile.id}:${change.field}`),
+        ).length,
+      0,
+    ) +
+    findings.reduce(
     (total, finding) =>
       total +
       finding.changes.filter((change) => accepted.has(`${finding.animal.id}:${change.field}`))
@@ -354,7 +412,47 @@ export function RefreshAllAncestors({
         </Callout>
       )}
 
-      {findings.length === 0 ? (
+      {ourFindings.length === 0 ? null : (
+        <div className="flex flex-col gap-2">
+          <p className="text-density font-medium text-ink">The farm&apos;s own animals</p>
+          <p className="text-sm text-muted">
+            Breed makeup, colour and horn status off their own papers. This is the one place a
+            registered animal of ours picks up a composition from the association rather than
+            having it worked out from its parents.
+          </p>
+          {ourFindings.map((finding) => (
+            <div key={finding.profile.id} className="flex flex-col gap-1 border-t border-edge pt-3">
+              <span className="text-density font-medium text-ink">{finding.label}</span>
+              {finding.changes.map((change) => {
+                const key = `profile:${finding.profile.id}:${change.field}`;
+                return (
+                  <label key={key} className="flex items-start gap-2 text-density">
+                    <input
+                      type="checkbox"
+                      checked={accepted.has(key)}
+                      onChange={() => toggle(key)}
+                      className="mt-1.5"
+                    />
+                    <span className="flex flex-wrap items-baseline gap-2">
+                      <span className="text-ink">{change.label}</span>
+                      <Pill tone={change.kind === "fill" ? "calm" : "action"}>
+                        {change.kind === "fill" ? "was blank" : "would change"}
+                      </Pill>
+                      <span className="text-sm text-muted">
+                        {change.before === undefined ? null : <s>{change.before}</s>}
+                        {change.before === undefined ? null : " → "}
+                        <span className="text-ink">{change.after}</span>
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {findings.length === 0 && ourFindings.length === 0 ? (
         stopped ? (
           <Callout tone="calm" title="Nothing has changed">
             Every page that could be read matches what is on file. That is worth knowing: the

@@ -13,6 +13,7 @@ import {
   parseDigitalBeefPage,
   parseDigitalBeefUrl,
   pedigreeChanges,
+  unknownOnChart,
   refreshChanges,
   type ExternalAnimal,
   type FieldChange,
@@ -73,6 +74,8 @@ export function RefreshFromAssociation({
   >([]);
   /** True when the page came back with a detail panel but no pedigree chart. */
   const [chartMissing, setChartMissing] = useState(false);
+  /** Animals on the chart that are not on file at all. */
+  const [strangers, setStrangers] = useState<readonly string[]>([]);
   const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
 
   const [association, regNumber] = which.split(":");
@@ -83,8 +86,9 @@ export function RefreshFromAssociation({
 
   function present(page: string, ref: { association: string; registration: string; url: string }) {
     const read = parseDigitalBeefPage(page, ref as never);
-    const found = refreshChanges(animal, read);
+    const found = refreshChanges(animal, read, everyone);
     setChartMissing(read.ancestors.length === 0);
+    setStrangers(unknownOnChart(read, everyone));
 
     // The chart on this page carries the defect results, colours and birth
     // dates of the *ancestors* — Digital Beef never prints an animal's own
@@ -282,6 +286,19 @@ export function RefreshFromAssociation({
           each ancestor, never on the animal&apos;s own page — so without it there are none to
           read. Open the page in a browser and paste it below; a select-all copies what the tabs
           loaded.
+        </Callout>
+      )}
+
+      {strangers.length === 0 ? null : (
+        <Callout
+          tone="action"
+          title={`${strangers.length} on this chart are not on file`}
+        >
+          {strangers.slice(0, 6).join(", ")}
+          {strangers.length > 6 ? `, and ${strangers.length - 6} more` : ""}. A refresh does not
+          add animals — importing this page does, and it shows every one for approval and wires the
+          whole tree at once. Use &ldquo;Import from Digital Beef&rdquo; with this
+          animal&apos;s number.
         </Callout>
       )}
 

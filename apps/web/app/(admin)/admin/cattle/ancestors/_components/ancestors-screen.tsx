@@ -250,6 +250,7 @@ export function AncestorsScreen({
         label: named.get(profile.animalId) ?? "an animal here",
         association: registration.association,
         regNumber: registration.regNumber,
+        profile,
       })),
     );
   }, [animals, profiles]);
