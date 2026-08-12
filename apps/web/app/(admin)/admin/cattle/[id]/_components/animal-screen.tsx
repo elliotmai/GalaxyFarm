@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import {
   Badge,
   Button,
+  Callout,
   Card,
   DetailList,
   EmptyState,
@@ -16,6 +17,7 @@ import {
   PageHeader,
   SafetyBadge,
   Section,
+  TextArea,
   Stat,
   StatRow,
   Tabs,
@@ -32,14 +34,17 @@ import {
   type ZoneAssignment,
 } from "@galaxy-farm/core";
 import {
+  animalsUnderWithdrawal,
   ASSOCIATIONS,
   cattleProfileSchema,
   describeComposition,
   HORN_STATUSES,
   isPapered,
-  registrationIn,
   type Association,
   type CattleProfile,
+  type HealthRecord,
+  type HornStatus,
+  type Registration,
 } from "@galaxy-farm/module-cattle";
 
 import {
@@ -82,6 +87,7 @@ export function AnimalScreen({
   const { records: profiles } = useRecords<CattleProfile>("cattleProfiles", { propertyId });
   const { records: zones } = useRecords<Zone>("zones", { propertyId });
   const { records: placements } = useRecords<ZoneAssignment>("zoneAssignments", { propertyId });
+  const { records: health } = useRecords<HealthRecord>("healthRecords", { propertyId });
 
   const registrationOf = useMemo(() => {
     const byAnimal = new Map(profiles.map((profile) => [profile.animalId, profile]));
@@ -128,6 +134,14 @@ export function AnimalScreen({
   const inside = standing.find((entry) => entry.slot === "inside");
   const zone = (outside ?? inside)?.zone;
   const months = ageInMonths(animal, new Date());
+
+  // #15: a withdrawal must be unmissable here. Selling or slaughtering an
+  // animal inside one is a residue violation, and the person about to do it is
+  // usually looking at this page — so it gets a banner above the tabs rather
+  // than a badge in a row of badges that already has six.
+  const withdrawal = animalsUnderWithdrawal(health, new Date()).find(
+    (entry) => entry.animalId === animal.id,
+  );
 
   // The URL the record answers to now. Somebody who arrived by an old link
   // gets moved to the current one rather than being left on a stale address
@@ -187,6 +201,23 @@ export function AnimalScreen({
           </>
         }
       />
+
+      {withdrawal === undefined ? null : (
+        <Callout
+          tone="danger"
+          title={`Under withdrawal for ${withdrawal.daysRemaining} more day${withdrawal.daysRemaining === 1 ? "" : "s"}`}
+        >
+          {withdrawal.product === undefined
+            ? "Not clear for sale or slaughter until "
+            : `${withdrawal.product}. Not clear for sale or slaughter until `}
+          {withdrawal.clearsOn.toLocaleDateString(undefined, {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          })}
+          .
+        </Callout>
+      )}
 
       <StatRow>
         <Stat label="Tag" value={animal.tagNumber ?? "—"} />
@@ -357,12 +388,18 @@ function Overview({
 }
 
 /**
- * The papers (spec §5.2).
+ * The papers, and what she looks like (spec §5.2, issue #15).
  *
  * An animal can be registered in several associations at once, which is
  * ordinary for show cattle, so this is a list rather than a pair of fields.
  * Adding one creates the profile record if there is not one yet — nobody
  * should have to know that a sidecar exists.
+ *
+ * Registrations are editable in place rather than remove-and-re-add. A
+ * transposed digit in a registration number is the single likeliest mistake
+ * on this screen, and making the fix go through a delete confirmation that
+ * warns about phone calls to the association trains people to click past the
+ * warning that matters (§4.5 clause 3).
  */
 function Registrations({
   animal,
@@ -389,10 +426,33 @@ function Registrations({
   const [regNumber, setRegNumber] = useState("");
   const [registeredName, setRegisteredName] = useState("");
   const [tattoo, setTattoo] = useState("");
+  /** The registration being edited, keyed as it is stored. Absent while adding. */
+  const [editingKey, setEditingKey] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
-  async function add(event: React.FormEvent) {
+  const registrations = profile?.registrations ?? [];
+  const keyOf = (entry: Registration) => `${entry.association}:${entry.regNumber}`;
+
+  function reset() {
+    setEditingKey(undefined);
+    setAssociation("AMAA");
+    setRegNumber("");
+    setRegisteredName("");
+    setTattoo("");
+    setError(undefined);
+  }
+
+  function startEdit(entry: Registration) {
+    setEditingKey(keyOf(entry));
+    setAssociation(entry.association);
+    setRegNumber(entry.regNumber);
+    setRegisteredName(entry.registeredName ?? "");
+    setTattoo(entry.tattoo ?? "");
+    setError(undefined);
+  }
+
+  async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(undefined);
 
@@ -400,12 +460,18 @@ function Registrations({
       setError("A registration needs its number");
       return;
     }
-    if (profile !== undefined && registrationIn(profile, association) !== undefined) {
+
+    // One set of papers per association. On an edit, the row being edited is
+    // not its own duplicate.
+    const clash = registrations.find(
+      (existing) => existing.association === association && keyOf(existing) !== editingKey,
+    );
+    if (clash !== undefined) {
       setError(`Already registered with ${association}. Remove that one first.`);
       return;
     }
 
-    const entry = {
+    const entry: Registration = {
       association,
       regNumber: regNumber.trim(),
       ...(registeredName.trim() === "" ? {} : { registeredName: registeredName.trim() }),
@@ -414,16 +480,26 @@ function Registrations({
 
     setBusy(true);
     try {
+      const next =
+        editingKey === undefined
+          ? [...registrations, entry]
+          : // The EPD snapshot is not on this form, so it is carried across
+            // rather than dropped: an EPD is what was true on the day it was
+            // quoted, and losing it to a typo fix loses the day too.
+            registrations.map((existing) =>
+              keyOf(existing) === editingKey ? { ...existing, ...entry } : existing,
+            );
+
       const result =
         profile === undefined
           ? await profiles.create({
               animalId: animal.id,
               breedComposition: [],
-              registrations: [entry],
-            })
+              registrations: next,
+            } as never)
           : await profiles.update(profile.id, {
-              registrations: [...profile.registrations, entry],
-            });
+              registrations: next,
+            } as Partial<CattleProfile>);
 
       if (!result.ok) {
         setError(
@@ -434,10 +510,14 @@ function Registrations({
         return;
       }
 
-      setRegNumber("");
-      setRegisteredName("");
-      setTattoo("");
-      show({ message: `${association} registration added` });
+      show({
+        message:
+          editingKey === undefined
+            ? `${association} registration added`
+            : `${association} registration updated`,
+        tone: "success",
+      });
+      reset();
     } finally {
       setBusy(false);
     }
@@ -451,7 +531,7 @@ function Registrations({
    * and getting a registration reinstated with an association is a phone call
    * rather than an undo.
    */
-  async function remove(entry: { association: string; regNumber: string }) {
+  async function remove(entry: Registration) {
     if (profile === undefined) return;
 
     const confirmed = await confirmDelete({
@@ -464,15 +544,12 @@ function Registrations({
     });
     if (!confirmed) return;
 
+    if (keyOf(entry) === editingKey) reset();
     await profiles.update(profile.id, {
-      registrations: profile.registrations.filter(
-        (existing) => existing.regNumber !== entry.regNumber,
-      ),
-    });
-    show({ message: "Registration removed" });
+      registrations: registrations.filter((existing) => keyOf(existing) !== keyOf(entry)),
+    } as Partial<CattleProfile>);
+    show({ message: "Registration removed", tone: "danger" });
   }
-
-  const registrations = profile?.registrations ?? [];
 
   return (
     <div className="flex flex-col gap-density pt-density">
@@ -488,7 +565,7 @@ function Registrations({
         ) : (
           <div className="flex flex-col gap-3">
             {registrations.map((entry) => (
-              <Card key={`${entry.association}:${entry.regNumber}`}>
+              <Card key={keyOf(entry)}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <DetailList
                     columns={3}
@@ -499,9 +576,14 @@ function Registrations({
                       { label: "Tattoo", value: entry.tattoo },
                     ]}
                   />
-                  <Button variant="ghost" onClick={() => void remove(entry)}>
-                    Remove
-                  </Button>
+                  <span className="flex gap-2">
+                    <Button variant="ghost" onClick={() => startEdit(entry)}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" onClick={() => void remove(entry)}>
+                      Remove
+                    </Button>
+                  </span>
                 </div>
               </Card>
             ))}
@@ -509,8 +591,8 @@ function Registrations({
         )}
       </Section>
 
-      <Section title="Add a registration">
-        <form onSubmit={(event) => void add(event)} className="flex flex-col gap-density">
+      <Section title={editingKey === undefined ? "Add a registration" : "Edit this registration"}>
+        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
           <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
             <Select
               label="Association"
@@ -520,6 +602,7 @@ function Registrations({
             />
             <TextInput
               label="Registration number"
+              numeric
               value={regNumber}
               onChange={(event) => setRegNumber(event.target.value)}
               {...(error === undefined ? {} : { error })}
@@ -537,21 +620,151 @@ function Registrations({
               onChange={(event) => setTattoo(event.target.value)}
             />
           </div>
-          <div>
+          <div className="flex flex-wrap gap-2">
             <Button type="submit" busy={busy}>
-              Add registration
+              {editingKey === undefined ? "Add registration" : "Save registration"}
             </Button>
+            {editingKey === undefined ? null : (
+              <Button variant="ghost" onClick={reset}>
+                Cancel
+              </Button>
+            )}
           </div>
         </form>
       </Section>
 
-      <Section title="Description">
-        <p className="max-w-prose text-sm text-muted">
-          Horn status ({HORN_STATUSES.join(", ")}), colour, markings and breed composition are
-          edited on the herd screen for now.
-        </p>
-      </Section>
+      {/*
+        Keyed on the profile so the form remounts when one arrives. Its fields
+        seed from `profile` at mount, and the profile is read from the local
+        store a tick after the animal is — without this the description would
+        seed from nothing and then quietly save a blank over what was there.
+      */}
+      <Description
+        key={profile?.id ?? "new"}
+        animal={animal}
+        profile={profile}
+        propertyId={propertyId}
+        actorId={actorId}
+      />
     </div>
+  );
+}
+
+/**
+ * Horn status, colour and markings (§5.2).
+ *
+ * These are how you tell one black baldy from the next black baldy in a pen of
+ * eleven, which is why they are here rather than in a notes field. Horn status
+ * is the one with consequences — a horned animal is a different proposition in
+ * a trailer and at a show — so it is a field, not a sentence in the markings.
+ */
+function Description({
+  animal,
+  profile,
+  propertyId,
+  actorId,
+}: {
+  readonly animal: Animal;
+  readonly profile: CattleProfile | undefined;
+  readonly propertyId: Ulid;
+  readonly actorId: Ulid;
+}) {
+  const profiles = useMutations<CattleProfile>(
+    "cattleProfiles",
+    "cattleProfiles",
+    cattleProfileSchema,
+    propertyId,
+    actorId,
+  );
+  const { show } = useToast();
+
+  const [hornStatus, setHornStatus] = useState(profile?.hornStatus ?? "");
+  const [colour, setColour] = useState(profile?.colour ?? "");
+  const [markings, setMarkings] = useState(profile?.markings ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(undefined);
+    setBusy(true);
+
+    // Blank clears the field rather than storing an empty string: "" and
+    // "nobody has said" read identically on the page but sort and filter
+    // differently everywhere else.
+    const patch = {
+      hornStatus: hornStatus === "" ? undefined : (hornStatus as HornStatus),
+      colour: colour.trim() === "" ? undefined : colour.trim(),
+      markings: markings.trim() === "" ? undefined : markings.trim(),
+    };
+
+    try {
+      const result =
+        profile === undefined
+          ? await profiles.create({
+              animalId: animal.id,
+              breedComposition: [],
+              registrations: [],
+              ...patch,
+            } as never)
+          : await profiles.update(profile.id, patch as Partial<CattleProfile>);
+
+      if (!result.ok) {
+        setError(
+          result.error.kind === "validation"
+            ? (result.error.issues[0]?.message ?? "That is not valid")
+            : "Could not save that",
+        );
+        return;
+      }
+      show({ message: "Description saved", tone: "success" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section
+      title="Description"
+      description="How you pick her out of a pen of eleven that look like her."
+    >
+      <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
+        <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+          <Select
+            label="Horn status"
+            value={hornStatus}
+            placeholder="Not recorded"
+            onChange={(event) => setHornStatus(event.target.value as HornStatus | "")}
+            options={HORN_STATUSES.map((value) => ({ value, label: value }))}
+          />
+          <TextInput
+            label="Colour"
+            hint="Black, red, roan, black baldy — whatever you would say on the phone."
+            value={colour}
+            onChange={(event) => setColour(event.target.value)}
+          />
+        </div>
+        <TextArea
+          label="Markings"
+          rows={3}
+          hint="White face, four socks, the scar over the left hip."
+          value={markings}
+          onChange={(event) => setMarkings(event.target.value)}
+        />
+
+        {error === undefined ? null : (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
+
+        <div>
+          <Button type="submit" busy={busy}>
+            Save description
+          </Button>
+        </div>
+      </form>
+    </Section>
   );
 }
 

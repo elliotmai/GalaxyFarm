@@ -36,6 +36,8 @@ import {
   type ZoneAssignment,
 } from "@galaxy-farm/core";
 
+import { animalsUnderWithdrawal, type HealthRecord } from "@galaxy-farm/module-cattle";
+
 import { useMutations } from "@/lib/local/mutations";
 import { animalHref, animalTitle } from "@/lib/animal-slug";
 import { useRecords } from "@/lib/local/use-records";
@@ -59,6 +61,28 @@ const SAFETY_OPTIONS = Object.values(SAFETY_LEVEL_DEFAULTS).map((level) => ({
   value: String(level.level),
   label: `${level.level} — ${level.label}`,
 }));
+
+/**
+ * The filters that actually get used (issue #15).
+ *
+ * Every one of them is "" for off rather than undefined, because they are read
+ * straight out of a `<select>` and a select has no undefined to give.
+ */
+interface Filters {
+  readonly zoneId: string;
+  readonly status: string;
+  readonly sex: string;
+  readonly safetyLevel: string;
+  readonly withdrawnOnly: boolean;
+}
+
+const NO_FILTERS: Filters = {
+  zoneId: "",
+  status: "",
+  sex: "",
+  safetyLevel: "",
+  withdrawnOnly: false,
+};
 
 interface Draft {
   readonly name: string;
@@ -92,9 +116,11 @@ export function HerdScreen({
   readonly actorId: Ulid;
 }) {
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const { records: all, loading } = useRecords<Animal>("animals", { propertyId, search });
   const { records: zones } = useRecords<Zone>("zones", { propertyId });
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", { propertyId });
+  const { records: health } = useRecords<HealthRecord>("healthRecords", { propertyId });
 
   // Which zones are indoor, so an assignment's slot can be read off its zone
   // rather than trusted from the row — a legacy `primary` row has to count
@@ -104,7 +130,51 @@ export function HerdScreen({
     [zones],
   );
 
-  const animals = all.filter((animal) => animal.species === "cattle");
+  const cattle = all.filter((animal) => animal.species === "cattle");
+
+  // Whoever is held back by a withdrawal today. Computed once for the whole
+  // list rather than per row: it reads every health record, and doing that
+  // inside a filter would read them once per animal.
+  const withheld = useMemo(
+    () => new Set(animalsUnderWithdrawal(health, new Date()).map((entry) => entry.animalId)),
+    [health],
+  );
+
+  /**
+   * The zone an animal is standing in now, by animal.
+   *
+   * An animal has an outside pen and an inside pen at once (§5.1), so "in this
+   * pen" is a membership test, not an equality one — filtering on the first
+   * open assignment would hide a cow from her own barn.
+   */
+  const openZonesByAnimal = useMemo(() => {
+    const map = new Map<Ulid, Set<Ulid>>();
+    for (const assignment of assignments) {
+      if (assignment.periodTo !== undefined) continue;
+      const existing = map.get(assignment.animalId) ?? new Set<Ulid>();
+      existing.add(assignment.zoneId);
+      map.set(assignment.animalId, existing);
+    }
+    return map;
+  }, [assignments]);
+
+  const animals = cattle.filter((animal) => {
+    if (
+      filters.zoneId !== "" &&
+      !(openZonesByAnimal.get(animal.id)?.has(filters.zoneId as Ulid) ?? false)
+    ) {
+      return false;
+    }
+    if (filters.status !== "" && animal.status !== filters.status) return false;
+    if (filters.sex !== "" && animal.sex !== filters.sex) return false;
+    if (filters.safetyLevel !== "" && String(animal.safetyLevel) !== filters.safetyLevel) {
+      return false;
+    }
+    if (filters.withdrawnOnly && !withheld.has(animal.id)) return false;
+    return true;
+  });
+
+  const filtered = animals.length !== cattle.length;
 
   const mutations = useMutations<Animal>("animals", "animals", animalSchema, propertyId, actorId);
   const placements = useMutations<ZoneAssignment>(
@@ -310,7 +380,7 @@ export function HerdScreen({
       render: (animal) => (
         <Select
           label={`Zone for ${animal.name ?? "animal"}`}
-          className="[&>label]:sr-only"
+          hideLabel
           options={zoneOptions}
           placeholder="Nowhere"
           value={currentZone(animal.id)?.id ?? ""}
@@ -321,7 +391,13 @@ export function HerdScreen({
     {
       key: "safety",
       header: "Care",
-      render: (animal) => <SafetyBadge level={animal.safetyLevel} size="compact" />,
+      render: (animal) => (
+        <span className="flex flex-wrap items-center gap-2">
+          <SafetyBadge level={animal.safetyLevel} size="compact" />
+          {/* The same fact the filter selects on, visible without selecting. */}
+          {withheld.has(animal.id) ? <Badge tone="danger">Withdrawal</Badge> : null}
+        </span>
+      ),
     },
     {
       key: "actions",
@@ -348,7 +424,7 @@ export function HerdScreen({
         <div className="flex items-center gap-2">
           <TextInput
             label="Search"
-            className="[&>label]:sr-only"
+            hideLabel
             placeholder="Name, tag, or notes"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -358,6 +434,61 @@ export function HerdScreen({
           </Button>
         </div>
       </header>
+
+      {/*
+        The filters #15 asks for, in the order they get reached for. They stack
+        rather than replace each other: "bulls in the north pen still under
+        withdrawal" is one question, not three.
+      */}
+      <Card title="Narrow the herd">
+        <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-5">
+          <Select
+            label="Pen"
+            value={filters.zoneId}
+            placeholder="Any pen"
+            options={zoneOptions}
+            onChange={(event) => setFilters({ ...filters, zoneId: event.target.value })}
+          />
+          <Select
+            label="Status"
+            value={filters.status}
+            placeholder="Any status"
+            options={STATUS_OPTIONS}
+            onChange={(event) => setFilters({ ...filters, status: event.target.value })}
+          />
+          <Select
+            label="Sex"
+            value={filters.sex}
+            placeholder="Any sex"
+            options={SEX_OPTIONS}
+            onChange={(event) => setFilters({ ...filters, sex: event.target.value })}
+          />
+          <Select
+            label="Handling level"
+            value={filters.safetyLevel}
+            placeholder="Any level"
+            options={SAFETY_OPTIONS}
+            onChange={(event) => setFilters({ ...filters, safetyLevel: event.target.value })}
+          />
+          <Checkbox
+            label="Under withdrawal"
+            hint="Cannot go to a sale or a packer today."
+            checked={filters.withdrawnOnly}
+            onChange={(event) => setFilters({ ...filters, withdrawnOnly: event.target.checked })}
+          />
+        </div>
+
+        {filtered ? (
+          <p className="mt-density flex flex-wrap items-center gap-3 text-sm text-muted">
+            <span>
+              Showing {animals.length} of {cattle.length}.
+            </span>
+            <Button variant="ghost" onClick={() => setFilters(NO_FILTERS)}>
+              Clear filters
+            </Button>
+          </p>
+        ) : null}
+      </Card>
 
       {draft !== undefined ? (
         <Card title={editing === undefined ? "New animal" : `Editing ${editing.name ?? "animal"}`}>

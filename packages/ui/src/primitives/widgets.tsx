@@ -275,3 +275,43 @@ export function CardGrid({
     </div>
   );
 }
+
+export interface CalloutProps {
+  readonly tone?: Tone;
+  readonly title: ReactNode;
+  readonly children?: ReactNode;
+  readonly actions?: ReactNode;
+}
+
+/**
+ * Something the reader must not scroll past.
+ *
+ * A `Badge` in a row of badges is a label among labels — it is exactly as
+ * visible as the six beside it, which is the wrong amount of visible for a
+ * withdrawal period. A callout is filled, full width, and sits above the
+ * content it is about, so the only way to miss it is not to open the page.
+ *
+ * `role="status"` rather than `role="alert"`: this is a standing condition
+ * found on arrival, not something that just happened, and an alert would
+ * interrupt a screen reader mid-heading to say so.
+ */
+export function Callout({ tone = "danger", title, children, actions }: CalloutProps) {
+  return (
+    <div
+      role="status"
+      className={[
+        "flex flex-wrap items-start justify-between gap-density rounded-density p-density",
+        "border border-current/25",
+        TONE_FILL[tone],
+      ].join(" ")}
+    >
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="font-heading text-density font-semibold">{title}</p>
+        {children === undefined ? null : <div className="text-sm opacity-90">{children}</div>}
+      </div>
+      {actions === undefined ? null : (
+        <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+      )}
+    </div>
+  );
+}

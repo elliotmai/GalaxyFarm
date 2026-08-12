@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { CardGrid, Meter, Pill, RecordCard, Tile } from "../src/primitives/widgets.js";
+import { Callout, CardGrid, Meter, Pill, RecordCard, Tile } from "../src/primitives/widgets.js";
 
 /**
  * The widgets that make a screen read as designed rather than as a form (§8).
@@ -120,5 +120,23 @@ describe("CardGrid", () => {
 
     expect(container.firstElementChild?.className).toContain("grid-cols-1");
     expect(container.firstElementChild?.className).toContain("xl:grid-cols-3");
+  });
+});
+
+describe("Callout", () => {
+  it("announces itself as a standing condition, not as an interruption", () => {
+    // A withdrawal period is true when you arrive at the page. `role="alert"`
+    // would cut across whatever a screen reader was in the middle of saying to
+    // report something that has not just happened.
+    render(<Callout title="Under withdrawal for 6 more days">Clears on 18 August.</Callout>);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Under withdrawal for 6 more days");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("carries the tone into the fill so danger does not read as neutral", () => {
+    render(<Callout tone="danger" title="Not clear for sale" />);
+
+    expect(screen.getByRole("status").className).toContain("bg-danger/15");
   });
 });
