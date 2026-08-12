@@ -170,6 +170,8 @@ export const cattleProfiles = pgTable(
   {
     ...baseColumns,
     animalId: text("animal_id").notNull(),
+    /** What breed it is, in words. A list — a crossbred animal is more than one. */
+    breed: jsonb("breed").$type<string[]>(),
     breedComposition: jsonb("breed_composition")
       .$type<{ breed: string; percent: number }[]>()
       .notNull()
@@ -247,6 +249,7 @@ export const externalAnimals = pgTable(
     hornStatus: text("horn_status"),
     /** The class the papers state — `PB`, `FB`, `3/4`. Kept as printed. */
     classification: text("classification"),
+    breed: jsonb("breed").$type<string[]>(),
     breedComposition: jsonb("breed_composition").$type<{ breed: string; percent: number }[]>(),
     /** The association's own inbreeding figure, not the one computed here. */
     coi: doublePrecision("coi"),

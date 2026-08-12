@@ -54,6 +54,15 @@ export interface ParentRef {
 
 export interface CattleProfile extends BaseRecord {
   readonly animalId: Ulid;
+  /**
+   * What breed this animal is, in words.
+   *
+   * A list, because a crossbred animal is more than one and a record that has
+   * to pick one picks wrong every time. Left unset on most animals and derived
+   * from the makeup — see `breedsOf` — so the two cannot drift apart; set by
+   * hand on a commercial cow who has a breed and will never have papers.
+   */
+  readonly breed?: readonly string[] | undefined;
   readonly breedComposition: readonly BreedShare[];
   /**
    * Hair-card results, one per defect tested.
@@ -123,6 +132,7 @@ export function isCompositionComplete(composition: readonly BreedShare[]): boole
 export const cattleProfileSchema = baseRecordSchema
   .extend({
     animalId: ulidSchema,
+    breed: z.array(z.string().min(1).max(60)).max(12).optional(),
     breedComposition: z.array(breedShareSchema),
     // Defaulted rather than optional: a profile with no `geneticTests` and one
     // with an empty array both mean "nothing tested", and two spellings of

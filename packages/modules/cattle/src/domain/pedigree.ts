@@ -83,6 +83,8 @@ export interface ExternalAnimal extends BaseRecord {
    * current makeup would not earn on its own.
    */
   readonly classification?: string | undefined;
+  /** What breed it is, in words. A list — a crossbred animal is more than one. */
+  readonly breed?: readonly string[] | undefined;
   readonly breedComposition?: readonly BreedShare[] | undefined;
   /**
    * The association's own inbreeding coefficient, as a percentage.
@@ -123,6 +125,7 @@ export const externalAnimalSchema = baseRecordSchema.extend({
   colour: z.string().max(120).optional(),
   hornStatus: z.string().max(40).optional(),
   classification: z.string().max(40).optional(),
+  breed: z.array(z.string().min(1).max(60)).max(12).optional(),
   breedComposition: z.array(breedShareSchema).optional(),
   coi: z.number().min(0).max(100).optional(),
   status: z.string().max(80).optional(),

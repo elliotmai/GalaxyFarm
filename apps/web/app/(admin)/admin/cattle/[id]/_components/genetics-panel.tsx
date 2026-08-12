@@ -269,7 +269,7 @@ export function GeneticsPanel({
       </Section>
 
       <Section
-        title="Coat colour"
+        title="Coat color"
         description="Two alleles per locus, off the test. The coat alone is not enough — a black animal can be ED/ED or ED/e, and out of a red mate those two throw entirely different calves."
       >
         {carried === undefined ? null : (
@@ -328,7 +328,7 @@ export function GeneticsPanel({
 
             {extension === undefined && roan === undefined ? (
               <p className="text-sm text-muted">
-                Nothing recorded. Both loci are needed before a calf's colour can be predicted.
+                Nothing recorded. Both loci are needed before a calf's color can be predicted.
               </p>
             ) : (
               <p className="flex flex-wrap items-center gap-2 text-density text-ink">
@@ -342,7 +342,7 @@ export function GeneticsPanel({
                   </span>
                 ) : (
                   <span className="text-muted">
-                    — the other locus is still needed to name the colour
+                    — the other locus is still needed to name the color
                   </span>
                 )}
               </p>

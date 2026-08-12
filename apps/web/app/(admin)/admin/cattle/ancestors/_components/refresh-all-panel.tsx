@@ -406,7 +406,7 @@ export function RefreshAllAncestors({
       {chartless === 0 ? null : (
         <Callout tone="action" title={`${chartless} pages came back without a pedigree chart`}>
           Digital Beef renders the details on the page and loads the pedigree tab separately, so a
-          server fetch can come back with names and colours and no ancestors.{" "}
+          server fetch can come back with names and colors and no ancestors.{" "}
           <strong>Defect results only exist on the chart</strong> — printed beside each ancestor,
           never on the animal&apos;s own page — so those pages had none to give. Check those
           animals one at a time and paste the page; a select-all in a browser copies what the tabs
@@ -426,7 +426,7 @@ export function RefreshAllAncestors({
         <div className="flex flex-col gap-2">
           <p className="text-density font-medium text-ink">The farm&apos;s own animals</p>
           <p className="text-sm text-muted">
-            Breed makeup, colour and horn status off their own papers. This is the one place a
+            Breed makeup, color and horn status off their own papers. This is the one place a
             registered animal of ours picks up a composition from the association rather than
             having it worked out from its parents.
           </p>

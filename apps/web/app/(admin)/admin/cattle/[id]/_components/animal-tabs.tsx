@@ -15,6 +15,7 @@ import {
   Pill,
   SearchSelect,
   Section,
+  TagInput,
   TextInput,
   useConfirmDelete,
   useToast,
@@ -50,6 +51,8 @@ import {
   weightIn,
   withdrawalEndDate,
   type AcquisitionRecord,
+  BREED_NAMES,
+  breedsFromComposition,
   type BreedingRecord,
   type BreedShare,
   type CalvingRecord,
@@ -104,6 +107,71 @@ function lb(value: number | undefined): string {
  * recorded as 50% Maine and nothing else means the other half was *forgotten*,
  * not that it is unknown, and it would misstate a percentage on a sale sheet.
  */
+export function BreedField({
+  animal,
+  profile,
+  propertyId,
+  actorId,
+}: {
+  readonly animal: Animal;
+  readonly profile: CattleProfile | undefined;
+  readonly propertyId: Ulid;
+  readonly actorId: Ulid;
+}) {
+  const api = useMutations<CattleProfile>(
+    "cattleProfiles",
+    "cattleProfiles",
+    cattleProfileSchema,
+    propertyId,
+    actorId,
+  );
+  const [busy, setBusy] = useState(false);
+
+  const shares = profile?.breedComposition ?? [];
+  const named = profile?.breed ?? [];
+  /** What the makeup would say, so the field can show it rather than sit blank. */
+  const derived = breedsFromComposition(shares);
+
+  async function setBreeds(next: string[]) {
+    setBusy(true);
+    try {
+      if (profile === undefined) {
+        await api.create({
+          animalId: animal.id,
+          breed: next,
+          breedComposition: [],
+          registrations: [],
+        } as never);
+        return;
+      }
+      await api.update(profile.id, { breed: next } as Partial<CattleProfile>);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section
+      title="Breed"
+      description="What this one is, in words. More than one, because a crossbred animal is more than one — and separate from the percentages below, which come off the papers."
+    >
+      <TagInput
+        label="Breed"
+        value={named.length > 0 ? named : derived}
+        onChange={(next) => void setBreeds(next)}
+        disabled={busy}
+        placeholder="Maine-Anjou"
+        suggestions={Object.values(BREED_NAMES).filter((name) => name !== "Unrecorded")}
+        hint={
+          named.length === 0 && derived.length > 0
+            ? "Worked out from the percentages below. Edit it and what you type is kept instead."
+            : "Kept as typed. Leave it empty to go back to whatever the percentages say."
+        }
+      />
+    </Section>
+  );
+}
+
 export function BreedComposition({
   animal,
   profile,

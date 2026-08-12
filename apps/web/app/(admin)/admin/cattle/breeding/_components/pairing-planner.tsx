@@ -236,7 +236,7 @@ export function PairingPlanner({
       {!chosen ? (
         <EmptyState
           title="Pick a sire and a dam"
-          detail="You will get the calf's breeding, the colours it can be, how close the two are, and what defects the pairing could carry."
+          detail="You will get the calf's breeding, the colors it can be, how close the two are, and what defects the pairing could carry."
         />
       ) : (
         <>
@@ -390,13 +390,13 @@ export function PairingPlanner({
           </Section>
 
           <Section
-            title="What colour"
-            description="Both loci together. Roan has no colour of its own — it takes the one Extension gave it, so black through roan is a blue roan."
+            title="What color"
+            description="Both loci together. Roan has no color of its own — it takes the one Extension gave it, so black through roan is a blue roan."
           >
             {colour === undefined || colour.outcomes.length === 0 ? (
               <EmptyState
-                title="No colour genotype on file"
-                detail="Both parents need their Extension and roan alleles recorded before a calf's colour can be predicted. A coat you can see is not enough — a black cow can be ED/ED or ED/e, and out of a red bull those two throw different calves."
+                title="No color genotype on file"
+                detail="Both parents need their Extension and roan alleles recorded before a calf's color can be predicted. A coat you can see is not enough — a black cow can be ED/ED or ED/e, and out of a red bull those two throw different calves."
               />
             ) : (
               <div className="flex flex-col gap-density">

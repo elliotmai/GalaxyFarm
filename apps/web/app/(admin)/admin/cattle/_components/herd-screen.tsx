@@ -37,7 +37,13 @@ import {
   type ZoneAssignment,
 } from "@galaxy-farm/core";
 
-import { animalsUnderWithdrawal, type HealthRecord } from "@galaxy-farm/module-cattle";
+import {
+  animalsUnderWithdrawal,
+  breedsInUse,
+  breedsOf,
+  type CattleProfile,
+  type HealthRecord,
+} from "@galaxy-farm/module-cattle";
 
 import { useMutations } from "@/lib/local/mutations";
 import { animalHref, animalTitle } from "@/lib/animal-slug";
@@ -73,6 +79,8 @@ interface Filters {
   readonly zoneId: string;
   readonly status: string;
   readonly sex: string;
+  /** A breed name, or "" for all of them. */
+  readonly breed: string;
   readonly safetyLevel: string;
   readonly withdrawnOnly: boolean;
 }
@@ -81,6 +89,7 @@ const NO_FILTERS: Filters = {
   zoneId: "",
   status: "",
   sex: "",
+  breed: "",
   safetyLevel: "",
   withdrawnOnly: false,
 };
@@ -122,6 +131,9 @@ export function HerdScreen({
   const { records: zones } = useRecords<Zone>("zones", { propertyId });
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", { propertyId });
   const { records: health } = useRecords<HealthRecord>("healthRecords", { propertyId });
+  // Breed lives on the profile rather than the animal, because most of what a
+  // profile holds is breeding information and this is the same conversation.
+  const { records: profiles } = useRecords<CattleProfile>("cattleProfiles", { propertyId });
 
   // Which zones are indoor, so an assignment's slot can be read off its zone
   // rather than trusted from the row — a legacy `primary` row has to count
@@ -167,6 +179,14 @@ export function HerdScreen({
       return false;
     }
     if (filters.status !== "" && animal.status !== filters.status) return false;
+    if (
+      filters.breed !== "" &&
+      !breedsOf(profileOf(animal.id) ?? {}).some(
+        (breed) => breed.toLowerCase() === filters.breed.toLowerCase(),
+      )
+    ) {
+      return false;
+    }
     if (filters.sex !== "" && animal.sex !== filters.sex) return false;
     if (filters.safetyLevel !== "" && String(animal.safetyLevel) !== filters.safetyLevel) {
       return false;
@@ -196,6 +216,9 @@ export function HerdScreen({
   const zoneOptions = zones
     .filter((zone) => zone.active)
     .map((zone) => ({ value: zone.id, label: zone.name }));
+
+  const profileOf = (animalId: Ulid) =>
+    profiles.find((profile) => profile.animalId === animalId);
 
   const currentZone = (animalId: Ulid) => {
     const open = assignments.find((a) => a.animalId === animalId && a.periodTo === undefined);
@@ -369,6 +392,24 @@ export function HerdScreen({
     },
     { key: "sex", header: "Sex", render: (animal) => animal.sex },
     {
+      key: "breed",
+      header: "Breed",
+      render: (animal) => {
+        const breeds = breedsOf(profileOf(animal.id) ?? {});
+        return breeds.length === 0 ? (
+          <span className="text-muted">—</span>
+        ) : (
+          <span className="flex flex-wrap gap-1.5">
+            {breeds.map((breed) => (
+              <Badge key={breed} tone="neutral">
+                {breed}
+              </Badge>
+            ))}
+          </span>
+        );
+      },
+    },
+    {
       key: "status",
       header: "Status",
       render: (animal) => (
@@ -442,7 +483,7 @@ export function HerdScreen({
         withdrawal" is one question, not three.
       */}
       <Card title="Narrow the herd">
-        <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-6">
           <Select
             label="Pen"
             value={filters.zoneId}
@@ -463,6 +504,14 @@ export function HerdScreen({
             placeholder="Any sex"
             options={SEX_OPTIONS}
             onChange={(event) => setFilters({ ...filters, sex: event.target.value })}
+          />
+          <Select
+            label="Breed"
+            hint="Typed on the animal, or worked out from its makeup."
+            value={filters.breed}
+            placeholder="Any breed"
+            options={breedsInUse(profiles).map((value) => ({ value, label: value }))}
+            onChange={(event) => setFilters({ ...filters, breed: event.target.value })}
           />
           <Select
             label="Handling level"

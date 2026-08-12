@@ -52,6 +52,7 @@ import {
 
 import {
   BreedComposition,
+  BreedField,
   BreedingTab,
   FinanceTab,
   HealthTab,
@@ -321,7 +322,13 @@ function AnimalTabs({
                 propertyId={propertyId}
                 actorId={actorId}
               />
-              {/* The papers and what she is are the same conversation (#15). */}
+              {/* The papers and what it is are the same conversation (#15). */}
+              <BreedField
+                animal={animal}
+                profile={profile}
+                propertyId={propertyId}
+                actorId={actorId}
+              />
               <BreedComposition
                 animal={animal}
                 profile={profile}
@@ -411,7 +418,7 @@ function Overview({
               wide: true,
             },
             { label: "Horns", value: profile?.hornStatus },
-            { label: "Colour", value: profile?.colour },
+            { label: "Color", value: profile?.colour },
             { label: "Markings", value: profile?.markings, wide: true },
           ]}
         />
@@ -790,7 +797,7 @@ function Description({
             options={HORN_STATUSES.map((value) => ({ value, label: value }))}
           />
           <TextInput
-            label="Colour"
+            label="Color"
             hint="Black, red, roan, black baldy — whatever you would say on the phone."
             value={colour}
             onChange={(event) => setColour(event.target.value)}

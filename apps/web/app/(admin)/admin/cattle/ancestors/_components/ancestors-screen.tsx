@@ -15,6 +15,7 @@ import {
   SearchSelect,
   Section,
   Select,
+  TagInput,
   TextArea,
   TextInput,
   Tile,
@@ -26,6 +27,9 @@ import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
   allRegistrations,
   ASSOCIATIONS,
+  BREED_NAMES,
+  breedsInUse,
+  breedsOf,
   canBe,
   externalAnimalSchema,
   filterAncestors,
@@ -77,6 +81,7 @@ interface Draft {
   readonly association: string;
   readonly sex: string;
   readonly tattoo: string;
+  readonly breed: readonly string[];
   readonly colour: string;
   readonly dob: string;
   readonly hornStatus: string;
@@ -91,6 +96,7 @@ const BLANK: Draft = {
   association: "",
   sex: "",
   tattoo: "",
+  breed: [],
   colour: "",
   dob: "",
   hornStatus: "",
@@ -139,6 +145,20 @@ export function AncestorsScreen({
    */
   const [trail, setTrail] = useState<readonly Ulid[]>([]);
   const looking = outsiders.find((entry) => entry.id === trail.at(-1));
+  /**
+   * What to offer while typing a breed.
+   *
+   * The herd's own spellings first, then the codes the associations print.
+   * Offering what is already in use is what stops "Maine Anjou" and
+   * "Maine-Anjou" becoming two breeds nothing can filter across.
+   */
+  const breedSuggestions = useMemo(
+    () => [
+      ...breedsInUse(outsiders),
+      ...Object.values(BREED_NAMES).filter((name) => name !== "Unrecorded"),
+    ],
+    [outsiders],
+  );
   const [draft, setDraft] = useState<Draft | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -269,6 +289,7 @@ export function AncestorsScreen({
       association: outsider.association ?? "",
       sex: outsider.sex ?? "",
       tattoo: outsider.tattoo ?? "",
+      breed: outsider.breed ?? [],
       colour: outsider.colour ?? "",
       dob: outsider.dob === undefined ? "" : outsider.dob.toISOString().slice(0, 10),
       hornStatus: outsider.hornStatus ?? "",
@@ -315,6 +336,7 @@ export function AncestorsScreen({
         ...(draft.association === "" ? {} : { association: draft.association }),
         ...(draft.sex === "" ? {} : { sex: draft.sex }),
         ...(draft.tattoo.trim() === "" ? {} : { tattoo: draft.tattoo.trim() }),
+        ...(draft.breed.length === 0 ? {} : { breed: [...draft.breed] }),
         ...(draft.colour.trim() === "" ? {} : { colour: draft.colour.trim() }),
         ...(draft.dob === "" ? {} : { dob: new Date(`${draft.dob}T00:00:00`) }),
         ...(draft.hornStatus.trim() === "" ? {} : { hornStatus: draft.hornStatus.trim() }),
@@ -336,6 +358,7 @@ export function AncestorsScreen({
               association: undefined,
               sex: undefined,
               tattoo: undefined,
+              breed: undefined,
               colour: undefined,
               dob: undefined,
               hornStatus: undefined,
@@ -424,6 +447,26 @@ export function AncestorsScreen({
             {papers.map((entry) => (
               <Pill key={`${entry.association}-${entry.regNumber}`} tone="identity">
                 {entry.association} {entry.regNumber}
+              </Pill>
+            ))}
+          </span>
+        );
+      },
+    },
+    {
+      key: "breed",
+      header: "Breed",
+      render: (row) => {
+        const breeds = breedsOf(row);
+        return breeds.length === 0 ? (
+          <span className="text-muted">—</span>
+        ) : (
+          <span className="flex flex-wrap gap-1.5">
+            {breeds.map((breed) => (
+              // Hollow when nobody typed it: the makeup said so, which is a
+              // weaker claim than a person writing it down.
+              <Pill key={breed} tone={(row.breed ?? []).length === 0 ? "neutral" : "identity"}>
+                {breed}
               </Pill>
             ))}
           </span>
@@ -721,9 +764,17 @@ export function AncestorsScreen({
                 value={draft.tattoo}
                 onChange={(event) => setDraft({ ...draft, tattoo: event.target.value })}
               />
+              <TagInput
+                label="Breed"
+                hint="What it is, in words — more than one for a cross. Left empty, it follows from the breed makeup on its papers."
+                value={draft.breed}
+                placeholder="Maine-Anjou"
+                suggestions={breedSuggestions}
+                onChange={(next) => setDraft({ ...draft, breed: next })}
+              />
               <TextInput
-                label="Colour"
-                hint="Feeds the calf-colour prediction, which is the only reason it is worth typing."
+                label="Color"
+                hint="Feeds the calf-color prediction, which is the only reason it is worth typing."
                 value={draft.colour}
                 onChange={(event) => setDraft({ ...draft, colour: event.target.value })}
               />
@@ -797,7 +848,7 @@ export function AncestorsScreen({
           <div className="flex flex-col gap-density">
             <TextInput
               label="Search"
-              hint="Name, registration number, tattoo, colour or breeder. Any part, in any order."
+              hint="Name, registration number, tattoo, color or breeder. Any part, in any order."
               value={filter.search}
               onChange={(event) => setFilter({ ...filter, search: event.target.value })}
               placeholder="sull tina, or 4157771"
@@ -823,6 +874,14 @@ export function AncestorsScreen({
                 placeholder="Any"
                 options={ASSOCIATIONS.map((value) => ({ value, label: value }))}
                 onChange={(event) => setFilter({ ...filter, association: event.target.value })}
+              />
+              <Select
+                label="Breed"
+                hint="Typed on the record, or worked out from its makeup."
+                value={filter.breed}
+                placeholder="Any"
+                options={breedsInUse(outsiders).map((value) => ({ value, label: value }))}
+                onChange={(event) => setFilter({ ...filter, breed: event.target.value })}
               />
               <Select
                 label="Used"

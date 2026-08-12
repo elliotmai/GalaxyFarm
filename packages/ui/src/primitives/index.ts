@@ -15,5 +15,6 @@ export * from "./pull-to-refresh.js";
 export * from "./search-select.js";
 export * from "./surfaces.js";
 export * from "./tabs.js";
+export * from "./tag-input.js";
 export * from "./toast.js";
 export * from "./widgets.js";

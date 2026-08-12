@@ -48,7 +48,7 @@ const LABELS: Record<string, string> = {
   tattoo: "Tattoo",
   sex: "Bull or cow",
   dob: "Date of birth",
-  colour: "Colour",
+  colour: "Color",
   hornStatus: "Horns",
   breedComposition: "Breed makeup",
   coi: "Their inbreeding figure",

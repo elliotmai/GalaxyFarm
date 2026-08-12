@@ -20,6 +20,7 @@ import {
   buildPedigree,
   carries,
   DEFECT_NAMES,
+  breedsOf,
   describeComposition,
   describeCompositionSource,
   registrationUrl,
@@ -157,6 +158,7 @@ export function AncestorDetail({
   // percentage — the registry decided it, and an animal upgraded years ago can
   // hold a class its current makeup would not earn.
   const eligibility = registrationClasses(breeding.composition, animal.classification);
+  const breeds = breedsOf({ ...animal, breedComposition: breeding.composition });
 
   return (
     <div className="flex flex-col gap-density">
@@ -225,9 +227,16 @@ export function AncestorDetail({
           columns={3}
           items={[
             { label: "Name", value: animal.name },
+            {
+              // What it is, in words. Derived from the makeup when nobody has
+              // typed one, so the row is not blank on an animal whose papers
+              // say exactly what it is.
+              label: "Breed",
+              value: breeds.length === 0 ? undefined : breeds.join(" · "),
+            },
             { label: "Tattoo", value: animal.tattoo },
-            { label: "Colour", value: animal.colour },
-            { label: "Born", value: animal.dob?.toLocaleDateString() },
+            { label: "Color", value: animal.colour },
+            { label: "DOB", value: animal.dob?.toLocaleDateString() },
             { label: "Horns", value: animal.hornStatus },
             { label: "Class on the papers", value: animal.classification },
             {
@@ -335,7 +344,7 @@ export function AncestorDetail({
         </Card>
       </Section>
 
-      <Section title="Behind it" description="Click any of them to follow the line up.">
+      <Section title="Pedigree" description="Click any of them to follow the line up.">
         <div className="flex flex-wrap gap-2">
           {(["sire", "dam"] as const).map((which) => {
             const parent = parentOf(which);
@@ -360,7 +369,7 @@ export function AncestorDetail({
 
         {tree === undefined || depth === 0 ? (
           <EmptyState
-            title="Nothing behind it yet"
+            title="No pedigree yet"
             detail="Set its sire and dam and everything above them follows from the ancestors already on file. Importing the association page fills in four generations at once."
           />
         ) : (
@@ -373,7 +382,7 @@ export function AncestorDetail({
       </Section>
 
       <Section
-        title="Out of it"
+        title="Progeny"
         description="Everything on file that names this animal as a parent."
       >
         {descendants.length === 0 ? (

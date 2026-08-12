@@ -212,11 +212,49 @@ describe("the filtered list", () => {
     ).toEqual(["GRANDMA'S RED COW"]);
   });
 
+  it("narrows to one breed, however that breed was arrived at", () => {
+    // The bull's breed is typed on his record; the cow's is worked out from
+    // her makeup. The filter cannot tell them apart, and should not — both
+    // mean the animal is that breed.
+    const typed = animal({ name: "A TYPED BULL", breed: ["Maine-Anjou"] });
+    const derived = animal({
+      name: "A PAPERED COW",
+      breedComposition: [
+        { breed: "MA", percent: 75 },
+        { breed: "AN", percent: 25 },
+      ],
+    });
+    const neither = animal({ name: "A COMMERCIAL COW" });
+    const mixed = [typed, derived, neither];
+
+    expect(
+      filterAncestors(mixed, { ...NO_FILTER, breed: "Maine-Anjou" }, new Map(), new Map()).map(
+        (entry) => entry.name,
+      ),
+    ).toEqual(["A PAPERED COW", "A TYPED BULL"]);
+  });
+
+  it("finds an animal by a breed nobody typed on it", () => {
+    const papered = animal({
+      name: "A PAPERED COW",
+      breedComposition: [{ breed: "SH", percent: 100 }],
+    });
+
+    expect(ancestorMatches(papered, "shorthorn")).toBe(true);
+  });
+
   it("applies every filter at once", () => {
     expect(
       filterAncestors(
         herd,
-        { search: "tyson", sex: "male", association: "AMAA", usage: "used", papers: "registered" },
+        {
+          search: "tyson",
+          sex: "male",
+          association: "AMAA",
+          breed: "",
+          usage: "used",
+          papers: "registered",
+        },
         sexes,
         usedBy,
       ).map((entry) => entry.name),

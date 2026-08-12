@@ -1,5 +1,6 @@
 import type { Ulid } from "@galaxy-farm/core";
 
+import { breedsOf } from "./breeds.js";
 import type { ParentRef } from "./cattle-profile.js";
 import { allRegistrations, normaliseRegistration, type ExternalAnimal } from "./pedigree.js";
 
@@ -108,6 +109,8 @@ export interface AncestorFilter {
   readonly sex: "all" | "male" | "female" | "unknown";
   /** An association code, or "" for all of them. */
   readonly association: string;
+  /** A breed name, or "" for all of them. */
+  readonly breed: string;
   /** Whether anything's pedigree names it. */
   readonly usage: "all" | "used" | "unused";
   readonly papers: "all" | "registered" | "unregistered" | "multiple";
@@ -117,6 +120,7 @@ export const NO_FILTER: AncestorFilter = {
   search: "",
   sex: "all",
   association: "",
+  breed: "",
   usage: "all",
   papers: "all",
 };
@@ -162,6 +166,11 @@ export function ancestorMatches(animal: ExternalAnimal, search: string): boolean
       animal.colour ?? "",
       animal.hornStatus ?? "",
       animal.status ?? "",
+      // The breeds it is, however they were arrived at — typed on the record
+      // or worked out from the makeup. Searching "maine" should find the bull
+      // whose papers say 79% MA as readily as the one somebody typed
+      // "Maine-Anjou" on.
+      ...breedsOf(animal),
       ...(animal.breedComposition ?? []).map((share) => share.breed),
       ...allRegistrations(animal).map((entry) => `${entry.association} ${entry.regNumber}`),
     ].join(" "),
@@ -186,6 +195,11 @@ export function filterAncestors(
   return animals
     .filter((animal) => {
       if (!ancestorMatches(animal, filter.search)) return false;
+
+      if (filter.breed !== "") {
+        const wanted = filter.breed.toLowerCase();
+        if (!breedsOf(animal).some((breed) => breed.toLowerCase() === wanted)) return false;
+      }
 
       if (filter.sex !== "all") {
         const sex = sexes.get(animal.id)?.sex;

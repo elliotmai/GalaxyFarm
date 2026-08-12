@@ -295,7 +295,7 @@ export function RefreshFromAssociation({
       {!chartMissing ? null : (
         <Callout tone="action" title="That page came back without its pedigree chart">
           Digital Beef renders the animal&apos;s details on the page and loads the pedigree tab
-          separately, so a fetch can come back with the name and the colour and no ancestors at
+          separately, so a fetch can come back with the name and the color and no ancestors at
           all. <strong>Defect results only exist on the chart</strong> — they are printed beside
           each ancestor, never on the animal&apos;s own page — so without it there are none to
           read. Open the page in a browser and paste it below; a select-all copies what the tabs
