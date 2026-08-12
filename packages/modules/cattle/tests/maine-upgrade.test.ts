@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAINE_CLASSES,
   maineClassFor,
+  maineClassFromCode,
   mainePaper,
   mainePercent,
   maineProgeny,
@@ -137,5 +138,28 @@ describe("the chart's shape", () => {
     for (const dam of MAINE_CLASSES) {
       expect(maineProgeny("fullblood", dam).progeny).toBeDefined();
     }
+  });
+});
+
+describe("the class the papers state", () => {
+  it("reads the codes an AMAA certificate prints", () => {
+    expect(maineClassFromCode("FB")).toBe("fullblood");
+    expect(maineClassFromCode("PB")).toBe("purebred");
+    expect(maineClassFromCode("3/4")).toBe("three_quarters");
+    expect(maineClassFromCode("5/8")).toBe("five_eighths");
+    expect(maineClassFromCode("1/2")).toBe("half");
+    expect(maineClassFromCode("3/8")).toBe("three_eighths");
+    expect(maineClassFromCode("1/4")).toBe("quarter");
+  });
+
+  it("ignores whitespace and case", () => {
+    expect(maineClassFromCode(" pb ")).toBe("purebred");
+  });
+
+  it("refuses a code from another registry rather than guessing", () => {
+    // The same field on a Chianina page reads `1CM`, which means something
+    // else entirely — a wrong class here ends up in a sale catalogue.
+    expect(maineClassFromCode("1CM")).toBeUndefined();
+    expect(maineClassFromCode("SH100")).toBeUndefined();
   });
 });

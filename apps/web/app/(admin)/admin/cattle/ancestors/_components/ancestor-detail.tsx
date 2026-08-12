@@ -153,7 +153,10 @@ export function AncestorDetail({
 
   const tests = animal.geneticTests ?? [];
   const house = herdRuleVerdict(tests);
-  const eligibility = registrationClasses(breeding.composition);
+  // The class the papers state wins over anything worked out from a
+  // percentage — the registry decided it, and an animal upgraded years ago can
+  // hold a class its current makeup would not earn.
+  const eligibility = registrationClasses(breeding.composition, animal.classification);
 
   return (
     <div className="flex flex-col gap-density">
@@ -226,6 +229,7 @@ export function AncestorDetail({
             { label: "Colour", value: animal.colour },
             { label: "Born", value: animal.dob?.toLocaleDateString() },
             { label: "Horns", value: animal.hornStatus },
+            { label: "Class on the papers", value: animal.classification },
             {
               label: "Their inbreeding figure",
               value: animal.coi === undefined ? undefined : `${animal.coi}%`,

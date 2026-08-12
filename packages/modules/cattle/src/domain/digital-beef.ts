@@ -823,6 +823,16 @@ export interface ImportedAnimal {
   readonly coi?: number | undefined;
   /** How this animal itself was conceived — natural service or AI. */
   readonly serviceType?: string | undefined;
+  /**
+   * The class the papers state — `PB`, `FB`, `3/4`.
+   *
+   * Straight off the certificate and better than any arithmetic: the registry
+   * decided it, the upgrading chart takes classes rather than fractions, and
+   * an animal upgraded years ago can hold a class its makeup would not earn.
+   * Kept as printed, because the same field on a Chianina page reads `1CM` and
+   * means something else.
+   */
+  readonly classification?: string | undefined;
   readonly breedComposition: readonly { breed: string; percent: number }[];
   /** Sire and dam off the detail panel, which is more reliable than the chart. */
   readonly sire?: ImportedParent | undefined;
@@ -896,6 +906,7 @@ export function parseDigitalBeefPage(
   const breeder = fieldValue(text, ["Breeder"]);
   const owner = fieldValue(text, ["Owner"]);
   const serviceType = fieldValue(text, ["Service Type"]);
+  const classification = fieldValue(text, ["Classification"]);
 
   const coiRaw = fieldValue(text, ["COI"]);
   const coi = coiRaw === undefined ? undefined : Number.parseFloat(coiRaw.replace("%", ""));
@@ -952,6 +963,7 @@ export function parseDigitalBeefPage(
     ...(owner === undefined ? {} : { owner }),
     ...(coi === undefined || !Number.isFinite(coi) ? {} : { coi }),
     ...(serviceType === undefined ? {} : { serviceType }),
+    ...(classification === undefined ? {} : { classification }),
     ...(sire === undefined ? {} : { sire }),
     ...(dam === undefined ? {} : { dam }),
     breedComposition: composition,

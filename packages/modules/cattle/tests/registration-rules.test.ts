@@ -152,3 +152,36 @@ describe("an animal papered twice", () => {
     ]);
   });
 });
+
+describe("the class an AMAA paper states", () => {
+  it("wins over anything worked out from a percentage", () => {
+    // An animal upgraded years ago can hold a class its current makeup would
+    // not earn on its own, and the registry's decision is the one that counts.
+    const stated = registrationClasses(
+      [{ breed: "MA", percent: 50 }, { breed: "AN", percent: 50 }],
+      "PB",
+    );
+
+    expect(stated.classes.map((entry) => entry.name).join(" ")).toMatch(/High Maine — Purebred/);
+    expect(stated.classes.find((entry) => entry.association === "AMAA")?.because).toMatch(
+      /papers state PB/,
+    );
+  });
+
+  it("falls back to the percentage when the papers say nothing", () => {
+    expect(
+      registrationClasses([{ breed: "MA", percent: 50 }, { breed: "AN", percent: 50 }])
+        .classes.map((entry) => entry.name)
+        .join(" "),
+    ).toMatch(/MaineTainer — 1\/2/);
+  });
+
+  it("falls back when the code belongs to another registry", () => {
+    // `1CM` is a Chianina classification and says nothing about Maine-Anjou.
+    expect(
+      registrationClasses([{ breed: "MA", percent: 50 }, { breed: "AN", percent: 50 }], "1CM")
+        .classes.map((entry) => entry.name)
+        .join(" "),
+    ).toMatch(/MaineTainer/);
+  });
+});

@@ -264,6 +264,33 @@ export function maineClassFor(percent: number): MaineClass {
   return ordered.find((entry) => percent >= CLASS_PERCENT[entry] - 0.5) ?? "commercial";
 }
 
+/**
+ * The class an AMAA paper actually states.
+ *
+ * The papers carry it outright — `Classification: PB` — and that beats working
+ * it out from a percentage every time. The registry's own arithmetic decided
+ * it, the upgrading chart takes *classes* as its input rather than fractions,
+ * and an animal upgraded years ago can hold a class its current makeup would
+ * not earn on its own.
+ *
+ * Returns undefined rather than guessing at a code it does not know: the same
+ * field on a Chianina page reads `1CM`, which means something else entirely.
+ */
+export function maineClassFromCode(value: string): MaineClass | undefined {
+  const code = value.trim().toUpperCase().replace(/\s+/g, "");
+
+  if (code === "FB" || code === "FULLBLOOD") return "fullblood";
+  if (code === "PB" || code === "PUREBRED") return "purebred";
+  if (code === "3/4" || code === ".75" || code === "75%") return "three_quarters";
+  if (code === "5/8" || code === ".625") return "five_eighths";
+  if (code === "1/2" || code === ".5" || code === "50%") return "half";
+  if (code === "3/8" || code === ".375") return "three_eighths";
+  if (code === "1/4" || code === ".25" || code === "25%") return "quarter";
+  if (code === "COMMERCIAL" || code === "COMM") return "commercial";
+
+  return undefined;
+}
+
 /** The Maine-Anjou share of a composition. */
 export function mainePercent(composition: readonly BreedShare[]): number {
   const wanted = new Set(["ma", "maine", "maine-anjou", "maine anjou"]);

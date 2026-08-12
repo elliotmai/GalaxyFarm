@@ -3,6 +3,7 @@ import {
   MAINE_ANGUS_NOTE,
   MAINE_CLASS_LABELS,
   maineClassFor,
+  maineClassFromCode,
   mainePaper,
   mainePercent,
   meetsMaineMinimum,
@@ -149,7 +150,27 @@ function chianina(composition: readonly BreedShare[]): RegistrationClass[] {
  * from 1/4 to 5/8, High Maine on brown from 3/4 up — and the floor is a
  * quarter, below which the association registers nothing at all.
  */
-function maine(composition: readonly BreedShare[]): RegistrationClass[] {
+function maine(
+  composition: readonly BreedShare[],
+  stated?: string | undefined,
+): RegistrationClass[] {
+  // The papers win. `Classification: PB` is the registry's own decision, and
+  // an animal upgraded years ago can hold a class its current makeup would not
+  // earn — recomputing it from a percentage would take that away.
+  const recorded = stated === undefined ? undefined : maineClassFromCode(stated);
+  if (recorded !== undefined) {
+    const paper = mainePaper(recorded);
+    return [
+      {
+        association: "AMAA",
+        name: `${paper ?? "Maine-Anjou"} — ${MAINE_CLASS_LABELS[recorded]}`,
+        because: `The papers state ${stated as string}.`,
+        alsoRequires:
+          paper === "MaineTainer" ? [MAINE_ANGUS_NOTE] : ["Registered with the AMAA"],
+      },
+    ];
+  }
+
   const percent = mainePercent(composition);
   if (percent <= 0) return [];
 
@@ -206,10 +227,20 @@ function shorthorn(composition: readonly BreedShare[]): RegistrationClass[] {
  * the ACA and ShorthornPlus with the ASA at the same time, and that is exactly
  * the dual registration this farm keeps.
  */
-export function registrationClasses(composition: readonly BreedShare[]): EligibilityVerdict {
+export function registrationClasses(
+  composition: readonly BreedShare[],
+  /** The class an AMAA paper states, when one is on file. It wins. */
+  maineClassification?: string | undefined,
+): EligibilityVerdict {
   if (composition.length === 0) {
     return { classes: [], unknownRules: "No breed makeup on file, so nothing can be worked out." };
   }
 
-  return { classes: [...chianina(composition), ...maine(composition), ...shorthorn(composition)] };
+  return {
+    classes: [
+      ...chianina(composition),
+      ...maine(composition, maineClassification),
+      ...shorthorn(composition),
+    ],
+  };
 }

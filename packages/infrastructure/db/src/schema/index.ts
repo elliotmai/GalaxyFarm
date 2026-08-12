@@ -245,6 +245,8 @@ export const externalAnimals = pgTable(
     dob: timestamp("dob", { withTimezone: true }),
     colour: text("colour"),
     hornStatus: text("horn_status"),
+    /** The class the papers state — `PB`, `FB`, `3/4`. Kept as printed. */
+    classification: text("classification"),
     breedComposition: jsonb("breed_composition").$type<{ breed: string; percent: number }[]>(),
     /** The association's own inbreeding figure, not the one computed here. */
     coi: doublePrecision("coi"),

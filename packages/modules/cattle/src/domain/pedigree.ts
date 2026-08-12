@@ -74,6 +74,15 @@ export interface ExternalAnimal extends BaseRecord {
   readonly dob?: Date | undefined;
   readonly colour?: string | undefined;
   readonly hornStatus?: string | undefined;
+  /**
+   * The class the papers state — `PB`, `FB`, `3/4`.
+   *
+   * Kept as printed, and preferred over anything worked out from a percentage:
+   * the registry decided it, the AMAA upgrading chart takes classes rather
+   * than fractions, and an animal upgraded years ago can hold a class its
+   * current makeup would not earn on its own.
+   */
+  readonly classification?: string | undefined;
   readonly breedComposition?: readonly BreedShare[] | undefined;
   /**
    * The association's own inbreeding coefficient, as a percentage.
@@ -113,6 +122,7 @@ export const externalAnimalSchema = baseRecordSchema.extend({
   dob: z.coerce.date().optional(),
   colour: z.string().max(120).optional(),
   hornStatus: z.string().max(40).optional(),
+  classification: z.string().max(40).optional(),
   breedComposition: z.array(breedShareSchema).optional(),
   coi: z.number().min(0).max(100).optional(),
   status: z.string().max(80).optional(),

@@ -647,6 +647,7 @@ function recordFor(row: ImportRow, animal: ImportedAnimal): Partial<ExternalAnim
       ? {}
       : {
           ...(animal.hornStatus === undefined ? {} : { hornStatus: animal.hornStatus }),
+          ...(animal.classification === undefined ? {} : { classification: animal.classification }),
           ...(animal.breedComposition.length === 0
             ? {}
             : { breedComposition: animal.breedComposition }),

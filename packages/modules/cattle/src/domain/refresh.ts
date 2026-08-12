@@ -54,6 +54,7 @@ const LABELS: Record<string, string> = {
   status: "Status",
   disposedOn: "Disposal date",
   serviceType: "How it was got",
+  classification: "Class on the papers",
   geneticTests: "Defect results",
   registrations: "Registrations",
   sourceUrl: "Source page",
@@ -131,6 +132,7 @@ export function refreshChanges(
       ? {}
       : { disposedOn: asDate(imported.disposedOn) }),
     ...(imported.serviceType === undefined ? {} : { serviceType: imported.serviceType }),
+    ...(imported.classification === undefined ? {} : { classification: imported.classification }),
     ...(imported.sourceUrl === undefined ? {} : { sourceUrl: imported.sourceUrl }),
   };
 
