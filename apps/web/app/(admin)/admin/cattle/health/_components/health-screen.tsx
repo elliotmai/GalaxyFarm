@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import {
@@ -25,9 +26,11 @@ import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
   animalsUnderWithdrawal,
   boosterDue,
+  drawDose,
   healthRecordSchema,
   HEALTH_RECORD_TYPES,
   isUnderWithdrawal,
+  medInventorySchema,
   ROUTES,
   withdrawalEndDate,
   type AdministrationRoute,
@@ -79,12 +82,28 @@ export function HealthScreen({
     propertyId,
     actorId,
   );
+  // Recording a treatment draws the dose out of the fridge, so this screen
+  // writes to two collections. Both go through the same mutation path — an
+  // inventory count that only moved on this device would be a count nobody
+  // could trust from the barn.
+  const fridge = useMutations<MedInventory>(
+    "medInventory",
+    "medInventory",
+    medInventorySchema,
+    propertyId,
+    actorId,
+  );
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
 
   const now = new Date();
   const byId = useMemo(() => new Map(animals.map((a) => [a.id, a])), [animals]);
   const records = records_;
+
+  // #17: logging a treatment is two taps from the animal. Her page links here
+  // with `?animal=`, and the form opens with her already chosen.
+  const prefilledAnimal = useSearchParams().get("animal") ?? "";
+  const [editing, setEditing] = useState<HealthRecord | undefined>();
 
   // Every cow with an unexpired withdrawal, from the domain rather than from a
   // filter written here — the same function the sale screen will ask.
@@ -167,9 +186,14 @@ export function HealthScreen({
       key: "actions",
       header: "",
       render: (record) => (
-        <Button variant="ghost" onClick={() => void remove(record)}>
-          Delete
-        </Button>
+        <span className="flex gap-2">
+          <Button variant="ghost" onClick={() => setEditing(record)}>
+            Edit
+          </Button>
+          <Button variant="ghost" onClick={() => void remove(record)}>
+            Delete
+          </Button>
+        </span>
       ),
     },
   ];
@@ -257,8 +281,26 @@ export function HealthScreen({
         </Section>
       )}
 
-      <Section title="Record a treatment">
-        <AddHealth animals={animals} meds={meds} api={api} heldSet={heldSet} />
+      <Section
+        title={editing === undefined ? "Record a treatment" : "Edit this treatment"}
+        description={
+          editing === undefined
+            ? undefined
+            : "Changing the date or the withdrawal days moves the clearance date with it — nothing is stored twice."
+        }
+      >
+        <AddHealth
+          key={editing?.id ?? "new"}
+          animals={animals}
+          meds={meds}
+          api={api}
+          fridge={fridge}
+          heldSet={heldSet}
+          records={records}
+          {...(editing === undefined ? {} : { editing })}
+          onDone={() => setEditing(undefined)}
+          defaultAnimalId={prefilledAnimal}
+        />
       </Section>
 
       <Section title="Everything recorded">
@@ -299,24 +341,56 @@ function AddHealth({
   animals,
   meds,
   api,
+  fridge,
   heldSet,
+  records,
+  editing,
+  onDone,
+  defaultAnimalId,
 }: {
   readonly animals: readonly Animal[];
   readonly meds: readonly MedInventory[];
   readonly api: Api;
+  readonly fridge: ReturnType<typeof useMutations<MedInventory>>;
   readonly heldSet: ReadonlySet<Ulid>;
+  readonly records: readonly HealthRecord[];
+  readonly editing?: HealthRecord;
+  readonly onDone: () => void;
+  readonly defaultAnimalId: string;
 }) {
   const { show } = useToast();
-  const [animalId, setAnimalId] = useState("");
-  const [type, setType] = useState<HealthRecordType>("vaccination");
-  const [medId, setMedId] = useState("");
-  const [product, setProduct] = useState("");
-  const [route, setRoute] = useState<AdministrationRoute>("subcutaneous");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [withdrawal, setWithdrawal] = useState("");
-  const [by, setBy] = useState("");
-  const [booster, setBooster] = useState("");
-  const [notes, setNotes] = useState("");
+
+  /**
+   * The last product used, and the fridge entry it came from.
+   *
+   * #17 asks for a treatment to be two taps from the animal, defaulting to
+   * today and the last-used product. Nearly every treatment on this place is
+   * the same bottle as the one before it — a round of blackleg is forty calves
+   * and one product — so re-choosing it forty times is forty chances to pick
+   * the wrong line of a dropdown.
+   */
+  const lastUsed = useMemo(
+    () => [...records].sort((left, right) => right.date.getTime() - left.date.getTime())[0],
+    [records],
+  );
+
+  const [animalId, setAnimalId] = useState(editing?.animalId ?? defaultAnimalId);
+  const [type, setType] = useState<HealthRecordType>(editing?.type ?? "vaccination");
+  const [medId, setMedId] = useState(editing?.medInventoryId ?? lastUsed?.medInventoryId ?? "");
+  const [product, setProduct] = useState(editing?.product ?? lastUsed?.product ?? "");
+  const [route, setRoute] = useState<AdministrationRoute>(
+    editing?.route ?? lastUsed?.route ?? "subcutaneous",
+  );
+  const [date, setDate] = useState((editing?.date ?? new Date()).toISOString().slice(0, 10));
+  const [withdrawal, setWithdrawal] = useState(
+    editing?.withdrawalDays === undefined ? "" : String(editing.withdrawalDays),
+  );
+  const [dose, setDose] = useState("");
+  const [by, setBy] = useState(editing?.administeredBy ?? "");
+  const [booster, setBooster] = useState(
+    editing?.boosterDueOn === undefined ? "" : editing.boosterDueOn.toISOString().slice(0, 10),
+  );
+  const [notes, setNotes] = useState(editing?.notes ?? "");
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
@@ -327,6 +401,8 @@ function AddHealth({
     setProduct(med.product);
     if (med.defaultWithdrawalDays !== undefined) setWithdrawal(String(med.defaultWithdrawalDays));
   }
+
+  const chosenMed = meds.find((entry) => entry.id === medId);
 
   // Shown before saving, because the clearance date is the point of the record
   // and a mistyped withdrawal is invisible until somebody tries to sell her.
@@ -344,20 +420,51 @@ function AddHealth({
       return;
     }
 
+    /*
+     * Drawing the dose is checked *before* the treatment is written, and both
+     * are written before either is reported. `drawDose` refuses to go negative
+     * (§4.5 clause 2) — a fridge showing minus two bottles is a fridge nobody
+     * trusts, and the honest reading is that the count was wrong before the
+     * dose rather than after it.
+     *
+     * Only on create. Editing a record does not draw a second dose, and
+     * putting one back on a correction would need the original amount, which
+     * the record does not carry — so an edit leaves the count alone and says
+     * so rather than guessing.
+     */
+    let drawn: MedInventory | undefined;
+    if (editing === undefined && chosenMed !== undefined && dose.trim() !== "") {
+      const result = drawDose(
+        chosenMed,
+        { amount: Number(dose), unit: chosenMed.onHand.unit },
+        new Date(),
+      );
+      if (!result.ok) {
+        setError(result.reason);
+        return;
+      }
+      drawn = result.item;
+    }
+
     setBusy(true);
     try {
-      const result = await api.create({
+      const payload = {
         animalId: animalId as Ulid,
         type,
         date: new Date(`${date}T12:00:00`),
-        ...(product.trim() === "" ? {} : { product: product.trim() }),
-        ...(medId === "" ? {} : { medInventoryId: medId as Ulid }),
+        product: product.trim() === "" ? undefined : product.trim(),
+        medInventoryId: medId === "" ? undefined : (medId as Ulid),
         route,
-        ...(by.trim() === "" ? {} : { administeredBy: by.trim() }),
-        ...(withdrawal === "" ? {} : { withdrawalDays: Number(withdrawal) }),
-        ...(booster === "" ? {} : { boosterDueOn: new Date(`${booster}T12:00:00`) }),
-        ...(notes.trim() === "" ? {} : { notes: notes.trim() }),
-      } as never);
+        administeredBy: by.trim() === "" ? undefined : by.trim(),
+        withdrawalDays: withdrawal === "" ? undefined : Number(withdrawal),
+        boosterDueOn: booster === "" ? undefined : new Date(`${booster}T12:00:00`),
+        notes: notes.trim() === "" ? undefined : notes.trim(),
+      };
+
+      const result =
+        editing === undefined
+          ? await api.create(payload as never)
+          : await api.update(editing.id, payload as Partial<HealthRecord>);
 
       if (!result.ok) {
         setError(
@@ -368,10 +475,25 @@ function AddHealth({
         return;
       }
 
-      setProduct("");
-      setMedId("");
+      if (drawn !== undefined) {
+        await fridge.update(drawn.id, { onHand: drawn.onHand } as Partial<MedInventory>);
+      }
+
+      if (editing !== undefined) {
+        show({
+          message:
+            clears === undefined
+              ? "Treatment updated"
+              : `Updated. Clear for sale ${formatDate(clears)}.`,
+          tone: "success",
+        });
+        onDone();
+        return;
+      }
+
       setNotes("");
       setBooster("");
+      setDose("");
 
       show({
         message:
@@ -396,7 +518,7 @@ function AddHealth({
           onChange={(event) => setAnimalId(event.target.value)}
           placeholder="Choose an animal"
           options={animals
-            .filter((entry) => entry.status === "active")
+            .filter((entry) => entry.status === "active" || entry.id === editing?.animalId)
             .map((entry) => ({
               value: entry.id,
               label: `${displayName(entry)}${heldSet.has(entry.id) ? " · under withdrawal" : ""}`,
@@ -422,7 +544,10 @@ function AddHealth({
           value={medId}
           onChange={(event) => chooseMed(event.target.value)}
           placeholder="Not from stock"
-          options={meds.map((med) => ({ value: med.id, label: med.product }))}
+          options={meds.map((med) => ({
+            value: med.id,
+            label: `${med.product} · ${med.onHand.amount} ${med.onHand.unit}`,
+          }))}
         />
         <TextInput
           label="Product"
@@ -434,6 +559,22 @@ function AddHealth({
           value={route}
           onChange={(event) => setRoute(event.target.value as AdministrationRoute)}
           options={ROUTES.map((value) => ({ value, label: value }))}
+        />
+        <TextInput
+          label={chosenMed === undefined ? "Dose" : `Dose (${chosenMed.onHand.unit})`}
+          hint={
+            editing !== undefined
+              ? "An edit does not draw a second dose, or put the first one back."
+              : chosenMed === undefined
+                ? "Choose from the fridge to draw the dose out of stock."
+                : `Comes off the ${chosenMed.onHand.amount} ${chosenMed.onHand.unit} on hand.`
+          }
+          type="number"
+          inputMode="decimal"
+          numeric
+          value={dose}
+          disabled={editing !== undefined}
+          onChange={(event) => setDose(event.target.value)}
         />
         <TextInput
           label="Withdrawal (days)"
@@ -466,8 +607,13 @@ function AddHealth({
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" busy={busy}>
-          Record treatment
+          {editing === undefined ? "Record treatment" : "Save treatment"}
         </Button>
+        {editing === undefined ? null : (
+          <Button variant="ghost" onClick={onDone}>
+            Cancel
+          </Button>
+        )}
         {clears === undefined ? null : (
           <p className="text-sm text-muted">
             {animal === undefined ? "She" : displayName(animal)} will not be clear for sale until{" "}

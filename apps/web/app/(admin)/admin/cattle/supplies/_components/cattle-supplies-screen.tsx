@@ -21,6 +21,7 @@ import {
 } from "@galaxy-farm/ui";
 import { fromDollars, type Ulid } from "@galaxy-farm/core";
 import {
+  expiringSoon,
   isExpired,
   isLowSemenInventory,
   MED_CATEGORIES,
@@ -77,6 +78,18 @@ export function CattleSuppliesScreen({
   const lowStraws = straws.filter((entry) => isLowSemenInventory(entry));
   const expired = meds.filter((entry) => isExpired(entry, now));
 
+  /**
+   * How far ahead to warn about expiry (#17).
+   *
+   * Configurable because the right answer depends on the product and on how
+   * often you get to the co-op. Thirty days is the default; a fortnight suits
+   * somebody in town twice a week, and ninety suits an annual order. Kept on
+   * the device rather than in a record: it is a preference about a screen, not
+   * a fact about the farm.
+   */
+  const [leadDays, setLeadDays] = useState(30);
+  const expiringMeds = expiringSoon(meds, now, leadDays);
+
   return (
     <PageBody>
       <PageHeader
@@ -99,13 +112,66 @@ export function CattleSuppliesScreen({
           hint={lowStraws.length > 0 ? "At or below reorder" : "All stocked"}
         />
         <Tile
-          label="Expired product"
-          value={expired.length}
-          tone={expired.length > 0 ? "danger" : "calm"}
-          emphasis={expired.length > 0}
+          label="Expiring or expired"
+          value={expiringMeds.length}
+          tone={expiringMeds.length > 0 ? "danger" : "calm"}
+          emphasis={expiringMeds.length > 0}
+          hint={
+            expired.length > 0 ? `${expired.length} already out of date` : `Within ${leadDays} days`
+          }
         />
         <Tile label="Protocols" value={protocols.filter((p) => p.active).length} tone="action" />
       </div>
+
+      {expiringMeds.length === 0 ? null : (
+        <Section
+          title="Coming out of date"
+          description="Expired stock stays on this list. A bottle that went out of date last month is still in the fridge and still the one somebody reaches for at six in the morning."
+          actions={
+            <Select
+              label="Warn me this far ahead"
+              hideLabel
+              value={String(leadDays)}
+              onChange={(event) => setLeadDays(Number(event.target.value))}
+              options={[
+                { value: "14", label: "14 days ahead" },
+                { value: "30", label: "30 days ahead" },
+                { value: "60", label: "60 days ahead" },
+                { value: "90", label: "90 days ahead" },
+              ]}
+            />
+          }
+        >
+          <CardGrid columns={3}>
+            {expiringMeds.map((med) => {
+              const days = Math.ceil(
+                ((med.expiresOn as Date).getTime() - now.getTime()) / 86_400_000,
+              );
+              return (
+                <RecordCard
+                  key={med.id}
+                  tone="danger"
+                  title={med.product}
+                  subtitle={med.storageLocation}
+                  actions={
+                    <Pill tone="danger" dot={days <= 0}>
+                      {days <= 0 ? "expired" : `${days} d`}
+                    </Pill>
+                  }
+                  meta={
+                    <>
+                      <Pill>
+                        {med.onHand.amount} {med.onHand.unit} on hand
+                      </Pill>
+                      <Pill tone="neutral">{formatDate(med.expiresOn)}</Pill>
+                    </>
+                  }
+                />
+              );
+            })}
+          </CardGrid>
+        </Section>
+      )}
 
       <Tabs tabs={TABS} label="Cattle supplies">
         {(active) => (

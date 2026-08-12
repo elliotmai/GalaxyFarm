@@ -692,11 +692,15 @@ export function HealthTab({
       title="Health"
       description="Treatments, and the withdrawal each one starts."
       actions={
+        // #17: two taps to a treatment. This link, then Record — the animal
+        // arrives chosen, the date is today, and the product is the last one
+        // used. A round of blackleg is forty calves and one bottle, and
+        // re-picking that bottle forty times is forty chances to pick wrong.
         <Link
-          href="/admin/cattle/health"
+          href={`/admin/cattle/health?animal=${animal.id}`}
           className="text-sm text-action underline underline-offset-2"
         >
-          Health screen
+          Record a treatment
         </Link>
       }
     >
