@@ -34,6 +34,16 @@ export const LOCAL_STORES = [
   "breedingRecords",
   "calvingRecords",
   "weightRecords",
+  "healthRecords",
+  "heatRecords",
+  "medInventory",
+  "semenInventory",
+  "syncProtocols",
+  "processingRecords",
+  "acquisitionRecords",
+  "saleRecords",
+  "geneticGoals",
+  "plannedMatings",
   "zoneAssignments",
   "feedingPlans",
   "contacts",
@@ -62,8 +72,11 @@ export type LocalStoreName = (typeof LOCAL_STORES)[number];
  * 4 — cattle profiles and external animals: papers and pedigree (§5.2).
  * 5 — breeding records, and every date derived from them (§5.2).
  * 6 — calving records and weights: the calf, and how it grows (§5.2).
+ * 7 — the rest of §5.2: health, heats, the medicine fridge, the semen tank,
+ *     sync protocols, processing, what animals cost and brought, and the
+ *     genetic plan.
  */
-export const LOCAL_SCHEMA_VERSION = 6;
+export const LOCAL_SCHEMA_VERSION = 7;
 
 /**
  * Which fields each entity's search box looks at.
@@ -85,6 +98,16 @@ const SEARCHABLE: Readonly<Record<LocalStoreName, readonly string[]>> = {
   breedingRecords: ["notes", "embryoCode"],
   calvingRecords: ["notes", "assistDetail"],
   weightRecords: ["notes"],
+  healthRecords: ["product", "notes", "administeredBy"],
+  heatRecords: ["notes", "observedBy"],
+  medInventory: ["product", "lotNumber", "storageLocation", "notes"],
+  semenInventory: ["sireName", "tank", "canister", "cane", "source", "notes"],
+  syncProtocols: ["name", "detail"],
+  processingRecords: ["notes"],
+  acquisitionRecords: ["notes", "transportNotes"],
+  saleRecords: ["notes", "transportNotes"],
+  geneticGoals: ["trait", "rationale"],
+  plannedMatings: ["damCriteria", "targetSeason", "rationale"],
   zoneAssignments: [],
   feedingPlans: ["name", "specialNotes"],
   contacts: ["name", "company", "address", "notes"],

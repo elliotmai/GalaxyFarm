@@ -34,6 +34,21 @@ export interface AdditionalCost {
 
 export interface PurchaseCandidate extends BaseRecord, PlannedRecord {
   readonly domain: "cattle" | "horses" | "equipment";
+  /**
+   * The domain-specific half, opaque here.
+   *
+   * §5.9's comparison view is shared — status, price, seller, distance, pros
+   * and cons are the same question whether it is a heifer or a baler. What
+   * differs is what you actually compare *on*, and that belongs to the module:
+   * cattle validates this with `cattleCandidateSchema`, equipment will
+   * validate its own. The kernel holding a typed union of every domain's
+   * fields would be the kernel knowing about cattle, which §4.1 forbids and
+   * which would need editing every time a module is added.
+   *
+   * One field rather than a child table, because the detail changes as a unit
+   * and the field-level merge (§4.2) wants exactly that.
+   */
+  readonly domainDetail?: Record<string, unknown> | undefined;
   /** The want this would satisfy, if any. */
   readonly roadmapItemId?: Ulid | undefined;
   readonly title: string;
@@ -62,6 +77,9 @@ const additionalCostSchema = z.object({
 
 export const purchaseCandidateSchema = baseRecordSchema.extend({
   domain: z.enum(["cattle", "horses", "equipment"]),
+  // Unvalidated here on purpose: the owning module validates its own shape,
+  // and a `z.unknown()` record is what lets that stay the module's business.
+  domainDetail: z.record(z.string(), z.unknown()).optional(),
   roadmapItemId: ulidSchema.optional(),
   title: z.string().min(1, "A candidate needs a title").max(160),
   status: z.enum(CANDIDATE_STATUSES),

@@ -1,7 +1,13 @@
-import { PagePlaceholder } from "../../../../_components/page-placeholder";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Herd Roadmap" };
+import { CattleRoadmapScreen } from "@/app/(admin)/admin/cattle/roadmap/_components/cattle-roadmap-screen";
+import { currentActor } from "@/lib/auth";
 
-export default function AdminCattleRoadmapPage() {
-  return <PagePlaceholder title={"Herd Roadmap"} route={"/admin/cattle/roadmap"} />;
+export const metadata = { title: "Genetic roadmap" };
+
+export default async function AdminCattleRoadmapPage() {
+  const actor = await currentActor();
+  if (actor === undefined) redirect("/login?next=/admin/cattle/roadmap");
+
+  return <CattleRoadmapScreen propertyId={actor.propertyId} actorId={actor.id} />;
 }

@@ -64,6 +64,13 @@
       "when": 1786484513857,
       "tag": "0008_watch_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786493755608,
+      "tag": "0009_cattle_records",
+      "breakpoints": true
     }
   ]
 }

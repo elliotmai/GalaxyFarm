@@ -1,7 +1,13 @@
-import { PagePlaceholder } from "../../../../_components/page-placeholder";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Health & Withdrawals" };
+import { HealthScreen } from "@/app/(admin)/admin/cattle/health/_components/health-screen";
+import { currentActor } from "@/lib/auth";
 
-export default function AdminCattleHealthPage() {
-  return <PagePlaceholder title={"Health & Withdrawals"} route={"/admin/cattle/health"} />;
+export const metadata = { title: "Health" };
+
+export default async function AdminCattleHealthPage() {
+  const actor = await currentActor();
+  if (actor === undefined) redirect("/login?next=/admin/cattle/health");
+
+  return <HealthScreen propertyId={actor.propertyId} actorId={actor.id} />;
 }

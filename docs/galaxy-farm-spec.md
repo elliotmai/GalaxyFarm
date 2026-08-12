@@ -392,6 +392,8 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/cattle/breeding          heat log, sync protocols, semen tank, breedings, preg checks
 /admin/cattle/calving
 /admin/cattle/health            treatments, withdrawal board, med inventory
+/admin/cattle/weights           weights, ADG, unadjusted 205-day
+/admin/cattle/supplies          semen tank, medicine fridge, sync protocols
 /admin/cattle/feed              feeding plans per animal & group
 /admin/cattle/sales             acquisitions, sales, processing records
 /admin/cattle/roadmap           genetic goals, target size, planned matings

@@ -85,7 +85,28 @@ export const parentRefSchema = z.object({
  * Half a point, so 33/33/34 and 33.3/33.3/33.4 both pass while a genuine
  * mistake — a missing quarter, a doubled half — does not.
  */
-const COMPOSITION_TOLERANCE = 0.5;
+export const COMPOSITION_TOLERANCE = 0.5;
+
+/** What a composition adds up to. */
+export function compositionTotal(composition: readonly BreedShare[]): number {
+  return composition.reduce((sum, share) => sum + share.percent, 0);
+}
+
+/**
+ * Does it add up?
+ *
+ * Exported so the editor and the validator answer identically. The editor
+ * saying "adds to 100%" on strict equality while the schema accepts 99.7 —
+ * or worse, the other way round — is a form that refuses to save while
+ * insisting everything is fine.
+ *
+ * An empty composition is complete: plenty of commercial cattle arrive with
+ * nobody's idea of what they are, and that is different from a half-filled one.
+ */
+export function isCompositionComplete(composition: readonly BreedShare[]): boolean {
+  if (composition.length === 0) return true;
+  return Math.abs(compositionTotal(composition) - 100) <= COMPOSITION_TOLERANCE;
+}
 
 export const cattleProfileSchema = baseRecordSchema
   .extend({
@@ -99,15 +120,11 @@ export const cattleProfileSchema = baseRecordSchema
     dam: parentRefSchema.optional(),
   })
   .refine(
-    (profile) => {
-      // An empty composition is fine — plenty of commercial cattle arrive with
-      // nobody's idea of what they are. A partial one is not: 50% Maine and
-      // nothing else means the other half was forgotten, not that it is
-      // unknown, and it would silently misstate a percentage on a sale sheet.
-      if (profile.breedComposition.length === 0) return true;
-      const total = profile.breedComposition.reduce((sum, share) => sum + share.percent, 0);
-      return Math.abs(total - 100) <= COMPOSITION_TOLERANCE;
-    },
+    // The same function the editor shows its running total from. Two
+    // implementations of "does this add up" would agree until the afternoon
+    // somebody changed one, and the symptom would be a form that refuses to
+    // save while insisting everything is fine.
+    (profile) => isCompositionComplete(profile.breedComposition),
     { message: "Breed composition has to add up to 100%", path: ["breedComposition"] },
   )
   .refine(

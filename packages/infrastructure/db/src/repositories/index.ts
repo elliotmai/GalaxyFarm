@@ -33,6 +33,17 @@ export const SEARCHABLE_FIELDS = {
   externalAnimals: ["name", "regNumber"],
   breedingRecords: ["notes", "embryoCode"],
   calvingRecords: ["notes", "assistDetail"],
+  healthRecords: ["product", "notes", "administeredBy"],
+  // A heat is found through its cow and its date, never by typing.
+  heatRecords: ["notes", "observedBy"],
+  medInventory: ["product", "lotNumber", "storageLocation", "notes"],
+  semenInventory: ["sireName", "tank", "canister", "cane", "source", "notes"],
+  syncProtocols: ["name", "detail"],
+  processingRecords: ["notes"],
+  acquisitionRecords: ["notes", "transportNotes"],
+  saleRecords: ["notes", "transportNotes"],
+  geneticGoals: ["trait", "rationale"],
+  plannedMatings: ["damCriteria", "targetSeason", "rationale"],
   // A weight is found through its animal. Searching "800" across every weight
   // on the property returns a list nobody can act on.
   weightRecords: ["notes"],

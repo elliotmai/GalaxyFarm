@@ -1,7 +1,13 @@
-import { PagePlaceholder } from "../../../../_components/page-placeholder";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Sales & Processing" };
+import { SalesScreen } from "@/app/(admin)/admin/cattle/sales/_components/sales-screen";
+import { currentActor } from "@/lib/auth";
 
-export default function AdminCattleSalesPage() {
-  return <PagePlaceholder title={"Sales & Processing"} route={"/admin/cattle/sales"} />;
+export const metadata = { title: "Sales and finance" };
+
+export default async function AdminCattleSalesPage() {
+  const actor = await currentActor();
+  if (actor === undefined) redirect("/login?next=/admin/cattle/sales");
+
+  return <SalesScreen propertyId={actor.propertyId} actorId={actor.id} />;
 }

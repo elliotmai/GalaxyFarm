@@ -42,6 +42,14 @@ import {
   type CattleProfile,
 } from "@galaxy-farm/module-cattle";
 
+import {
+  BreedComposition,
+  BreedingTab,
+  FinanceTab,
+  HealthTab,
+  Pedigree,
+  WeightsTab,
+} from "@/app/(admin)/admin/cattle/[id]/_components/animal-tabs";
 import { animalSlug, animalTitle, resolveAnimalSlug } from "@/lib/animal-slug";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
@@ -249,14 +257,31 @@ function AnimalTabs({
           return <Overview animal={animal} profile={profile} zone={zone} />;
         if (active === "registrations") {
           return (
-            <Registrations
-              animal={animal}
-              profile={profile}
-              propertyId={propertyId}
-              actorId={actorId}
-            />
+            <>
+              <Registrations
+                animal={animal}
+                profile={profile}
+                propertyId={propertyId}
+                actorId={actorId}
+              />
+              {/* The papers and what she is are the same conversation (#15). */}
+              <BreedComposition
+                animal={animal}
+                profile={profile}
+                propertyId={propertyId}
+                actorId={actorId}
+              />
+            </>
           );
         }
+        if (active === "pedigree") {
+          return <Pedigree animal={animal} profile={profile} propertyId={propertyId} />;
+        }
+        if (active === "breeding") return <BreedingTab animal={animal} propertyId={propertyId} />;
+        if (active === "health") return <HealthTab animal={animal} propertyId={propertyId} />;
+        if (active === "weights") return <WeightsTab animal={animal} propertyId={propertyId} />;
+        if (active === "finance") return <FinanceTab animal={animal} propertyId={propertyId} />;
+
         const tab = TABS.find((entry) => entry.id === active);
         return <Pending what={tab?.label ?? "This"} />;
       }}

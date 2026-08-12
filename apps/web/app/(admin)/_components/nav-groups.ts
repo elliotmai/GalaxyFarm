@@ -51,6 +51,8 @@ export const NAV: readonly NavGroup[] = [
       { href: "/admin/cattle/breeding", label: "Breeding" },
       { href: "/admin/cattle/calving", label: "Calving" },
       { href: "/admin/cattle/health", label: "Health" },
+      { href: "/admin/cattle/weights", label: "Weights" },
+      { href: "/admin/cattle/supplies", label: "Tank and fridge" },
       { href: "/admin/cattle/feed", label: "Feed plans" },
       { href: "/admin/cattle/sales", label: "Sales" },
       { href: "/admin/cattle/roadmap", label: "Roadmap" },

@@ -22,10 +22,20 @@ import {
 } from "@galaxy-farm/core";
 
 import {
+  acquisitionRecordSchema,
   breedingRecordSchema,
   calvingRecordSchema,
   cattleProfileSchema,
   externalAnimalSchema,
+  geneticGoalSchema,
+  healthRecordSchema,
+  heatRecordSchema,
+  medInventorySchema,
+  plannedMatingSchema,
+  processingRecordSchema,
+  saleRecordSchema,
+  semenInventorySchema,
+  syncProtocolSchema,
   weightRecordSchema,
 } from "@galaxy-farm/module-cattle";
 
@@ -62,6 +72,16 @@ const SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   breedingRecords: breedingRecordSchema,
   calvingRecords: calvingRecordSchema,
   weightRecords: weightRecordSchema,
+  healthRecords: healthRecordSchema,
+  heatRecords: heatRecordSchema,
+  medInventory: medInventorySchema,
+  semenInventory: semenInventorySchema,
+  syncProtocols: syncProtocolSchema,
+  processingRecords: processingRecordSchema,
+  acquisitionRecords: acquisitionRecordSchema,
+  saleRecords: saleRecordSchema,
+  geneticGoals: geneticGoalSchema,
+  plannedMatings: plannedMatingSchema,
   zoneAssignments: zoneAssignmentSchema,
   feedingPlans: feedingPlanSchema,
   contacts: contactSchema,

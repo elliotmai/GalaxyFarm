@@ -299,6 +299,210 @@ export const weightRecords = pgTable(
   baseIndexes("weight_records"),
 );
 
+/**
+ * Treatments, and the clock they start (§5.2).
+ *
+ * `withdrawalDays` is copied from the product at the time of treatment rather
+ * than read through to the inventory record. A label change next year must not
+ * silently move a clearance date somebody has already sold an animal against.
+ */
+export const healthRecords = pgTable(
+  "health_records",
+  {
+    ...baseColumns,
+    animalId: text("animal_id").notNull(),
+    type: text("type").notNull(),
+    date: timestamp("date", { withTimezone: true, mode: "date" }).notNull(),
+    product: text("product"),
+    medInventoryId: text("med_inventory_id"),
+    dose: jsonb("dose").$type<{ amount: number; unit: string }>(),
+    route: text("route"),
+    administeredBy: text("administered_by"),
+    vetContactId: text("vet_contact_id"),
+    cost: jsonb("cost").$type<{ cents: number }>(),
+    withdrawalDays: integer("withdrawal_days"),
+    boosterDueOn: timestamp("booster_due_on", { withTimezone: true, mode: "date" }),
+    notes: text("notes"),
+  },
+  baseIndexes("health_records"),
+);
+
+/** Standing heats, which is what the next breeding window is built on (§5.2). */
+export const heatRecords = pgTable(
+  "heat_records",
+  {
+    ...baseColumns,
+    animalId: text("animal_id").notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true, mode: "date" }).notNull(),
+    intensity: text("intensity").notNull(),
+    observedBy: text("observed_by"),
+    notes: text("notes"),
+  },
+  baseIndexes("heat_records"),
+);
+
+/** What is in the medicine fridge (§5.2). */
+export const medInventory = pgTable(
+  "med_inventory",
+  {
+    ...baseColumns,
+    product: text("product").notNull(),
+    category: text("category").notNull(),
+    onHand: jsonb("on_hand").$type<{ amount: number; unit: string }>().notNull(),
+    expiresOn: timestamp("expires_on", { withTimezone: true, mode: "date" }),
+    lotNumber: text("lot_number"),
+    unitCost: jsonb("unit_cost").$type<{ cents: number }>(),
+    defaultWithdrawalDays: integer("default_withdrawal_days"),
+    storageLocation: text("storage_location"),
+    vendorContactId: text("vendor_contact_id"),
+    notes: text("notes"),
+  },
+  baseIndexes("med_inventory"),
+);
+
+/** What is in the tank (§5.2). */
+export const semenInventory = pgTable(
+  "semen_inventory",
+  {
+    ...baseColumns,
+    sireExternalId: text("sire_external_id"),
+    sireAnimalId: text("sire_animal_id"),
+    sireName: text("sire_name").notNull(),
+    strawsOnHand: integer("straws_on_hand").notNull(),
+    tank: text("tank"),
+    canister: text("canister"),
+    cane: text("cane"),
+    source: text("source"),
+    vendorContactId: text("vendor_contact_id"),
+    pricePerStraw: jsonb("price_per_straw").$type<{ cents: number }>(),
+    purchasedOn: timestamp("purchased_on", { withTimezone: true, mode: "date" }),
+    reorderThreshold: integer("reorder_threshold"),
+    notes: text("notes"),
+  },
+  baseIndexes("semen_inventory"),
+);
+
+/** Oestrus synchronisation protocols, as a template of dated steps (§5.2). */
+export const syncProtocols = pgTable(
+  "sync_protocols",
+  {
+    ...baseColumns,
+    name: text("name").notNull(),
+    detail: text("detail"),
+    steps: jsonb("steps")
+      .$type<
+        {
+          dayOffset: number;
+          action: string;
+          label: string;
+          hourOffset?: number;
+          product?: string;
+          notes?: string;
+        }[]
+      >()
+      .notNull()
+      .default([]),
+    active: boolean("active").notNull(),
+  },
+  baseIndexes("sync_protocols"),
+);
+
+/** Freezer beef: what went in, what came back, and who it went to (§5.2). */
+export const processingRecords = pgTable(
+  "processing_records",
+  {
+    ...baseColumns,
+    animalId: text("animal_id").notNull(),
+    processorId: text("processor_id"),
+    deliveredOn: timestamp("delivered_on", { withTimezone: true, mode: "date" }).notNull(),
+    collectedOn: timestamp("collected_on", { withTimezone: true, mode: "date" }),
+    liveScaleWeightLb: doublePrecision("live_scale_weight_lb"),
+    hangingWeightLb: doublePrecision("hanging_weight_lb"),
+    processingCost: jsonb("processing_cost").$type<{ cents: number }>(),
+    paymentReceived: jsonb("payment_received").$type<{ cents: number }>(),
+    cutLines: jsonb("cut_lines")
+      .$type<{ cut: string; pounds: number; disposition: string }[]>()
+      .notNull()
+      .default([]),
+    notes: text("notes"),
+  },
+  baseIndexes("processing_records"),
+);
+
+/** What an animal cost to get here (§5.2). */
+export const acquisitionRecords = pgTable(
+  "acquisition_records",
+  {
+    ...baseColumns,
+    animalId: text("animal_id").notNull(),
+    counterpartyId: text("counterparty_id"),
+    date: timestamp("date", { withTimezone: true, mode: "date" }).notNull(),
+    price: jsonb("price").$type<{ cents: number }>().notNull(),
+    type: text("type").notNull(),
+    transportNotes: text("transport_notes"),
+    notes: text("notes"),
+  },
+  baseIndexes("acquisition_records"),
+);
+
+/** What she brought, and what the barn took out of it (§5.2). */
+export const saleRecords = pgTable(
+  "sale_records",
+  {
+    ...baseColumns,
+    animalId: text("animal_id").notNull(),
+    counterpartyId: text("counterparty_id"),
+    date: timestamp("date", { withTimezone: true, mode: "date" }).notNull(),
+    price: jsonb("price").$type<{ cents: number }>().notNull(),
+    type: text("type").notNull(),
+    commission: jsonb("commission").$type<{ cents: number }>(),
+    transportNotes: text("transport_notes"),
+    notes: text("notes"),
+  },
+  baseIndexes("sale_records"),
+);
+
+/** What the herd is being bred toward (§5.2). */
+export const geneticGoals = pgTable(
+  "genetic_goals",
+  {
+    ...baseColumns,
+    trait: text("trait").notNull(),
+    direction: text("direction").notNull(),
+    rationale: text("rationale"),
+    active: boolean("active").notNull(),
+  },
+  baseIndexes("genetic_goals"),
+);
+
+/**
+ * A mating before it happens (§5.2).
+ *
+ * `realisedAs` is the BreedingRecord it became — the planned-to-actual pattern
+ * §5.9 uses everywhere: the plan becomes the fact in one tap and nothing is
+ * typed twice.
+ */
+export const plannedMatings = pgTable(
+  "planned_matings",
+  {
+    ...baseColumns,
+    damId: text("dam_id"),
+    damCriteria: text("dam_criteria"),
+    method: text("method").notNull(),
+    semenInventoryId: text("semen_inventory_id"),
+    bullId: text("bull_id"),
+    sireExternalId: text("sire_external_id"),
+    targetSeason: text("target_season"),
+    targetDate: timestamp("target_date", { withTimezone: true, mode: "date" }),
+    rationale: text("rationale"),
+    planStatus: text("plan_status").notNull(),
+    realisedAs: text("realised_as"),
+    realisedAt: timestamp("realised_at", { withTimezone: true, mode: "date" }),
+    abandonedReason: text("abandoned_reason"),
+  },
+  baseIndexes("planned_matings"),
+);
+
 export const zoneAssignments = pgTable(
   "zone_assignments",
   {
@@ -483,6 +687,17 @@ export const purchaseCandidates = pgTable(
     realisedAs: text("realised_as"),
     realisedAt: timestamp("realised_at", { withTimezone: true, mode: "date" }),
     abandonedReason: text("abandoned_reason"),
+    /**
+     * The domain-specific half — §5.2's `CattleCandidateDetail`, and whatever
+     * equipment and horses add later.
+     *
+     * A column rather than a table because the detail is one-per-candidate and
+     * is never queried on its own, and because it is not a `BaseRecord` — it
+     * has no id of its own to sync by. As jsonb it rides along with its
+     * candidate as one field, which is what the field-level merge wants: the
+     * whole detail changes as a unit.
+     */
+    domainDetail: jsonb("domain_detail").$type<Record<string, unknown>>(),
   },
   baseIndexes("purchase_candidates"),
 );
@@ -617,6 +832,16 @@ export const allTables = {
   breedingRecords,
   calvingRecords,
   weightRecords,
+  healthRecords,
+  heatRecords,
+  medInventory,
+  semenInventory,
+  syncProtocols,
+  processingRecords,
+  acquisitionRecords,
+  saleRecords,
+  geneticGoals,
+  plannedMatings,
   zoneAssignments,
   feedingPlans,
   contacts,

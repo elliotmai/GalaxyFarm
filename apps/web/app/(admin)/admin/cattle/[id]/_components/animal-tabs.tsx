@@ -1,0 +1,647 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+
+import {
+  Button,
+  Card,
+  DataTable,
+  DetailList,
+  EmptyState,
+  Meter,
+  Pill,
+  Section,
+  TextInput,
+  useConfirmDelete,
+  useToast,
+  type Column,
+} from "@galaxy-farm/ui";
+import { displayName, formatMoney, type Animal, type Ulid } from "@galaxy-farm/core";
+import {
+  animalProfitAndLoss,
+  breedingsFor,
+  buildPedigree,
+  calvingsFor,
+  calvingInterval,
+  cattleProfileSchema,
+  daysBred,
+  describeComposition,
+  healthHistoryFor,
+  isUnderWithdrawal,
+  lifetimeGain,
+  projectedDueDate,
+  compositionTotal,
+  isCompositionComplete,
+  unadjusted205DayWeight,
+  weightsFor,
+  weightIn,
+  withdrawalEndDate,
+  type AcquisitionRecord,
+  type BreedingRecord,
+  type BreedShare,
+  type CalvingRecord,
+  type CattleProfile,
+  type ExternalAnimal,
+  type HealthRecord,
+  type ParentRef,
+  type PedigreeNode,
+  type ProcessingRecord,
+  type SaleRecord,
+  type WeightRecord,
+} from "@galaxy-farm/module-cattle";
+
+import { useMutations } from "@/lib/local/mutations";
+import { useRecords } from "@/lib/local/use-records";
+
+/**
+ * The per-animal tabs §7 asks for (issues #15, #16, #20).
+ *
+ * Each is a view over records that live elsewhere — nothing here is a second
+ * store. The health tab reads the same `healthRecords` the health screen
+ * writes, so a treatment logged in a chute is on her page before anybody
+ * navigates.
+ *
+ * Split out of `animal-screen.tsx` because that file had grown past the point
+ * where the page's own structure was visible in it.
+ */
+
+function formatDate(value: Date | undefined): string {
+  return value === undefined
+    ? "—"
+    : value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function lb(value: number | undefined): string {
+  return value === undefined ? "—" : `${Math.round(value)} lb`;
+}
+
+/* ------------------------------------------------------------------ breeds */
+
+/**
+ * The breed-composition editor (issue #15).
+ *
+ * Percentages, not fractions: "½ Maine ¼ Chi ¼ Shorthorn" is written 50/25/25
+ * on every paper this farm will handle, and a three-way split with a third in
+ * it has no exact fractional form anyway.
+ *
+ * The running total is shown while editing rather than only on save. A
+ * composition that does not reach 100 is refused by the schema — an animal
+ * recorded as 50% Maine and nothing else means the other half was *forgotten*,
+ * not that it is unknown, and it would misstate a percentage on a sale sheet.
+ */
+export function BreedComposition({
+  animal,
+  profile,
+  propertyId,
+  actorId,
+}: {
+  readonly animal: Animal;
+  readonly profile: CattleProfile | undefined;
+  readonly propertyId: Ulid;
+  readonly actorId: Ulid;
+}) {
+  const api = useMutations<CattleProfile>(
+    "cattleProfiles",
+    "cattleProfiles",
+    cattleProfileSchema,
+    propertyId,
+    actorId,
+  );
+  const confirmDelete = useConfirmDelete();
+  const { show } = useToast();
+
+  const [breed, setBreed] = useState("");
+  const [percent, setPercent] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const shares = profile?.breedComposition ?? [];
+  const total = compositionTotal(shares);
+  const complete = isCompositionComplete(shares);
+
+  async function save(next: readonly BreedShare[]) {
+    setBusy(true);
+    try {
+      if (profile === undefined) {
+        await api.create({
+          animalId: animal.id,
+          breedComposition: next,
+          registrations: [],
+        } as never);
+        return;
+      }
+      await api.update(profile.id, { breedComposition: next } as Partial<CattleProfile>);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function add(event: React.FormEvent) {
+    event.preventDefault();
+    if (breed.trim() === "" || percent === "") return;
+
+    await save([...shares, { breed: breed.trim(), percent: Number(percent) }]);
+    setBreed("");
+    setPercent("");
+  }
+
+  async function drop(share: BreedShare) {
+    const confirmed = await confirmDelete({
+      tier: "standard",
+      recordName: `${share.percent}% ${share.breed}`,
+      entity: "breed share",
+      dependents: [],
+      consequence: complete
+        ? "The composition will no longer add to 100%, and will not save until it does."
+        : undefined,
+      action: "Remove",
+    });
+    if (!confirmed) return;
+
+    await save(shares.filter((entry) => entry !== share));
+    show({ message: `${share.breed} removed` });
+  }
+
+  return (
+    <Section
+      title="Breed composition"
+      description="Percentages as they are written on the papers. It has to add to 100 — a partial composition means half was forgotten, not that it is unknown."
+    >
+      {shares.length === 0 ? (
+        <EmptyState
+          title="No composition recorded"
+          detail="Plenty of commercial cattle arrive with nobody's idea of what they are. Add the shares you know."
+        />
+      ) : (
+        <div className="flex flex-col gap-3">
+          <p className="text-density text-ink">{describeComposition(shares)}</p>
+          {shares.map((share) => (
+            <div key={`${share.breed}-${share.percent}`} className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-density text-ink">{share.breed}</span>
+                <span className="flex items-center gap-2">
+                  <Pill tone="identity">{share.percent}%</Pill>
+                  <Button variant="ghost" onClick={() => void drop(share)}>
+                    Remove
+                  </Button>
+                </span>
+              </div>
+              <Meter value={share.percent / 100} tone="identity" />
+            </div>
+          ))}
+
+          <p
+            className={`text-sm ${complete ? "text-calm" : "text-danger"}`}
+            role={complete ? undefined : "alert"}
+          >
+            {complete
+              ? "Adds to 100%."
+              : `Adds to ${total}% — this will not save until it reaches 100.`}
+          </p>
+        </div>
+      )}
+
+      <form onSubmit={(event) => void add(event)} className="flex flex-wrap items-end gap-3">
+        <div className="min-w-0 flex-1">
+          <TextInput
+            label="Breed"
+            value={breed}
+            onChange={(event) => setBreed(event.target.value)}
+          />
+        </div>
+        <TextInput
+          label="Percent"
+          type="number"
+          inputMode="decimal"
+          value={percent}
+          onChange={(event) => setPercent(event.target.value)}
+        />
+        <Button type="submit" busy={busy}>
+          Add breed
+        </Button>
+      </form>
+    </Section>
+  );
+}
+
+/* ---------------------------------------------------------------- pedigree */
+
+/**
+ * The pedigree, as a tree (issue #16).
+ *
+ * Depth-limited for two reasons and the second is not theoretical: §5.2 asks
+ * for a 3/4/5-generation view, and a pedigree can genuinely contain a cycle
+ * once somebody mistypes a registration number and makes an animal its own
+ * great-grandsire. `buildPedigree` bounds the walk; this only draws it.
+ *
+ * Rendered as nested lists rather than a canvas: it stays readable on a phone,
+ * it is navigable by keyboard, and a screen reader can announce the
+ * relationships. The constellation drawing §8 wants is a later pass over this
+ * same data.
+ */
+export function Pedigree({
+  animal,
+  profile,
+  propertyId,
+}: {
+  readonly animal: Animal;
+  readonly profile: CattleProfile | undefined;
+  readonly propertyId: Ulid;
+}) {
+  const { records: animals } = useRecords<Animal>("animals", { propertyId });
+  const { records: profiles } = useRecords<CattleProfile>("cattleProfiles", { propertyId });
+  const { records: outsiders } = useRecords<ExternalAnimal>("externalAnimals", { propertyId });
+  const [generations, setGenerations] = useState(4);
+
+  const source = {
+    parentsOf(ref: ParentRef) {
+      if (ref.kind === "animal") {
+        const found = profiles.find((entry) => entry.animalId === ref.id);
+        if (found === undefined) return undefined;
+        return {
+          ...(found.sire === undefined ? {} : { sire: found.sire }),
+          ...(found.dam === undefined ? {} : { dam: found.dam }),
+        };
+      }
+      const outsider = outsiders.find((entry) => entry.id === ref.id);
+      if (outsider === undefined) return undefined;
+      return {
+        ...(outsider.sire === undefined ? {} : { sire: outsider.sire }),
+        ...(outsider.dam === undefined ? {} : { dam: outsider.dam }),
+      };
+    },
+    describe(ref: ParentRef) {
+      if (ref.kind === "animal") {
+        const found = animals.find((entry) => entry.id === ref.id);
+        if (found === undefined) return undefined;
+        const reg = profiles.find((entry) => entry.animalId === ref.id)?.registrations[0]
+          ?.regNumber;
+        return { name: displayName(found), ...(reg === undefined ? {} : { regNumber: reg }) };
+      }
+      const outsider = outsiders.find((entry) => entry.id === ref.id);
+      if (outsider === undefined) return undefined;
+      return {
+        name: outsider.name,
+        ...(outsider.regNumber === undefined ? {} : { regNumber: outsider.regNumber }),
+      };
+    },
+  };
+
+  const tree = buildPedigree({ kind: "animal", id: animal.id }, source, generations);
+  const hasParents = profile?.sire !== undefined || profile?.dam !== undefined;
+
+  return (
+    <Section
+      title="Pedigree"
+      description="As far back as the papers go. Ancestors that are not ours are held as external animals — a five-generation tree has thirty of them and this farm owns two."
+      actions={
+        <span className="flex gap-2">
+          {[3, 4, 5].map((n) => (
+            <Button
+              key={n}
+              variant={n === generations ? "primary" : "ghost"}
+              onClick={() => setGenerations(n)}
+            >
+              {n} gen
+            </Button>
+          ))}
+        </span>
+      }
+    >
+      {!hasParents || tree === undefined ? (
+        <EmptyState
+          title="No pedigree recorded"
+          detail="Set her sire and dam on the registrations tab, and everything above them follows from the external animals already on file."
+        />
+      ) : (
+        <PedigreeBranch node={tree} />
+      )}
+    </Section>
+  );
+}
+
+function PedigreeBranch({ node }: { readonly node: PedigreeNode }) {
+  const parents = [node.sire, node.dam].filter(
+    (entry): entry is PedigreeNode => entry !== undefined,
+  );
+
+  return (
+    <ul className="flex flex-col gap-2 border-l border-edge pl-density">
+      <li className="flex flex-wrap items-center gap-2">
+        <span className="text-density font-medium text-ink">{node.name}</span>
+        {node.regNumber === undefined ? null : <Pill>{node.regNumber}</Pill>}
+        {node.ref.kind === "external" ? <Pill tone="neutral">outside</Pill> : null}
+      </li>
+      {parents.length === 0 ? null : (
+        <li>
+          {parents.map((parent) => (
+            <PedigreeBranch key={`${parent.ref.kind}:${parent.ref.id}`} node={parent} />
+          ))}
+        </li>
+      )}
+    </ul>
+  );
+}
+
+/* --------------------------------------------------------------- breeding */
+
+export function BreedingTab({
+  animal,
+  propertyId,
+}: {
+  readonly animal: Animal;
+  readonly propertyId: Ulid;
+}) {
+  const { records: breedings } = useRecords<BreedingRecord>("breedingRecords", { propertyId });
+  const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", { propertyId });
+
+  const hers = breedingsFor(breedings, animal.id);
+  const herCalvings = calvingsFor(calvings, animal.id);
+  const interval = calvingInterval(calvings, animal.id);
+  const now = new Date();
+
+  return (
+    <div className="flex flex-col gap-density">
+      <Section
+        title="Breeding"
+        description="Every service, and the dates that follow from it."
+        actions={
+          <Link
+            href={`/admin/cattle/breeding`}
+            className="text-sm text-action underline underline-offset-2"
+          >
+            Breeding screen
+          </Link>
+        }
+      >
+        {hers.length === 0 ? (
+          <EmptyState title="Never bred" detail="Record a service on the breeding screen." />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {hers.map((record) => (
+              <Card key={record.id}>
+                <DetailList
+                  columns={3}
+                  items={[
+                    { label: "Bred", value: formatDate(record.date) },
+                    { label: "Method", value: record.method },
+                    { label: "Due", value: formatDate(projectedDueDate(record)) },
+                    {
+                      label: "Day",
+                      value: daysBred(record, now) < 0 ? "—" : daysBred(record, now),
+                    },
+                    { label: "Check", value: record.pregCheck?.result ?? "not checked" },
+                    { label: "Notes", value: record.notes, wide: true },
+                  ]}
+                />
+              </Card>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section
+        title="Calvings"
+        description={
+          interval === undefined
+            ? "Her calving history."
+            : `${interval} days between her last two — the number that says whether she is holding a yearly interval.`
+        }
+      >
+        {herCalvings.length === 0 ? (
+          <EmptyState title="Never calved" detail="Nothing recorded yet." />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {herCalvings.map((record) => (
+              <Card key={record.id}>
+                <DetailList
+                  columns={3}
+                  items={[
+                    { label: "Calved", value: formatDate(record.date) },
+                    { label: "Ease", value: record.calvingEase },
+                    { label: "Vigour", value: record.vigour },
+                    { label: "Birth weight", value: lb(record.birthWeightLb) },
+                    { label: "Assisted", value: record.assisted ? "yes" : "no" },
+                    { label: "Notes", value: record.notes, wide: true },
+                  ]}
+                />
+              </Card>
+            ))}
+          </div>
+        )}
+      </Section>
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------- health */
+
+export function HealthTab({
+  animal,
+  propertyId,
+}: {
+  readonly animal: Animal;
+  readonly propertyId: Ulid;
+}) {
+  const { records } = useRecords<HealthRecord>("healthRecords", { propertyId });
+  const now = new Date();
+  const hers = healthHistoryFor(records, animal.id);
+  const held = hers.filter((record) => isUnderWithdrawal(record, now));
+
+  const columns: readonly Column<HealthRecord>[] = [
+    { key: "date", header: "Date", primary: true, render: (r) => formatDate(r.date) },
+    { key: "type", header: "Type", render: (r) => r.type },
+    { key: "product", header: "Product", render: (r) => r.product ?? "—" },
+    {
+      key: "withdrawal",
+      header: "Withdrawal",
+      render: (r) => {
+        const ends = withdrawalEndDate(r);
+        if (ends === undefined) return <span className="text-muted">None</span>;
+        return isUnderWithdrawal(r, now) ? (
+          <Pill tone="danger" dot>
+            until {formatDate(ends)}
+          </Pill>
+        ) : (
+          <Pill tone="calm">cleared</Pill>
+        );
+      },
+    },
+    { key: "by", header: "By", render: (r) => r.administeredBy ?? "—" },
+  ];
+
+  return (
+    <Section
+      title="Health"
+      description="Treatments, and the withdrawal each one starts."
+      actions={
+        <Link
+          href="/admin/cattle/health"
+          className="text-sm text-action underline underline-offset-2"
+        >
+          Health screen
+        </Link>
+      }
+    >
+      {held.length === 0 ? null : (
+        <Card title="Not clear for sale">
+          <p className="text-density text-danger">
+            {displayName(animal)} is inside a withdrawal period until{" "}
+            {formatDate(
+              held
+                .map((record) => withdrawalEndDate(record) as Date)
+                .sort((a, b) => b.getTime() - a.getTime())[0],
+            )}
+            .
+          </p>
+        </Card>
+      )}
+
+      <Card>
+        <DataTable
+          caption={`Health records for ${displayName(animal)}`}
+          columns={columns}
+          rows={hers}
+          rowKey={(record) => record.id}
+          empty={<EmptyState title="Nothing recorded" detail="No treatments on file for her." />}
+        />
+      </Card>
+    </Section>
+  );
+}
+
+/* ---------------------------------------------------------------- weights */
+
+export function WeightsTab({
+  animal,
+  propertyId,
+}: {
+  readonly animal: Animal;
+  readonly propertyId: Ulid;
+}) {
+  const { records } = useRecords<WeightRecord>("weightRecords", { propertyId });
+
+  const series = weightsFor(records, animal.id);
+  const birth = weightIn(records, animal.id, "birth");
+  const weaning = weightIn(records, animal.id, "weaning");
+  const adg = lifetimeGain(records, animal.id);
+  const w205 =
+    birth === undefined || weaning === undefined
+      ? undefined
+      : unadjusted205DayWeight(birth, weaning);
+  const heaviest = Math.max(...series.map((entry) => entry.weightLb), 1);
+
+  return (
+    <Section
+      title="Weights"
+      description="Birth weights are the reliable ones. The 205-day figure is unadjusted — the age-of-dam and sex factors are not applied."
+      actions={
+        <Link
+          href="/admin/cattle/weights"
+          className="text-sm text-action underline underline-offset-2"
+        >
+          Weights screen
+        </Link>
+      }
+    >
+      {series.length === 0 ? (
+        <EmptyState title="Never weighed" detail="Record one on the weights screen." />
+      ) : (
+        <div className="flex flex-col gap-density">
+          <DetailList
+            columns={3}
+            items={[
+              { label: "Birth", value: lb(birth?.weightLb) },
+              { label: "Weaning", value: lb(weaning?.weightLb) },
+              { label: "Latest", value: lb(series[series.length - 1]?.weightLb) },
+              { label: "Lifetime ADG", value: adg === undefined ? "—" : `${adg.toFixed(2)} lb/d` },
+              {
+                label: "205-day, unadjusted",
+                value: w205 === undefined ? "—" : lb(w205),
+              },
+              { label: "Weights taken", value: series.length },
+            ]}
+          />
+
+          <div className="flex flex-col gap-2">
+            {series.map((entry) => (
+              <Meter
+                key={entry.id}
+                value={entry.weightLb / heaviest}
+                tone={entry.context === "birth" ? "identity" : "action"}
+                label={`${formatDate(entry.date)} · ${entry.context}`}
+                detail={lb(entry.weightLb)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+/* ---------------------------------------------------------------- finance */
+
+export function FinanceTab({
+  animal,
+  propertyId,
+}: {
+  readonly animal: Animal;
+  readonly propertyId: Ulid;
+}) {
+  const query = { propertyId };
+  const { records: acquisitions } = useRecords<AcquisitionRecord>("acquisitionRecords", query);
+  const { records: sales } = useRecords<SaleRecord>("saleRecords", query);
+  const { records: health } = useRecords<HealthRecord>("healthRecords", query);
+  const { records: processing } = useRecords<ProcessingRecord>("processingRecords", query);
+
+  const pl = animalProfitAndLoss({
+    animalId: animal.id,
+    acquisitions,
+    sales,
+    health,
+    processing,
+  });
+
+  return (
+    <Section
+      title="Finance"
+      description="What she cost and what she brought."
+      actions={
+        <Link
+          href="/admin/cattle/sales"
+          className="text-sm text-action underline underline-offset-2"
+        >
+          Sales screen
+        </Link>
+      }
+    >
+      <DetailList
+        columns={3}
+        items={[
+          { label: "Acquisition", value: formatMoney(pl.acquisitionCost) },
+          { label: "Health", value: formatMoney(pl.healthCost) },
+          { label: "Feed", value: formatMoney(pl.feedCost) },
+          { label: "Breeding", value: formatMoney(pl.breedingCost) },
+          { label: "Total cost", value: formatMoney(pl.totalCost) },
+          { label: "Revenue", value: formatMoney(pl.totalRevenue) },
+        ]}
+      />
+
+      <Card title={pl.net.cents >= 0 ? "In front" : "Behind"}>
+        <p className="font-heading text-3xl font-semibold [font-variant-numeric:tabular-nums] text-ink">
+          {formatMoney(pl.net)}
+        </p>
+        {pl.complete ? null : (
+          // Said plainly rather than shown as a clean number. A home-raised
+          // calf with no feed allocation shows a flattering profit that is
+          // arithmetically right and practically misleading.
+          <p className="pt-2 text-sm text-muted">
+            One or more cost lines has no figure behind it yet — usually feed, which is apportioned
+            in §5.3. Treat this as incomplete rather than as a profit.
+          </p>
+        )}
+      </Card>
+    </Section>
+  );
+}
