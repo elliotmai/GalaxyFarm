@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as { url?: unknown };
+  const body = (await request.json().catch(() => ({}))) as { url?: unknown; raw?: unknown };
   if (typeof body.url !== "string") {
     return NextResponse.json({ error: "Send the animal's web address." }, { status: 400 });
   }
@@ -92,6 +92,12 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     animal,
+    // The unparsed page, when the caller asked for it. The refresh screen
+    // compares a fresh read against what is on file, and doing that against
+    // the same text a paste would give keeps the two paths honest — a
+    // difference between them would be a difference in the *fetch*, which is
+    // exactly the thing nobody would think to look for.
+    ...(body.raw === true ? { page: html } : {}),
     // Returned so the screen can say "we fetched a page and read nothing off
     // it", which is a different problem from "we could not fetch a page".
     fetched: true,

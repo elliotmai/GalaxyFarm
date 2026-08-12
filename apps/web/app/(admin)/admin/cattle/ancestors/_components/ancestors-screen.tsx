@@ -38,6 +38,7 @@ import {
 } from "@galaxy-farm/module-cattle";
 
 import { DigitalBeefImport } from "@/app/(admin)/admin/cattle/ancestors/_components/import-panel";
+import { RefreshFromAssociation } from "@/app/(admin)/admin/cattle/ancestors/_components/refresh-panel";
 import { useMutations } from "@/lib/local/mutations";
 import { usePedigreeSource } from "@/lib/pedigree-source";
 import { useRecords } from "@/lib/local/use-records";
@@ -73,6 +74,8 @@ interface Draft {
   readonly sex: string;
   readonly tattoo: string;
   readonly colour: string;
+  readonly dob: string;
+  readonly hornStatus: string;
   readonly sire: string;
   readonly dam: string;
   readonly notes: string;
@@ -85,6 +88,8 @@ const BLANK: Draft = {
   sex: "",
   tattoo: "",
   colour: "",
+  dob: "",
+  hornStatus: "",
   sire: "",
   dam: "",
   notes: "",
@@ -115,6 +120,8 @@ export function AncestorsScreen({
 
   const [editing, setEditing] = useState<ExternalAnimal | undefined>();
   const [filter, setFilter] = useState<AncestorFilter>(NO_FILTER);
+  /** The one being checked against its association, if any. */
+  const [checking, setChecking] = useState<ExternalAnimal | undefined>();
   const [draft, setDraft] = useState<Draft | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -227,6 +234,8 @@ export function AncestorsScreen({
       sex: outsider.sex ?? "",
       tattoo: outsider.tattoo ?? "",
       colour: outsider.colour ?? "",
+      dob: outsider.dob === undefined ? "" : outsider.dob.toISOString().slice(0, 10),
+      hornStatus: outsider.hornStatus ?? "",
       sire: refKey(outsider.sire),
       dam: refKey(outsider.dam),
       notes: outsider.notes ?? "",
@@ -271,6 +280,8 @@ export function AncestorsScreen({
         ...(draft.sex === "" ? {} : { sex: draft.sex }),
         ...(draft.tattoo.trim() === "" ? {} : { tattoo: draft.tattoo.trim() }),
         ...(draft.colour.trim() === "" ? {} : { colour: draft.colour.trim() }),
+        ...(draft.dob === "" ? {} : { dob: new Date(`${draft.dob}T00:00:00`) }),
+        ...(draft.hornStatus.trim() === "" ? {} : { hornStatus: draft.hornStatus.trim() }),
         ...(sire === undefined ? {} : { sire }),
         ...(dam === undefined ? {} : { dam }),
         ...(draft.notes.trim() === "" ? {} : { notes: draft.notes.trim() }),
@@ -290,6 +301,8 @@ export function AncestorsScreen({
               sex: undefined,
               tattoo: undefined,
               colour: undefined,
+              dob: undefined,
+              hornStatus: undefined,
               notes: undefined,
               ...payload,
             } as Partial<ExternalAnimal>);
@@ -393,6 +406,36 @@ export function AncestorsScreen({
       },
     },
     {
+      key: "detail",
+      header: "Off the papers",
+      render: (row) => {
+        const parts = [
+          row.colour,
+          row.hornStatus,
+          row.dob === undefined ? undefined : row.dob.toLocaleDateString(),
+          row.breedComposition === undefined || row.breedComposition.length === 0
+            ? undefined
+            : row.breedComposition.map((share) => `${share.percent}% ${share.breed}`).join(" "),
+          row.coi === undefined ? undefined : `COI ${row.coi}%`,
+        ].filter((part): part is string => part !== undefined && part !== "");
+
+        const carries = (row.geneticTests ?? []).filter(
+          (test) => test.status === "carrier" || test.status === "affected",
+        );
+
+        return (
+          <span className="flex flex-wrap items-center gap-1.5">
+            {parts.length === 0 ? <span className="text-muted">—</span> : parts.join(" · ")}
+            {carries.length === 0 ? null : (
+              <Pill tone="danger" dot>
+                {carries.map((test) => test.defect).join(", ")} carrier
+              </Pill>
+            )}
+          </span>
+        );
+      },
+    },
+    {
       key: "parents",
       header: "Parents",
       render: (row) => {
@@ -426,6 +469,11 @@ export function AncestorsScreen({
           <Button variant="ghost" onClick={() => startEdit(row)}>
             Edit
           </Button>
+          {allRegistrations(row).length === 0 ? null : (
+            <Button variant="ghost" onClick={() => setChecking(row)}>
+              Refresh
+            </Button>
+          )}
           <Button variant="ghost" onClick={() => void remove(row)}>
             Delete
           </Button>
@@ -519,6 +567,18 @@ export function AncestorsScreen({
                 value={draft.colour}
                 onChange={(event) => setDraft({ ...draft, colour: event.target.value })}
               />
+              <TextInput
+                label="Date of birth"
+                type="date"
+                value={draft.dob}
+                onChange={(event) => setDraft({ ...draft, dob: event.target.value })}
+              />
+              <TextInput
+                label="Horns"
+                hint="As the association prints it — polled, horned, scurred."
+                value={draft.hornStatus}
+                onChange={(event) => setDraft({ ...draft, hornStatus: event.target.value })}
+              />
               <SearchSelect
                 label="Sire"
                 hint="Bulls only. Type any part of a name or a registration number."
@@ -565,6 +625,15 @@ export function AncestorsScreen({
             </div>
           </form>
         </Card>
+      )}
+
+      {checking === undefined ? null : (
+        <RefreshFromAssociation
+          animal={checking}
+          propertyId={propertyId}
+          actorId={actorId}
+          onDone={() => setChecking(undefined)}
+        />
       )}
 
       <DigitalBeefImport existing={outsiders} propertyId={propertyId} actorId={actorId} />

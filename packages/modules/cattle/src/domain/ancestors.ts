@@ -160,7 +160,9 @@ export function ancestorMatches(animal: ExternalAnimal, search: string): boolean
       animal.name,
       animal.tattoo ?? "",
       animal.colour ?? "",
-      animal.breeder ?? "",
+      animal.hornStatus ?? "",
+      animal.status ?? "",
+      ...(animal.breedComposition ?? []).map((share) => share.breed),
       ...allRegistrations(animal).map((entry) => `${entry.association} ${entry.regNumber}`),
     ].join(" "),
   );

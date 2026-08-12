@@ -2,7 +2,12 @@ import { z } from "zod";
 
 import { baseRecordSchema, type BaseRecord } from "@galaxy-farm/core";
 
-import { parentRefSchema, type ParentRef } from "./cattle-profile.js";
+import {
+  breedShareSchema,
+  parentRefSchema,
+  type BreedShare,
+  type ParentRef,
+} from "./cattle-profile.js";
 import { geneticTestSchema, type GeneticTest } from "./genetics.js";
 
 /**
@@ -68,7 +73,24 @@ export interface ExternalAnimal extends BaseRecord {
   readonly sex?: "male" | "female" | undefined;
   readonly dob?: Date | undefined;
   readonly colour?: string | undefined;
-  readonly breeder?: string | undefined;
+  readonly hornStatus?: string | undefined;
+  readonly breedComposition?: readonly BreedShare[] | undefined;
+  /**
+   * The association's own inbreeding coefficient, as a percentage.
+   *
+   * Kept alongside the one this farm computes rather than instead of it: they
+   * are different numbers. Theirs walks the whole registry, ours walks four
+   * generations of what is on file, and where they disagree the gap is a
+   * measure of how much of the pedigree is missing here.
+   */
+  readonly coi?: number | undefined;
+  /** Active, culled, dead — as the registry has it, not as this farm has it. */
+  readonly status?: string | undefined;
+  readonly disposedOn?: Date | undefined;
+  /** Natural service or AI — how this animal itself was got. */
+  readonly serviceType?: string | undefined;
+  /** The page this was read off, so anybody can go and check it. */
+  readonly sourceUrl?: string | undefined;
   /** Defect flags as the association printed them. */
   readonly geneticTests?: readonly GeneticTest[] | undefined;
   readonly sire?: ParentRef | undefined;
@@ -90,7 +112,13 @@ export const externalAnimalSchema = baseRecordSchema.extend({
   sex: z.enum(["male", "female"]).optional(),
   dob: z.coerce.date().optional(),
   colour: z.string().max(120).optional(),
-  breeder: z.string().max(160).optional(),
+  hornStatus: z.string().max(40).optional(),
+  breedComposition: z.array(breedShareSchema).optional(),
+  coi: z.number().min(0).max(100).optional(),
+  status: z.string().max(80).optional(),
+  disposedOn: z.coerce.date().optional(),
+  serviceType: z.string().max(80).optional(),
+  sourceUrl: z.string().max(500).optional(),
   geneticTests: z.array(geneticTestSchema).optional(),
   sire: parentRefSchema.optional(),
   dam: parentRefSchema.optional(),

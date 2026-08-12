@@ -220,40 +220,24 @@ export function DigitalBeefImport({
               ? undefined
               : mergeRegistration(record, match.addsRegistration);
 
-          if (patch === undefined) {
+          // Anything this page knows that the record does not. A Chianina page
+          // carries a breed makeup a Maine-Anjou page does not print at all,
+          // and a Shorthorn pedigree carries colours going back to 1955.
+          // Existing values are never overwritten: the record on file may have
+          // been corrected by hand, and an import is not evidence against that.
+          const fill = fillBlanks(record, recordFor(row, animal));
+          const together = { ...(patch ?? {}), ...fill };
+
+          if (Object.keys(together).length === 0) {
             known += 1;
           } else {
-            await api.update(match.existingId, patch);
+            await api.update(match.existingId, together);
             merged += 1;
           }
           continue;
         }
 
-        const ancestor = row.ancestor;
-        const result = await api.create({
-          name: row.name,
-          ...(row.regNumber === undefined ? {} : { regNumber: row.regNumber }),
-          association: row.association,
-          ...(row.regNumber === undefined
-            ? {}
-            : { registrations: [{ association: row.association, regNumber: row.regNumber }] }),
-          ...(ancestor?.tattoo === undefined ? {} : { tattoo: ancestor.tattoo }),
-          // A slot called `dam's dam's sire` ends in "sire", so that animal is
-          // a bull. Recorded at import because the chart is the only place it
-          // is ever stated — a certificate has no sex field.
-          ...(row.position === undefined || sexFromPosition(row.position) === undefined
-            ? {}
-            : { sex: sexFromPosition(row.position) }),
-          ...(ancestor?.colour === undefined ? {} : { colour: ancestor.colour }),
-          ...(ancestor?.breeder === undefined ? {} : { breeder: ancestor.breeder }),
-          ...(ancestor?.dob === undefined || Number.isNaN(new Date(ancestor.dob).getTime())
-            ? {}
-            : { dob: new Date(ancestor.dob) }),
-          ...(ancestor === undefined || ancestor.geneticTests.length === 0
-            ? {}
-            : { geneticTests: ancestor.geneticTests }),
-          notes: `Imported from ${animal.association}${row.position === undefined ? "" : ` · ${row.position}`}`,
-        } as never);
+        const result = await api.create(recordFor(row, animal) as never);
 
         if (!result.ok) {
           setError(`Could not save ${row.name}.`);
@@ -559,11 +543,18 @@ function Row({
   const carries = (row.ancestor?.geneticTests ?? []).filter(
     (test) => test.status === "carrier" || test.status === "affected",
   );
+  // What else is coming in with this animal, so nothing is saved unseen.
+  const detail = [row.ancestor?.tattoo, row.ancestor?.colour, row.ancestor?.dob]
+    .filter((part) => part !== undefined && part !== "")
+    .join(" · ");
 
   return (
     <div className="flex flex-col gap-1 border-t border-edge pt-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-density text-ink">{row.name}</span>
+        <span className="flex flex-wrap items-baseline gap-2">
+          <span className="text-density text-ink">{row.name}</span>
+          {detail === "" ? null : <span className="text-sm text-muted">{detail}</span>}
+        </span>
         <span className="flex flex-wrap items-center gap-2">
           {carries.length === 0 ? null : (
             <Pill tone="danger" dot>
@@ -598,4 +589,94 @@ function Row({
       )}
     </div>
   );
+}
+
+/**
+ * Everything read off the page, as a record.
+ *
+ * One place, so the subject animal and its thirty ancestors are written the
+ * same way. They were not: the subject row carried no `ancestor`, so the
+ * animal the page is actually *about* was saved with a name and a number while
+ * its colour, birth date, horn status, breed makeup and defect results — all
+ * of them already parsed — were dropped on the floor.
+ *
+ * Breeders and owners are read and deliberately not kept. They are a matter of
+ * public record on the association's own site and nobody here needs them.
+ */
+function recordFor(row: ImportRow, animal: ImportedAnimal): Partial<ExternalAnimal> {
+  const subject = row.key === "subject";
+  const ancestor = row.ancestor;
+
+  const date = (value: string | undefined): Date | undefined => {
+    if (value === undefined) return undefined;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  };
+
+  const dob = date(subject ? animal.dob : ancestor?.dob);
+  const colour = subject ? animal.colour : ancestor?.colour;
+  const tattoo = subject ? animal.tattoo : ancestor?.tattoo;
+  const tests = subject ? [] : (ancestor?.geneticTests ?? []);
+
+  // A slot called `dam's dam's sire` ends in "sire", so that animal is a bull.
+  // The chart is the only place it is ever stated — a certificate has no sex
+  // field. The subject's own page states it outright.
+  const sex = subject
+    ? /^(bull|steer)/i.test(animal.sex ?? "")
+      ? "male"
+      : /^(cow|heifer)/i.test(animal.sex ?? "")
+        ? "female"
+        : undefined
+    : row.position === undefined
+      ? undefined
+      : sexFromPosition(row.position);
+
+  return {
+    name: row.name,
+    ...(row.regNumber === undefined ? {} : { regNumber: row.regNumber }),
+    association: row.association,
+    ...(row.regNumber === undefined
+      ? {}
+      : { registrations: [{ association: row.association, regNumber: row.regNumber }] }),
+    ...(tattoo === undefined ? {} : { tattoo }),
+    ...(sex === undefined ? {} : { sex }),
+    ...(dob === undefined ? {} : { dob }),
+    ...(colour === undefined ? {} : { colour }),
+    ...(tests.length === 0 ? {} : { geneticTests: tests }),
+    ...(!subject
+      ? {}
+      : {
+          ...(animal.hornStatus === undefined ? {} : { hornStatus: animal.hornStatus }),
+          ...(animal.breedComposition.length === 0
+            ? {}
+            : { breedComposition: animal.breedComposition }),
+          ...(animal.coi === undefined ? {} : { coi: animal.coi }),
+          ...(animal.status === undefined ? {} : { status: animal.status }),
+          ...(date(animal.disposedOn) === undefined ? {} : { disposedOn: date(animal.disposedOn) }),
+          ...(animal.serviceType === undefined ? {} : { serviceType: animal.serviceType }),
+          ...(animal.sourceUrl === undefined ? {} : { sourceUrl: animal.sourceUrl }),
+        }),
+    notes: `Imported from ${animal.association}${row.position === undefined ? "" : ` · ${row.position}`}`,
+  };
+}
+
+/** Only what the record does not already have. Never overwrites. */
+function fillBlanks(
+  existing: ExternalAnimal | undefined,
+  read: Partial<ExternalAnimal>,
+): Partial<ExternalAnimal> {
+  if (existing === undefined) return {};
+  const patch: Record<string, unknown> = {};
+
+  for (const [field, value] of Object.entries(read)) {
+    // `notes`, `name`, `association` and `regNumber` are excluded: the first
+    // would append an import trail to a record somebody wrote by hand, and the
+    // other three belong to whichever registry the record was created under.
+    if (["notes", "name", "association", "regNumber", "registrations"].includes(field)) continue;
+    if (value === undefined) continue;
+    if ((existing as unknown as Record<string, unknown>)[field] !== undefined) continue;
+    patch[field] = value;
+  }
+
+  return patch as Partial<ExternalAnimal>;
 }
