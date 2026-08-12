@@ -329,7 +329,7 @@ export function HerdScreen({
         label: zones.find((zone) => zone.id === assignment.zoneId)?.name ?? "a zone",
         effect: "deleted" as const,
       })),
-      consequence: "Everything recorded about her goes to Trash with her, and can be restored.",
+      consequence: "Everything recorded about this animal goes to Trash with it, and can be restored.",
     });
 
     if (!confirmed) return;
@@ -504,7 +504,7 @@ export function HerdScreen({
               label="Name"
               value={draft.name}
               error={errors["name"]}
-              hint="What you call her. A tag number is enough if she has no name."
+              hint="What you call it. A tag number is enough on its own."
               onChange={(event) => setDraft({ ...draft, name: event.target.value })}
             />
             <TextInput

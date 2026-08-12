@@ -61,11 +61,26 @@ export function checkable(animals: readonly ExternalAnimal[]): ExternalAnimal[] 
 
 export function RefreshAllAncestors({
   animals,
+  ourRegistrations,
   propertyId,
   actorId,
   onDone,
 }: {
   readonly animals: readonly ExternalAnimal[];
+  /**
+   * The farm's own papered cattle, by registration.
+   *
+   * Not decoration. Digital Beef prints an animal's genetic tests on the
+   * charts of its *descendants*, so the flags for the sire and dam at the top
+   * of the tree — the two ancestors closest to this herd — are on the pages of
+   * the farm's own animals and nowhere else. Checking only the ancestors leaves
+   * exactly those two permanently untested.
+   */
+  readonly ourRegistrations: readonly {
+    readonly label: string;
+    readonly association: string;
+    readonly regNumber: string;
+  }[];
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
   readonly onDone: () => void;
@@ -80,6 +95,7 @@ export function RefreshAllAncestors({
   const { show } = useToast();
 
   const queue = checkable(animals);
+  const pages = queue.length + ourRegistrations.length;
   const [done, setDone] = useState(0);
   const [running, setRunning] = useState(false);
   const [stopped, setStopped] = useState(false);
@@ -180,6 +196,49 @@ export function RefreshAllAncestors({
       setAccepted(new Set(ticked));
     }
 
+    // The farm's own papered cattle last. Their pages are read purely for
+    // what the charts say about the ancestors above them — nothing on this
+    // screen edits an animal of ours.
+    for (const ours of ourRegistrations) {
+      const url = digitalBeefUrl(ours.association as never, ours.regNumber);
+      const parsed = url === undefined ? undefined : parseDigitalBeefUrl(url);
+      if (url === undefined || parsed === undefined || !parsed.ok) {
+        setDone((count) => count + 1);
+        continue;
+      }
+
+      try {
+        const response = await fetch("/api/import/digital-beef", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url, raw: true }),
+        });
+        const payload = (await response.json()) as { page?: string; error?: string };
+
+        if (!response.ok || payload.page === undefined) {
+          failed.push({
+            animal: { id: ours.label, name: ours.label } as ExternalAnimal,
+            reason: payload.error ?? "Could not read that page.",
+          });
+        } else {
+          const page = parseDigitalBeefPage(payload.page, parsed.ref);
+          for (const entry of pedigreeChanges(page, animals)) {
+            record(entry.animal, { association: ours.association, regNumber: ours.regNumber }, entry.changes);
+          }
+        }
+      } catch {
+        failed.push({
+          animal: { id: ours.label, name: ours.label } as ExternalAnimal,
+          reason: "Could not reach the server.",
+        });
+      }
+
+      setDone((count) => count + 1);
+      setFindings([...found]);
+      setFailures([...failed]);
+      setAccepted(new Set(ticked));
+    }
+
     setRunning(false);
     setStopped(true);
   }
@@ -246,15 +305,23 @@ export function RefreshAllAncestors({
           </p>
 
           {!running && !stopped ? (
-            <div>
-              <Button onClick={() => void run()}>Check all {queue.length}</Button>
-            </div>
+            <>
+              <p className="text-sm text-muted">
+                Defect results are read off the <em>pedigree charts</em>. Digital Beef never prints
+                an animal&apos;s own genetic tests on its own page — only beside it on the pages of
+                everything descended from it — so the farm&apos;s own animals are read too, because
+                their charts are the only place the sire and dam at the top of the tree appear.
+              </p>
+              <div>
+                <Button onClick={() => void run()}>Check all {pages} pages</Button>
+              </div>
+            </>
           ) : (
             <Meter
-              value={queue.length === 0 ? 0 : (done / queue.length) * 100}
+              value={pages === 0 ? 0 : (done / pages) * 100}
               tone="action"
               label={running ? "Reading the papers" : "Finished"}
-              detail={`${done} of ${queue.length} · ${findings.length} with something to say · ${failures.length} unreachable`}
+              detail={`${done} of ${pages} pages · ${findings.length} with something to say · ${failures.length} unreachable`}
             />
           )}
         </>

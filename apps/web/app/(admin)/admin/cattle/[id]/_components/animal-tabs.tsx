@@ -312,7 +312,7 @@ export function Pedigree({
         {!hasParents || tree === undefined ? (
           <EmptyState
             title="No pedigree recorded"
-            detail="Set her sire and dam below, and everything above them follows from the ancestors already on file."
+            detail="Set the sire and dam below, and everything above them follows from the ancestors already on file."
           />
         ) : (
           <div className="flex flex-col gap-density">
@@ -491,7 +491,7 @@ function Parents({
     for (const [role, ref] of Object.entries(next)) {
       if (ref !== undefined && wouldCreateCycle(self, ref, source)) {
         setError(
-          `${displayName(animal)} already appears above that animal, so it cannot also be her ${role}.`,
+          `${displayName(animal)} already appears above that animal, so it cannot also be the ${role}.`,
         );
         return;
       }
@@ -660,8 +660,8 @@ export function BreedingTab({
         title="Calvings"
         description={
           interval === undefined
-            ? "Her calving history."
-            : `${interval} days between her last two — the number that says whether she is holding a yearly interval.`
+            ? "The calving history."
+            : `${interval} days between the last two — the number that says whether a yearly interval is holding.`
         }
       >
         {herCalvings.length === 0 ? (
@@ -763,7 +763,7 @@ export function HealthTab({
           columns={columns}
           rows={hers}
           rowKey={(record) => record.id}
-          empty={<EmptyState title="Nothing recorded" detail="No treatments on file for her." />}
+          empty={<EmptyState title="Nothing recorded" detail="No treatments on file for this animal." />}
         />
       </Card>
     </Section>
@@ -866,7 +866,7 @@ export function FinanceTab({
   return (
     <Section
       title="Finance"
-      description="What she cost and what she brought."
+      description="What it cost and what it brought."
       actions={
         <Link
           href="/admin/cattle/sales"

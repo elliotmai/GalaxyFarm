@@ -228,7 +228,7 @@ export function GeneticsPanel({
 
       <Section
         title="Coat colour"
-        description="Two alleles per locus, off the test. Her own coat is not enough — a black cow can be ED/ED or ED/e, and out of a red bull those two throw entirely different calves."
+        description="Two alleles per locus, off the test. The coat alone is not enough — a black animal can be ED/ED or ED/e, and out of a red mate those two throw entirely different calves."
       >
         <Card>
           <div className="flex flex-col gap-density">
@@ -279,7 +279,7 @@ export function GeneticsPanel({
                 {roan === undefined ? null : <Pill tone="identity">{writeRoan(roan)}</Pill>}
                 {extension !== undefined && roan !== undefined ? (
                   <span>
-                    which makes her <strong>{coatName(extension, roan)}</strong>
+                    which makes it <strong>{coatName(extension, roan)}</strong>
                   </span>
                 ) : (
                   <span className="text-muted">

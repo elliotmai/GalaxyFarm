@@ -31,6 +31,7 @@ export * from "./domain/med-inventory.js";
 export * from "./domain/pedigree.js";
 export * from "./domain/processing-record.js";
 export * from "./domain/refresh.js";
+export * from "./domain/registration-rules.js";
 export * from "./domain/risks.js";
 export * from "./domain/profit-and-loss.js";
 export * from "./domain/semen-inventory.js";

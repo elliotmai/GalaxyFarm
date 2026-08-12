@@ -317,7 +317,7 @@ function SalesTab({
       // derived value here with a legal edge on it, and a screen that let
       // somebody save straight past it would make the flag decorative.
       setError(
-        `${chosen === undefined ? "That animal" : displayName(chosen)} is under withdrawal and is not clear for slaughter. To sell her anyway, tick the override and say why.`,
+        `${chosen === undefined ? "That animal" : displayName(chosen)} is under withdrawal and is not clear for slaughter. To sell it anyway, tick the override and say why.`,
       );
       return;
     }
@@ -474,11 +474,11 @@ function SalesTab({
             >
               <div className="flex flex-col gap-density pt-2">
                 <p>
-                  She must not enter the food chain before that date. A sale to another producer is
+                  It must not enter the food chain before that date. A sale to another producer is
                   a different matter — if that is what this is, say so and it goes on the record.
                 </p>
                 <Checkbox
-                  label="Sell her anyway"
+                  label="Sell it anyway"
                   checked={override}
                   onChange={(event) => setOverride(event.target.checked)}
                 />
@@ -934,7 +934,7 @@ function ProcessingTab({
             >
               <div className="flex flex-col gap-density pt-2">
                 <p>
-                  Delivering her to a processor before that date puts her in the food chain inside a
+                  Delivering it to a processor before that date puts it in the food chain inside a
                   withdrawal period. That is a residue violation, not a paperwork problem.
                 </p>
                 <TextInput

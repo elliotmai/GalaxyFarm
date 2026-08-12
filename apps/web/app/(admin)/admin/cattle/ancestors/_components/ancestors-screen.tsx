@@ -236,6 +236,24 @@ export function AncestorsScreen({
   const unplaced = shown.filter((animal) => sexes.get(animal.id)?.sex === undefined);
   const conflicted = outsiders.filter((animal) => sexes.get(animal.id)?.conflict === true);
 
+  /**
+   * The farm's own papered cattle.
+   *
+   * Their association pages are what carry the defect results of the sire and
+   * dam sitting at the top of the ancestor tree — Digital Beef prints an
+   * animal's genetic tests on its descendants' charts, never on its own page.
+   */
+  const ourRegistrations = useMemo(() => {
+    const named = new Map(animals.map((entry) => [entry.id, displayName(entry)]));
+    return profiles.flatMap((profile) =>
+      profile.registrations.map((registration) => ({
+        label: named.get(profile.animalId) ?? "an animal here",
+        association: registration.association,
+        regNumber: registration.regNumber,
+      })),
+    );
+  }, [animals, profiles]);
+
   function startCreate() {
     setEditing(undefined);
     setDraft(BLANK);
@@ -606,6 +624,7 @@ export function AncestorsScreen({
         >
           <RefreshAllAncestors
             animals={outsiders}
+            ourRegistrations={ourRegistrations}
             propertyId={propertyId}
             actorId={actorId}
             onDone={() => setCheckingAll(false)}
@@ -618,7 +637,7 @@ export function AncestorsScreen({
           key={merging.id}
           size="wide"
           title={`Merge another record into ${merging.name}`}
-          description="For when one animal was imported from two associations before anything could join them — two records, two numbers, half her descendants on each."
+          description="For when one animal was imported from two associations before anything could join them — two records, two numbers, half the descendants on each."
           onClose={() => setMerging(undefined)}
         >
           <MergeAncestors

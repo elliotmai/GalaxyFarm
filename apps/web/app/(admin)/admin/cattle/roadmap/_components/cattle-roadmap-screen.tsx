@@ -257,7 +257,7 @@ export function CattleRoadmapScreen({
         {plans.length === 0 ? (
           <EmptyState
             title="Nothing planned"
-            detail="A plan carries the sire you chose and why. When you breed her, it becomes the record in one tap."
+            detail="A plan carries the sire you chose and why. When the breeding happens, it becomes the record in one tap."
           />
         ) : (
           <CardGrid columns={2}>

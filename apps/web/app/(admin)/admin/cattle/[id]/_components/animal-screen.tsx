@@ -194,7 +194,7 @@ export function AnimalScreen({
         subtitle={
           breeding.composition.length === 0
             ? undefined
-            : `${describeComposition(breeding.composition)}${breeding.source === "parents" ? " (from her parents)" : ""}`
+            : `${describeComposition(breeding.composition)}${breeding.source === "parents" ? " (from its parents)" : ""}`
         }
         meta={
           <>
@@ -410,7 +410,7 @@ function Overview({
 
       <Section
         title="Handling"
-        description="What anyone working around her needs to know before they open a gate."
+        description="What anyone working around this animal needs to know before they open a gate."
       >
         <DetailList
           columns={1}
@@ -653,7 +653,7 @@ function Registrations({
             />
             <TextInput
               label="Registered name"
-              hint="As it reads on the certificate, if that differs from her barn name."
+              hint="As it reads on the certificate, if that differs from the barn name."
               value={registeredName}
               onChange={(event) => setRegisteredName(event.target.value)}
             />
@@ -769,7 +769,7 @@ function Description({
   return (
     <Section
       title="Description"
-      description="How you pick her out of a pen of eleven that look like her."
+      description="How you pick this one out of a pen of eleven that look the same."
     >
       <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
         <div className="grid grid-cols-1 gap-density sm:grid-cols-2">

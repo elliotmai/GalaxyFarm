@@ -296,7 +296,7 @@ export function CattleCandidatesScreen({
               empty={
                 <EmptyState
                   title="Nothing under consideration"
-                  detail="Add a heifer or a show prospect above. Hauling and commission go on the record, so the comparison is on what she would really cost."
+                  detail="Add a heifer or a show prospect above. Hauling and commission go on the record, so the comparison is on what it would really cost."
                 />
               }
             />

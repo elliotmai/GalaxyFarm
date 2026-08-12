@@ -28,6 +28,7 @@ import {
   HOUSE_RULE_DEFECTS,
   isKnownFree,
   pedigreeDepth,
+  registrationClasses,
   resolveCompositionFor,
   statusOf,
   STATUS_LABELS,
@@ -45,9 +46,14 @@ import { compositionLookup } from "@/lib/composition";
  * Everything known about one ancestor, in one place (spec §5.2).
  *
  * The list is a list: it answers "which one is that" and nothing else. This
- * answers the questions somebody actually opens an ancestor for — what is she,
- * what did she test, who is behind her, and who here came out of her — without
+ * answers the questions somebody actually opens an ancestor for — what it is,
+ * what it tested, what is behind it, and what here came out of it — without
  * needing four screens or an edit form to read a value out of.
+ *
+ * Written without "she" throughout, and that is not fussiness: half the
+ * animals on this screen are bulls. A pedigree is the one place where every
+ * record is as likely to be a bull as a cow, and a screen that calls a
+ * herd sire "her" reads as one nobody checked.
  *
  * Two things make it worth having rather than a wider table.
  *
@@ -147,6 +153,7 @@ export function AncestorDetail({
 
   const tests = animal.geneticTests ?? [];
   const house = herdRuleVerdict(tests);
+  const eligibility = registrationClasses(breeding.composition);
 
   return (
     <div className="flex flex-col gap-density">
@@ -210,7 +217,7 @@ export function AncestorDetail({
         </Callout>
       )}
 
-      <Section title="What she is" description="Off the papers, or worked out from what is.">
+      <Section title="What it is" description="Off the papers, or worked out from what is.">
         <DetailList
           columns={3}
           items={[
@@ -238,9 +245,49 @@ export function AncestorDetail({
               value: describeCompositionSource(breeding),
               wide: true,
             },
+            {
+              // A makeup is a number; what it *buys* at the registry is the
+              // thing that decides whether a calf can be papered, and that is
+              // most of what a makeup is worth.
+              label: "Could be registered as",
+              value:
+                eligibility.classes.length === 0
+                  ? undefined
+                  : eligibility.classes.map((entry) => entry.name).join(" · "),
+              wide: true,
+            },
             { label: "Notes", value: animal.notes, wide: true },
           ]}
         />
+
+        {eligibility.classes.length === 0 && eligibility.unknownRules === undefined ? null : (
+          <Card>
+            <div className="flex flex-col gap-2">
+              {eligibility.classes.map((entry) => (
+                <div key={`${entry.association}-${entry.name}`} className="flex flex-col gap-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Pill tone="identity">{entry.association}</Pill>
+                    <span className="text-density font-medium text-ink">{entry.name}</span>
+                  </span>
+                  <span className="text-sm text-muted">{entry.because}</span>
+                  {entry.alsoRequires === undefined ? null : (
+                    // Colour, poll and registered parentage are conditions no
+                    // percentage can answer. Listed rather than assumed, so
+                    // nobody quotes a class the animal does not hold.
+                    <ul className="flex flex-col gap-0.5 text-sm text-muted">
+                      {entry.alsoRequires.map((condition) => (
+                        <li key={condition}>· also needs: {condition}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+              {eligibility.unknownRules === undefined ? null : (
+                <p className="text-sm text-muted">{eligibility.unknownRules}</p>
+              )}
+            </div>
+          </Card>
+        )}
       </Section>
 
       <Section
@@ -284,7 +331,7 @@ export function AncestorDetail({
         </Card>
       </Section>
 
-      <Section title="Behind her" description="Click any of them to follow the line up.">
+      <Section title="Behind it" description="Click any of them to follow the line up.">
         <div className="flex flex-wrap gap-2">
           {(["sire", "dam"] as const).map((which) => {
             const parent = parentOf(which);
@@ -309,8 +356,8 @@ export function AncestorDetail({
 
         {tree === undefined || depth === 0 ? (
           <EmptyState
-            title="Nothing behind her yet"
-            detail="Set her sire and dam and everything above them follows from the ancestors already on file. Importing her association page fills in four generations at once."
+            title="Nothing behind it yet"
+            detail="Set its sire and dam and everything above them follows from the ancestors already on file. Importing the association page fills in four generations at once."
           />
         ) : (
           <Constellation
@@ -322,13 +369,13 @@ export function AncestorDetail({
       </Section>
 
       <Section
-        title="Out of her"
+        title="Out of it"
         description="Everything on file that names this animal as a parent."
       >
         {descendants.length === 0 ? (
           <EmptyState
-            title="Nothing points at her"
-            detail="No pedigree names this animal, which also means she can be deleted without breaking anything."
+            title="Nothing points at it"
+            detail="No pedigree names this animal, which also means it can be deleted without breaking anything."
           />
         ) : (
           <Card>

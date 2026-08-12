@@ -132,7 +132,7 @@ export function RisksScreen({ propertyId }: { readonly propertyId: Ulid }) {
         <>
           <Section
             title="By animal"
-            description="One cow's findings read together, because that is how a decision gets made about her."
+            description="One animal's findings read together, because that is how a decision gets made about it."
           >
             <CardGrid columns={2}>
               {flagged.map(({ animalId, risks }) => {
