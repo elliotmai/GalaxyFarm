@@ -81,7 +81,7 @@ export type LocalStoreName = (typeof LOCAL_STORES)[number];
  *     genetic plan.
  * 8 — the feed catalogue, so a plan's lines can name what they feed (§5.3).
  */
-export const LOCAL_SCHEMA_VERSION = 10;
+export const LOCAL_SCHEMA_VERSION = 11;
 
 /**
  * Which fields each entity's search box looks at.

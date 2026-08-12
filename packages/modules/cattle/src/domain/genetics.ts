@@ -29,14 +29,18 @@ import { z } from "zod";
  * DS — developmental duplication, the polymelia gene, mostly Angus but it
  * crosses in. The rest are the other recessives a commercial bull might carry.
  */
-export const GENETIC_DEFECTS = ["TH", "PHA", "DS", "NH", "AM", "CA", "OS", "MSUD"] as const;
+export const GENETIC_DEFECTS = ["TH", "PHA", "DS", "DD", "NH", "AM", "CA", "OS", "MSUD"] as const;
 export type GeneticDefect = (typeof GENETIC_DEFECTS)[number];
 
 /** What each abbreviation is, for a screen that should not assume anyone knows. */
 export const DEFECT_NAMES: Record<GeneticDefect, string> = {
   TH: "Tibial hemimelia",
   PHA: "Pulmonary hypoplasia with anasarca",
-  DS: "Developmental duplication",
+  // Two codes, one condition as far as anyone here is concerned — but they are
+  // kept apart because a hair card says one or the other, and merging them
+  // would let a "DS free" result silently answer for a DD the lab never ran.
+  DS: "Developmental duplication — Shorthorn's code",
+  DD: "Developmental duplication — Chianina and Angus's code",
   NH: "Neuropathic hydrocephalus",
   AM: "Arthrogryposis multiplex",
   CA: "Contractural arachnodactyly",
@@ -64,11 +68,39 @@ export const HOUSE_RULE_DEFECTS: readonly GeneticDefect[] = ["TH", "PHA", "DS"];
 export const DEFECT_STATUSES = [
   "free",
   "free_by_parentage",
+  "suspect",
   "carrier",
   "affected",
   "untested",
 ] as const;
 export type DefectStatus = (typeof DEFECT_STATUSES)[number];
+
+/** How each status reads to somebody who has not memorised the vocabulary. */
+export const STATUS_LABELS: Record<DefectStatus, string> = {
+  free: "Free — tested",
+  free_by_parentage: "Free by parentage",
+  suspect: "Possible carrier — not tested",
+  carrier: "Carrier",
+  affected: "Affected",
+  untested: "Untested",
+};
+
+/**
+ * Known not to have it.
+ *
+ * The one predicate the house rule turns on, and it is written as a whitelist
+ * on purpose. Asking "is it untested?" instead lets every status nobody
+ * thought about — `suspect`, and whatever the associations invent next — fall
+ * through as clean, which is precisely how a carrier gets bought.
+ */
+export function isKnownFree(status: DefectStatus): boolean {
+  return status === "free" || status === "free_by_parentage";
+}
+
+/** Neither a clean result nor a known carrier — the answer is "we don't know". */
+export function unresolved(status: DefectStatus): boolean {
+  return status === "untested" || status === "suspect";
+}
 
 export interface GeneticTest {
   readonly defect: GeneticDefect;
@@ -130,7 +162,14 @@ export function herdRuleVerdict(
   required: readonly GeneticDefect[] = HOUSE_RULE_DEFECTS,
 ): HerdRuleVerdict {
   const carried = required.filter((defect) => carries(statusOf(tests, defect)));
-  const untested = untestedDefects(tests, required);
+  // Everything that is not a clean result and not a carrier: untested, and the
+  // association's "possible carrier" — an animal with a tested carrier close
+  // behind it. Both mean the same thing to the person deciding: send a hair
+  // card before this one comes onto the place.
+  const untested = required.filter((defect) => {
+    const status = statusOf(tests, defect);
+    return !isKnownFree(status) && !carries(status);
+  });
   return { clean: carried.length === 0 && untested.length === 0, carried, untested };
 }
 
@@ -179,7 +218,10 @@ export function matingDefectRisk(
         affectedChance: fromSire * fromDam,
         // Either side passing it, less the overlap where both do.
         carrierChance: fromSire + fromDam - fromSire * fromDam,
-        uncertain: sire === "untested" || dam === "untested",
+        // Not "somebody skipped the test" — "the number below is a floor".
+        // Carrier × carrier is certain at a quarter; carrier × *unknown* is
+        // not, and neither is unknown × unknown.
+        uncertain: unresolved(sire) || unresolved(dam),
       };
     })
     .filter((risk) => risk.affectedChance > 0 || risk.carrierChance > 0 || risk.uncertain);

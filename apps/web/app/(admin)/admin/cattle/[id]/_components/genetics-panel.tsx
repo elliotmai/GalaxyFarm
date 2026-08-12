@@ -9,6 +9,7 @@ import {
   coatName,
   DEFECT_NAMES,
   DEFECT_STATUSES,
+  STATUS_LABELS,
   EXTENSION_ALLELES,
   GENETIC_DEFECTS,
   herdRuleVerdict,
@@ -39,9 +40,14 @@ import { useMutations } from "@/lib/local/mutations";
  * missing. The whole grid, always, is what makes an absent result visible.
  */
 
-const STATUS_TONE: Record<DefectStatus, "calm" | "danger" | "neutral"> = {
+const STATUS_TONE: Record<DefectStatus, "calm" | "danger" | "neutral" | "action"> = {
   free: "calm",
   free_by_parentage: "calm",
+  // Not neutral. "Possible carrier" is what the associations print against an
+  // animal with a tested carrier close behind it, and under a rule that no
+  // carrier comes onto the place it is a reason to send a hair card, not a
+  // shrug.
+  suspect: "action",
   carrier: "danger",
   affected: "danger",
   untested: "neutral",
@@ -209,7 +215,7 @@ export function GeneticsPanel({
                     disabled={busy}
                     options={DEFECT_STATUSES.map((value) => ({
                       value,
-                      label: value.replace(/_/g, " "),
+                      label: STATUS_LABELS[value],
                     }))}
                     onChange={(event) => void setStatus(defect, event.target.value as DefectStatus)}
                   />

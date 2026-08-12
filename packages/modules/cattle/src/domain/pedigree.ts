@@ -3,6 +3,27 @@ import { z } from "zod";
 import { baseRecordSchema, type BaseRecord } from "@galaxy-farm/core";
 
 import { parentRefSchema, type ParentRef } from "./cattle-profile.js";
+import { geneticTestSchema, type GeneticTest } from "./genetics.js";
+
+/**
+ * A registration number reduced to what can be compared.
+ *
+ * Shorthorn prints one animal's number as `*s4219133` on her own page and
+ * `*x4157771` in a pedigree, while the URL that reached the page says
+ * `4219133`. The `*` and the lowercase letters are that registry's flags for
+ * how the entry is recorded, not part of the number.
+ *
+ * Uppercase letters *are* part of it and stay: `MA364424`, `CA240047` and
+ * `AR30478` are different series, and `240047` under Chianina is a different
+ * animal from `CA240047` under Maine-Anjou. Stripping every letter would merge
+ * those two, which is the opposite mistake and a worse one.
+ */
+export function normaliseRegistration(value: string): string {
+  return value
+    .replace(/[^0-9A-Za-z]/g, "")
+    .replace(/^[a-z]+/, "")
+    .toUpperCase();
+}
 
 /**
  * Pedigree, on-farm and off (spec §5.2).
@@ -15,23 +36,82 @@ import { parentRefSchema, type ParentRef } from "./cattle-profile.js";
  * pretending those animals are here.
  */
 
+/** One registry's number for an animal. */
+export interface ExternalRegistration {
+  readonly association: string;
+  readonly regNumber: string;
+}
+
 export interface ExternalAnimal extends BaseRecord {
   readonly name: string;
+  /** The number shown first. One of `registrations`, or the only one there is. */
   readonly regNumber?: string | undefined;
   readonly association?: string | undefined;
+  /**
+   * Every registry this animal is recorded in.
+   *
+   * A bull registered with both Maine-Anjou and Chianina has a different
+   * number in each. His Maine-Anjou pedigree prints his dam's Maine-Anjou
+   * number and his Chianina pedigree prints her Chianina one — so importing
+   * both pages against a single `regNumber` made two copies of one cow, each
+   * holding half her descendants and neither showing the whole line.
+   */
+  readonly registrations?: readonly ExternalRegistration[] | undefined;
+  readonly tattoo?: string | undefined;
+  readonly dob?: Date | undefined;
+  readonly colour?: string | undefined;
+  readonly breeder?: string | undefined;
+  /** Defect flags as the association printed them. */
+  readonly geneticTests?: readonly GeneticTest[] | undefined;
   readonly sire?: ParentRef | undefined;
   readonly dam?: ParentRef | undefined;
   readonly notes?: string | undefined;
 }
 
+export const externalRegistrationSchema = z.object({
+  association: z.string().min(1).max(40),
+  regNumber: z.string().min(1).max(60),
+});
+
 export const externalAnimalSchema = baseRecordSchema.extend({
   name: z.string().min(1, "An ancestor needs a name").max(160),
   regNumber: z.string().max(60).optional(),
   association: z.string().max(40).optional(),
+  registrations: z.array(externalRegistrationSchema).max(8).optional(),
+  tattoo: z.string().max(40).optional(),
+  dob: z.coerce.date().optional(),
+  colour: z.string().max(120).optional(),
+  breeder: z.string().max(160).optional(),
+  geneticTests: z.array(geneticTestSchema).optional(),
   sire: parentRefSchema.optional(),
   dam: parentRefSchema.optional(),
   notes: z.string().max(2000).optional(),
 }) as unknown as z.ZodType<ExternalAnimal>;
+
+/**
+ * Every number this animal is known by, old records included.
+ *
+ * Records written before `registrations` existed carry a single
+ * `regNumber`/`association` pair, and a lookup that only reads the array would
+ * stop finding them. One accessor, so nothing has to remember that.
+ */
+export function allRegistrations(
+  animal: Pick<ExternalAnimal, "regNumber" | "association" | "registrations">,
+): ExternalRegistration[] {
+  const found = new Map<string, ExternalRegistration>();
+
+  if (animal.regNumber !== undefined && animal.regNumber !== "") {
+    found.set(`${animal.association ?? "other"}:${normaliseRegistration(animal.regNumber)}`, {
+      association: animal.association ?? "other",
+      regNumber: animal.regNumber,
+    });
+  }
+  for (const entry of animal.registrations ?? []) {
+    found.set(`${entry.association}:${normaliseRegistration(entry.regNumber)}`, entry);
+  }
+
+  return [...found.values()];
+}
 
 /** One node of the tree, whichever side of the fence it came from. */
 export interface PedigreeNode {

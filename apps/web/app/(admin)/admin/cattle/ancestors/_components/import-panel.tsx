@@ -15,11 +15,16 @@ import {
 } from "@galaxy-farm/ui";
 import type { Ulid } from "@galaxy-farm/core";
 import {
+  allRegistrations,
   externalAnimalSchema,
+  mergeRegistration,
   parseDigitalBeefPage,
   parseDigitalBeefUrl,
-  type ImportedAnimal,
+  planImport,
   type ExternalAnimal,
+  type ImportedAnimal,
+  type ImportPlan,
+  type ImportRow,
   type ParentRef,
 } from "@galaxy-farm/module-cattle";
 
@@ -32,13 +37,14 @@ import { useMutations } from "@/lib/local/mutations";
  *
  * **By address**: the server fetches the page, because a browser cannot reach
  * digitalbeef.com from this origin and no CORS header is coming. That works
- * when the association's host will talk to a datacenter IP, and plenty do not.
+ * when the association's host will talk to a datacenter IP, and at least one
+ * of the three will not.
  *
  * **By paste**: open the page yourself, select all, paste it here. This works
  * regardless of what the host thinks of our server, and it works behind a
  * login. It is the path to use when the first one fails, and it is worth
- * knowing about *before* it fails, which is why both are on the screen at
- * once rather than one appearing after the other errors.
+ * knowing about *before* it fails, which is why both are on the screen at once
+ * rather than one appearing after the other errors.
  *
  * Everything lands in a preview first. This parses a page built for a person
  * to look at; it will be wrong the day the template changes, and being wrong
@@ -67,7 +73,45 @@ export function DigitalBeefImport({
   const [html, setHtml] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
-  const [preview, setPreview] = useState<ImportedAnimal | undefined>();
+  const [preview, setPreview] = useState<{ animal: ImportedAnimal; plan: ImportPlan } | undefined>();
+  /** Which proposed merges the person has agreed to. Certain ones are not asked. */
+  const [merging, setMerging] = useState<ReadonlySet<string>>(new Set());
+
+  /**
+   * Slot → record, for the animal this page is about, if it is already here.
+   *
+   * This is what lets a Chianina page join onto a Maine-Anjou one. The two
+   * registries number the same cow differently, so nothing about the numbers
+   * connects them — but both charts put her in the same slot.
+   */
+  function pedigreeOf(subject: ExternalAnimal): ReadonlyMap<string, ExternalAnimal> {
+    const byId = new Map(existing.map((animal) => [animal.id, animal]));
+    const slots = new Map<string, ExternalAnimal>();
+
+    const walk = (animal: ExternalAnimal, path: string, depth: number) => {
+      if (depth > 4) return;
+      for (const [ref, side] of [
+        [animal.sire, "sire"],
+        [animal.dam, "dam"],
+      ] as const) {
+        if (ref === undefined) continue;
+        const parent = byId.get(ref.id);
+        if (parent === undefined) continue;
+        const position = path === "" ? side : `${path}'s ${side}`;
+        slots.set(position, parent);
+        walk(parent, position, depth + 1);
+      }
+    };
+
+    walk(subject, "", 1);
+    return slots;
+  }
+
+  function show_(animal: ImportedAnimal) {
+    const plan = planImport(animal, existing, pedigreeOf);
+    setPreview({ animal, plan });
+    setMerging(new Set());
+  }
 
   async function fetchByUrl() {
     setError(undefined);
@@ -92,7 +136,7 @@ export function DigitalBeefImport({
         setError(payload.error ?? "Could not read that page.");
         return;
       }
-      setPreview(payload.animal);
+      show_(payload.animal);
     } catch {
       setError("Could not reach the server. Try pasting the page instead.");
     } finally {
@@ -116,95 +160,106 @@ export function DigitalBeefImport({
       return;
     }
 
-    setPreview(parseDigitalBeefPage(html, parsed.ref));
+    show_(parseDigitalBeefPage(html, parsed.ref));
   }
 
   /**
-   * Write the animal and its ancestors.
+   * Write the animals, then wire the parents.
    *
-   * Ids are minted here and the parents wired in a second pass, because an
-   * ancestor's sire is another ancestor that may not exist yet. Anything
-   * already on file under the same registration number is left alone rather
-   * than duplicated — importing the same bull twice is the likeliest mistake
-   * on this screen, since he is the sire of half the herd.
+   * Two passes, because an ancestor's sire is another ancestor that may not
+   * exist yet. Anything recognised as already here is left alone — with its
+   * new registry number folded in when this page brought one.
    */
-  async function commit(animal: ImportedAnimal) {
+  async function commit(animal: ImportedAnimal, plan: ImportPlan) {
     setBusy(true);
     try {
-      const byReg = new Map(
-        existing
-          .filter((entry) => entry.regNumber !== undefined)
-          .map((entry) => [entry.regNumber as string, entry.id]),
-      );
+      const byId = new Map(existing.map((entry) => [entry.id, entry]));
+      /** Import row key → the record it ended up as. */
+      const resolved = new Map<string, Ulid>();
+      let created = 0;
+      let merged = 0;
+      let known = 0;
 
-      const minted = new Map<string, Ulid>();
-      const created: string[] = [];
-      let skipped = 0;
+      for (const row of plan.rows) {
+        const match = row.match;
+        const agreed = match !== undefined && (match.confidence === "certain" || merging.has(row.key));
 
-      const rows = [
-        {
-          name: animal.name ?? `${animal.association} ${animal.registration}`,
-          regNumber: animal.registration,
-          position: "subject",
-        },
-        ...animal.ancestors.map((ancestor) => ({
-          name: ancestor.name ?? "Unnamed",
-          regNumber: ancestor.regNumber,
-          position: ancestor.position,
-        })),
-      ];
+        if (agreed) {
+          resolved.set(row.key, match.existingId);
+          const record = byId.get(match.existingId);
+          const patch =
+            record === undefined || match.addsRegistration === undefined
+              ? undefined
+              : mergeRegistration(record, match.addsRegistration);
 
-      for (const row of rows) {
-        const key = row.regNumber ?? `name:${row.name}`;
-        if (row.regNumber !== undefined && byReg.has(row.regNumber)) {
-          minted.set(key, byReg.get(row.regNumber) as Ulid);
-          skipped += 1;
+          if (patch === undefined) {
+            known += 1;
+          } else {
+            await api.update(match.existingId, patch);
+            merged += 1;
+          }
           continue;
         }
-        if (minted.has(key)) continue;
 
+        const ancestor = row.ancestor;
         const result = await api.create({
           name: row.name,
           ...(row.regNumber === undefined ? {} : { regNumber: row.regNumber }),
-          association: animal.association,
-          notes: `Imported from ${animal.association} · ${row.position}`,
+          association: row.association,
+          ...(row.regNumber === undefined
+            ? {}
+            : { registrations: [{ association: row.association, regNumber: row.regNumber }] }),
+          ...(ancestor?.tattoo === undefined ? {} : { tattoo: ancestor.tattoo }),
+          ...(ancestor?.colour === undefined ? {} : { colour: ancestor.colour }),
+          ...(ancestor?.breeder === undefined ? {} : { breeder: ancestor.breeder }),
+          ...(ancestor?.dob === undefined || Number.isNaN(new Date(ancestor.dob).getTime())
+            ? {}
+            : { dob: new Date(ancestor.dob) }),
+          ...(ancestor === undefined || ancestor.geneticTests.length === 0
+            ? {}
+            : { geneticTests: ancestor.geneticTests }),
+          notes: `Imported from ${animal.association}${row.position === undefined ? "" : ` · ${row.position}`}`,
         } as never);
 
         if (!result.ok) {
           setError(`Could not save ${row.name}.`);
           return;
         }
-        minted.set(key, result.value.id);
-        created.push(row.name);
+        resolved.set(row.key, result.value.id);
+        created += 1;
       }
 
-      // Second pass: the sire and dam of the subject, which are the only two
-      // relationships a three-generation chart pins down without ambiguity.
-      // Grandparents are positional and get wired by hand — guessing wrong
-      // there puts a bull on the wrong side of a pedigree.
-      const subjectId = minted.get(animal.registration);
-      const sire = animal.ancestors.find((entry) => entry.position === "sire");
-      const dam = animal.ancestors.find((entry) => entry.position === "dam");
+      // Second pass. Every placed slot names its own parents by construction —
+      // `sire's dam` is the dam of `sire` — so the whole chart wires up, not
+      // just the two parents the old version could be sure of.
+      for (const row of plan.rows) {
+        const id = resolved.get(row.key);
+        if (id === undefined) continue;
 
-      const refOf = (entry: typeof sire): ParentRef | undefined => {
-        if (entry === undefined) return undefined;
-        const id = minted.get(entry.regNumber ?? `name:${entry.name ?? "Unnamed"}`);
-        return id === undefined ? undefined : { kind: "external", id };
-      };
+        const base = row.position ?? "";
+        const sire = resolved.get(base === "" ? "sire" : `${base}'s sire`);
+        const dam = resolved.get(base === "" ? "dam" : `${base}'s dam`);
+        const ref = (value: Ulid | undefined): ParentRef | undefined =>
+          value === undefined ? undefined : { kind: "external", id: value };
 
-      if (subjectId !== undefined) {
-        const sireRef = refOf(sire);
-        const damRef = refOf(dam);
-        if (sireRef !== undefined || damRef !== undefined) {
-          await api.update(subjectId, {
-            ...(sireRef === undefined ? {} : { sire: sireRef }),
-            ...(damRef === undefined ? {} : { dam: damRef }),
-          } as Partial<ExternalAnimal>);
-        }
+        const sireRef = ref(sire);
+        const damRef = ref(dam);
+        if (sireRef === undefined && damRef === undefined) continue;
+
+        await api.update(id, {
+          ...(sireRef === undefined ? {} : { sire: sireRef }),
+          ...(damRef === undefined ? {} : { dam: damRef }),
+        } as Partial<ExternalAnimal>);
       }
 
       show({
-        message: `${created.length} added${skipped > 0 ? `, ${skipped} already on file` : ""}`,
+        message: [
+          `${created} added`,
+          merged > 0 ? `${merged} gained a second registration` : undefined,
+          known > 0 ? `${known} already on file` : undefined,
+        ]
+          .filter((part) => part !== undefined)
+          .join(", "),
         tone: "success",
       });
       setPreview(undefined);
@@ -242,9 +297,10 @@ export function DigitalBeefImport({
             </summary>
             <div className="flex flex-col gap-density pt-density">
               <p className="text-sm text-muted">
-                Open the animal's page in a browser, select the whole page and copy it, then paste
-                it here. This works behind a login and regardless of what the association's host
-                thinks of our server.
+                Open the animal&apos;s page in a browser, select the whole page and copy it, then
+                paste it here. This works behind a login and regardless of what the association&apos;s
+                host thinks of our server. Paste it as it comes — the blank rows in the pedigree
+                chart are what say which ancestors are missing, so do not tidy it up.
               </p>
               <TextArea
                 label="The page"
@@ -270,9 +326,21 @@ export function DigitalBeefImport({
 
       {preview === undefined ? null : (
         <Preview
-          animal={preview}
+          animal={preview.animal}
+          plan={preview.plan}
+          merging={merging}
+          onToggleMerge={(key) =>
+            setMerging((current) => {
+              const next = new Set(current);
+              // crud-guard: allow-unconfirmed — unticking a checkbox in an unsaved preview
+              if (next.has(key)) next.delete(key);
+              else next.add(key);
+              return next;
+            })
+          }
+          existing={existing}
           busy={busy}
-          onSave={() => void commit(preview)}
+          onSave={() => void commit(preview.animal, preview.plan)}
           onDiscard={() => setPreview(undefined)}
         />
       )}
@@ -282,16 +350,27 @@ export function DigitalBeefImport({
 
 function Preview({
   animal,
+  plan,
+  merging,
+  onToggleMerge,
+  existing,
   busy,
   onSave,
   onDiscard,
 }: {
   readonly animal: ImportedAnimal;
+  readonly plan: ImportPlan;
+  readonly merging: ReadonlySet<string>;
+  readonly onToggleMerge: (key: string) => void;
+  readonly existing: readonly ExternalAnimal[];
   readonly busy: boolean;
   readonly onSave: () => void;
   readonly onDiscard: () => void;
 }) {
-  const nothingRead = animal.ancestors.length === 0 && animal.name === undefined;
+  const nothingRead = plan.rows.length <= 1 && animal.name === undefined;
+  const proposed = plan.rows.filter(
+    (row) => row.match !== undefined && row.match.confidence !== "certain",
+  );
 
   return (
     <Card title="What it read">
@@ -320,6 +399,13 @@ function Preview({
             { label: "Born", value: animal.dob },
             { label: "Colour", value: animal.colour },
             { label: "Horns", value: animal.hornStatus },
+            { label: "Status", value: animal.status },
+            { label: "Disposed", value: animal.disposedOn },
+            { label: "Bred by", value: animal.breeder },
+            {
+              label: "Inbreeding (their figure)",
+              value: animal.coi === undefined ? undefined : `${animal.coi}%`,
+            },
             {
               label: "Breeding",
               value:
@@ -333,26 +419,44 @@ function Preview({
           ]}
         />
 
-        {animal.ancestors.length === 0 ? null : (
+        {proposed.length === 0 ? null : (
+          <Callout
+            tone="action"
+            title={`${proposed.length} of these may already be on file under another registry`}
+          >
+            One animal registered with two associations has two numbers, and neither page mentions
+            the other. Tick the ones to join up — the second number gets added to the record that is
+            already here. Leave one unticked and it comes in as a separate animal, which is the
+            safer mistake: a duplicate is visible and can be merged later, a wrong join is not.
+          </Callout>
+        )}
+
+        <div className="flex flex-col gap-2">
+          <h3 className="text-density font-medium text-ink">
+            Pedigree — {plan.rows.length - 1} ancestors
+          </h3>
+          {plan.rows.map((row) => (
+            <Row
+              key={row.key}
+              row={row}
+              existing={existing}
+              ticked={merging.has(row.key)}
+              onToggle={() => onToggleMerge(row.key)}
+            />
+          ))}
+        </div>
+
+        {plan.unplaced.length === 0 ? null : (
           <div className="flex flex-col gap-2">
-            <h3 className="text-density font-medium text-ink">Pedigree</h3>
-            {animal.ancestors.map((ancestor) => (
-              <div
-                key={`${ancestor.position}-${ancestor.regNumber ?? ancestor.name}`}
-                className="flex flex-wrap items-center justify-between gap-2 border-t border-edge pt-2"
-              >
-                <span className="text-density text-ink">{ancestor.name ?? "Unnamed"}</span>
-                <span className="flex flex-wrap gap-2">
-                  {ancestor.regNumber === undefined ? null : <Pill>{ancestor.regNumber}</Pill>}
-                  <Pill tone="identity">{ancestor.position}</Pill>
-                </span>
-              </div>
+            <Callout tone="action" title={`${plan.unplaced.length} could not be placed on the chart`}>
+              The chart had gaps that could not be accounted for, so where these sit is unknown.
+              They are still worth saving — but their position has to be set by hand, because
+              guessing puts a bull on the wrong side of a pedigree and every relatedness figure
+              worked out afterwards is quietly wrong.
+            </Callout>
+            {plan.unplaced.map((row) => (
+              <Row key={row.key} row={row} existing={existing} ticked={false} />
             ))}
-            <p className="text-sm text-muted">
-              The sire and the dam get wired to this animal. Grandparents are saved as ancestors and
-              left for you to place — their position on a chart is inferred from order, and guessing
-              wrong puts a bull on the wrong side of a pedigree.
-            </p>
           </div>
         )}
 
@@ -366,5 +470,62 @@ function Preview({
         </div>
       </div>
     </Card>
+  );
+}
+
+function Row({
+  row,
+  existing,
+  ticked,
+  onToggle,
+}: {
+  readonly row: ImportRow;
+  readonly existing: readonly ExternalAnimal[];
+  readonly ticked: boolean;
+  readonly onToggle?: (() => void) | undefined;
+}) {
+  const match = row.match;
+  const onFile = existing.find((entry) => entry.id === match?.existingId);
+  const carries = (row.ancestor?.geneticTests ?? []).filter(
+    (test) => test.status === "carrier" || test.status === "affected",
+  );
+
+  return (
+    <div className="flex flex-col gap-1 border-t border-edge pt-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-density text-ink">{row.name}</span>
+        <span className="flex flex-wrap items-center gap-2">
+          {carries.length === 0 ? null : (
+            <Pill tone="danger" dot>
+              {carries.map((test) => test.defect).join(", ")} carrier
+            </Pill>
+          )}
+          {row.regNumber === undefined ? null : <Pill>{row.regNumber}</Pill>}
+          <Pill tone="identity">{row.position ?? row.ancestor?.branch ?? "this animal"}</Pill>
+        </span>
+      </div>
+
+      {match === undefined ? null : match.confidence === "certain" ? (
+        <p className="text-sm text-muted">{match.reason}</p>
+      ) : (
+        <label className="flex items-start gap-2 text-sm text-muted">
+          <input
+            type="checkbox"
+            checked={ticked}
+            onChange={() => onToggle?.()}
+            disabled={onToggle === undefined}
+            className="mt-1"
+          />
+          <span>
+            {match.reason}
+            {onFile === undefined
+              ? null
+              : ` Already known as ${allRegistrations(onFile)
+                  .map((entry) => `${entry.association} ${entry.regNumber}`)
+                  .join(", ")}.`}
+          </span>
+        </label>
+      )}
+    </div>
   );
 }

@@ -229,6 +229,22 @@ export const externalAnimals = pgTable(
     name: text("name").notNull(),
     regNumber: text("reg_number"),
     association: text("association"),
+    /**
+     * Every registry this animal is recorded in.
+     *
+     * One animal, several numbers: a bull registered with both Maine-Anjou and
+     * Chianina has a different number in each, and his dam's Chianina pedigree
+     * prints her Chianina number while his Maine-Anjou pedigree prints her
+     * Maine-Anjou one. `regNumber` alone made those two pages import the same
+     * cow twice, with each copy holding half her descendants.
+     */
+    registrations:
+      jsonb("registrations").$type<{ association: string; regNumber: string }[]>(),
+    tattoo: text("tattoo"),
+    dob: timestamp("dob", { withTimezone: true }),
+    colour: text("colour"),
+    breeder: text("breeder"),
+    geneticTests: jsonb("genetic_tests").$type<{ defect: string; status: string }[]>(),
     sire: jsonb("sire").$type<{ kind: string; id: string }>(),
     dam: jsonb("dam").$type<{ kind: string; id: string }>(),
     notes: text("notes"),
