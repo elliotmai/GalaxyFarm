@@ -11,6 +11,7 @@ import {
   Checkbox,
   DataTable,
   EmptyState,
+  Modal,
   SafetyBadge,
   Select,
   TextArea,
@@ -491,7 +492,13 @@ export function HerdScreen({
       </Card>
 
       {draft !== undefined ? (
-        <Card title={editing === undefined ? "New animal" : `Editing ${editing.name ?? "animal"}`}>
+        <Modal
+          key={editing?.id ?? "new"}
+          size="wide"
+          title={editing === undefined ? "New animal" : `Editing ${editing.name ?? "animal"}`}
+          description="Name or tag is enough to start. Everything else can be filled in later."
+          onClose={() => setDraft(undefined)}
+        >
           <div className="flex flex-col gap-density md:grid md:grid-cols-2">
             <TextInput
               label="Name"
@@ -563,7 +570,7 @@ export function HerdScreen({
             </Button>
             <Button onClick={() => setDraft(undefined)}>Cancel</Button>
           </div>
-        </Card>
+        </Modal>
       ) : null}
 
       <Card>

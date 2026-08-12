@@ -9,6 +9,7 @@ import {
   Checkbox,
   DataTable,
   EmptyState,
+  Modal,
   SafetyBadge,
   Select,
   TextArea,
@@ -256,7 +257,13 @@ export function ZonesScreen({
       </header>
 
       {draft !== undefined ? (
-        <Card title={editing === undefined ? "New zone" : `Editing ${editing.name}`}>
+        <Modal
+          key={editing?.id ?? "new"}
+          size="wide"
+          title={editing === undefined ? "New zone" : `Editing ${editing.name}`}
+          description="A pen, a trap, a pasture — anywhere an animal can be."
+          onClose={() => setDraft(undefined)}
+        >
           <div className="flex flex-col gap-density">
             <TextInput
               label="Name"
@@ -338,7 +345,7 @@ export function ZonesScreen({
               <Button onClick={() => setDraft(undefined)}>Cancel</Button>
             </div>
           </div>
-        </Card>
+        </Modal>
       ) : null}
 
       <Card>
