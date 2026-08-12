@@ -38,6 +38,7 @@ import {
   type ParentRef,
 } from "@galaxy-farm/module-cattle";
 
+import { AncestorDetail } from "@/app/(admin)/admin/cattle/ancestors/_components/ancestor-detail";
 import { DigitalBeefImport } from "@/app/(admin)/admin/cattle/ancestors/_components/import-panel";
 import { MergeAncestors } from "@/app/(admin)/admin/cattle/ancestors/_components/merge-panel";
 import { checkable, RefreshAllAncestors } from "@/app/(admin)/admin/cattle/ancestors/_components/refresh-all-panel";
@@ -129,6 +130,15 @@ export function AncestorsScreen({
   const [merging, setMerging] = useState<ExternalAnimal | undefined>();
   /** Whether the check-them-all dialog is open. */
   const [checkingAll, setCheckingAll] = useState(false);
+  /**
+   * The ancestor being looked at, and how we got here.
+   *
+   * A trail rather than one id: following a line four generations up and then
+   * wanting to come back one step is the ordinary way a pedigree gets read,
+   * and a dialog that only knows where you are now makes you start again.
+   */
+  const [trail, setTrail] = useState<readonly Ulid[]>([]);
+  const looking = outsiders.find((entry) => entry.id === trail.at(-1));
   const [draft, setDraft] = useState<Draft | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -369,7 +379,20 @@ export function AncestorsScreen({
   }
 
   const columns: readonly Column<ExternalAnimal>[] = [
-    { key: "name", header: "Name", primary: true, render: (row) => row.name },
+    {
+      key: "name",
+      header: "Name",
+      primary: true,
+      render: (row) => (
+        <button
+          type="button"
+          onClick={() => setTrail([row.id])}
+          className="text-left text-action underline decoration-edge underline-offset-4 hover:decoration-action"
+        >
+          {row.name}
+        </button>
+      ),
+    },
     {
       key: "association",
       header: "Registered",
@@ -472,22 +495,12 @@ export function AncestorsScreen({
       key: "actions",
       header: "",
       render: (row) => (
-        <span className="flex gap-2">
-          <Button variant="ghost" onClick={() => startEdit(row)}>
-            Edit
-          </Button>
-          {allRegistrations(row).length === 0 ? null : (
-            <Button variant="ghost" onClick={() => setChecking(row)}>
-              Refresh
-            </Button>
-          )}
-          <Button variant="ghost" onClick={() => setMerging(row)}>
-            Merge
-          </Button>
-          <Button variant="ghost" onClick={() => void remove(row)}>
-            Delete
-          </Button>
-        </span>
+        // One way in. Everything that used to be four buttons on every row of
+        // a four-hundred-row table lives on the record itself now, where the
+        // rest of what it is can be read at the same time.
+        <Button variant="ghost" onClick={() => setTrail([row.id])}>
+          Open
+        </Button>
       ),
     },
   ];
@@ -534,6 +547,52 @@ export function AncestorsScreen({
             propertyId={propertyId}
             actorId={actorId}
             onDone={() => setChecking(undefined)}
+          />
+        </Modal>
+      )}
+
+      {looking === undefined ? null : (
+        <Modal
+          key={looking.id}
+          size="wide"
+          title={looking.name}
+          {...(trail.length > 1
+            ? { description: `Followed from ${outsiders.find((entry) => entry.id === trail[0])?.name ?? "the list"}.` }
+            : {})}
+          onClose={() => setTrail([])}
+          footer={
+            trail.length <= 1 ? undefined : (
+              <Button variant="ghost" onClick={() => setTrail(trail.slice(0, -1))}>
+                ← Back to{" "}
+                {outsiders.find((entry) => entry.id === trail.at(-2))?.name ?? "the last one"}
+              </Button>
+            )
+          }
+        >
+          <AncestorDetail
+            animal={looking}
+            outsiders={outsiders}
+            animals={animals}
+            profiles={profiles}
+            source={source}
+            sexes={sexes}
+            onOpen={(next) => setTrail([...trail, next.id])}
+            onEdit={() => {
+              startEdit(looking);
+              setTrail([]);
+            }}
+            onRefresh={() => {
+              setChecking(looking);
+              setTrail([]);
+            }}
+            onMerge={() => {
+              setMerging(looking);
+              setTrail([]);
+            }}
+            onDelete={() => {
+              setTrail([]);
+              void remove(looking);
+            }}
           />
         </Modal>
       )}
