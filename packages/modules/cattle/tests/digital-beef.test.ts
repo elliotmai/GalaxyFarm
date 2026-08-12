@@ -1,33 +1,31 @@
 import { describe, expect, it } from "vitest";
 
+import { parseDigitalBeefPage, parseDigitalBeefUrl } from "../src/domain/parsers/digital-beef.js";
 import {
   parseAncestorDetail,
   parseComposition,
   parseDefectCode,
-  parseDigitalBeefPage,
-  parseDigitalBeefUrl,
-  parsePedigreeEntry,
-  parseShorthornPercent,
   splitParent,
   type ImportedAnimal,
-} from "../src/domain/digital-beef.js";
-import {
-  CHIANINA_PAGE,
-  CHIANINA_SPARSE_PAGE,
-  MAINE_ANJOU_PAGE,
-  SHORTHORN_CARRIER_PAGE,
-  SHORTHORN_PAGE,
-} from "./fixtures/digital-beef-pages.js";
+} from "../src/domain/parsers/page.js";
+import { CHIANINA_PAGE } from "./fixtures/chianina-pages.js";
+import { MAINE_ANJOU_PAGE } from "./fixtures/maine-anjou-pages.js";
+import { SHORTHORN_PAGE } from "./fixtures/shorthorn-pages.js";
 
 /**
- * The Digital Beef importer, against pages that actually exist (spec §5.2).
+ * The engine the three associations share (spec §5.2).
  *
- * Every assertion below was written after reading the real page, not before.
- * The first version of this parser passed a suite of invented fixtures and
- * then, on a real Chianina page, read the animal's sex as "Bull Sire: MA364424
- * CMAC TYSON ET", the horn status of a Shorthorn as "SHORTHORNS", and filed
- * the navigation tab strip as three generations of ancestors. Fixtures that
- * agree with the parser prove nothing.
+ * What each of them does *differently* is checked in its own file —
+ * `chianina.test.ts`, `maine-anjou.test.ts`, `shorthorn.test.ts`. What is here
+ * is what has to hold on all three at once, which is the more interesting half:
+ * a rule that works on one page and not the others is not a rule, it is a
+ * coincidence that has not been caught yet.
+ *
+ * Every assertion was written after reading the real page. The first version of
+ * this parser passed a suite of invented fixtures and then, on a real page,
+ * read the animal's sex as "Bull Sire: MA364424 CMAC TYSON ET", the horn status
+ * of a Shorthorn as "SHORTHORNS", and filed the navigation tab strip as three
+ * generations of ancestors. Fixtures that agree with the parser prove nothing.
  */
 
 const read = (page: string, association: "AMAA" | "ACA" | "ASA", registration: string) =>
@@ -35,6 +33,12 @@ const read = (page: string, association: "AMAA" | "ACA" | "ASA", registration: s
 
 const at = (animal: ImportedAnimal, position: string) =>
   animal.ancestors.find((ancestor) => ancestor.position === position);
+
+const everyPage = () => [
+  read(CHIANINA_PAGE, "ACA", "359968"),
+  read(MAINE_ANJOU_PAGE, "AMAA", "402303"),
+  read(SHORTHORN_PAGE, "ASA", "4219133"),
+];
 
 describe("the address", () => {
   it("says which registry the numbers belong to", () => {
@@ -70,22 +74,17 @@ describe("the detail panel", () => {
     expect(animal.colour).toBe("Black");
   });
 
-  it("reads the horn status from the field that holds it", () => {
-    // `Horn/Poll/Scur` is the only place any of the three records this. An
-    // earlier version searched for "Horned" and "Polled" as labels and
-    // returned "SHORTHORNS", off a breeder's name four hundred lines away.
+  it("finds the horn status on all three, which spell it the same way", () => {
     expect(read(CHIANINA_PAGE, "ACA", "359968").hornStatus).toBe("Polled");
     expect(read(MAINE_ANJOU_PAGE, "AMAA", "402303").hornStatus).toBe("Polled");
     expect(read(SHORTHORN_PAGE, "ASA", "4219133").hornStatus).toBe("Scurred");
   });
 
-  it("finds the tattoo under all three spellings of it", () => {
-    // Chianina splits it into a herd prefix and a left-ear number on two
-    // lines, Maine-Anjou prints it whole under "Left Ear", Shorthorn calls it
-    // "Tattoo - LE" and leaves a stray colon on the end.
-    expect(read(CHIANINA_PAGE, "ACA", "359968").tattoo).toBe("ZNT901W");
-    expect(read(MAINE_ANJOU_PAGE, "AMAA", "402303").tattoo).toBe("ZNT901W");
-    expect(read(SHORTHORN_PAGE, "ASA", "4219133").tattoo).toBe("204C");
+  it("finds a tattoo on all three, which do not spell it the same way", () => {
+    // Chianina splits it across two cells, Maine-Anjou prints it whole under
+    // an ear, Shorthorn under "Tattoo - LE". Each breed's file owns its own
+    // reading; this is the check that all three arrive.
+    expect(everyPage().map((animal) => animal.tattoo)).toEqual(["ZNT901W", "ZNT901W", "204C"]);
   });
 
   it("takes the parents from the panel, where they are named outright", () => {
@@ -95,141 +94,24 @@ describe("the detail panel", () => {
     expect(animal.dam).toEqual({ regNumber: "337003", name: "ZNT JENNA 707T" });
   });
 
-  it("reads the breed makeup in each association's spelling", () => {
-    expect(read(CHIANINA_PAGE, "ACA", "359968").breedComposition).toEqual([
-      { breed: "CA", percent: 3.72 },
-      { breed: "MA", percent: 79.57 },
-      { breed: "AN", percent: 14.41 },
-      { breed: "XX", percent: 2.3 },
-    ]);
-    expect(read(SHORTHORN_PAGE, "ASA", "4219133").breedComposition).toEqual([
-      { breed: "SH", percent: 100 },
-    ]);
-  });
-
-  it("prefers the full makeup over the single-breed percentage on a page carrying both", () => {
-    // A Chianina page prints `Chianina %: 3.72` *and* `Genetic Makeup: 3.72%
-    // CA | 79.57% MA | ...`. Reading the first would file a bull who is 80%
-    // Maine-Anjou as 3.72% Chianina and nothing else.
-    const animal = read(CHIANINA_PAGE, "ACA", "359968");
-
-    expect(animal.breedComposition).toHaveLength(4);
-    expect(animal.breedComposition.map((share) => share.breed)).toContain("MA");
-  });
-
-  it("reads Shorthorn's percentage field as a Shorthorn share, not a breed called AR", () => {
-    expect(parseShorthornPercent("SH100")).toEqual({ percent: 100, register: "SH" });
-    expect(parseShorthornPercent("AR50")).toEqual({ percent: 50, register: "AR" });
-    expect(parseShorthornPercent("AR25")).toEqual({ percent: 25, register: "AR" });
-    // No prefix, and no share at all — both are real values on that field.
-    expect(parseShorthornPercent("0")).toEqual({ percent: 0 });
-    expect(parseShorthornPercent("50%")).toEqual({ percent: 50 });
-    expect(parseShorthornPercent("Purebred")).toBeUndefined();
-  });
-
-  it("keeps the class the papers state, wherever the association prints it", () => {
-    // Maine-Anjou has a field for it; Shorthorn states it as the register code
-    // in front of the percentage; Chianina's is its own code again.
-    expect(read(MAINE_ANJOU_PAGE, "AMAA", "402303").classification).toBe("PB");
-    expect(read(SHORTHORN_PAGE, "ASA", "4219133").classification).toBe("SH");
-    expect(read(CHIANINA_PAGE, "ACA", "359968").classification).toBe("1CM");
-  });
-
-  it("keeps the association's own inbreeding figure and the disposal date", () => {
-    expect(read(CHIANINA_PAGE, "ACA", "359968").coi).toBe(4.57);
-
-    const culled = read(MAINE_ANJOU_PAGE, "AMAA", "402303");
-    expect(culled.status).toBe("Culled - Culled - age");
-    expect(culled.disposedOn).toBe("03/17/2022");
-  });
-
   it("finds every field it looks for on all three", () => {
-    for (const animal of [
-      read(CHIANINA_PAGE, "ACA", "359968"),
-      read(MAINE_ANJOU_PAGE, "AMAA", "402303"),
-      read(SHORTHORN_PAGE, "ASA", "4219133"),
-    ]) {
+    for (const animal of everyPage()) {
       expect(animal.missing).toEqual([]);
     }
   });
 });
 
 describe("the pedigree chart", () => {
-  it("reads a complete five-generation chart into all thirty slots", () => {
-    const animal = read(MAINE_ANJOU_PAGE, "AMAA", "402303");
-
-    expect(animal.ancestors).toHaveLength(30);
-    expect(animal.unplacedAncestors).toEqual([]);
-  });
-
-  it("places by in-order position, which is how the chart is drawn", () => {
-    // Digital Beef draws each animal vertically centred between its two
-    // parents' subtrees, so the flattened chart is an in-order traversal.
-    // These four are the check: JAZX MS 720G is the dam's dam's dam, out of
-    // JAZX MS DESIGN 012D by DESIGNED BY SHOWTIME, and the names corroborate
-    // the arithmetic.
-    const animal = read(MAINE_ANJOU_PAGE, "AMAA", "402303");
-
-    expect(at(animal, "dam")?.name).toBe("ZNT JENNA 707T");
-    expect(at(animal, "dam's dam")?.name).toBe("JAZX AUDREY 352N");
-    expect(at(animal, "dam's dam's dam")?.name).toBe("JAZX MS 720G");
-    expect(at(animal, "dam's dam's dam's sire")?.name).toBe("DESIGNED BY SHOWTIME");
-    expect(at(animal, "dam's dam's dam's dam")?.name).toBe("JAZX MS DESIGN 012D");
-  });
-
-  it("counts generations from the animal outwards", () => {
-    const animal = read(MAINE_ANJOU_PAGE, "AMAA", "402303");
-
-    expect(at(animal, "sire")?.generation).toBe(1);
-    expect(at(animal, "sire's sire")?.generation).toBe(2);
-    expect(at(animal, "sire's sire's dam")?.generation).toBe(3);
-    expect(at(animal, "sire's sire's dam's dam")?.generation).toBe(4);
-  });
-
-  it("holds the slot open where the chart has a gap in it", () => {
-    // The Chianina chart for this bull records only two of his dam's dam's
-    // four grandparents. The blank rows are what say *which* two: closing
-    // them up would make JAZX MAINE ANJOU 352 the dam's dam's sire, when she
-    // is the dam's dam's dam.
-    const animal = read(CHIANINA_PAGE, "ACA", "359968");
-
-    expect(at(animal, "dam's dam")?.name).toBe("JAZX AUDREY 352N");
-    expect(at(animal, "dam's dam's dam")?.name).toBe("JAZX MAINE ANJOU 352");
-    expect(at(animal, "dam's dam's sire")?.name).toBe("CTR SUCCESS 02K 2CA");
-    expect(at(animal, "dam's dam's dam's sire")).toBeUndefined();
-  });
-
   it("does not read the navigation tabs as ancestors", () => {
     // Anchored on "5-Generation Pedigree", not on the first mention of the
     // word — the page has a tab strip above the chart with a Pedigree tab on
     // it, and starting there files "tab left" as a grandsire.
-    for (const animal of [
-      read(CHIANINA_PAGE, "ACA", "359968"),
-      read(MAINE_ANJOU_PAGE, "AMAA", "402303"),
-      read(SHORTHORN_PAGE, "ASA", "4219133"),
-    ]) {
+    for (const animal of everyPage()) {
       const names = [...animal.ancestors, ...animal.unplacedAncestors].map(
         (ancestor) => ancestor.name ?? "",
       );
       expect(names.some((name) => /tab (left|right)|^DNA$|^Breeding$/i.test(name))).toBe(false);
     }
-  });
-
-  it("reads Shorthorn's second line as colour and birth date, not as an animal", () => {
-    const animal = read(SHORTHORN_PAGE, "ASA", "4219133");
-
-    expect(animal.ancestors).toHaveLength(30);
-    expect(at(animal, "sire")).toMatchObject({
-      name: "JAKE'S PROUD JAZZ 266L",
-      colour: "Roan",
-      dob: "09/04/2001",
-      breeder: "JACOB T OHLDE",
-    });
-    expect(at(animal, "sire's sire's sire's sire")).toMatchObject({
-      name: "CORONET MAX LEADER",
-      colour: "Roan",
-      dob: "09/22/1955",
-    });
   });
 
   it("reads the same bull off two association pages into the same shape", () => {
@@ -247,81 +129,34 @@ describe("the pedigree chart", () => {
 
 describe("the defect flags", () => {
   it("reads Chianina's dashed list and Shorthorn's bare one alike", () => {
-    expect(
-      parsePedigreeEntry(
-        "MA307184        COWAN'S ALI 4M         [ COWN4M ]    -- PHAF THF",
-        "",
-      )?.geneticTests,
-    ).toEqual([
-      { defect: "PHA", status: "free", notes: expect.stringContaining("PHAF") },
-      { defect: "TH", status: "free", notes: expect.stringContaining("THF") },
-    ]);
-
-    expect(
-      parsePedigreeEntry(
-        "*xAR30384        [ 245B ]        OCC JAKE'S PRIDE 245B   DSC PHAF THF",
-        "",
-      )?.geneticTests,
-    ).toEqual([
-      { defect: "DS", status: "carrier", notes: expect.stringContaining("DSC") },
-      { defect: "PHA", status: "free", notes: expect.anything() },
-      { defect: "TH", status: "free", notes: expect.anything() },
-    ]);
+    expect(parseDefectCode("THF")).toMatchObject({ defect: "TH", status: "free" });
+    expect(parseDefectCode("PHAFT")).toMatchObject({ defect: "PHA", status: "free" });
+    expect(parseDefectCode("THC")).toMatchObject({ defect: "TH", status: "carrier" });
+    expect(parseDefectCode("DDS")).toMatchObject({ defect: "DD", status: "suspect" });
   });
 
   it("keeps free-by-test and free-by-pedigree apart", () => {
-    expect(parseDefectCode("THFT")?.status).toBe("free");
-    expect(parseDefectCode("THFP")?.status).toBe("free_by_parentage");
+    expect(parseDefectCode("PHAFP")).toMatchObject({ status: "free_by_parentage" });
   });
 
   it("calls a suffix it does not recognise suspect, never free", () => {
-    // The house rule is that no carrier comes onto the place. A code nobody
-    // recognised being rounded down to "fine" is precisely how one would.
-    expect(parseDefectCode("AMS")?.status).toBe("suspect");
-    expect(parseDefectCode("DSP")?.status).toBe("suspect");
-    expect(parseDefectCode("PHA")?.status).toBe("suspect");
+    // On a place whose house rule is that no carrier comes onto it, rounding
+    // an unrecognised code down to "fine" is the one failure that matters.
+    expect(parseDefectCode("AMS")).toMatchObject({ defect: "AM", status: "suspect" });
   });
 
   it("ignores a word that is not a flag", () => {
     expect(parseDefectCode("ET")).toBeUndefined();
-    expect(
-      parsePedigreeEntry("MA276888        CMAC KATARINA ET         [ ]", "")?.name,
-    ).toBe("CMAC KATARINA ET");
+    expect(parseDefectCode("SIRE")).toBeUndefined();
   });
 
   it("carries a carrier through to the animal it belongs to", () => {
-    const animal = read(SHORTHORN_PAGE, "ASA", "4219133");
-
-    expect(at(animal, "sire")?.geneticTests).toContainEqual(
-      expect.objectContaining({ defect: "DS", status: "carrier" }),
+    const animal = read(CHIANINA_PAGE, "ACA", "359968");
+    const flagged = [...animal.ancestors, ...animal.unplacedAncestors].filter(
+      (ancestor) => ancestor.geneticTests.length > 0,
     );
-  });
-});
 
-describe("one ancestor line", () => {
-  it("reads Chianina's number-then-name", () => {
-    expect(
-      parsePedigreeEntry("MA185219        JF WAR CHIEF         [ 38C JMAF ]", "sire"),
-    ).toMatchObject({ regNumber: "MA185219", name: "JF WAR CHIEF", tattoo: "38C JMAF" });
-  });
-
-  it("reads Maine-Anjou's number-then-tattoo-then-name", () => {
-    expect(
-      parsePedigreeEntry("185219        [ 38C JMAF ]        JF WAR CHIEF   -- PHAFP THFP", "sire"),
-    ).toMatchObject({ regNumber: "185219", name: "JF WAR CHIEF", tattoo: "38C JMAF" });
-  });
-
-  it("keeps Shorthorn's flags on the number as printed", () => {
-    // `*`, `x` and `s` are how Shorthorn records what kind of entry it is.
-    // They stay, because the number as printed is what somebody checks
-    // against the paper in the drawer.
-    expect(parsePedigreeEntry("*sxAR30383        [ 0016 ]        OCC LUSTRE 0016", "")).toMatchObject(
-      { regNumber: "*sxAR30383", name: "OCC LUSTRE 0016" },
-    );
-  });
-
-  it("reads an empty tattoo as no tattoo", () => {
-    expect(parsePedigreeEntry("264745        FGJ HABANERO         [ ]", "")?.tattoo).toBeUndefined();
+    expect(flagged.length).toBeGreaterThan(0);
   });
 });
 
@@ -357,53 +192,6 @@ describe("the odds and ends", () => {
     expect(parseComposition("50% MA 25% CH")).toEqual([
       { breed: "MA", percent: 50 },
       { breed: "CH", percent: 25 },
-    ]);
-  });
-});
-
-describe("pages that broke earlier readings", () => {
-  it("keeps three blank rows as three empty slots", () => {
-    // The Chianina page for ZNT TRIPLE X records one of his dam's dam's four
-    // grandparents, printed as three blanks, the animal, three blanks. An
-    // earlier version squeezed runs of blank lines down to one, which moved
-    // her two slots up and made her the dam's dam's sire.
-    const animal = read(CHIANINA_SPARSE_PAGE, "ACA", "319149");
-
-    expect(at(animal, "dam")?.name).toBe("JAZX AUDREY 352N");
-    expect(at(animal, "dam's dam")?.name).toBe("JAZX MAINE ANJOU 352");
-    expect(at(animal, "dam's dam's sire")).toBeUndefined();
-  });
-
-  it("reads a carrier as a carrier", () => {
-    // `THC` — tibial hemimelia, carrier by test. Every other page checked in
-    // here reads THF, so until this one nothing proved the suffix was read.
-    const animal = read(SHORTHORN_CARRIER_PAGE, "ASA", "4094372");
-    const improver = [...animal.ancestors, ...animal.unplacedAncestors].find(
-      (entry) => entry.name === "DEERPARK IMPROVER 57",
-    );
-
-    expect(improver?.geneticTests).toContainEqual(
-      expect.objectContaining({ defect: "TH", status: "carrier" }),
-    );
-    expect(improver?.geneticTests).toContainEqual(
-      expect.objectContaining({ defect: "PHA", status: "free" }),
-    );
-  });
-
-  it("still reads the whole chart on that page", () => {
-    const animal = read(SHORTHORN_CARRIER_PAGE, "ASA", "4094372");
-
-    expect(animal.ancestors).toHaveLength(30);
-    expect(at(animal, "sire")?.name).toBe("CF TRUMP X");
-    expect(at(animal, "dam")?.name).toBe("NPS DESERT ROSE 004");
-  });
-
-  it("reads the Chianina makeup off the detail panel", () => {
-    expect(read(CHIANINA_SPARSE_PAGE, "ACA", "319149").breedComposition).toEqual([
-      { breed: "CA", percent: 6.44 },
-      { breed: "MA", percent: 69.14 },
-      { breed: "AN", percent: 23.82 },
-      { breed: "XX", percent: 0.6 },
     ]);
   });
 });

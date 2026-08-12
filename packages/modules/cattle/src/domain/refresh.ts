@@ -1,5 +1,5 @@
 import { HORN_STATUSES, type CattleProfile } from "./cattle-profile.js";
-import type { ImportedAnimal } from "./digital-beef.js";
+import type { ImportedAnimal } from "./parsers/page.js";
 import {
   allRegistrations,
   normaliseRegistration,

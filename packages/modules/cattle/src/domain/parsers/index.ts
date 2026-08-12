@@ -1,5 +1,14 @@
 import { parseAngusPage, parseAngusUrl } from "./angus.js";
-import { parseDigitalBeefPage, parseDigitalBeefUrl, type ImportedAnimal } from "./digital-beef.js";
+import { parseDigitalBeefPage, parseDigitalBeefUrl } from "./digital-beef.js";
+import type { ImportedAnimal } from "./page.js";
+
+export * from "./angus.js";
+export * from "./chianina.js";
+export * from "./digital-beef.js";
+export * from "./digital-beef-breed.js";
+export * from "./maine-anjou.js";
+export * from "./page.js";
+export * from "./shorthorn.js";
 
 /**
  * One door onto every association this app can read (spec §5.2).

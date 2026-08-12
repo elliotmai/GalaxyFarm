@@ -4,8 +4,8 @@ import {
   type ImportedAncestor,
   type ImportedAnimal,
   type ImportedParent,
-} from "./digital-beef.js";
-import type { GeneticTest } from "./genetics.js";
+} from "./page.js";
+import type { GeneticTest } from "../genetics.js";
 
 /**
  * Reading an animal off the American Angus Association's site (spec §5.2).

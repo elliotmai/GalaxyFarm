@@ -6,7 +6,7 @@ import {
   parseAngusPage,
   parseAngusUrl,
   parseConditionStrip,
-} from "../src/domain/angus.js";
+} from "../src/domain/parsers/angus.js";
 import { ANGUS_PAGE } from "./fixtures/angus-page.js";
 
 /**

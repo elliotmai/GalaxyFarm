@@ -1,6 +1,6 @@
 import type { Ulid } from "@galaxy-farm/core";
 
-import type { ImportedAncestor, ImportedAnimal } from "./digital-beef.js";
+import type { ImportedAncestor, ImportedAnimal } from "./parsers/page.js";
 import { allRegistrations, normaliseRegistration, type ExternalAnimal } from "./pedigree.js";
 import { splitRegistration } from "./registries.js";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseDigitalBeefPage } from "../src/domain/digital-beef.js";
+import { parseDigitalBeefPage } from "../src/domain/parsers/digital-beef.js";
 import {
   applyChanges,
   defaultAccepted,
@@ -11,11 +11,9 @@ import {
 } from "../src/domain/refresh.js";
 import type { CattleProfile } from "../src/domain/cattle-profile.js";
 import type { ExternalAnimal } from "../src/domain/pedigree.js";
-import {
-  CHIANINA_PAGE,
-  MAINE_ANJOU_PAGE,
-  SHORTHORN_PAGE,
-} from "./fixtures/digital-beef-pages.js";
+import { CHIANINA_PAGE } from "./fixtures/chianina-pages.js";
+import { MAINE_ANJOU_PAGE } from "./fixtures/maine-anjou-pages.js";
+import { SHORTHORN_PAGE } from "./fixtures/shorthorn-pages.js";
 
 /**
  * Checking an animal against its association again (spec §5.2).

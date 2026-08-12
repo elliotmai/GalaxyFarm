@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { parseDigitalBeefPage } from "../src/domain/digital-beef.js";
+import { parseDigitalBeefPage } from "../src/domain/parsers/digital-beef.js";
 import { matchCandidate, mergeRegistration, planImport } from "../src/domain/import-identity.js";
 import { allRegistrations, type ExternalAnimal } from "../src/domain/pedigree.js";
 import { splitRegistration } from "../src/domain/registries.js";
-import { CHIANINA_PAGE, MAINE_ANJOU_PAGE } from "./fixtures/digital-beef-pages.js";
+import { CHIANINA_PAGE } from "./fixtures/chianina-pages.js";
+import { MAINE_ANJOU_PAGE } from "./fixtures/maine-anjou-pages.js";
 
 /**
  * One animal, two registries (spec §5.2).
