@@ -116,6 +116,37 @@ describe("suggestions", () => {
     expect(offered).toEqual(["Maine-Anjou", "Shorthorn"]);
   });
 
+  it("offers each word once, however often it was handed over", () => {
+    // A caller assembling "what the herd already uses" plus "the breeds we
+    // know about" hands over the same word twice by construction. A dropdown
+    // showing Chianina three times looks broken enough to make the whole
+    // field look untrustworthy.
+    setup([], { suggestions: ["Chianina", "Chianina", "chianina", "Angus"] });
+
+    const offered = Array.from(document.querySelectorAll("datalist option")).map((node) =>
+      node.getAttribute("value"),
+    );
+    expect(offered).toEqual(["Chianina", "Angus"]);
+  });
+
+  it("keeps the first spelling of a repeat, so the herd's own comes first", () => {
+    setup([], { suggestions: ["Maine Anjou", "Maine-Anjou", "maine anjou"] });
+
+    const offered = Array.from(document.querySelectorAll("datalist option")).map((node) =>
+      node.getAttribute("value"),
+    );
+    expect(offered).toEqual(["Maine Anjou", "Maine-Anjou"]);
+  });
+
+  it("does not let the browser's own form history into the list", () => {
+    // A browser offers what was typed into a field it thinks is this one,
+    // under a divider, and it does not know a breed from a cow's name. An
+    // animal called Andromeda turned up in the breed list that way.
+    const { box } = setup([], { suggestions: ["Angus"] });
+
+    expect(box).toHaveAttribute("autocomplete", "off");
+  });
+
   it("narrows as you type, without stopping anything else being entered", () => {
     const { onChange, box } = setup([], { suggestions: ["Maine-Anjou", "Shorthorn"] });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BREEDS,
   breedName,
   breedsFromComposition,
   breedsInUse,
@@ -28,6 +29,28 @@ describe("naming a breed", () => {
     // registry's mouth, on a field that ends up in a sale catalogue.
     expect(breedName("ZQ")).toBe("ZQ");
     expect(breedName("Black Baldy")).toBe("Black Baldy");
+  });
+});
+
+describe("the list to pick from", () => {
+  it("holds each breed once, though several codes decode to it", () => {
+    // `BREED_NAMES` is a decoding table: Chianina answers to CA, CH and CHIA.
+    // Handing its values straight to a dropdown put Chianina in it three
+    // times, which is what a lookup table looks like when it is mistaken for
+    // a list.
+    expect(BREEDS.filter((name) => name === "Chianina")).toHaveLength(1);
+    expect(new Set(BREEDS).size).toBe(BREEDS.length);
+  });
+
+  it("does not offer Unrecorded as something to pick", () => {
+    // It is what an association writes when it does not know.
+    expect(BREEDS).not.toContain("Unrecorded");
+  });
+
+  it("still covers the breeds this farm runs", () => {
+    expect(BREEDS).toEqual(
+      expect.arrayContaining(["Maine-Anjou", "Chianina", "Shorthorn", "Angus"]),
+    );
   });
 });
 

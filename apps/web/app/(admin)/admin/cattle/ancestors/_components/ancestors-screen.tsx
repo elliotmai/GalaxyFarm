@@ -27,7 +27,7 @@ import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
   allRegistrations,
   ASSOCIATIONS,
-  BREED_NAMES,
+  BREEDS,
   breedsInUse,
   breedsOf,
   canBe,
@@ -153,10 +153,10 @@ export function AncestorsScreen({
    * "Maine-Anjou" becoming two breeds nothing can filter across.
    */
   const breedSuggestions = useMemo(
-    () => [
-      ...breedsInUse(outsiders),
-      ...Object.values(BREED_NAMES).filter((name) => name !== "Unrecorded"),
-    ],
+    // The herd's own spellings first — `TagInput` keeps the first of any
+    // duplicate, so a breed this farm already runs stays at the top of the
+    // list rather than being buried among ones it does not.
+    () => [...breedsInUse(outsiders), ...BREEDS],
     [outsiders],
   );
   const [draft, setDraft] = useState<Draft | undefined>();

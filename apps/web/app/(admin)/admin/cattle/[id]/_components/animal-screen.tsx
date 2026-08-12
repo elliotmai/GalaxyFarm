@@ -326,6 +326,7 @@ function AnimalTabs({
               <BreedField
                 animal={animal}
                 profile={profile}
+                profiles={profiles}
                 propertyId={propertyId}
                 actorId={actorId}
               />

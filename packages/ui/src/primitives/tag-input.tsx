@@ -72,11 +72,28 @@ export function TagInput({
     onChange(value.filter((held) => held !== entry));
   };
 
-  const offered = suggestions.filter(
-    (entry) =>
-      !value.some((held) => held.toLowerCase() === entry.toLowerCase()) &&
-      (draft.trim() === "" || entry.toLowerCase().includes(draft.trim().toLowerCase())),
-  );
+  /**
+   * What to put in the list, each thing once.
+   *
+   * Deduped here rather than trusting the caller. A caller assembling
+   * "what the herd already uses" plus "the breeds we know about" will hand
+   * over the same word twice by construction, and a dropdown showing Chianina
+   * three times looks broken in a way that makes the whole field look
+   * untrustworthy.
+   */
+  const offered: string[] = [];
+  const alreadyOffered = new Set(value.map((held) => held.toLowerCase()));
+  for (const raw of suggestions) {
+    const entry = raw.trim();
+    if (entry === "") continue;
+    // First spelling wins, not the last. A caller puts what the herd already
+    // uses at the front precisely so it stays there — `new Map` would have
+    // quietly kept the canonical spelling at the back instead.
+    if (alreadyOffered.has(entry.toLowerCase())) continue;
+    if (draft.trim() !== "" && !entry.toLowerCase().includes(draft.trim().toLowerCase())) continue;
+    alreadyOffered.add(entry.toLowerCase());
+    offered.push(entry);
+  }
 
   return (
     <Field
@@ -114,6 +131,12 @@ export function TagInput({
             aria-invalid={invalid}
             value={draft}
             disabled={disabled || value.length >= max}
+            // The browser offers its own form history alongside a datalist,
+            // under a divider, and it does not know a breed from a cow's
+            // name. An animal called Andromeda turned up in the breed list
+            // because somebody had once typed it into a field the browser
+            // decided was the same one.
+            autoComplete="off"
             list={offered.length === 0 ? undefined : `${id}-suggestions`}
             placeholder={value.length >= max ? `That is as many as ${label} holds` : placeholder}
             onChange={(event) => setDraft(event.target.value)}

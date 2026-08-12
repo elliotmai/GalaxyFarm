@@ -51,8 +51,9 @@ import {
   weightIn,
   withdrawalEndDate,
   type AcquisitionRecord,
-  BREED_NAMES,
+  BREEDS,
   breedsFromComposition,
+  breedsInUse,
   type BreedingRecord,
   type BreedShare,
   type CalvingRecord,
@@ -110,11 +111,14 @@ function lb(value: number | undefined): string {
 export function BreedField({
   animal,
   profile,
+  profiles = [],
   propertyId,
   actorId,
 }: {
   readonly animal: Animal;
   readonly profile: CattleProfile | undefined;
+  /** The rest of the herd, so its own spellings are offered first. */
+  readonly profiles?: readonly CattleProfile[];
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
 }) {
@@ -161,7 +165,10 @@ export function BreedField({
         onChange={(next) => void setBreeds(next)}
         disabled={busy}
         placeholder="Maine-Anjou"
-        suggestions={Object.values(BREED_NAMES).filter((name) => name !== "Unrecorded")}
+        // What this farm already runs first, then the rest. Offering the
+        // herd's own spellings is what stops "Maine Anjou" and "Maine-Anjou"
+        // becoming two breeds nothing can filter across.
+        suggestions={[...breedsInUse(profiles), ...BREEDS]}
         hint={
           named.length === 0 && derived.length > 0
             ? "Worked out from the percentages below. Edit it and what you type is kept instead."

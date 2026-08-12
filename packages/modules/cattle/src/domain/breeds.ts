@@ -53,6 +53,21 @@ export function breedName(code: string): string {
 }
 
 /**
+ * The breeds themselves, each once, for anything offering a choice.
+ *
+ * `BREED_NAMES` is a decoding table and has several codes pointing at one
+ * breed — Chianina answers to `CA`, `CH` and `CHIA`. Handing its values
+ * straight to a dropdown put Chianina in it three times, which is what a
+ * lookup table looks like when it is mistaken for a list.
+ *
+ * "Unrecorded" is left out: it is what an association writes when it does not
+ * know, and it is not something anybody should be picking.
+ */
+export const BREEDS: readonly string[] = [
+  ...new Set(Object.values(BREED_NAMES).filter((name) => name !== "Unrecorded")),
+];
+
+/**
  * Shares below this are not what anybody means by "the breed".
  *
  * A bull who is 79% Maine, 14% Angus and 2.3% unrecorded is a Maine-Angus.
