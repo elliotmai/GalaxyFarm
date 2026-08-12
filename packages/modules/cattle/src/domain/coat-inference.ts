@@ -182,6 +182,40 @@ function crossPossible<A extends string>(
   };
 }
 
+/**
+ * Settle a locus, keeping the chances and the `weighted` flag in step.
+ *
+ * They have to agree or `transmits` lies. A settled locus that was flagged
+ * weighted but carried no chance on its one pair read as "hands this allele
+ * down 0% of the time" — so a red cow, `e/e` beyond any doubt, was reported
+ * as unable to throw a red calf. One pair means one certainty: chance 1.
+ */
+function finish<A extends string>(
+  possible: readonly Possible<A>[],
+  weighted: boolean,
+  because: readonly string[],
+): LocusInference<A> {
+  const settled = possible.length === 1;
+  if (settled && possible[0] !== undefined) {
+    return {
+      possible: [{ pair: possible[0].pair, chance: 1 }],
+      settled: true,
+      weighted: true,
+      because: [...because],
+    };
+  }
+
+  const priced = renormalise(possible);
+  return {
+    possible: priced,
+    settled: false,
+    // Only weighted when every pair actually carries a number. A flag saying
+    // otherwise is what produced the bug above.
+    weighted: weighted && priced.every((entry) => entry.chance !== undefined),
+    because: [...because],
+  };
+}
+
 /** Keep only the pairs a rule allows, and note why if anything went. */
 function narrow<A extends string>(
   current: { possible: readonly Possible<A>[]; because: readonly string[] },
@@ -332,13 +366,7 @@ function inferExtension(evidence: CoatEvidence): LocusInference<ExtensionAllele>
     because = state.because;
   }
 
-  const settled = possible.length === 1;
-  return {
-    possible: renormalise(possible),
-    settled,
-    weighted: weighted && !settled ? true : settled || weighted,
-    because,
-  };
+  return finish(possible, weighted, because);
 }
 
 function inferRoan(evidence: CoatEvidence): LocusInference<RoanAllele> {
@@ -397,8 +425,7 @@ function inferRoan(evidence: CoatEvidence): LocusInference<RoanAllele> {
     because = state.because;
   }
 
-  const settled = possible.length === 1;
-  return { possible: renormalise(possible), settled, weighted: settled || weighted, because };
+  return finish(possible, weighted, because);
 }
 
 /**
@@ -469,6 +496,109 @@ function chanceOfCarryingRed(
   // Conditioned on the animal being black, so the red quarter is off the table.
   if (red >= 1) return undefined;
   return { chance: carries / (1 - red) };
+}
+
+export interface CalfColour {
+  /** What the calf can be, commonest first. */
+  readonly outcomes: readonly { name: string; chance: number }[];
+  /** What stopped a fuller answer, when something did. */
+  readonly missing: readonly string[];
+}
+
+/**
+ * What colour a calf out of these two could be (spec §5.2).
+ *
+ * Off the parents' *inferred* genotypes rather than off hair cards, which is
+ * the whole point: this farm has cards for almost nothing, and a planner that
+ * says "no colour genotype on file" for every pairing is a planner nobody
+ * opens twice. A red cow is `e/e` whether or not anybody paid a lab to say so.
+ *
+ * Worked from how often each parent hands an allele down rather than from
+ * which pair it is, so it stays exact where the pair is not. Two parents each
+ * known to carry red — `ED/e` or `E/e`, nobody knows which — throw a quarter
+ * red, and that quarter is not in doubt even though neither parent's pair is
+ * settled.
+ *
+ * A locus nothing can be said about is left out rather than guessed at, and
+ * named in `missing` so the screen can say which half of the answer is absent
+ * instead of showing a confident-looking list that is only half the story.
+ */
+export function predictCalfColour(sire: CoatInference, dam: CoatInference): CalfColour {
+  const missing: string[] = [];
+
+  const redFromSire = transmits(sire.extension, "e");
+  const redFromDam = transmits(dam.extension, "e");
+  // A parent that hands red down *never* settles it on its own: nothing times
+  // zero is zero, so a homozygous-black bull makes every calf black whatever
+  // is unknown about the cow. Requiring both sides would throw that away.
+  const red =
+    redFromSire === 0 || redFromDam === 0
+      ? 0
+      : redFromSire === undefined || redFromDam === undefined
+        ? undefined
+        : redFromSire * redFromDam;
+  const base = red === undefined ? undefined : { red, black: 1 - red };
+  if (base === undefined) {
+    missing.push("Neither parent's Extension can be pinned down, so red or black is open.");
+  }
+
+  const roanFromSire = transmits(sire.roan, "r");
+  const roanFromDam = transmits(dam.roan, "r");
+  const pattern =
+    roanFromSire === undefined || roanFromDam === undefined
+      ? undefined
+      : {
+          white: roanFromSire * roanFromDam,
+          roan: roanFromSire * (1 - roanFromDam) + (1 - roanFromSire) * roanFromDam,
+          solid: (1 - roanFromSire) * (1 - roanFromDam),
+        };
+  if (pattern === undefined) {
+    missing.push("Neither parent's roan pair can be pinned down, so the pattern is open.");
+  }
+
+  // Representative pairs, only so the naming lives in one place — `coatName`
+  // already knows that black through roan is a blue roan and that a white
+  // animal's points follow its base.
+  const BASE_PAIR: Record<"black" | "red", readonly [ExtensionAllele, ExtensionAllele]> = {
+    black: ["ED", "ED"],
+    red: ["e", "e"],
+  };
+  const PATTERN_PAIR: Record<"solid" | "roan" | "white", readonly [RoanAllele, RoanAllele]> = {
+    solid: ["R", "R"],
+    roan: ["R", "r"],
+    white: ["r", "r"],
+  };
+
+  const outcomes: { name: string; chance: number }[] = [];
+  if (base !== undefined && pattern !== undefined) {
+    // The loci are independent, so the coat is one multiplied by the other.
+    for (const [baseName, baseChance] of Object.entries(base) as [
+      "black" | "red",
+      number,
+    ][]) {
+      for (const [patternName, patternChance] of Object.entries(pattern) as [
+        "solid" | "roan" | "white",
+        number,
+      ][]) {
+        const chance = baseChance * patternChance;
+        if (chance <= 0) continue;
+        outcomes.push({ name: coatName(BASE_PAIR[baseName], PATTERN_PAIR[patternName]), chance });
+      }
+    }
+  } else if (base !== undefined) {
+    for (const [name, chance] of Object.entries(base)) {
+      if (chance > 0) outcomes.push({ name, chance });
+    }
+  } else if (pattern !== undefined) {
+    for (const [name, chance] of Object.entries(pattern)) {
+      if (chance > 0) outcomes.push({ name, chance });
+    }
+  }
+
+  return {
+    outcomes: outcomes.sort((left, right) => right.chance - left.chance),
+    missing,
+  };
 }
 
 /** The pair as a hair card would write it, or a description of what is left. */

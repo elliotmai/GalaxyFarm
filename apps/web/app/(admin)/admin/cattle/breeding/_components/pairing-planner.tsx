@@ -28,6 +28,7 @@ import {
   resolveCompositionFor,
   matingAllowed,
   matingDefectRisk,
+  predictCalfColour,
   predictColour,
   relatedness,
   registrationClasses,
@@ -42,6 +43,7 @@ import {
 
 import { animalHref } from "@/lib/animal-slug";
 import { compositionLookup } from "@/lib/composition";
+import { coatResolver } from "@/lib/coat";
 import { usePedigreeSource } from "@/lib/pedigree-source";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -143,6 +145,27 @@ export function PairingPlanner({
           maineClassFor(mainePercent(damBreeding.composition)),
         );
   const eligibility = registrationClasses(composition);
+
+  /**
+   * The calf's colour, off what can be *worked out* about the parents.
+   *
+   * This used to need a hair card on both sides and so said "no colour
+   * genotype on file" for every pairing anybody actually made — there is a
+   * card for almost nothing here. A red cow is `e/e` whether or not a lab ever
+   * said so, and a bull who has thrown a red calf carries red whatever his own
+   * page says.
+   *
+   * The Punnett squares below still want settled pairs, so they appear only
+   * where both parents have them; the outcome list does not, and is the part
+   * that matters standing at a chute.
+   */
+  const coats = useMemo(() => coatResolver({ profiles, outsiders }), [profiles, outsiders]);
+  const sireCoat = sireRef === undefined ? undefined : coats.of(sireRef);
+  const damCoat = damRef === undefined ? undefined : coats.of(damRef);
+  const calfColour =
+    sireCoat === undefined || damCoat === undefined
+      ? undefined
+      : predictCalfColour(sireCoat, damCoat);
 
   const colour =
     sireProfile?.coatGenotype === undefined || damProfile?.coatGenotype === undefined
@@ -391,16 +414,38 @@ export function PairingPlanner({
 
           <Section
             title="What color"
-            description="Both loci together. Roan has no color of its own — it takes the one Extension gave it, so black through roan is a blue roan."
+            description="Both loci together. Roan has no color of its own — it takes the one Extension gave it, so black through roan is a blue roan. Worked out from the parents' coats and pedigrees; a hair card sharpens it but is not needed."
           >
-            {colour === undefined || colour.outcomes.length === 0 ? (
+            {calfColour === undefined || calfColour.outcomes.length === 0 ? (
               <EmptyState
-                title="No color genotype on file"
-                detail="Both parents need their Extension and roan alleles recorded before a calf's color can be predicted. A coat you can see is not enough — a black cow can be ED/ED or ED/e, and out of a red bull those two throw different calves."
+                title="Nothing to go on yet"
+                detail="Neither parent's coat is recorded and neither has a pedigree that settles one. A colour on each of them is usually enough — red is e/e outright, and roan is R/r."
               />
             ) : (
               <div className="flex flex-col gap-density">
                 <Card>
+                  <div className="flex flex-col gap-3">
+                    {calfColour.outcomes.map((outcome) => (
+                      <div key={outcome.name} className="flex flex-col gap-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-density text-ink">{outcome.name}</span>
+                          <Pill tone="action">{percent(outcome.chance)}</Pill>
+                        </div>
+                        <Meter value={outcome.chance} tone="action" />
+                      </div>
+                    ))}
+                    {calfColour.missing.length === 0 ? null : (
+                      <ul className="flex flex-col gap-1 text-sm text-muted">
+                        {calfColour.missing.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </Card>
+
+                {colour === undefined ? null : (
+                <Card title="Off the hair cards">
                   <div className="flex flex-col gap-3">
                     {colour.outcomes.map((outcome) => (
                       <div key={outcome.label} className="flex flex-col gap-1">
@@ -421,13 +466,17 @@ export function PairingPlanner({
                     ))}
                   </div>
                 </Card>
+                )}
 
                 {/*
-                  The squares themselves. A breeder reads four boxes and checks
-                  them; a bar chart of percentages has to be taken on trust.
+                  The squares themselves, where both parents are hair-carded. A
+                  breeder reads four boxes and checks them; a bar chart of
+                  percentages has to be taken on trust. Shown only for typed
+                  parents because a square drawn over an unsettled pair would
+                  be four boxes of guesswork wearing the same clothes.
                 */}
                 <div className="grid grid-cols-1 gap-density md:grid-cols-2">
-                  {colour.extensionSquare === undefined ? null : (
+                  {colour?.extensionSquare === undefined ? null : (
                     <PunnettTable
                       title="Extension — black or red"
                       square={colour.extensionSquare.map((row) =>
@@ -437,7 +486,7 @@ export function PairingPlanner({
                       dam={damProfile?.coatGenotype?.extension ?? []}
                     />
                   )}
-                  {colour.roanSquare === undefined ? null : (
+                  {colour?.roanSquare === undefined ? null : (
                     <PunnettTable
                       title="Roan — solid, roan or white"
                       square={colour.roanSquare.map((row) =>
@@ -449,11 +498,13 @@ export function PairingPlanner({
                   )}
                 </div>
 
-                <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted">
-                  {colour.caveats.map((caveat) => (
-                    <li key={caveat}>{caveat}</li>
-                  ))}
-                </ul>
+                {colour === undefined ? null : (
+                  <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted">
+                    {colour.caveats.map((caveat) => (
+                      <li key={caveat}>{caveat}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
           </Section>

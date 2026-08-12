@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { EXTENSION_ALLELES, ROAN_ALLELES } from "../src/domain/coat-colour.js";
 import {
   describeLocus,
+  predictCalfColour,
   inferCoat,
   readPhenotype,
   settledGenotype,
@@ -243,5 +244,68 @@ describe("saying why", () => {
 
     expect(settledGenotype(roanRed)).toEqual({ extension: ["e", "e"], roan: ["R", "r"] });
     expect(settledGenotype(seen("Black")).extension).toBeUndefined();
+  });
+});
+
+describe("what colour the calf can be", () => {
+  it("works off inferred parents, with no hair card anywhere", () => {
+    // The point of the exercise. A red cow is e/e whether or not anybody paid
+    // a lab to say so, and a planner that needs a card for every pairing is
+    // one nobody opens twice.
+    const redCow = seen("Red");
+    const blackBull = inferCoat({
+      observed: readPhenotype("Black"),
+      progeny: [readPhenotype("Red")],
+    });
+
+    const calf = predictCalfColour(blackBull, redCow);
+
+    // He carries red and she is red, so half the calves are red.
+    const red = calf.outcomes.find((outcome) => outcome.name === "red");
+    expect(red?.chance).toBeCloseTo(0.5, 5);
+    expect(calf.missing).toEqual([]);
+  });
+
+  it("gets the quarter right when neither parent's own pair is settled", () => {
+    // Both are `ED/e` or `E/e` and nobody knows which. It does not matter —
+    // each hands red down half the time, so a quarter of the calves are red.
+    const carrier = inferCoat({
+      observed: readPhenotype("Black"),
+      progeny: [readPhenotype("Red")],
+    });
+
+    const calf = predictCalfColour(carrier, carrier);
+
+    expect(calf.outcomes.find((outcome) => outcome.name === "red")?.chance).toBeCloseTo(0.25, 5);
+    expect(calf.outcomes.find((outcome) => outcome.name === "black")?.chance).toBeCloseTo(0.75, 5);
+  });
+
+  it("names the coat both loci make, not one of each", () => {
+    // Roan has no colour of its own — it takes the one Extension gave it, so
+    // black through roan is a blue roan. Reporting the loci apart would say
+    // "half black, half roan" about a mating where every calf is a blue roan.
+    const blueRoan = seen("Blue Roan");
+    const black = inferCoat({ tested: { extension: ["ED", "ED"], roan: ["R", "R"] } });
+
+    const calf = predictCalfColour(black, blueRoan);
+
+    expect(calf.outcomes.map((outcome) => outcome.name).sort()).toEqual(["black", "blue roan"]);
+    expect(calf.outcomes.every((outcome) => outcome.chance === 0.5)).toBe(true);
+  });
+
+  it("says which half of the answer is missing rather than half-answering", () => {
+    // Two black animals with no pedigree: the pattern is settled by their
+    // coats, the base is not.
+    const calf = predictCalfColour(seen("Black"), seen("Black"));
+
+    expect(calf.outcomes.map((outcome) => outcome.name)).toEqual(["solid"]);
+    expect(calf.missing.join(" ")).toContain("Extension");
+  });
+
+  it("never offers an outcome that cannot happen", () => {
+    const red = seen("Red");
+    const calf = predictCalfColour(red, red);
+
+    expect(calf.outcomes.map((outcome) => outcome.name)).toEqual(["red"]);
   });
 });

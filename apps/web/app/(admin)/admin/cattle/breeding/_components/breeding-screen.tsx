@@ -6,12 +6,14 @@ import { useMemo, useState } from "react";
 import {
   Badge,
   Button,
+  Callout,
   Card,
   DataTable,
   DetailList,
   EmptyState,
   PageBody,
   PageHeader,
+  Pill,
   Section,
   SearchSelect,
   Select,
@@ -27,6 +29,7 @@ import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
   allRegistrations,
   BREEDING_METHODS,
+  predictCalfColour,
   breedingRecordSchema,
   canBe,
   DEFAULT_GESTATION_DAYS,
@@ -48,6 +51,7 @@ import {
 
 import { PairingPlanner } from "@/app/(admin)/admin/cattle/breeding/_components/pairing-planner";
 import { animalHref } from "@/lib/animal-slug";
+import { coatResolver } from "@/lib/coat";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -326,7 +330,14 @@ export function BreedingScreen({
       <PairingPlanner animals={animals} propertyId={propertyId} />
 
       <Section title="Record a breeding">
-        <AddBreeding dams={dams} sires={sires} api={breedingsApi} />
+        <AddBreeding
+          dams={dams}
+          sires={sires}
+          api={breedingsApi}
+          animals={animals}
+          profiles={profiles}
+          outsiders={outsiders}
+        />
       </Section>
 
       <Section title="Every breeding">
@@ -361,10 +372,17 @@ function AddBreeding({
   dams,
   sires,
   api,
+  animals,
+  profiles,
+  outsiders,
 }: {
   readonly dams: readonly Animal[];
   readonly sires: readonly SearchOption[];
   readonly api: Api;
+  /** Everything on file, so the calf's colour can be worked out before saving. */
+  readonly animals: readonly Animal[];
+  readonly profiles: readonly CattleProfile[];
+  readonly outsiders: readonly ExternalAnimal[];
 }) {
   const { show } = useToast();
   const [damId, setDamId] = useState("");
@@ -375,6 +393,39 @@ function AddBreeding({
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+
+  /**
+   * What colour the calf can be, before the breeding is even recorded.
+   *
+   * The moment to know is while the bull is still a choice. Worked out from
+   * the parents' inferred genotypes rather than from hair cards — this farm
+   * has cards for almost nothing, and a prediction that needs one would be
+   * blank on every pairing anybody actually makes.
+   *
+   * The sire is stored as a name rather than an id, because a straw from a
+   * bull this farm will never own is a legitimate answer. So he is matched
+   * back by name, and a typed-in bull nobody has on file simply yields
+   * nothing.
+   */
+  const calfColour = useMemo(() => {
+    if (damId === "" || sire.trim() === "") return undefined;
+
+    const herd = { profiles, outsiders };
+    const resolve = coatResolver(herd);
+
+    const damCoat = resolve.of({ kind: "animal", id: damId as Ulid });
+    const ours = animals.find((animal) => displayName(animal) === sire.trim());
+    const theirs = outsiders.find((entry) => entry.name === sire.trim());
+    const sireCoat =
+      ours !== undefined
+        ? resolve.of({ kind: "animal", id: ours.id })
+        : theirs !== undefined
+          ? resolve.of({ kind: "external", id: theirs.id })
+          : undefined;
+
+    if (damCoat === undefined || sireCoat === undefined) return undefined;
+    return predictCalfColour(sireCoat, damCoat);
+  }, [damId, sire, animals, profiles, outsiders]);
 
   // Shown before saving, because the date is the whole point of the record and
   // a typo in the year is invisible until eleven months later.
@@ -501,6 +552,30 @@ function AddBreeding({
           </p>
         )}
       </div>
+
+      {calfColour === undefined || calfColour.outcomes.length === 0 ? null : (
+        <Callout tone="identity" title="What colour the calf can be">
+          <ul className="flex flex-wrap gap-2">
+            {calfColour.outcomes.map((outcome) => (
+              <li key={outcome.name}>
+                <Pill tone={outcome.chance === 1 ? "identity" : "neutral"}>
+                  {outcome.name} · {Math.round(outcome.chance * 100)}%
+                </Pill>
+              </li>
+            ))}
+          </ul>
+          {calfColour.missing.length === 0 ? null : (
+            // Half an answer, said to be half an answer. A confident-looking
+            // list that only covers one locus is worse than one that admits
+            // the other is open.
+            <ul className="mt-2 flex flex-col gap-1 text-sm">
+              {calfColour.missing.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          )}
+        </Callout>
+      )}
     </form>
   );
 }
