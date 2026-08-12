@@ -168,6 +168,7 @@ export default tseslint.config(
       // CLI entry points. A migration runner that cannot say what it applied
       // is worse than one that can, and the same goes for a seed script.
       "**/src/migrate.ts",
+      "**/src/baseline-cli.ts",
       "**/scripts/**/*",
     ],
     rules: { "no-console": "off" },

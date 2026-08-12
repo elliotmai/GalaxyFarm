@@ -23,6 +23,7 @@
     "test:e2e": "playwright test",
     "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test:coverage && pnpm run build",
     "db:generate": "pnpm --filter @galaxy-farm/infra-db db:generate",
+    "db:baseline": "dotenv -e .env.local -- pnpm --filter @galaxy-farm/infra-db db:baseline",
     "db:migrate": "dotenv -e .env.local -- pnpm --filter @galaxy-farm/infra-db db:migrate",
     "db:migrate:deployed": "pnpm --filter @galaxy-farm/infra-db db:migrate",
     "db:seed": "dotenv -e .env.local -- pnpm --filter @galaxy-farm/web db:seed",

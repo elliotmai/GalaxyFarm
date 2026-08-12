@@ -29,6 +29,7 @@ import {
   type ParentRef,
 } from "@galaxy-farm/module-cattle";
 
+import { DigitalBeefImport } from "@/app/(admin)/admin/cattle/ancestors/_components/import-panel";
 import { useMutations } from "@/lib/local/mutations";
 import { usePedigreeSource } from "@/lib/pedigree-source";
 import { useRecords } from "@/lib/local/use-records";
@@ -420,6 +421,8 @@ export function AncestorsScreen({
           </form>
         </Card>
       )}
+
+      <DigitalBeefImport existing={outsiders} propertyId={propertyId} actorId={actorId} />
 
       <Section title="On file">
         {loading ? (

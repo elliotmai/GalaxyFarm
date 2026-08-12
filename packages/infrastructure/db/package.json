@@ -12,6 +12,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
+    "db:baseline": "tsx src/baseline-cli.ts",
     "db:migrate": "tsx src/migrate.ts",
     "db:studio": "drizzle-kit studio"
   },

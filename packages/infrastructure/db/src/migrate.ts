@@ -61,6 +61,42 @@ export function splitStatements(sql: string): string[] {
     .filter((statement) => statement !== "");
 }
 
+/**
+ * Postgres codes that mean "this object is already there".
+ *
+ * 42P07 duplicate table, 42701 duplicate column, 42P06 duplicate schema,
+ * 42710 duplicate object (an index or a constraint).
+ */
+const ALREADY_EXISTS = new Set(["42P07", "42701", "42P06", "42710"]);
+
+/**
+ * Turn a migration failure into something somebody can act on.
+ *
+ * The default is a Postgres stack trace ending in `heap_create_with_catalog`,
+ * which says nothing about what to do next. The one case worth recognising by
+ * name is a database that already has the schema: nothing is broken, the
+ * ledger is simply empty, and running `db:baseline` is the whole fix.
+ */
+export function describeMigrationFailure(file: string, error: unknown): string {
+  const code = (error as { code?: unknown }).code;
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (typeof code === "string" && ALREADY_EXISTS.has(code)) {
+    return (
+      `${file} failed: ${message}\n\n` +
+      "That means the database already has this, but the migration ledger does " +
+      "not know about it — usually a schema created by `drizzle-kit push`, a " +
+      "restore from a dump, or a file run by hand.\n\n" +
+      "Nothing is broken and nothing needs deleting. Run `pnpm db:baseline` " +
+      "once: it records every migration whose tables and columns are already " +
+      "there, without running them, and stops at the first one that is not. " +
+      "Then run `pnpm db:migrate` again."
+    );
+  }
+
+  return `${file} failed: ${message}`;
+}
+
 export interface MigrationOutcome {
   /** Files applied by this run. */
   readonly applied: readonly string[];
@@ -103,12 +139,21 @@ export async function migrate(databaseUrl: string): Promise<MigrationOutcome> {
     for (const file of pending) {
       const statements = splitStatements(readFileSync(join(MIGRATIONS_DIR, file), "utf8"));
 
-      // One transaction per migration: a half-applied schema is worse than an
-      // unapplied one, because the next run cannot tell what state it is in.
-      await sql.begin(async (tx) => {
-        for (const statement of statements) await tx.unsafe(statement);
-        await tx`insert into _migrations (name) values (${file})`;
-      });
+      try {
+        // One transaction per migration: a half-applied schema is worse than
+        // an unapplied one, because the next run cannot tell what state it is
+        // in.
+        await sql.begin(async (tx) => {
+          for (const statement of statements) await tx.unsafe(statement);
+          await tx`insert into _migrations (name) values (${file})`;
+        });
+      } catch (error) {
+        // A duplicate-object error here is not a broken migration. It is a
+        // database that already has the schema and a ledger that does not know
+        // — from a `push`, a restore, or a hand-run file — and the fix is a
+        // different command, not a different migration.
+        throw new Error(describeMigrationFailure(file, error), { cause: error });
+      }
 
       applied.push(file);
     }
