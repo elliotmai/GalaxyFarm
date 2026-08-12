@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Button, Callout, Meter, Pill, useToast } from "@galaxy-farm/ui";
+import { Button, Callout, Meter, Pill, TextArea, useToast } from "@galaxy-farm/ui";
 import type { Ulid } from "@galaxy-farm/core";
 import {
   allRegistrations,
@@ -41,32 +41,76 @@ import { useMutations } from "@/lib/local/mutations";
  * useful whether it takes twenty seconds or two minutes.
  */
 
-interface Finding {
+export interface Finding {
   readonly animal: ExternalAnimal;
   /** The page it came off. An animal papered twice has two, and they differ. */
   readonly registration: { association: string; regNumber: string };
   changes: readonly FieldChange[];
 }
 
-interface Failure {
-  readonly animal: ExternalAnimal;
+/**
+ * A page the run could not finish with, and everything needed to finish it by
+ * hand.
+ *
+ * The two ways a page goes wrong want the same remedy, so they are one type.
+ * Either the host would not answer this server at all, or it answered without
+ * the pedigree tab — and in both cases what fixes it is a person opening the
+ * page in a browser, where it works, and pasting what they see.
+ *
+ * Everything the run would have used is carried along: which record the page
+ * is about, which registration it was reached by, and the address. That is
+ * what lets the paste be resolved *here*, in the same window, instead of
+ * sending somebody to thirty separate screens to do thirty separate pastes.
+ */
+export interface Pending {
+  /** Stable row key — the page, since that is what is being resolved. */
+  readonly key: string;
+  readonly label: string;
+  /** Why it is in this list, in words. */
   readonly reason: string;
-  /**
-   * The page that could not be read.
-   *
-   * Carried so the screen can hand it over as a link rather than as a count.
-   * "Four could not be read" is a dead end; four names you can click through
-   * to the association, copy, and paste back in is the way the job gets
-   * finished — and these hosts refuse a datacenter IP often enough that this
-   * is the ordinary path, not the exception.
-   */
+  readonly kind: "unread" | "chartless";
   readonly url?: string | undefined;
+  /** The ancestor this page is about, when it is one of them. */
+  readonly animal?: ExternalAnimal | undefined;
+  /** The farm's own animal, when the page is one of ours. */
+  readonly ours?:
+    | { readonly label: string; readonly profile: CattleProfile }
+    | undefined;
+  readonly registration?: { association: string; regNumber: string } | undefined;
 }
 
-/** A page that answered but had no pedigree chart on it. */
-interface Chartless {
-  readonly label: string;
-  readonly url?: string | undefined;
+/**
+ * Merge a page's proposals into what is already on the screen.
+ *
+ * Free of React on purpose: the run calls it in a loop over local arrays, and
+ * a paste calls it against copies of the current state. One implementation, so
+ * a page read by hand lands exactly where a page read by the server would.
+ */
+export function recordInto(
+  found: Finding[],
+  ticked: Set<string>,
+  animal: ExternalAnimal,
+  registration: { association: string; regNumber: string },
+  changes: readonly FieldChange[],
+): void {
+  if (changes.length === 0) return;
+
+  const existing = found.find((entry) => entry.animal.id === animal.id);
+  if (existing === undefined) {
+    found.push({ animal, registration, changes });
+  } else {
+    // A field already proposed off another registry's page wins — the first
+    // page to carry it is as good an answer as the second, and two rows for
+    // one field is a question nobody can answer from a checkbox.
+    const known = new Set(existing.changes.map((change) => change.field));
+    existing.changes = [
+      ...existing.changes,
+      ...changes.filter((change) => !known.has(change.field)),
+    ];
+  }
+  for (const change of changes) {
+    if (change.kind === "fill") ticked.add(`${animal.id}:${change.field}`);
+  }
 }
 
 /** Only the ones there is actually a page to look up. */
@@ -152,9 +196,8 @@ export function RefreshAllAncestors({
   const [running, setRunning] = useState(false);
   const [stopped, setStopped] = useState(false);
   const [findings, setFindings] = useState<readonly Finding[]>([]);
-  const [failures, setFailures] = useState<readonly Failure[]>([]);
-  /** Pages that came back with a detail panel but no pedigree chart. */
-  const [chartless, setChartless] = useState<readonly Chartless[]>([]);
+  /** Pages that need a person to open them and paste what they see. */
+  const [pending, setPending] = useState<readonly Pending[]>([]);
   /** What the farm's own animals' pages would change on their profiles. */
   const [ourFindings, setOurFindings] = useState<
     readonly { label: string; profile: CattleProfile; changes: readonly FieldChange[] }[]
@@ -162,47 +205,30 @@ export function RefreshAllAncestors({
   /** `${animalId}:${field}` for every change agreed to. */
   const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  /** Which stuck row has its paste box open, and what is in each. */
+  const [openPaste, setOpenPaste] = useState<string | undefined>();
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [pasteError, setPasteError] = useState<Record<string, string>>({});
 
   async function run() {
     setRunning(true);
     setStopped(false);
     setDone(0);
     setFindings([]);
-    setFailures([]);
-    setChartless([]);
+    setPending([]);
     setOurFindings([]);
     setAccepted(new Set());
 
     const found: Finding[] = [];
     const ourResults: { label: string; profile: CattleProfile; changes: readonly FieldChange[] }[] = [];
-    const failed: Failure[] = [];
-    const noChart: Chartless[] = [];
+    const stuck: Pending[] = [];
     const ticked = new Set<string>();
 
-    /** Merge a change into what is already proposed for an animal. */
     const record = (
       animal: ExternalAnimal,
       registration: { association: string; regNumber: string },
       changes: readonly FieldChange[],
-    ) => {
-      if (changes.length === 0) return;
-      const existing = found.find((entry) => entry.animal.id === animal.id);
-      if (existing === undefined) {
-        found.push({ animal, registration, changes });
-      } else {
-        // A field already proposed off another registry's page wins — the
-        // first page to carry it is as good an answer as the second, and two
-        // rows for one field is a question nobody can answer from a checkbox.
-        const known = new Set(existing.changes.map((change) => change.field));
-        existing.changes = [
-          ...existing.changes,
-          ...changes.filter((change) => !known.has(change.field)),
-        ];
-      }
-      for (const change of changes) {
-        if (change.kind === "fill") ticked.add(`${animal.id}:${change.field}`);
-      }
-    };
+    ) => recordInto(found, ticked, animal, registration, changes);
 
     for (const animal of queue) {
       // *Every* registry the animal is papered in, not just the first. Only
@@ -238,7 +264,15 @@ export function RefreshAllAncestors({
           const payload = (await response.json()) as { page?: string; error?: string };
 
           if (!response.ok || payload.page === undefined) {
-            failed.push({ animal, reason: payload.error ?? "Could not read that page.", url });
+            stuck.push({
+              key: url,
+              label: animal.name,
+              reason: payload.error ?? "Could not read that page.",
+              kind: "unread",
+              url,
+              animal,
+              registration,
+            });
             continue;
           }
 
@@ -247,7 +281,17 @@ export function RefreshAllAncestors({
           // A page without its chart carries no defect results at all — they
           // are printed beside each ancestor and nowhere else — so this is
           // counted and said out loud rather than passing as "no changes".
-          if (page.ancestors.length === 0) noChart.push({ label: animal.name, url });
+          if (page.ancestors.length === 0) {
+            stuck.push({
+              key: url,
+              label: animal.name,
+              reason: "The page answered, but without its pedigree chart.",
+              kind: "chartless",
+              url,
+              animal,
+              registration,
+            });
+          }
           record(animal, registration, refreshChanges(animal, page, animals));
 
           // The chart on this page carries the defect results of the ancestors
@@ -258,18 +302,31 @@ export function RefreshAllAncestors({
             record(entry.animal, registration, entry.changes);
           }
         } catch {
-          failed.push({ animal, reason: "Could not reach the server.", url });
+          stuck.push({
+            key: url,
+            label: animal.name,
+            reason: "Could not reach the server.",
+            kind: "unread",
+            url,
+            animal,
+            registration,
+          });
         }
       }
 
       if (!read && registrations.length === 0) {
-        failed.push({ animal, reason: "No page could be built for that registry." });
+        stuck.push({
+          key: `no-page:${animal.id}`,
+          label: animal.name,
+          reason: "No page could be built for that registry.",
+          kind: "unread",
+          animal,
+        });
       }
 
       setDone((count) => count + 1);
       setFindings([...found]);
-      setFailures([...failed]);
-      setChartless([...noChart]);
+      setPending([...stuck]);
       setAccepted(new Set(ticked));
     }
 
@@ -293,14 +350,28 @@ export function RefreshAllAncestors({
         const payload = (await response.json()) as { page?: string; error?: string };
 
         if (!response.ok || payload.page === undefined) {
-          failed.push({
-            animal: { id: ours.label, name: ours.label } as ExternalAnimal,
+          stuck.push({
+            key: url,
+            label: ours.label,
             reason: payload.error ?? "Could not read that page.",
+            kind: "unread",
             url,
+            ours: { label: ours.label, profile: ours.profile },
+            registration: { association: ours.association, regNumber: ours.regNumber },
           });
         } else {
           const page = parseAnimalPage(payload.page, parsed.ref);
-          if (page.ancestors.length === 0) noChart.push({ label: ours.label, url });
+          if (page.ancestors.length === 0) {
+            stuck.push({
+              key: url,
+              label: ours.label,
+              reason: "The page answered, but without its pedigree chart.",
+              kind: "chartless",
+              url,
+              ours: { label: ours.label, profile: ours.profile },
+              registration: { association: ours.association, regNumber: ours.regNumber },
+            });
+          }
 
           // The animal's own breed makeup, colour and horn status. This is the
           // one place the farm's own cattle get a composition off the papers —
@@ -319,22 +390,112 @@ export function RefreshAllAncestors({
           }
         }
       } catch {
-        failed.push({
-          animal: { id: ours.label, name: ours.label } as ExternalAnimal,
+        stuck.push({
+          key: url,
+          label: ours.label,
           reason: "Could not reach the server.",
+          kind: "unread",
           url,
+          ours: { label: ours.label, profile: ours.profile },
+          registration: { association: ours.association, regNumber: ours.regNumber },
         });
       }
 
       setDone((count) => count + 1);
       setFindings([...found]);
       setOurFindings([...ourResults]);
-      setFailures([...failed]);
+      setPending([...stuck]);
       setAccepted(new Set(ticked));
     }
 
     setRunning(false);
     setStopped(true);
+  }
+
+  /**
+   * Finish one stuck page with a paste, without leaving this screen.
+   *
+   * The whole point of doing it here: a herd of thirty ancestors can leave
+   * eight pages needing a person, and sending somebody to eight separate
+   * screens to paste eight pages — re-finding each animal on the way — is how
+   * a job that takes ten minutes turns into one nobody finishes. The paste
+   * lands in the same list of proposals the fetched pages produced, ticked the
+   * same way, saved by the same button.
+   */
+  function resolveByPaste(entry: Pending, html: string) {
+    const parsed = entry.url === undefined ? undefined : parseAnimalUrl(entry.url);
+    if (parsed === undefined || !parsed.ok) {
+      setPasteError({
+        ...pasteError,
+        [entry.key]:
+          "There is no address for this one, so there is no way to know which registry the numbers on the page belong to.",
+      });
+      return;
+    }
+    if (html.trim() === "") {
+      setPasteError({ ...pasteError, [entry.key]: "Paste the page first." });
+      return;
+    }
+
+    const page = parseAnimalPage(html, parsed.ref);
+    const registration = entry.registration ?? {
+      association: parsed.ref.association,
+      regNumber: parsed.ref.registration,
+    };
+
+    // Copies, because these are merged into and React state is not.
+    const found: Finding[] = findings.map((finding) => ({ ...finding }));
+    const ticked = new Set(accepted);
+    const ourResults = [...ourFindings];
+
+    if (entry.animal !== undefined) {
+      recordInto(found, ticked, entry.animal, registration, refreshChanges(entry.animal, page, animals));
+    }
+
+    if (entry.ours !== undefined) {
+      const mine = profileChanges(entry.ours.profile, page);
+      if (mine.length > 0) {
+        const at = ourResults.findIndex((row) => row.profile.id === entry.ours?.profile.id);
+        const row = { label: entry.ours.label, profile: entry.ours.profile, changes: mine };
+        if (at < 0) ourResults.push(row);
+        else ourResults[at] = row;
+        for (const change of mine) {
+          if (change.kind === "fill") {
+            ticked.add(`profile:${entry.ours.profile.id}:${change.field}`);
+          }
+        }
+      }
+    }
+
+    // The chart is why this is worth doing at all: it carries the defect
+    // results of every ancestor above this animal, and it is the only place
+    // any association prints them.
+    for (const other of pedigreeChanges(page, animals)) {
+      recordInto(found, ticked, other.animal, registration, other.changes);
+    }
+
+    setFindings(found);
+    setOurFindings(ourResults);
+    setAccepted(ticked);
+
+    if (page.ancestors.length === 0) {
+      // Pasted, but still no chart — usually a copy taken before the pedigree
+      // tab had loaded. Saying so beats dropping the row and leaving somebody
+      // to wonder whether it worked.
+      setPasteError({
+        ...pasteError,
+        [entry.key]:
+          "That paste had no pedigree chart in it either. Open the animal's page, wait for the pedigree tab to draw, then select all and copy.",
+      });
+      return;
+    }
+
+    setPasteError(Object.fromEntries(
+      Object.entries(pasteError).filter(([key]) => key !== entry.key),
+    ));
+    setPending((current) => current.filter((row) => row.key !== entry.key));
+    setOpenPaste(undefined);
+    show({ message: `${entry.label} read from the paste`, tone: "success" });
   }
 
   async function apply() {
@@ -433,24 +594,7 @@ export function RefreshAllAncestors({
                 Not a failure — there is simply nowhere to look. Anything with a link is on a site
                 this app cannot read; open it and fill the record in by hand.
               </p>
-              <ul className="mt-2 flex flex-col gap-1">
-                {unreachable.map((entry) => (
-                  <li key={entry.label} className="flex flex-wrap items-baseline gap-2">
-                    <span className="text-density text-ink">{entry.label}</span>
-                    <span className="text-sm text-muted">{entry.why}</span>
-                    {entry.url === undefined ? null : (
-                      <a
-                        href={entry.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-sm text-action underline decoration-edge underline-offset-4 hover:decoration-action"
-                      >
-                        open the page ↗
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <PageLinks entries={unreachable} />
             </Callout>
           )}
 
@@ -471,44 +615,86 @@ export function RefreshAllAncestors({
               value={pages === 0 ? 0 : (done / pages) * 100}
               tone="action"
               label={running ? "Reading the papers" : "Finished"}
-              detail={`${done} of ${pages} pages · ${findings.length} with something to say · ${failures.length} unreachable`}
+              detail={`${done} of ${pages} pages · ${findings.length} with something to say · ${pending.length} needing a paste`}
             />
           )}
         </>
       )}
 
-      {chartless.length === 0 ? null : (
-        <Callout
-          tone="action"
-          title={`${chartless.length} pages came back without a pedigree chart`}
-        >
+      {pending.length === 0 ? null : (
+        <Callout tone="action" title={`${pending.length} need the page pasting in`}>
           <p>
-            Digital Beef renders the details on the page and loads the pedigree tab separately, so
-            a server fetch can come back with names and colors and no ancestors.{" "}
+            Two things land here and both have the same remedy. A host that will not answer this
+            server will answer a browser; and Digital Beef loads the pedigree tab separately, so a
+            server fetch can come back with names and colors and no ancestors.{" "}
             <strong>Defect results only exist on the chart</strong> — printed beside each ancestor,
-            never on the animal&apos;s own page — so those pages had none to give. Open one, select
-            all, and paste it into that animal&apos;s own check: a browser has already run the tab
-            requests, so a select-all copies what they produced.
+            never on the animal&apos;s own page.
           </p>
-          <PageLinks entries={chartless} />
+          <p className="mt-1">
+            Open one, wait for the pedigree to draw, select all, copy, and paste it below. What it
+            reads joins the list of proposals underneath, ticked the same way and saved by the same
+            button.
+          </p>
         </Callout>
       )}
 
-      {failures.length === 0 ? null : (
-        <Callout tone="action" title={`${failures.length} could not be read`}>
-          <p>
-            {[...new Set(failures.map((failure) => failure.reason))].join(" ")} Those records are
-            untouched. Open the page yourself and paste it into that animal&apos;s own check — that
-            path works regardless of what the host thinks of this server, and behind a login.
-          </p>
-          <PageLinks
-            entries={failures.map((failure) => ({
-              label: failure.animal.name,
-              url: failure.url,
-            }))}
-          />
-        </Callout>
-      )}
+      {pending.map((entry) => (
+        <div key={entry.key} className="flex flex-col gap-2 rounded-density border border-edge p-density">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="flex flex-wrap items-baseline gap-2">
+              <span className="text-density font-medium text-ink">{entry.label}</span>
+              <Pill tone={entry.kind === "chartless" ? "action" : "neutral"}>
+                {entry.kind === "chartless" ? "no pedigree chart" : "could not be read"}
+              </Pill>
+            </span>
+            <span className="flex flex-wrap items-center gap-3">
+              {entry.url === undefined ? null : (
+                <a
+                  href={entry.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm text-action underline decoration-edge underline-offset-4 hover:decoration-action"
+                >
+                  open the page ↗
+                </a>
+              )}
+              <Button
+                variant="ghost"
+                onClick={() => setOpenPaste(openPaste === entry.key ? undefined : entry.key)}
+                disabled={entry.url === undefined}
+              >
+                {openPaste === entry.key ? "Hide" : "Paste the page"}
+              </Button>
+            </span>
+          </div>
+
+          <p className="text-sm text-muted">{entry.reason}</p>
+
+          {openPaste !== entry.key ? null : (
+            <div className="flex flex-col gap-2">
+              <TextArea
+                label={`The page for ${entry.label}`}
+                hint="Select all on the animal's page and paste it here. This works regardless of what the host thinks of our server, and behind a login."
+                rows={6}
+                value={drafts[entry.key] ?? ""}
+                onChange={(event) =>
+                  setDrafts({ ...drafts, [entry.key]: event.target.value })
+                }
+              />
+              {pasteError[entry.key] === undefined ? null : (
+                <p role="alert" className="text-sm text-danger">
+                  {pasteError[entry.key]}
+                </p>
+              )}
+              <div>
+                <Button onClick={() => resolveByPaste(entry, drafts[entry.key] ?? "")}>
+                  Read this page
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
 
       {ourFindings.length === 0 ? null : (
         <div className="flex flex-col gap-2">
@@ -634,7 +820,12 @@ export function RefreshAllAncestors({
 function PageLinks({
   entries,
 }: {
-  readonly entries: readonly { label: string; url?: string | undefined }[];
+  readonly entries: readonly {
+    label: string;
+    url?: string | undefined;
+    /** Why there is nothing to click, when there is not. */
+    why?: string | undefined;
+  }[];
 }) {
   if (entries.length === 0) return null;
 
@@ -647,8 +838,13 @@ function PageLinks({
       {rows.map((entry) => (
         <li key={entry.label} className="flex flex-wrap items-baseline gap-2">
           <span className="text-density text-ink">{entry.label}</span>
+          {entry.why === undefined ? null : (
+            <span className="text-sm text-muted">{entry.why}</span>
+          )}
           {entry.url === undefined ? (
-            <span className="text-sm text-muted">no page could be built for its registry</span>
+            entry.why === undefined ? (
+              <span className="text-sm text-muted">no page could be built for its registry</span>
+            ) : null
           ) : (
             <a
               href={entry.url}
