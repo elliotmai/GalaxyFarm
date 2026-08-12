@@ -50,6 +50,8 @@ export const SEARCHABLE_FIELDS = {
   // Assignments are found through the animal or the zone, never by typing.
   zoneAssignments: [],
   feedTypes: ["name", "notes"],
+  feedPurchases: ["notes"],
+  feedConsumption: ["notes"],
   feedingPlans: ["name", "specialNotes"],
   contacts: ["name", "company", "address", "notes"],
   attachments: ["filename", "caption"],

@@ -39,7 +39,11 @@ import {
   weightRecordSchema,
 } from "@galaxy-farm/module-cattle";
 
-import { feedTypeSchema } from "@galaxy-farm/module-feed";
+import {
+  feedConsumptionSchema,
+  feedPurchaseSchema,
+  feedTypeSchema,
+} from "@galaxy-farm/module-feed";
 
 import { allTables } from "../src/schema/index.js";
 import { REPOSITORY_TABLES } from "../src/sync/entities.js";
@@ -86,6 +90,8 @@ const SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   plannedMatings: plannedMatingSchema,
   zoneAssignments: zoneAssignmentSchema,
   feedTypes: feedTypeSchema,
+  feedPurchases: feedPurchaseSchema,
+  feedConsumption: feedConsumptionSchema,
   feedingPlans: feedingPlanSchema,
   contacts: contactSchema,
   attachments: attachmentSchema,

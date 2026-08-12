@@ -78,6 +78,13 @@
       "when": 1786494602368,
       "tag": "0010_feed_types",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786496660685,
+      "tag": "0011_feed_ledgers",
+      "breakpoints": true
     }
   ]
 }

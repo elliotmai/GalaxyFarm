@@ -579,6 +579,43 @@ export const feedingPlans = pgTable(
   baseIndexes("feeding_plans"),
 );
 
+/**
+ * Feed bought and feed used (§5.3, issue #18).
+ *
+ * Both are append-only logs, and the on-hand count is derived from them rather
+ * than stored — §4.5's rule for a running total: the log entries carry the
+ * CRUD and the total re-derives. A stored count would drift the first time
+ * somebody edited a purchase.
+ */
+export const feedPurchases = pgTable(
+  "feed_purchases",
+  {
+    ...baseColumns,
+    feedTypeId: text("feed_type_id").notNull(),
+    quantity: doublePrecision("quantity").notNull(),
+    unitCost: jsonb("unit_cost").$type<{ cents: number }>().notNull(),
+    vendorContactId: text("vendor_contact_id"),
+    purchasedOn: timestamp("purchased_on", { withTimezone: true }).notNull(),
+    notes: text("notes"),
+  },
+  baseIndexes("feed_purchases"),
+);
+
+export const feedConsumption = pgTable(
+  "feed_consumption",
+  {
+    ...baseColumns,
+    feedTypeId: text("feed_type_id").notNull(),
+    quantity: doublePrecision("quantity").notNull(),
+    kind: text("kind").notNull(),
+    usedOn: timestamp("used_on", { withTimezone: true }).notNull(),
+    animalId: text("animal_id"),
+    zoneId: text("zone_id"),
+    notes: text("notes"),
+  },
+  baseIndexes("feed_consumption"),
+);
+
 export const contacts = pgTable(
   "contacts",
   {
@@ -871,6 +908,8 @@ export const allTables = {
   zoneAssignments,
   feedTypes,
   feedingPlans,
+  feedPurchases,
+  feedConsumption,
   contacts,
   attachments,
   choreTemplates,

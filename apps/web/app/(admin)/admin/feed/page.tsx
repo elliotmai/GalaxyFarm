@@ -1,7 +1,13 @@
-import { PagePlaceholder } from "../../../_components/page-placeholder";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Feed Inventory" };
+import { FeedScreen } from "@/app/(admin)/admin/feed/_components/feed-screen";
+import { currentActor } from "@/lib/auth";
 
-export default function AdminFeedPage() {
-  return <PagePlaceholder title={"Feed Inventory"} route={"/admin/feed"} />;
+export const metadata = { title: "Feed inventory" };
+
+export default async function AdminFeedPage() {
+  const actor = await currentActor();
+  if (actor === undefined) redirect("/login?next=/admin/feed");
+
+  return <FeedScreen propertyId={actor.propertyId} actorId={actor.id} />;
 }
