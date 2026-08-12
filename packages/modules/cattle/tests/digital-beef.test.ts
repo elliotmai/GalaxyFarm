@@ -12,7 +12,9 @@ import {
 } from "../src/domain/digital-beef.js";
 import {
   CHIANINA_PAGE,
+  CHIANINA_SPARSE_PAGE,
   MAINE_ANJOU_PAGE,
+  SHORTHORN_CARRIER_PAGE,
   SHORTHORN_PAGE,
 } from "./fixtures/digital-beef-pages.js";
 
@@ -326,6 +328,53 @@ describe("the odds and ends", () => {
     expect(parseComposition("50% MA 25% CH")).toEqual([
       { breed: "MA", percent: 50 },
       { breed: "CH", percent: 25 },
+    ]);
+  });
+});
+
+describe("pages that broke earlier readings", () => {
+  it("keeps three blank rows as three empty slots", () => {
+    // The Chianina page for ZNT TRIPLE X records one of his dam's dam's four
+    // grandparents, printed as three blanks, the animal, three blanks. An
+    // earlier version squeezed runs of blank lines down to one, which moved
+    // her two slots up and made her the dam's dam's sire.
+    const animal = read(CHIANINA_SPARSE_PAGE, "ACA", "319149");
+
+    expect(at(animal, "dam")?.name).toBe("JAZX AUDREY 352N");
+    expect(at(animal, "dam's dam")?.name).toBe("JAZX MAINE ANJOU 352");
+    expect(at(animal, "dam's dam's sire")).toBeUndefined();
+  });
+
+  it("reads a carrier as a carrier", () => {
+    // `THC` — tibial hemimelia, carrier by test. Every other page checked in
+    // here reads THF, so until this one nothing proved the suffix was read.
+    const animal = read(SHORTHORN_CARRIER_PAGE, "ASA", "4094372");
+    const improver = [...animal.ancestors, ...animal.unplacedAncestors].find(
+      (entry) => entry.name === "DEERPARK IMPROVER 57",
+    );
+
+    expect(improver?.geneticTests).toContainEqual(
+      expect.objectContaining({ defect: "TH", status: "carrier" }),
+    );
+    expect(improver?.geneticTests).toContainEqual(
+      expect.objectContaining({ defect: "PHA", status: "free" }),
+    );
+  });
+
+  it("still reads the whole chart on that page", () => {
+    const animal = read(SHORTHORN_CARRIER_PAGE, "ASA", "4094372");
+
+    expect(animal.ancestors).toHaveLength(30);
+    expect(at(animal, "sire")?.name).toBe("CF TRUMP X");
+    expect(at(animal, "dam")?.name).toBe("NPS DESERT ROSE 004");
+  });
+
+  it("reads the Chianina makeup off the detail panel", () => {
+    expect(read(CHIANINA_SPARSE_PAGE, "ACA", "319149").breedComposition).toEqual([
+      { breed: "CA", percent: 6.44 },
+      { breed: "MA", percent: 69.14 },
+      { breed: "AN", percent: 23.82 },
+      { breed: "XX", percent: 0.6 },
     ]);
   });
 });

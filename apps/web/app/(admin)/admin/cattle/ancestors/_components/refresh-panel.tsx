@@ -71,6 +71,8 @@ export function RefreshFromAssociation({
   const [others, setOthers] = useState<
     readonly { animal: ExternalAnimal; changes: readonly FieldChange[] }[]
   >([]);
+  /** True when the page came back with a detail panel but no pedigree chart. */
+  const [chartMissing, setChartMissing] = useState(false);
   const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
 
   const [association, regNumber] = which.split(":");
@@ -82,6 +84,7 @@ export function RefreshFromAssociation({
   function present(page: string, ref: { association: string; registration: string; url: string }) {
     const read = parseDigitalBeefPage(page, ref as never);
     const found = refreshChanges(animal, read);
+    setChartMissing(read.ancestors.length === 0);
 
     // The chart on this page carries the defect results, colours and birth
     // dates of the *ancestors* — Digital Beef never prints an animal's own
@@ -271,7 +274,18 @@ export function RefreshFromAssociation({
         </p>
       )}
 
-      {changes === undefined ? null : changes.length === 0 ? (
+      {!chartMissing ? null : (
+        <Callout tone="action" title="That page came back without its pedigree chart">
+          Digital Beef renders the animal&apos;s details on the page and loads the pedigree tab
+          separately, so a fetch can come back with the name and the colour and no ancestors at
+          all. <strong>Defect results only exist on the chart</strong> — they are printed beside
+          each ancestor, never on the animal&apos;s own page — so without it there are none to
+          read. Open the page in a browser and paste it below; a select-all copies what the tabs
+          loaded.
+        </Callout>
+      )}
+
+      {changes === undefined ? null : changes.length === 0 && others.length === 0 ? (
         <Callout tone="calm" title="Nothing has changed">
           Everything on the page matches what is on file. Worth knowing — it means the record has
           not gone stale, which is not the same as nobody having looked.

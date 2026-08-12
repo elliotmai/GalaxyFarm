@@ -219,3 +219,151 @@ Defect Color Code meanings: \t Green - this animal has been tested and is confir
 \tDigitalBeef, LLC | PostNuke | Zikula \t
 `;
 
+
+/**
+ * A Chianina page whose dam's-dam block is three blanks, one animal, three
+ * blanks. The blanks are the three grandparents nobody recorded, and they are
+ * what says the animal in the middle is the dam's dam rather than her sire.
+ */
+export const CHIANINA_SPARSE_PAGE = ` Animal Detail Screen \t   \t  
+Identification\t\tOther Details
+ Sex:  \tBull\t Sire:  MA323178 \t CMAC HARD CORE 
+ Name:  \tZNT TRIPLE X\t Dam:  303231 \t JAZX AUDREY 352N 
+ Herd Prefix/Tattoo:  \t
+ZNT\tLE: 503R 
+ Chianina %:  \t6.44  Classification: 1CM
+ Registration:  \t319149\t Genetic Makeup:  \t6.44% CA | 69.14% MA | 23.82% AN | 0.6% XX 
+ International ID:  \tCIAUSAM000000319149\t  COI:  \t0%
+ EID:  \t\t Service Type:  \tArtificial Insemination
+ Horn/Poll/Scur: \tScurred\t Breeder:  \t(N) ZNT CATTLE CO (36694) 
+ Color: \tBlack\t Owner:  \t(N) CEDAR TOP RANCH (28286) 
+ \t DOB: 09/10/2005  \t Age: 20 years, 11 months, 2 days
+ Status:  \tActive
+tab left\tPedigree\ttab right
+tab left\tDNA\ttab right
+   5-Generation Pedigree   
+Defect Key:  \t     Free by Test\t     Free by Pedigree\t     Suspected Carrier\t     Carrier by Test\t     Affected by Test
+  \t
+connector\tMA211933        CALBERTA PAYDIRT 169C         [ ]   
+connector\tMA227544        RSG PAY OFF 805E MCF         [ RSG805E ]    -- PHAF THF
+connector\tMA190151        MISS GLOVER 7H         [ ]   
+connector\tMA291476        MCF MR DEBS GIRL PAYOFF         [ MCF23L ]    -- PHAF THF
+connector\tMA132774        MR BILL 042X         [ ]   
+connector\tMA195844        DEBBIES GIRL RW71C         [ ]   
+connector\tMA192408        MISS DEBBIE         [ ]   
+Sire:  \t
+MA323178        CMAC HARD CORE         [ CMAC55N ]    -- AMS DDS NHS PHAFT THFT
+  \t
+connector\tMA120327        PISTOL PETE         [ JJW446V ]   
+connector\t264745        FGJ HABANERO         [ FGJ9500E ]    -- AMS DDS NHS PHAFT THFT
+connector\t264685        JDA MS PWR PLANT 19A 1CM         [ 19A ]    -- AMS DDS NHS
+connector\tMA267938        CMAC DANDYS SAMANTHA ET         [ ]    -- AMS DDS NHS
+connector\tMA135189        FR MAGIC 179X         [ GFF179X ]   
+connector\tMA196960        D&D SWEET DANDY         [ ]   
+connector\tMA142764        MAJORS RB SWEET CHEEKS         [ ]   
+  \t
+connector\t187623        TOTAL PLAY CAX         [ 75V 75V ]   
+connector\t240047        WYR IMPULSE 1CA         [ 0315E ]   
+connector\tAN10700901        ERICA IRENE 179 B W         [ 591 591 ]   
+connector\t276412        CTR SUCCESS 02K 2CA         [ 02K ]   
+connector\t188099        MOONSHINE PCA         [ 53X 53X ]   
+connector\t276404        CTR STARLIGHT 5691E 1CA         [ 5691E ]   
+connector\tF105540        RTC ANGUS 9396         [ ]   
+Dam:  \t
+303231        JAZX AUDREY 352N         [ 352N ]    -- PHAFT THFT
+  \t 
+ 
+ 
+connector\tC102102        JAZX MAINE ANJOU 352         [ ]   
+ 
+ 
+ 
+\tDigitalBeef, LLC | PostNuke | Zikula \t
+`;
+
+/**
+ * A Shorthorn page carrying a real carrier: `THC` on DEERPARK IMPROVER 57.
+ *
+ * Every other page checked in here reads `THF` — free — so nothing until now
+ * proved the carrier suffix was read as anything at all.
+ */
+export const SHORTHORN_CARRIER_PAGE = ` Animal Detail Screen \t   \t  
+Identification\t\tOther Details
+ Sex:  \tBull\t Sire:  *x3909231 \t CF TRUMP X 
+ Name:  \tCF PRIMO X ET\t Dam:  4021066 \t NPS DESERT ROSE 004 
+ Herd Prefix: \t Tattoo - LE: 541 : \t
+ Shorthorn %:  \tSH100
+ Registration:  \t*x4094372\t   \t 
+ International ID:  \tBSHUSAM000004094372\t  COI:  \t2.51%
+ EID:  \t\t Service Type:  \tEmbryo Transfer
+ Horn/Poll/Scur: \tPolled\t Breeder:  \t(N) TYLER HAHN (14-6321) 
+ \t DOB: 03/04/2005  \t Age: 21 years, 5 months, 8 days
+ Status:  \tActive - Active
+ Color: Roan
+tab left\tPedigree\ttab right
+   5-Generation Pedigree   
+  \t
+connector\tMA100056        [ ]        ATAN  
+connector\tMA6963        [ 123565 ]        CUNIA   PHAF THF
+ \tRed & White, 06/10/1969, ROBERT BOUVET
+connector\tMA100057        [ ]        PETUNIA  
+connector\t*xAR20454        [ 091 ]        PHILDON CUNIA DIVIDEND  
+ \tRed & White, 02/16/1991, PHILDON FARMS
+connector\t3684143        [ ]        DEERPARK LEADER 13TH   DSF
+ \tRoan, 03/09/1973, EDWARD QUANE
+connector\tx3746078        [ 203 ]        PHILDON FINESSE  
+ \tRed & White, 06/01/1982, PHILDON FARMS
+connector\tx3678443        [ ]        PHILDON DIANNA 4  
+ \tWhite, PHILDON FARMS
+Sire:  \t
+*x3909231        [ 334 ]        CF TRUMP X   DSF PHAF THF
+ \tRoan, 03/15/1993, CATES FARMS
+  \t
+connector\tx3818499        [ R617 ]        GR COMBO  
+ \tRed w/ White Marks, 06/28/1986, GREEN RIDGE SHORTHORNS
+connector\tx3843826        [ 809 ]        EVERGREEN NUGGET 88 ET  
+ \tRed w/ White Marks, 04/07/1988, RACHEL SCHILLING
+connector\t3775267        [ 3298 ]        GR BONNIE RACHEL 83  
+ \tRed, 11/18/1983, RACHEL SCHILLING
+connector\tx3881362        [ 158 ]        CF CARMELE NG NG 158X  
+ \tRed w/ White Marks, 04/22/1991, CATES FARMS
+connector\tx3790685        [ 5C21 ]        CF RAMBO X  
+ \tRed, 01/30/1985, CATES FARMS
+connector\tx3848031        [ 950 ]        CF CARMELE RB 950X  
+ \tRed w/ White Marks, 03/18/1989, CATES FARMS
+connector\t3807175        [ 646 ]        CF CARMELE DT 86   DSP THP
+ \tRed w/ White Marks, 03/16/1986, CATES FARMS
+  \t
+connector\tI605697        [ ]        DEERPARK IMPROVER 19TH  
+connector\t3807924        [ IAAU5 ]        DEERPARK IMPROVER 57   DSF PHAF THC
+ \tRed, 04/05/1982, EDWARD QUANE
+connector\tI217596        [ ]        DEERPARK SCARLET 11TH   DSP THP
+connector\tx3989821        [ 774 ]        NPS DURANGO 774 CBH ET   DSF PHAF THF
+ \tRoan, 07/30/1997, NICK STEINKE
+connector\t3744349        [ 8254 ]        LEN RU T A LEADER   DSC PHAF THF
+ \tRoan, 02/01/1982, W.O POLLED SHORTHORNS
+connector\t*x3869997        [ 479 ]        KA'BA ROSE T90   DSF PHAF THF
+ \tRoan, 06/23/1990, KA'BA RANCH
+connector\t*sxAR14708        [ 245 ]        KA'BA MARY ROSE 88T   PHAF THF
+ \tRoan, 06/22/1988, KA'BA RANCH
+Dam:  \t
+4021066        [ 004 ]        NPS DESERT ROSE 004   PHAF THF
+ \tRed & White, 03/04/2000, NICK STEINKE
+  \t
+connector\tx3854743        [ 539T ]        C CISCO SE 539  
+ \tRed w/ White Marks, 05/04/1989, C.WHITE CATTLE CO.
+connector\tx3921311        [ 9340 ]        JG CACTUS JACK C9340   DSF
+ \tRed, 07/01/1993, JETT-GARDNER POLLED SHORTHORNS
+connector\tx3855100        [ 9Q32 ]        QH SWEET RODEO DRIVE 9Q32  
+ \tRed, 03/22/1989, QUESTING HILLS FARM
+connector\tx3998785        [ 833 ]        NPS DESERT ROSE 833 ET   PHAF THF
+ \tRed, 04/03/1998, NICK STEINKE
+connector\t3744349        [ 8254 ]        LEN RU T A LEADER   DSC PHAF THF
+ \tRoan, 02/01/1982, W.O POLLED SHORTHORNS
+connector\t*x3869997        [ 479 ]        KA'BA ROSE T90   DSF PHAF THF
+ \tRoan, 06/23/1990, KA'BA RANCH
+connector\t*sxAR14708        [ 245 ]        KA'BA MARY ROSE 88T   PHAF THF
+ \tRoan, 06/22/1988, KA'BA RANCH
+Defect Color Code meanings: \t Green - this animal has been tested and is confirmed free
+\tDigitalBeef, LLC | PostNuke | Zikula \t
+`;

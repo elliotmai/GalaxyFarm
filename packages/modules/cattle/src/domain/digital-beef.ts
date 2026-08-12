@@ -147,7 +147,12 @@ export function textOf(source: string): string {
     // separating `MA185219` from `JF WAR CHIEF` on a Chianina pedigree line.
     .map((line) => line.replace(/[ \t]+$/, "").replace(/^[ \t]+/, ""))
     .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
+    // Runs of blank lines are **not** collapsed either, and this one cost a
+    // whole afternoon. Three blank rows in a pedigree block are three
+    // ancestors nobody recorded, and squeezing them to one moves everything
+    // below them two slots up. The Chianina page for ZNT TRIPLE X records one
+    // of his dam's dam's grandparents as three blanks, the animal, three
+    // blanks — collapse those and she lands in her own mother's place.
     .trim();
 }
 
@@ -468,17 +473,28 @@ const SUBTREE = [
 
 const SUBTREE_SLOTS = SUBTREE.length;
 
-const dropLeadingGaps = (tokens: readonly Token[]): Token[] => {
-  let start = 0;
-  while (start < tokens.length && tokens[start]?.kind === "gap") start += 1;
-  return tokens.slice(start);
-};
+/**
+ * Slot → the slot of its child, in the seven-slot in-order layout.
+ *
+ * 1 and 3 are slot 2's parents; 5 and 7 are slot 6's; 2 and 6 are the root's.
+ * The root at 4 has no child inside the block.
+ */
+const CHILD_SLOT: Readonly<Record<number, number>> = { 0: 1, 2: 1, 4: 5, 6: 5, 1: 3, 5: 3 };
 
-const dropTrailingGaps = (tokens: readonly Token[]): Token[] => {
-  let end = tokens.length;
-  while (end > 0 && tokens[end - 1]?.kind === "gap") end -= 1;
-  return tokens.slice(0, end);
-};
+/**
+ * Does this reading look like a printed pedigree?
+ *
+ * An ancestor recorded while the animal between it and the root is blank is
+ * not something a chart prints — it is a misread offset. Cheap to check and it
+ * is the only thing that tells a separator row from an empty first slot.
+ */
+function isCoherentChart(window: readonly Token[]): boolean {
+  return window.every((token, index) => {
+    if (token.kind !== "entry") return true;
+    const child = CHILD_SLOT[index];
+    return child === undefined || window[child]?.kind === "entry";
+  });
+}
 
 /**
  * Place one subtree's ancestors, or decline to.
@@ -494,9 +510,7 @@ export function placeSubtree(
   root: string,
   rootGeneration: number,
 ): ImportedAncestor[] | undefined {
-  const lead = dropLeadingGaps(tokens);
-  const both = dropTrailingGaps(lead);
-  const entries = both.filter((token) => token.kind === "entry");
+  const entries = tokens.filter((token) => token.kind === "entry");
   if (entries.length === 0) return [];
 
   const at = (slot: number, entry: ImportedAncestor): ImportedAncestor => {
@@ -523,22 +537,62 @@ export function placeSubtree(
   }
 
   // A short block places only when the blank rows account for what is missing.
-  // The chart is a table: an ancestor nobody recorded still renders a row, so
-  // a seven-row block with two blanks in it is unambiguous. Rows past the
-  // seventh are the separator before whatever comes next and must all be
-  // blank — if one of them holds an animal, this is not the shape assumed
-  // here and nothing gets placed.
-  if (lead.length >= SUBTREE_SLOTS) {
-    const overflow = lead.slice(SUBTREE_SLOTS);
-    return overflow.every((token) => token.kind === "gap")
-      ? bySlot(lead.slice(0, SUBTREE_SLOTS))
-      : undefined;
+  // The chart is a table: an ancestor nobody recorded still renders a row, so a
+  // seven-row block with blanks in it is unambiguous.
+  //
+  // The order these are tried in is the whole subtlety. A leading blank is
+  // sometimes the separator between blocks and sometimes the *first slot* of
+  // the block itself, and nothing in the text distinguishes them — so the run
+  // that already measures seven wins, whichever end its blanks are on. The
+  // Chianina page for ZNT TRIPLE X records exactly one of its dam's dam's four
+  // grandparents, as three blanks, the animal, three blanks: dropping the
+  // leading three first would put her in her own great-grandmother's slot.
+  //
+  // Leading gaps come off first, because the one row that is reliably *not* a
+  // slot is the separator printed between blocks — it appears before the first
+  // block and after each of the sire and dam rows. Only if that does not
+  // measure seven is the run taken as printed.
+  // Which row is the block's first slot, and which is the separator printed
+  // between blocks, cannot be told apart by looking: both are blank. So every
+  // reading is tried and the incoherent ones are thrown away.
+  //
+  // The rule that separates them is how a pedigree is printed, not how this
+  // text happens to be shaped: **a chart never records a great-grandparent
+  // without the grandparent between them.** Digital Beef prints the parent
+  // whenever the child is known, so a filled slot whose own child slot is
+  // blank is not a chart — it is this misreading its offset.
+  //
+  // That one rule settles both of the real pages that disagree. On ZNT MONTEGO
+  // BAY the leading blank *is* a separator; on ZNT TRIPLE X it is the first of
+  // three empty slots, and reading it as a separator would put his dam's dam
+  // in her own daughter's place.
+  const leadingGaps = tokens.findIndex((token) => token.kind !== "gap");
+  const candidates: Token[][] = [];
+
+  for (let skip = 0; skip <= Math.max(leadingGaps, 0); skip += 1) {
+    const window = tokens.slice(skip, skip + SUBTREE_SLOTS);
+    // Anything past the seventh row has to be blank — it is the separator
+    // before whatever comes next, not an eighth ancestor.
+    if (!tokens.slice(skip + SUBTREE_SLOTS).every((token) => token.kind === "gap")) continue;
+    if (window.filter((token) => token.kind === "entry").length !== entries.length) continue;
+
+    // A block whose tail was trimmed by the copy is padded back out. The
+    // missing rows are blank slots either way.
+    while (window.length < SUBTREE_SLOTS) window.push({ kind: "gap" });
+    if (isCoherentChart(window)) candidates.push(window);
   }
 
-  // Fewer than seven rows and no way to tell which ones are missing. A guess
-  // here shifts every ancestor below the gap up one slot, which is how a
-  // great-grandsire becomes a grandsire and every relatedness figure computed
-  // afterwards is quietly wrong. These come back unplaced instead.
+  const distinct = new Set(
+    candidates.map((window) =>
+      window.map((token) => (token.kind === "entry" ? "x" : ".")).join(""),
+    ),
+  );
+  if (distinct.size === 1 && candidates[0] !== undefined) return bySlot(candidates[0]);
+
+  // No coherent reading, or more than one that disagree. A guess here shifts
+  // every ancestor below the gap by a slot, which is how a great-grandsire
+  // becomes a grandsire and every relatedness figure worked out afterwards is
+  // quietly wrong. These come back unplaced instead.
   return undefined;
 }
 

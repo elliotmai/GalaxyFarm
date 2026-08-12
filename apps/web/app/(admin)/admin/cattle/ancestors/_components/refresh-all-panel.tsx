@@ -101,6 +101,8 @@ export function RefreshAllAncestors({
   const [stopped, setStopped] = useState(false);
   const [findings, setFindings] = useState<readonly Finding[]>([]);
   const [failures, setFailures] = useState<readonly Failure[]>([]);
+  /** Pages that came back with a detail panel but no pedigree chart. */
+  const [chartless, setChartless] = useState(0);
   /** `${animalId}:${field}` for every change agreed to. */
   const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -111,6 +113,7 @@ export function RefreshAllAncestors({
     setDone(0);
     setFindings([]);
     setFailures([]);
+    setChartless(0);
     setAccepted(new Set());
 
     const found: Finding[] = [];
@@ -172,6 +175,10 @@ export function RefreshAllAncestors({
 
           read = true;
           const page = parseDigitalBeefPage(payload.page, parsed.ref);
+          // A page without its chart carries no defect results at all — they
+          // are printed beside each ancestor and nowhere else — so this is
+          // counted and said out loud rather than passing as "no changes".
+          if (page.ancestors.length === 0) setChartless((count) => count + 1);
           record(animal, registration, refreshChanges(animal, page));
 
           // The chart on this page carries the defect results of the ancestors
@@ -222,6 +229,7 @@ export function RefreshAllAncestors({
           });
         } else {
           const page = parseDigitalBeefPage(payload.page, parsed.ref);
+          if (page.ancestors.length === 0) setChartless((count) => count + 1);
           for (const entry of pedigreeChanges(page, animals)) {
             record(entry.animal, { association: ours.association, regNumber: ours.regNumber }, entry.changes);
           }
@@ -325,6 +333,17 @@ export function RefreshAllAncestors({
             />
           )}
         </>
+      )}
+
+      {chartless === 0 ? null : (
+        <Callout tone="action" title={`${chartless} pages came back without a pedigree chart`}>
+          Digital Beef renders the details on the page and loads the pedigree tab separately, so a
+          server fetch can come back with names and colours and no ancestors.{" "}
+          <strong>Defect results only exist on the chart</strong> — printed beside each ancestor,
+          never on the animal&apos;s own page — so those pages had none to give. Check those
+          animals one at a time and paste the page; a select-all in a browser copies what the tabs
+          loaded.
+        </Callout>
       )}
 
       {failures.length === 0 ? null : (

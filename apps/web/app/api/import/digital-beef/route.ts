@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { parseDigitalBeefPage, parseDigitalBeefUrl } from "@galaxy-farm/module-cattle";
 
 import { currentActor } from "@/lib/auth";
+import { pedigreeDocuments } from "@/lib/digital-beef-panels";
 
 /**
  * /api/import/digital-beef — fetch an animal page and read it (spec §5.2).
@@ -24,12 +25,35 @@ import { currentActor } from "@/lib/auth";
  * It does not **retry**. A site that refuses a datacenter IP will refuse it
  * again, and the honest answer is the paste-the-page fallback rather than
  * three more seconds of the same failure.
+ *
+ * What it *does* do is fetch more than one document, and that took three
+ * rounds to find. **The pedigree chart is not in the animal's page.** Digital
+ * Beef renders the detail panel server-side and loads the tabs beneath it —
+ * pedigree, EPDs, progeny — separately, so a plain fetch of the animal's URL
+ * comes back with the name, the sex and the colour and no ancestors at all.
+ * Pasting the page works because a browser has already run those requests and
+ * a select-all copies what they produced.
+ *
+ * That is why every defect result was missing: the flags live on the chart,
+ * and the chart was never in what the server had. The sub-documents are found
+ * by reading the page for its own URLs rather than by hardcoding a path,
+ * because a path invented here would break the day the template moves and
+ * would be indistinguishable from the animal simply having no pedigree.
  */
 
 export const dynamic = "force-dynamic";
 
 /** Long enough for a slow association site, short enough not to hang a form. */
 const TIMEOUT_MS = 20_000;
+
+/**
+ * How many of the page's own sub-documents to follow.
+ *
+ * Two: the pedigree tab, and whichever near-miss the page names alongside it.
+ * A page that listed forty would be a page this should not be walking.
+ */
+const MAX_SUB_DOCUMENTS = 2;
+
 
 export async function POST(request: Request) {
   const actor = await currentActor();
@@ -48,6 +72,7 @@ export async function POST(request: Request) {
   }
 
   let html: string;
+  const fetched: string[] = [];
   try {
     const response = await fetch(parsed.ref.url, {
       // These pages are served to browsers and some hosts refuse anything that
@@ -74,6 +99,34 @@ export async function POST(request: Request) {
     }
 
     html = await response.text();
+
+    // The tabs, fetched from whatever URLs the page itself names. Same host
+    // only — this validated the animal's URL against the three known hosts
+    // before fetching, and following an arbitrary link out of a page's markup
+    // would hand that guarantee straight back.
+    for (const extra of pedigreeDocuments(html, parsed.ref.url).slice(0, MAX_SUB_DOCUMENTS)) {
+      try {
+        const panel = await fetch(extra, {
+          headers: {
+            "user-agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
+            accept: "text/html,application/xhtml+xml,*/*",
+            referer: parsed.ref.url,
+          },
+          redirect: "follow",
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+          cache: "no-store",
+        });
+        if (!panel.ok) continue;
+        const body = await panel.text();
+        fetched.push(extra);
+        html += `\n${body}`;
+      } catch {
+        // One tab failing is not the whole read failing. The detail panel is
+        // already in hand and the screen says what came back empty.
+        continue;
+      }
+    }
   } catch (error) {
     // Every failure here has the same fix, so they get the same message: the
     // site is unreachable from this server, and the page in front of you is
@@ -98,6 +151,16 @@ export async function POST(request: Request) {
     // difference between them would be a difference in the *fetch*, which is
     // exactly the thing nobody would think to look for.
     ...(body.raw === true ? { page: html } : {}),
+    /**
+     * Which extra documents were pulled in.
+     *
+     * Reported so a screen can tell "the pedigree tab could not be fetched"
+     * apart from "this animal has no pedigree recorded" — three rounds of
+     * "the defects still are not coming through" were exactly that
+     * distinction going unmade.
+     */
+    panels: fetched,
+    pedigreeFound: animal.ancestors.length > 0,
     // Returned so the screen can say "we fetched a page and read nothing off
     // it", which is a different problem from "we could not fetch a page".
     fetched: true,
