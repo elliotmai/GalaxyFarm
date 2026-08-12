@@ -5,6 +5,7 @@ import {
   normaliseRegistration,
   type ExternalAnimal,
 } from "./pedigree.js";
+import { splitRegistration } from "./registries.js";
 
 /**
  * Checking an animal against the association again (spec §5.2).
@@ -152,23 +153,39 @@ export function refreshChanges(
     });
   }
 
-  // A number this registry issued that is not on the record yet. Added rather
-  // than replacing, because an animal papered twice keeps both.
+  // Registrations, on two counts.
+  //
+  // One: a number this registry issued that is not on the record yet. Added
+  // rather than replacing, because an animal papered twice keeps both.
+  //
+  // Two: a number filed under the wrong registry. A record holding `ASA /
+  // MA364424` is a Maine-Anjou animal that arrived on a Shorthorn page, and
+  // until it is re-filed every lookup of it asks the wrong association — which
+  // is a refresh that finds nothing and a link that opens a page saying no
+  // such animal. Proposed rather than done, like everything else here.
   const known = allRegistrations(existing);
-  const holds = known.some(
+  const filed = known.map((entry) => {
+    const issued = splitRegistration(entry.regNumber, entry.association);
+    return issued.foreignTo === undefined
+      ? entry
+      : { association: issued.association, regNumber: issued.regNumber };
+  });
+  const holds = filed.some(
     (entry) =>
       entry.association === imported.association &&
       entry.regNumber.replace(/\D/g, "") === imported.registration.replace(/\D/g, ""),
   );
-  if (!holds) {
-    const next = [
-      ...known,
-      { association: imported.association, regNumber: imported.registration },
-    ];
+  const next = holds
+    ? filed
+    : [...filed, { association: imported.association, regNumber: imported.registration }];
+
+  if (show(next) !== show(known)) {
     changes.push({
       field: "registrations",
       label: LABELS["registrations"] as string,
-      kind: "fill",
+      // Re-filing is a *change* — it moves a number from one registry to
+      // another — so it is not ticked by default and shows both sides.
+      kind: holds ? "change" : "fill",
       before: show(known),
       after: show(next),
       value: next,
@@ -220,11 +237,13 @@ function findParent(
   everyone: readonly ExternalAnimal[],
 ): ExternalAnimal | undefined {
   if (parent.regNumber !== undefined) {
-    const wanted = normaliseRegistration(parent.regNumber);
+    // `Sire: MA364424` on a Chianina page is a Maine-Anjou number, so the
+    // registry to search is the one that issued it and not the one printing
+    // it. Both spellings are tried, for records written before that was known.
+    const wanted = new Set(chartKeys(parent.regNumber, association));
     const byNumber = everyone.find((animal) =>
-      allRegistrations(animal).some(
-        (entry) =>
-          entry.association === association && normaliseRegistration(entry.regNumber) === wanted,
+      allRegistrations(animal).some((entry) =>
+        wanted.has(`${entry.association}:${normaliseRegistration(entry.regNumber)}`),
       ),
     );
     if (byNumber !== undefined) return byNumber;
@@ -258,6 +277,29 @@ function findParent(
  * every chart entry, going back to bulls born in the 1950s, and that is the
  * only record of either that exists anywhere.
  */
+/**
+ * The keys a number printed on a chart could be filed under here.
+ *
+ * Two, and both are needed. A Chianina page prints a Maine-Anjou ancestor as
+ * `MA364424`, and the importer files that where it belongs — under AMAA, as
+ * 364424 — so looking it up as `ACA:MA364424` finds nothing. That is not a
+ * cosmetic miss: the chart is the *only* place an association prints an
+ * ancestor's defect results, so a lookup that fails is a herd that comes back
+ * with no genetics at all. Twelve ancestors on one page carried results and
+ * four of them landed.
+ *
+ * The as-printed key is kept as a fallback for records written before the
+ * registry prefix was understood, which are filed under the page they arrived
+ * on.
+ */
+function chartKeys(regNumber: string, onPage: string): string[] {
+  const issued = splitRegistration(regNumber, onPage);
+  return [
+    `${issued.association}:${normaliseRegistration(issued.regNumber)}`,
+    `${onPage}:${normaliseRegistration(regNumber)}`,
+  ];
+}
+
 export function pedigreeChanges(
   imported: ImportedAnimal,
   existing: readonly ExternalAnimal[],
@@ -278,8 +320,9 @@ export function pedigreeChanges(
   for (const ancestor of [...imported.ancestors, ...imported.unplacedAncestors]) {
     if (ancestor.regNumber === undefined) continue;
 
-    const key = `${imported.association}:${normaliseRegistration(ancestor.regNumber)}`;
-    const match = index.get(key);
+    const match = chartKeys(ancestor.regNumber, imported.association)
+      .map((key) => index.get(key))
+      .find((found) => found !== undefined);
     if (match === undefined || seen.has(match.id)) continue;
     seen.add(match.id);
 
@@ -425,7 +468,7 @@ export function unknownOnChart(
   const found = new Set<string>();
   for (const ancestor of [...imported.ancestors, ...imported.unplacedAncestors]) {
     if (ancestor.regNumber === undefined || ancestor.name === undefined) continue;
-    if (known.has(`${imported.association}:${normaliseRegistration(ancestor.regNumber)}`)) continue;
+    if (chartKeys(ancestor.regNumber, imported.association).some((key) => known.has(key))) continue;
     found.add(ancestor.name);
   }
 

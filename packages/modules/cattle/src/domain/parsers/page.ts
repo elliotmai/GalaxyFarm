@@ -104,6 +104,21 @@ export const BREED_CODES: Record<string, string> = {
   angus: "AN",
   hereford: "HH",
 };
+/**
+ * Is this code the name of a breed rather than anything else?
+ *
+ * Asked before a code goes into the class-on-papers field. `SH` is Shorthorn
+ * and `AN` is Angus; neither is a class, and a record whose papers read
+ * "Class: SH" tells nobody anything the breed makeup beside it did not.
+ */
+export function isBreedCode(code: string): boolean {
+  const wanted = code.trim().toUpperCase();
+  return (
+    Object.values(BREED_CODES).includes(wanted) ||
+    Object.keys(BREED_CODES).includes(wanted.toLowerCase())
+  );
+}
+
 /* ---------------------------------------------------------- registration */
 
 /**

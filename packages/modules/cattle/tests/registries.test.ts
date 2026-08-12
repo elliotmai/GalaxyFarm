@@ -92,6 +92,31 @@ describe("registrationUrl", () => {
   it("has nothing to offer for a registry it does not know", () => {
     expect(registrationUrl("other", "12345")).toBeUndefined();
   });
+
+  it("follows the number, not the registry the record is filed under", () => {
+    // A record holding `ASA / MA364424` is a Maine-Anjou animal that was read
+    // off a Shorthorn page. Asking shorthorn.digitalbeef.com for `MA364424`
+    // gets nothing at all — which is what a refresh that "did nothing" was.
+    expect(registrationUrl("ASA", "MA364424")).toContain("maine-anjou.digitalbeef.com");
+    expect(registrationUrl("ASA", "MA364424")).toContain("animal_registration=364424");
+    expect(registrationUrl("AMAA", "AN13054003")).toBe(
+      "https://www.angus.org/find-an-animal?aid=13054003",
+    );
+  });
+
+  it("works between any two breeds, in either direction", () => {
+    // The rule is not about one registry: a number tagged with another breed's
+    // code belongs to that breed, and it is that registry's page that gets
+    // fetched — the one it was printed on has nothing under that number.
+    expect(registrationUrl("AMAA", "SH4219133")).toContain("shorthorn.digitalbeef.com");
+    expect(registrationUrl("ASA", "CA359968")).toContain("chianina.digitalbeef.com");
+    expect(registrationUrl("ACA", "MA402303")).toContain("maine-anjou.digitalbeef.com");
+  });
+
+  it("leaves a Shorthorn number filed under Shorthorn alone", () => {
+    // `AR` is a register inside the ASA herdbook, not another association.
+    expect(registrationUrl("ASA", "*AR30478")).toContain("shorthorn.digitalbeef.com");
+  });
 });
 
 describe("canRefresh", () => {
@@ -105,6 +130,13 @@ describe("canRefresh", () => {
     expect(canRefresh("ASA")).toBe(true);
     expect(canRefresh("AAA")).toBe(true);
     expect(canRefresh("other")).toBe(false);
+  });
+
+  it("lets the number overrule the registry it is filed under", () => {
+    // Filed under a registry with no reader, but the number names one that
+    // has: refreshable, against Maine-Anjou.
+    expect(canRefresh("other", "MA364424")).toBe(true);
+    expect(canRefresh("other", "12345")).toBe(false);
   });
 
   it("names the association, so a message can say which site it means", () => {

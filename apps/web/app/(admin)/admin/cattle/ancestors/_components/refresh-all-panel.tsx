@@ -57,7 +57,7 @@ interface Failure {
 export function checkable(animals: readonly ExternalAnimal[]): ExternalAnimal[] {
   return animals.filter((animal) =>
     allRegistrations(animal).some((entry) =>
-      canRefresh(entry.association),
+      canRefresh(entry.association, entry.regNumber),
     ),
   );
 }
@@ -168,9 +168,19 @@ export function RefreshAllAncestors({
       // Chianina prints a breed makeup; a Maine-Anjou page carries none at all,
       // so checking the first number and stopping is why a dual-registered
       // animal came back with nothing to say about its breeding.
-      const registrations = allRegistrations(animal).filter((entry) =>
-        canRefresh(entry.association),
-      );
+      //
+      // Deduped by the page each one actually resolves to. A record can hold
+      // the same animal's number twice — once filed correctly and once under
+      // the registry whose page printed it, `ASA / MA364424` — and both
+      // resolve to one Maine-Anjou page. Fetching it twice is a wasted round
+      // trip against an association that is already slow to answer.
+      const byPage = new Map<string, { association: string; regNumber: string }>();
+      for (const entry of allRegistrations(animal)) {
+        if (!canRefresh(entry.association, entry.regNumber)) continue;
+        const url = registrationUrl(entry.association, entry.regNumber);
+        if (url !== undefined && !byPage.has(url)) byPage.set(url, entry);
+      }
+      const registrations = [...byPage.values()];
 
       let read = false;
       for (const registration of registrations) {

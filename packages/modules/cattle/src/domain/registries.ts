@@ -28,6 +28,11 @@
  * ASA herdbook, not another association. Treating it as one would have filed a
  * Shorthorn cow under a breed society that does not exist. Codes that are not
  * listed are left attached to the number, exactly as printed.
+ *
+ * The rule generalises in both directions and is applied that way: a number on
+ * any breed's page tagged with another breed's code belongs to that other
+ * breed, and it is that registry's page that gets fetched — not the one it was
+ * printed on, which has nothing filed under that number at all.
  */
 
 import type { Association } from "./cattle-profile.js";
@@ -84,8 +89,7 @@ export const REGISTRIES: readonly Registry[] = [
   {
     code: "ASA",
     name: "American Shorthorn Association",
-    // No prefix: `AR` and `SH` on a Shorthorn page are its own registers, and
-    // nothing has been seen citing an ASA number from off-site.
+    prefix: "SH",
     urlFor: (registration) => digitalBeef("shorthorn.digitalbeef.com", registration),
     readable: true,
   },
@@ -105,13 +109,6 @@ const BY_CODE = new Map(REGISTRIES.map((registry) => [registry.code, registry]))
 
 export function registryFor(code: string): Registry | undefined {
   return BY_CODE.get(code.trim().toUpperCase());
-}
-
-/** The animal's page on whichever registry issued the number. */
-export function registrationUrl(code: string, registration: string): string | undefined {
-  const registry = registryFor(code);
-  if (registry?.urlFor === undefined) return undefined;
-  return registry.urlFor(registration.trim());
 }
 
 export interface SplitRegistration {
@@ -153,6 +150,37 @@ export function splitRegistration(value: string, onPage: string): SplitRegistrat
 }
 
 /**
+ * The animal's page on whichever registry issued the number.
+ *
+ * The number decides, not the registry it happens to be filed under here. A
+ * record holding `ASA / MA364424` is a Maine-Anjou animal that was read off a
+ * Shorthorn page, and asking shorthorn.digitalbeef.com for `MA364424` gets
+ * nothing at all — which is what a refresh that "did nothing" looked like.
+ */
+export function registrationUrl(code: string, registration: string): string | undefined {
+  const issued = splitRegistration(registration, code);
+  const registry = registryFor(issued.association);
+  if (registry?.urlFor === undefined) return undefined;
+  return registry.urlFor(issued.regNumber);
+}
+
+/**
+ * Where a number should really be filed, and where it is filed now.
+ *
+ * Handed to a screen so it can say "this one is recorded under Shorthorn but
+ * the number is Maine-Anjou's" rather than silently doing something else than
+ * what is on the row.
+ */
+export function resolveRegistration(
+  code: string,
+  registration: string,
+): SplitRegistration & { url?: string | undefined } {
+  const issued = splitRegistration(registration, code);
+  const url = registrationUrl(code, registration);
+  return { ...issued, ...(url === undefined ? {} : { url }) };
+}
+
+/**
  * Registries whose pages this app can actually read.
  *
  * The refresh offers these. The rest get a link and an explanation, which is
@@ -162,9 +190,18 @@ export const READABLE_REGISTRIES: readonly string[] = REGISTRIES.filter(
   (registry) => registry.readable,
 ).map((registry) => registry.code);
 
-/** Whether a registration can be refreshed, or only linked to. */
-export function canRefresh(code: string): boolean {
-  return registryFor(code)?.readable === true;
+/**
+ * Whether a registration can be refreshed, or only linked to.
+ *
+ * Takes the number as well as the code, because the number can overrule it: a
+ * record filed under Shorthorn whose number is `MA364424` is refreshed against
+ * Maine-Anjou, and a record filed under a registry with no reader at all can
+ * still be refreshable if its number names one that has.
+ */
+export function canRefresh(code: string, registration?: string): boolean {
+  const issued =
+    registration === undefined ? code : splitRegistration(registration, code).association;
+  return registryFor(issued)?.readable === true;
 }
 
 /** The Digital Beef associations, for a dropdown that has to offer a choice. */

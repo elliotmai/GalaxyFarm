@@ -119,7 +119,7 @@ export function RefreshFromAssociation({
     // knows how to read. Saying which is far more use than a failed parse: the
     // link is right there, and a person can copy what they find into the
     // record by hand.
-    if (association !== undefined && !canRefresh(association)) {
+    if (association !== undefined && !canRefresh(association, regNumber)) {
       const registry = registryFor(association);
       setError(
         `${registry?.name ?? association} is not a site this app can read. Its page for ` +

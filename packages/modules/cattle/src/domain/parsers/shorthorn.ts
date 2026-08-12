@@ -1,4 +1,10 @@
-import { BREED_CODES, parseComposition, parseShorthornPercent, type FieldReader } from "./page.js";
+import {
+  BREED_CODES,
+  isBreedCode,
+  parseComposition,
+  parseShorthornPercent,
+  type FieldReader,
+} from "./page.js";
 import type { DigitalBeefBreed } from "./digital-beef-breed.js";
 
 /**
@@ -49,13 +55,21 @@ export const SHORTHORN: DigitalBeefBreed = {
     const stated = share === undefined ? undefined : parseShorthornPercent(share);
     if (stated === undefined) return { composition: [] };
 
+    // `SH100` states a breed and a share; `AR50` states a *register* and a
+    // share. Only the second is a class, and putting the first in the class
+    // field made every Shorthorn's papers read "Class: SH" — which says the
+    // animal is a Shorthorn, which the breed makeup right beside it already
+    // said, and which is not what a class means to anybody reading it.
+    const register =
+      stated.register === undefined || isBreedCode(stated.register) ? undefined : stated.register;
+
     return {
       // Zero is a real answer, and it is not a share of anything.
       composition:
         stated.percent === 0
           ? []
           : [{ breed: BREED_CODES.shorthorn as string, percent: stated.percent }],
-      ...(stated.register === undefined ? {} : { classification: stated.register }),
+      ...(register === undefined ? {} : { classification: register }),
     };
   },
 };

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { planImport } from "../src/domain/import-identity.js";
 import { parseDigitalBeefPage } from "../src/domain/parsers/digital-beef.js";
 import {
   applyChanges,
@@ -494,5 +495,74 @@ describe("what a chart offers that is not on file", () => {
       );
 
     expect(unknownOnChart(read, herd)).toEqual([]);
+  });
+});
+
+describe("what the chart says about the ancestors on it", () => {
+  /**
+   * The end-to-end check, and the one that was missing.
+   *
+   * Three separate rounds of "the refresh still is not getting the defects"
+   * came down to a lookup key: the importer files an ancestor under the
+   * registry that issued its number, and the refresh looked it up under the
+   * registry whose page it was printed on. On a Chianina page most ancestors
+   * carry Maine-Anjou numbers, so most of them missed — and the chart is the
+   * *only* place an association prints an ancestor's defect results.
+   *
+   * Asserting the count rather than a sample is deliberate. "Some defects came
+   * through" was true the whole time it was broken.
+   */
+  const imported = () =>
+    parseDigitalBeefPage(CHIANINA_PAGE, { association: "ACA", registration: "359968" });
+
+  /** The herd exactly as the import screen would have written it. */
+  const asImported = (page: ReturnType<typeof imported>) =>
+    planImport(page, [])
+      .rows.filter((row) => row.ancestor !== undefined)
+      .map((row) =>
+        external({
+          name: row.name,
+          ...(row.regNumber === undefined ? {} : { regNumber: row.regNumber }),
+          association: row.association,
+        }),
+      );
+
+  it("proposes results for every ancestor on the chart that has any", () => {
+    const page = imported();
+    const herd = asImported(page);
+
+    const carrying = new Set(
+      page.ancestors.filter((entry) => entry.geneticTests.length > 0).map((entry) => entry.name),
+    );
+    const proposed = pedigreeChanges(page, herd).filter((entry) =>
+      entry.changes.some((change) => change.field === "geneticTests"),
+    );
+
+    expect(carrying.size).toBeGreaterThan(5);
+    expect(proposed).toHaveLength(carrying.size);
+  });
+
+  it("finds an ancestor filed under the registry that issued its number", () => {
+    // `MA364424` on this Chianina page is Maine-Anjou 364424, and that is
+    // where the importer put him.
+    const page = imported();
+    const tyson = external({ name: "CMAC TYSON ET", regNumber: "364424", association: "AMAA" });
+
+    expect(pedigreeChanges(page, [tyson])).toHaveLength(1);
+  });
+
+  it("still finds one filed the old way, under the page it arrived on", () => {
+    // Records written before the prefix was understood are filed under the
+    // printing registry with the tag still on the number. They keep working.
+    const page = imported();
+    const tyson = external({ name: "CMAC TYSON ET", regNumber: "MA364424", association: "ACA" });
+
+    expect(pedigreeChanges(page, [tyson])).toHaveLength(1);
+  });
+
+  it("does not count an animal it already knows as a stranger", () => {
+    const page = imported();
+
+    expect(unknownOnChart(page, asImported(page))).toEqual([]);
   });
 });

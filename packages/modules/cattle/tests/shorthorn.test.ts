@@ -32,12 +32,14 @@ describe("the Shorthorn percentage field", () => {
     expect(parseShorthornPercent("Purebred")).toBeUndefined();
   });
 
-  it("becomes a makeup and a class on the animal", () => {
+  it("becomes a makeup, and does not become a class", () => {
     const animal = read(SHORTHORN_PAGE, "4219133");
 
     expect(animal.breedComposition).toEqual([{ breed: "SH", percent: 100 }]);
-    // The register code is the only place this template states a class.
-    expect(animal.classification).toBe("SH");
+    // `SH` names the breed. Putting it in the class field made every
+    // Shorthorn's papers read "Class: SH", which says only what the breed
+    // makeup beside it already said, and is not what a class means.
+    expect(animal.classification).toBeUndefined();
   });
 });
 
