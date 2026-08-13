@@ -34,8 +34,8 @@ BAR      = 10.0     # face width; 1/4"-1/2" on a 4" character is 6.25%-12.5%
 NOTCH    = 6.25     # 1/4" -- the gap left at a sharp corner or a joint
 MIN_SEP  = 25.0     # 1"   -- between characters, and between parallel lines
 SPREAD   = 1.7      # the scar spreads to about this much of the bar face
-SHARP    = 90.0     # corners under this are heat traps and must be notched
-BEND_R   = 12.0     # 1.5 x bar; flat stock will not take a tighter radius
+SHARP    = 90.0     # corners under this get a notch filed in the iron's face
+BEND_R   = 10.0     # corner radius, capped per-corner so it cannot eat the letter
 MAX_UNITS = 3       # "few brands have more than 3 units"
 
 
@@ -62,50 +62,29 @@ def unpack(piece):
 
 
 def render(piece, r=BEND_R, gap=NOTCH, sharp=SHARP):
-    """Polyline -> SVG path. A corner tighter than `sharp` is left open by
-       `gap` (the filed notch); anything slacker is bent to radius r. Ends
-       tagged as joints are pulled back by the same gap."""
+    """Polyline -> SVG path, continuous, every corner attached and rounded.
+
+    The bar runs through a corner without a break -- a brand is one unbroken
+    drawing, and rounded angles are what the trade calls a `running` letter.
+    The 1/4" notch is real but it is a cut in the FACE of the iron, a groove
+    that lets heat out; it is not a gap in the design and does not appear here.
+
+    Radius is capped at a quarter of the shorter arm so an acute corner is
+    softened rather than swallowed -- the mistake an earlier pass made when it
+    let a fixed radius eat the letterforms."""
     pts, ns, ne = unpack(piece)
-    pts = list(pts)
-    if ns:
-        u = _n((pts[1][0]-pts[0][0], pts[1][1]-pts[0][1]))
-        pts[0] = (pts[0][0]+u[0]*gap, pts[0][1]+u[1]*gap)
-    if ne:
-        u = _n((pts[-2][0]-pts[-1][0], pts[-2][1]-pts[-1][1]))
-        pts[-1] = (pts[-1][0]+u[0]*gap, pts[-1][1]+u[1]*gap)
-    out, cur = [], [pts[0]]
+    d = [f"M{pts[0][0]:.1f} {pts[0][1]:.1f}"]
     for i in range(1, len(pts)-1):
         P, A, B = pts[i], pts[i-1], pts[i+1]
         th = _ang(P, A, B)
         u, v = _n((A[0]-P[0], A[1]-P[1])), _n((B[0]-P[0], B[1]-P[1]))
-        if th < sharp:
-            # notch: stop short of the corner, restart past it
-            t = gap / (2*math.sin(math.radians(th)/2))
-            t = min(t, math.dist(P, A)*0.55, math.dist(P, B)*0.55)
-            cur.append((P[0]+u[0]*t, P[1]+u[1]*t))
-            out.append(cur)
-            cur = [(P[0]+v[0]*t, P[1]+v[1]*t)]
-        else:
-            t = min(r/math.tan(math.radians(th)/2),
-                    math.dist(P, A)/2, math.dist(P, B)/2)
-            rr = t*math.tan(math.radians(th)/2)
-            sw = 1 if (u[0]*v[1] - u[1]*v[0]) > 0 else 0
-            cur.append(("A", (P[0]+u[0]*t, P[1]+u[1]*t),
-                             (P[0]+v[0]*t, P[1]+v[1]*t), rr, sw))
-    cur.append(pts[-1])
-    out.append(cur)
-
-    d = []
-    for run in out:
-        first = run[0]
-        d.append(f"M{first[0]:.1f} {first[1]:.1f}")
-        for step in run[1:]:
-            if isinstance(step, tuple) and step and step[0] == "A":
-                _, a, b, rr, sw = step
-                d.append(f"L{a[0]:.1f} {a[1]:.1f}")
-                d.append(f"A{rr:.1f} {rr:.1f} 0 0 {sw} {b[0]:.1f} {b[1]:.1f}")
-            else:
-                d.append(f"L{step[0]:.1f} {step[1]:.1f}")
+        half = math.tan(math.radians(th)/2)
+        t = min(r/half, 0.25*min(math.dist(P, A), math.dist(P, B)))
+        rr = t*half
+        sw = 1 if (u[0]*v[1] - u[1]*v[0]) > 0 else 0
+        d.append(f"L{P[0]+u[0]*t:.1f} {P[1]+u[1]*t:.1f}")
+        d.append(f"A{rr:.1f} {rr:.1f} 0 0 {sw} {P[0]+v[0]*t:.1f} {P[1]+v[1]*t:.1f}")
+    d.append(f"L{pts[-1][0]:.1f} {pts[-1][1]:.1f}")
     return " ".join(d)
 
 
@@ -193,7 +172,7 @@ def M_connected(x, y=0.0, w=MW, h=H):
     vd = VD*h/H
     zig = [(x, y+h), (x, y), (x+w/2, y+vd), (x+w, y),
            (x+1.5*w, y+vd), (x+2*w, y), (x+2*w, y+h)]
-    leg = ([(x+w, y), (x+w, y+h)], True, False)   # welded here, notched when drawn
+    leg = [(x+w, y), (x+w, y+h)]                  # welded at the apex
     return [zig, leg]
 
 def rocker(x0, x1, y, sag, n=12):
@@ -250,7 +229,7 @@ if __name__ == "__main__":
         allok &= ok
         w, h = vb.split()[2], vb.split()[3]
         print(f"{'OK ' if ok else 'XX '}{name:30s} {w:>3s}x{h:<3s} "
-              f"ratio={int(w)/int(h):.2f} units={units} notches={st['notches']} "
+              f"ratio={int(w)/int(h):.2f} units={units} filed-corners={st['notches']} "
               f"closest={st['closest']}")
         for p in probs[:3]:
             print(f"        - {p}")

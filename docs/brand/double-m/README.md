@@ -14,9 +14,15 @@ Open **[`concepts.html`](./concepts.html)**. Marks are named in brand grammar �
 modifier first, letter last — rather than by the numbering earlier sheets used.
 The full history is in git.
 
+> **Sourcing caveat.** This environment's network blocks `tscra.org`, so the
+> rules below were assembled from search summaries of that page plus the
+> iron-making sources at the end. I have not seen a single brand rendered on it.
+> Anything here that conflicts with the drawings on the page itself is wrong
+> here, not there.
+
 ## The correction
 
-Earlier versions of this sheet got the corners backwards, twice.
+The corners took three goes.
 
 **First they drew mitred corners** and called that the buildable language. Flat
 bar bends; it doesn't fold. A mitre is a cut and two welds.
@@ -28,15 +34,19 @@ letters. That produced a derivation, presented confidently, that "a brandable M
 has no vertical strokes." It was an artefact of a 60°-minimum-angle rule that was
 invented rather than looked up.
 
-**The trade solves it with a file.** A sharp corner gets a **¼ inch notch cut
-into the face** so heat vents; the letter keeps its normal shape. M is named
-explicitly in the guidance as a letter that needs this, alongside A, K, V, N, X,
-Y and Z. Closed counters — B, O, R, 8, 6, 9 — get a gap cut for the same reason.
-The notch is cut into the face only; the bar behind stays continuous, so a
-notched corner doesn't make it a second piece of iron.
+**Then they drew the corners broken.** Having learned that the trade files a ¼
+inch notch at a sharp corner, the sheet put that notch in the *artwork* — visible
+gaps at every corner and joint.
 
-So these have upright legs and ordinary proportions, with visible breaks at every
-sharp corner and joint — which is what real brands look like up close.
+**Corners are attached and rounded.** A brand is one unbroken drawing. Rounded
+angles have their own name in the grammar: a letter drawn that way is *running*.
+The notch is real, but it is a groove cut in the **face** of the iron so heat can
+escape a corner instead of burning through — a fabrication detail, not a feature
+of the design, and it does not belong in the artwork.
+
+So these have upright legs, ordinary proportions, and every corner attached and
+rounded, with the radius capped per corner at a quarter of the shorter arm so an
+acute corner is softened rather than swallowed.
 
 ## The rules
 
@@ -46,24 +56,25 @@ Per 100 units of letter height, so a 4″ character puts 1″ at 25 and ¼″ at
 | --- | --- | --- |
 | Reading order | left to right, top to bottom, outside in | joined characters read "connected" |
 | Units | 2 or more, rarely over 3 | simple brands read better and hurt the animal less |
-| Notch | ¼ inch | at every sharp corner and every joint, so heat escapes |
+| Corners | attached, rounded | the bar runs through; rounded angles are *running* |
+| Notch | ¼ inch, in the face | filed at sharp corners and joints so heat escapes — not drawn |
 | Bar face | ¼ to ½ inch | edges slightly rounded; this sheet uses 10% of letter height |
 | Character | 4×3 inch | calves under a year; 6×3½ for grown cattle |
 | Clear space | 1 inch | between characters and between any two parallel lines |
 
 ## The nine
 
-| Mark | Units | Notches | Ratio |
+| Mark | Units | Filed corners | Ratio |
 | --- | --- | --- | --- |
 | **Rocking Double M** | 3 | 6 | 1.31:1 |
-| **Double M** | 2 | 6 | 1.61:1 |
-| **Bar Double M** | 3 | 6 | 1.46:1 |
-| **Rocking Connected Double M** | 2 | 5 | 1.16:1 |
-| **Connected Double M** | 1 | 5 | 1.39:1 |
+| **Double M** | 2 | 6 | 1.59:1 |
+| **Bar Double M** | 3 | 6 | 1.45:1 |
+| **Rocking Connected Double M** | 2 | 5 | 1.15:1 |
+| **Connected Double M** | 1 | 5 | 1.38:1 |
 | **Bar Connected Double M** | 2 | 5 | 1.28:1 |
-| **Dropped Double M** | 2 | 6 | 1.32:1 |
+| **Dropped Double M** | 2 | 6 | 1.31:1 |
 | **Dam and Calf Double M** | 2 | 6 | 1.41:1 |
-| **Lazy Double M** | 2 | 6 | 0.62:1 |
+| **Lazy Double M** | 2 | 6 | 0.63:1 |
 
 - **Connected Double M** is the cheapest iron and the only single-unit mark — one
   zigzag of bar plus a welded spur for the shared leg.
@@ -76,7 +87,7 @@ Per 100 units of letter height, so a 4″ character puts 1″ at 25 and ¼″ at
 
 ## What the rules changed
 
-**Fixed the letterforms.** Aspect ratios went from 1.30–2.68:1 to 0.62–1.61:1 —
+**Fixed the letterforms.** Aspect ratios went from 1.30–2.68:1 to 0.63–1.59:1 —
 which is just what letters look like.
 
 **Killed Overlapped Double M and Double-struck Double M.** Both are *defined* by
@@ -114,7 +125,8 @@ any number quoted in `concepts.html`:
 python3 iron-check.py
 ```
 
-It reports units, notch count, and the closest approach between any two lines.
+It reports units, how many corners need filing, and the closest approach
+between any two lines.
 All nine pass.
 
 ## Sources
