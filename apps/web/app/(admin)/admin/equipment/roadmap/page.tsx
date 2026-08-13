@@ -1,7 +1,13 @@
-import { PagePlaceholder } from "../../../../_components/page-placeholder";
+import { redirect } from "next/navigation";
+
+import { EquipmentRoadmapScreen } from "@/app/(admin)/admin/equipment/roadmap/_components/equipment-roadmap-screen";
+import { currentActor } from "@/lib/auth";
 
 export const metadata = { title: "Equipment Roadmap" };
 
-export default function AdminEquipmentRoadmapPage() {
-  return <PagePlaceholder title={"Equipment Roadmap"} route={"/admin/equipment/roadmap"} />;
+export default async function AdminEquipmentRoadmapPage() {
+  const actor = await currentActor();
+  if (actor === undefined) redirect("/login?next=/admin/equipment/roadmap");
+
+  return <EquipmentRoadmapScreen propertyId={actor.propertyId} actorId={actor.id} />;
 }

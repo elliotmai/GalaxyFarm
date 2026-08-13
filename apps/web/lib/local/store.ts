@@ -50,6 +50,15 @@ export const LOCAL_STORES = [
   "feedPurchases",
   "feedConsumption",
   "feedingPlans",
+  "equipment",
+  "meterReadings",
+  "maintenanceRules",
+  "maintenanceLogs",
+  "fuelLogs",
+  "supplyItems",
+  "supplyPurchases",
+  "supplyUsage",
+  "durableAssignments",
   "contacts",
   "attachments",
   "choreTemplates",
@@ -80,8 +89,10 @@ export type LocalStoreName = (typeof LOCAL_STORES)[number];
  *     sync protocols, processing, what animals cost and brought, and the
  *     genetic plan.
  * 8 — the feed catalogue, so a plan's lines can name what they feed (§5.3).
+ * 12 — the Kit: the fleet with its meters, rules, service and fuel (§5.6), and
+ *      the supply shelf with its purchases, usage and durables (§5.11).
  */
-export const LOCAL_SCHEMA_VERSION = 11;
+export const LOCAL_SCHEMA_VERSION = 12;
 
 /**
  * Which fields each entity's search box looks at.
@@ -119,6 +130,17 @@ const SEARCHABLE: Readonly<Record<LocalStoreName, readonly string[]>> = {
   feedPurchases: ["notes"],
   feedConsumption: ["notes"],
   feedingPlans: ["name", "specialNotes"],
+  // A serial number is what somebody has in their hand at a parts counter, so
+  // it is searchable alongside the name it is never remembered by.
+  equipment: ["name", "make", "model", "vin", "notes"],
+  meterReadings: ["notes"],
+  maintenanceRules: ["task", "parts"],
+  maintenanceLogs: ["task", "parts", "notes"],
+  fuelLogs: ["notes"],
+  supplyItems: ["name", "storageLocation", "notes"],
+  supplyPurchases: ["notes"],
+  supplyUsage: ["notes"],
+  durableAssignments: ["notes"],
   contacts: ["name", "company", "address", "notes"],
   attachments: ["filename", "caption"],
   choreTemplates: ["title", "detail"],

@@ -46,6 +46,21 @@ import {
   feedTypeSchema,
 } from "@galaxy-farm/module-feed";
 
+import {
+  equipmentSchema,
+  fuelLogSchema,
+  maintenanceLogSchema,
+  maintenanceRuleSchema,
+  meterReadingSchema,
+} from "@galaxy-farm/module-equipment";
+
+import {
+  durableAssignmentSchema,
+  supplyItemSchema,
+  supplyPurchaseSchema,
+  supplyUsageSchema,
+} from "@galaxy-farm/module-supplies";
+
 import { allTables } from "../src/schema/index.js";
 import { REPOSITORY_TABLES } from "../src/sync/entities.js";
 
@@ -95,6 +110,15 @@ const SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   feedPurchases: feedPurchaseSchema,
   feedConsumption: feedConsumptionSchema,
   feedingPlans: feedingPlanSchema,
+  equipment: equipmentSchema,
+  meterReadings: meterReadingSchema,
+  maintenanceRules: maintenanceRuleSchema,
+  maintenanceLogs: maintenanceLogSchema,
+  fuelLogs: fuelLogSchema,
+  supplyItems: supplyItemSchema,
+  supplyPurchases: supplyPurchaseSchema,
+  supplyUsage: supplyUsageSchema,
+  durableAssignments: durableAssignmentSchema,
   contacts: contactSchema,
   attachments: attachmentSchema,
   choreTemplates: choreTemplateSchema,

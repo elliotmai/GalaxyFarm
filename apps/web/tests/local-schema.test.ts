@@ -45,6 +45,15 @@ const PINNED_STORES = [
   "feedPurchases",
   "feedConsumption",
   "feedingPlans",
+  "equipment",
+  "meterReadings",
+  "maintenanceRules",
+  "maintenanceLogs",
+  "fuelLogs",
+  "supplyItems",
+  "supplyPurchases",
+  "supplyUsage",
+  "durableAssignments",
   "contacts",
   "attachments",
   "choreTemplates",
@@ -57,7 +66,7 @@ const PINNED_STORES = [
 describe("the local schema version tracks the store list", () => {
   it("holds exactly the pinned entities at the pinned version", () => {
     expect([...LOCAL_STORES]).toEqual(PINNED_STORES);
-    expect(LOCAL_SCHEMA_VERSION).toBe(11);
+    expect(LOCAL_SCHEMA_VERSION).toBe(12);
   });
 
   it("names each store once", () => {

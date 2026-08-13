@@ -54,6 +54,20 @@ export const SEARCHABLE_FIELDS = {
   feedPurchases: ["notes"],
   feedConsumption: ["notes"],
   feedingPlans: ["name", "specialNotes"],
+  // A serial number is what somebody has in their hand at a parts counter, so
+  // it is searchable alongside the name the machine is never remembered by.
+  equipment: ["name", "make", "model", "vin", "notes"],
+  // A reading is found through its machine, never by typing a number that
+  // several machines have passed through.
+  meterReadings: ["notes"],
+  maintenanceRules: ["task", "parts"],
+  maintenanceLogs: ["task", "parts", "notes"],
+  fuelLogs: ["notes"],
+  supplyItems: ["name", "storageLocation", "notes"],
+  supplyPurchases: ["notes"],
+  supplyUsage: ["notes"],
+  // Assignments are found through the item, the animal or the zone.
+  durableAssignments: ["notes"],
   contacts: ["name", "company", "address", "notes"],
   attachments: ["filename", "caption"],
   choreTemplates: ["title", "detail"],

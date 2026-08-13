@@ -32,6 +32,8 @@ const ADMIN_ROUTES = [
   "/admin/supplies",
   "/admin/contacts",
   "/admin/settings",
+  "/admin/equipment",
+  "/admin/equipment/roadmap",
   "/admin/equipment/candidates",
   "/admin/cattle/candidates",
 ];
