@@ -7,7 +7,6 @@ import {
   addCalendarDays,
   choreDaySheet,
   choreProgress,
-  isSameDay,
   startOfDay,
   type Animal,
   type ChoreTemplate,
@@ -18,6 +17,7 @@ import {
 
 import { DaySheet } from "@/app/(admin)/admin/chores/_components/day-sheet";
 import { TemplatesPanel } from "@/app/(admin)/admin/chores/_components/templates-panel";
+import { dayLabel } from "@/lib/chores";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -39,24 +39,6 @@ import { useRecords } from "@/lib/local/use-records";
  * holds — so a chore says what and when, and who waits for the store to carry
  * users.
  */
-
-const TABS = [
-  { id: "today", label: "Today" },
-  { id: "templates", label: "Templates" },
-] as const;
-
-/** "Today", "Yesterday", or the day named in full. */
-export function dayLabel(date: Date, today: Date): string {
-  if (isSameDay(date, today)) return "Today";
-  if (isSameDay(date, addCalendarDays(today, -1))) return "Yesterday";
-  if (isSameDay(date, addCalendarDays(today, 1))) return "Tomorrow";
-
-  return date.toLocaleDateString(undefined, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-}
 
 export function ChoresScreen({
   propertyId,
@@ -86,6 +68,15 @@ export function ChoresScreen({
 
   const sheet = choreDaySheet({ tasks, templates }, date, now);
   const progress = choreProgress(sheet);
+  const day = dayLabel(date, today);
+
+  // The first tab is named for the day it is showing. Stepping back to
+  // yesterday and finding a tab still labelled "Today" reads as the step
+  // having done nothing.
+  const tabs = [
+    { id: "today", label: day, adornment: progress.open === 0 ? undefined : progress.open },
+    { id: "templates", label: "Templates" },
+  ];
 
   return (
     <PageBody>
@@ -116,7 +107,7 @@ export function ChoresScreen({
         }
         meta={
           <>
-            <Pill tone="identity">{dayLabel(date, today)}</Pill>
+            <Pill tone="identity">{day}</Pill>
             <Pill>
               {date.toLocaleDateString(undefined, {
                 weekday: "short",
@@ -157,7 +148,7 @@ export function ChoresScreen({
           <Meter
             value={progress.fraction}
             tone={progress.overdue > 0 ? "danger" : progress.open === 0 ? "calm" : "action"}
-            label={dayLabel(date, today)}
+            label={day}
             detail={
               progress.open === 0
                 ? "Everything on the list is done."
@@ -167,7 +158,7 @@ export function ChoresScreen({
         </Card>
       )}
 
-      <Tabs tabs={TABS} label="Chores">
+      <Tabs tabs={tabs} label="Chores">
         {(active) => (
           <div className="pt-density">
             {active === "today" ? (
@@ -180,7 +171,7 @@ export function ChoresScreen({
                   zones={zones}
                   animals={animals}
                   date={date}
-                  dayName={dayLabel(date, today)}
+                  dayName={day}
                   propertyId={propertyId}
                   actorId={actorId}
                 />

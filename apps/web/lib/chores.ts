@@ -1,4 +1,6 @@
 import {
+  addCalendarDays,
+  isSameDay,
   taskFromTemplate,
   type ChoreEntry,
   type ChoreTemplate,
@@ -24,6 +26,21 @@ import type { Mutations } from "@/lib/local/mutations";
  * logic rather than markup: what somebody typed into a box, and what a stored
  * rule means in a sentence.
  */
+
+/**
+ * "Today", "Yesterday", or the day named in full.
+ *
+ * The three near days get words because that is what somebody stepping back
+ * one screen is looking for; anything further away gets its name, because
+ * "three days ago" is a sum and a date is not.
+ */
+export function dayLabel(date: Date, today: Date): string {
+  if (isSameDay(date, today)) return "Today";
+  if (isSameDay(date, addCalendarDays(today, -1))) return "Yesterday";
+  if (isSameDay(date, addCalendarDays(today, 1))) return "Tomorrow";
+
+  return date.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+}
 
 export const WEEKDAY_NAMES = [
   "Sunday",

@@ -10,7 +10,7 @@ import {
   type Ulid,
 } from "@galaxy-farm/core";
 
-import { describeRecurrence, parseMonthDays, toggleChore } from "../lib/chores.js";
+import { dayLabel, describeRecurrence, parseMonthDays, toggleChore } from "../lib/chores.js";
 import type { Mutations } from "../lib/local/mutations.js";
 
 /**
@@ -166,6 +166,31 @@ describe("toggleChore", () => {
     expect(calls).toEqual([]);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.kind).toBe("not-found");
+  });
+});
+
+describe("dayLabel", () => {
+  const today = new Date(2026, 0, 15);
+
+  it("gives the three near days words", () => {
+    expect(dayLabel(new Date(2026, 0, 15, 18, 0), today)).toBe("Today");
+    expect(dayLabel(new Date(2026, 0, 14), today)).toBe("Yesterday");
+    expect(dayLabel(new Date(2026, 0, 16), today)).toBe("Tomorrow");
+  });
+
+  it("names anything further out", () => {
+    // "Three days ago" is a sum. A date is not.
+    const label = dayLabel(new Date(2026, 0, 12), today);
+
+    expect(label).not.toMatch(/Today|Yesterday|Tomorrow/);
+    expect(label).toMatch(/12/);
+  });
+
+  it("steps across a month end without arithmetic on the hours", () => {
+    const marchFirst = new Date(2026, 2, 1);
+
+    expect(dayLabel(new Date(2026, 1, 28), marchFirst)).toBe("Yesterday");
+    expect(dayLabel(new Date(2026, 2, 2), marchFirst)).toBe("Tomorrow");
   });
 });
 
