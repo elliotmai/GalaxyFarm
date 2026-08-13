@@ -491,6 +491,41 @@
     </g>
   </symbol>
 
+
+  <!-- Horned pair: two whole M's whose inner legs sweep out and cross, the way two
+       longhorns standing side by side overlap. M2 sits 6 units lower so the pair
+       reads as two animals at different depths rather than one flat pattern. -->
+  <symbol id="m-con-bar" viewBox="0 0 100 100">
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 64 L14 32 L32 52 L50 32 L68 52 L86 32 L86 64" stroke="var(--m2)" stroke-width="2.5"/>
+      <path d="M14 80 L86 80" stroke="var(--m2)" stroke-width="8"/>
+    </g>
+    <g fill="var(--m1)">
+      <use href="#star-pts" transform="translate(14 32) scale(0.24) translate(-50 -50)"/>
+      <use href="#star-pts" transform="translate(50 32) scale(0.24) translate(-50 -50)"/>
+      <use href="#star-pts" transform="translate(86 32) scale(0.24) translate(-50 -50)"/>
+      <use href="#star-pts" transform="translate(32 52) scale(0.175) translate(-50 -50)"/>
+      <use href="#star-pts" transform="translate(68 52) scale(0.175) translate(-50 -50)"/>
+      <use href="#star-pts" transform="translate(14 64) scale(0.175) translate(-50 -50)"/>
+      <use href="#star-pts" transform="translate(86 64) scale(0.175) translate(-50 -50)"/>
+    </g>
+  </symbol>
+
+  <symbol id="m-crossed" viewBox="0 0 100 100">
+    <g fill="none" stroke="var(--m1)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 64 L20 30 L34 52 L48 30 L60 64"/>
+      <path d="M40 70 L52 36 L66 58 L80 36 L92 70"/>
+    </g>
+  </symbol>
+
+  <symbol id="m-crossed-bar" viewBox="0 0 100 100">
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 64 L20 30 L34 52 L48 30 L60 64" stroke="var(--m1)" stroke-width="7"/>
+      <path d="M40 70 L52 36 L66 58 L80 36 L92 70" stroke="var(--m1)" stroke-width="7"/>
+      <path d="M10 84 L90 84" stroke="var(--m2)" stroke-width="8"/>
+    </g>
+  </symbol>
+
   <symbol id="m-longhorn" viewBox="0 0 100 100">
     <path d="M16 66 Q10 46 22 32 L36 52 L50 32 L64 52 L78 32 Q90 46 84 66"
           fill="none" stroke="var(--m1)" stroke-width="9"
@@ -519,7 +554,7 @@
     <p class="eyebrow">Brand concepts &middot; issue #26</p>
     <h1>Double&nbsp;M Brand Sheet</h1>
     <p class="standfirst">
-      Ten ways to burn two&nbsp;M&rsquo;s, drawn in the same livestock-brand grammar as the approved
+      Sixteen ways to burn two&nbsp;M&rsquo;s, drawn in the same livestock-brand grammar as the approved
       <strong>Rocking Double Star</strong> and coloured from the locked palette in
       <code>packages/config/tailwind.preset.ts</code>. Nothing here replaces the star mark &mdash; these are
       candidates for the day the farm and business names land.
@@ -986,9 +1021,134 @@
     </figcaption>
   </figure>
 
-  <h2>All thirteen at 24&nbsp;px</h2>
+  <h2>Take three: a bar under the constellation, and a crossed pair</h2>
   <p class="section-note">
-    All thirteen on the admin ground where small sizes actually live, with 40&nbsp;px alongside for reference.
+    Two separate lines of enquiry. The first gives the constellation the same straight bar that rescued the
+    solid zigzag, to see whether a heavy ground element buys the star chart any survival at small sizes. The
+    second drops the shared apex altogether: two whole M&rsquo;s, splayed and overlapped so their inner legs
+    cross &mdash; the way two longhorns standing side by side overlap. Straight lines throughout, no curves.
+  </p>
+
+  <div class="registry">
+
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-con-bar"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-con-bar"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Constellation Bar Double M</h3>
+          <span class="chip chip--tight">Tight at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>The star chart given a floor. The bar is the one element heavy enough to hold its own at any size, so the mark keeps an anchor even once the stars themselves have gone to dust.</dd>
+          <dt>Watch</dt>
+          <dd>It buys presence, not legibility. At 24&nbsp;px what is left is a purple bar with grey speckle above it &mdash; better than the bare constellation, which leaves nothing at all, but still not a nav-bar mark.</dd>
+          <dt>Use</dt>
+          <dd>Where it earns its keep is the middle range. From about 40&nbsp;px the bar gives the constellation the weight it was missing, which makes it usable on a PDF header or an email signature, not just a splash screen.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-con-bar"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-con-bar"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-con-bar"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Crossed Double M</h3>
+          <span class="chip chip--tight">Tight at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>Two complete M&rsquo;s, legs splayed, overlapped until the inner two cross. Nothing is shared and nothing is abbreviated &mdash; they are simply standing close enough to overlap, which is exactly what the reference photograph shows two longhorns doing.</dd>
+          <dt>Watch</dt>
+          <dd>The crossing is a real junction: the strokes merge where they meet rather than passing over and under, because an interlace would need a knockout in the ground colour and these marks are transparent by design.</dd>
+          <dt>Note</dt>
+          <dd>The second M sits six units lower. That offset is doing the work &mdash; it reads as two animals at slightly different depths rather than as one flat pattern, and it is what keeps the crossing from looking like a drafting error.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed-bar"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed-bar"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Crossed Double M, barred</h3>
+          <span class="chip chip--tight">Tight at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>The crossed pair given the same bar. The two M&rsquo;s sit at different heights, so the bar does more here than it does anywhere else on the sheet: it supplies the common ground the offset takes away.</dd>
+          <dt>Watch</dt>
+          <dd>Three horizontals now compete &mdash; the bar, and the two staggered baselines of the M&rsquo;s. It resolves at 96&nbsp;px; check it against the plain version before assuming the bar helps.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed-bar"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed-bar"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed-bar"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+  </div>
+
+  <h3 class="evidence-head">The pixel test, again</h3>
+  <p class="section-note">
+    Same method as before, applied to the three marks in this section: rasterised at true 24&nbsp;px and true
+    16&nbsp;px, then magnified.
+  </p>
+
+  <figure class="evidence">
+    <img src="data:image/png;base64,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" alt="The bare constellation, constellation with a bar, the crossed pair, and the crossed pair with a bar, all rasterised at 24 and 16 pixels and magnified. The bar stays solid and bright at both sizes while the star chart above it dissolves into speckle; the crossed pair keeps two peaked forms at 24 pixels and merges into humps at 16.">
+    <figcaption>
+      The bar does rescue the constellation, but not in the way the question implies. It buys
+      <strong>presence</strong>, not legibility: at both sizes the bar stays solid and bright while the star
+      chart above it goes to speckle, so the mark survives as <em>something</em> rather than as nothing &mdash;
+      which is a real gain over the bare constellation, and still not a mark that says M&nbsp;M. The
+      <strong>crossed pair</strong> keeps two distinct peaked forms at 24&nbsp;px; what it loses is the
+      crossing, which fills in solid. By 16&nbsp;px both crossed versions are humps. All three verdict chips
+      above were written before this raster and all three were then corrected down.
+    </figcaption>
+  </figure>
+
+  <h2>All sixteen at 24&nbsp;px</h2>
+  <p class="section-note">
+    All sixteen on the admin ground where small sizes actually live, with 40&nbsp;px alongside for reference.
     Squint: whatever still has a shape here is a real candidate, and whatever turns to lint is a hero mark that
     needs a small companion &mdash; but keep the pixel test in mind while you squint, because several of these
     hold their shape without holding their letters.
@@ -1068,6 +1228,13 @@
       </figure>
       <figure>
         <div class="pair">
+          <svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-con-bar"/></svg>
+          <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-con-bar"/></svg>
+        </div>
+        <figcaption>Constellation&nbsp;bar</figcaption>
+      </figure>
+      <figure>
+        <div class="pair">
           <svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-longhorn"/></svg>
           <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-longhorn"/></svg>
         </div>
@@ -1086,6 +1253,20 @@
           <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-star"/></svg>
         </div>
         <figcaption>Star</figcaption>
+      </figure>
+      <figure>
+        <div class="pair">
+          <svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed"/></svg>
+          <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed"/></svg>
+        </div>
+        <figcaption>Crossed</figcaption>
+      </figure>
+      <figure>
+        <div class="pair">
+          <svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed-bar"/></svg>
+          <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-crossed-bar"/></svg>
+        </div>
+        <figcaption>Crossed&nbsp;bar</figcaption>
       </figure>
     </div>
   </div>

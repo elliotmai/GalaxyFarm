@@ -1,6 +1,6 @@
 # Double M — logo concepts
 
-Thirteen candidate marks for a "Double M" identity, drawn in the same
+Sixteen candidate marks for a "Double M" identity, drawn in the same
 livestock-brand grammar as the approved **Rocking Double Star** and coloured
 from `packages/config/tailwind.preset.ts`.
 
@@ -11,8 +11,8 @@ business names.
 
 Open **[`concepts.html`](./concepts.html)** to see them — every mark rendered on
 both real grounds (Midnight Nebula and Bluebonnet Linen) at 96, 64, 40 and
-24&nbsp;px, plus a pixel test of the leading candidates rasterised at true 24 and
-16&nbsp;px (`pixel-test.png`).
+24&nbsp;px, plus two pixel tests of the leading candidates rasterised at true 24
+and 16&nbsp;px (`pixel-test.png`, `pixel-test-2.png`).
 
 ## The brand grammar
 
@@ -30,7 +30,7 @@ vocabulary rather than decoration:
 
 The approved mark is already named this way, so the candidates are too.
 
-## The thirteen
+## The sixteen
 
 Verdicts are against the threshold the brand README already put on the
 record — the pair "drifts apart below about 24px". The three **Rocking
@@ -50,9 +50,12 @@ that is the mark they fix.
 | **Stacked Double M** | One M over another. The only square variant, and the only one where two tones say something true (farm name over business name). | Tight — merges at 24px; its slots are 180px+ |
 | **Circle Double M** | Enclosed, so it has its own edge. The seal for signed PDFs and invoices. | Tight — the ring eats the letters below ~40px |
 | **Constellation Double M** | The zigzag as a star chart. Makes the logo and the pedigree screens one idea. | Fails — needs a solid companion below ~48px |
+| **Constellation Bar Double M** | The star chart given a floor. | Tight — the bar survives, the stars do not |
 | **Longhorn Double M** | Outer legs swept into horn tips. Says cattle before it says letters. | Holds as a shape, but the sweep is the first thing lost |
 | **Lazy Double M** | Two M's lying down, back to back. Symmetric, reads as a chute. | Tight — and honestly may not read as M at all |
 | **Double M Star** | The letters under a single star. The bridge mark. | Tight — works from 40px up |
+| **Crossed Double M** | Two whole M's, legs splayed, overlapped until the inner two cross — two longhorns standing side by side. Straight lines, no curves. | Tight — keeps two peaks, loses the crossing |
+| **… barred** | The crossed pair on a bar, which supplies the common ground the height offset takes away. | Tight — same, with an anchor |
 
 ## Recommendation
 
@@ -82,6 +85,23 @@ which therefore flatters every candidate. Rasterising the leading marks at true
   Connected, Bar and the half-stem all survive small sizes as marks while
   quietly becoming a single crown. For a mark whose whole job is to say
   "Double M", that is a real demerit, and it is why the primary changed from Bar.
+
+## What the second pixel test changed
+
+The three marks above were given verdict chips before being rasterised, and all
+three came back down a grade:
+
+- **A bar under the constellation buys presence, not legibility.** At 24 and
+  16&nbsp;px the bar stays solid and bright while the star chart above it goes
+  to speckle. That is a real gain over the bare constellation, which leaves
+  nothing at all — but it still is not a mark that says "M M". Its range is the
+  middle: from about 40&nbsp;px the bar gives the constellation the weight it
+  was missing, which makes it usable on a PDF header or an email signature.
+- **The crossed pair keeps its letters at 24&nbsp;px and loses its crossing.**
+  The two peaked forms stay distinct; the overlap fills in solid, because the
+  strokes merge rather than passing over and under. A true interlace would need
+  a knockout in the ground colour, and these marks are transparent by design.
+  By 16&nbsp;px both crossed versions are humps.
 
 ## One thing to settle first
 
