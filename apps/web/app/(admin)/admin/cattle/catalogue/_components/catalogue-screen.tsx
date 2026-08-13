@@ -72,17 +72,14 @@ interface Found {
   readonly total: number;
 }
 
-/** What the API says when the graph is not configured, said in plainer words. */
-const NOT_SET_UP =
-  "The association catalogue is not connected on this server. Everything else on the site works without it — it is the crawled herdbooks that are missing, not your own records.";
-
 async function ask<T>(url: string): Promise<T> {
   const response = await fetch(url);
   const body = (await response.json()) as T & { error?: string };
 
-  if (!response.ok) {
-    throw new Error(response.status === 503 ? NOT_SET_UP : (body.error ?? "That did not work."));
-  }
+  // The route's own words either way. A 503 here means the graph is not
+  // configured, and it names which settings are missing — which is the whole
+  // difference between "nothing is set up" and "you set three of the four".
+  if (!response.ok) throw new Error(body.error ?? "That did not work.");
   return body;
 }
 
