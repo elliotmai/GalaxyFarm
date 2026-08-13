@@ -104,6 +104,22 @@ type Row = Record<string, unknown>;
 const asString = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() !== "" ? value : undefined;
 
+/**
+ * A map from the graph, or nothing.
+ *
+ * Cypher's absent value is `null`, not `undefined`, and it arrives over JSON as
+ * literal `null` — so `head([])` on an animal with no recorded sire returns a
+ * field that is present and null. Checking for `undefined` alone lets that
+ * through to be read as an object. Everything the graph might not have goes
+ * through here, and `typeof null === "object"` is exactly the trap being shut.
+ */
+const asRow = (value: unknown): Row | undefined =>
+  typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Row) : undefined;
+
+/** A list from the graph, with anything unreadable in it dropped. */
+const asRows = (value: unknown): Row[] =>
+  Array.isArray(value) ? value.map(asRow).filter((entry): entry is Row => entry !== undefined) : [];
+
 const asNumber = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) ? value : undefined;
 
@@ -127,27 +143,27 @@ const asDefectStatus = (value: unknown): "free" | "carrier" | "suspect" => {
 };
 
 function toAnimal(row: Row): RegistryAnimal | undefined {
-  const animal = row["animal"] as Record<string, unknown> | undefined;
+  const animal = asRow(row["animal"]);
   const association = asString(row["association"]);
   const regNumber = asString(row["regNumber"]);
   if (animal === undefined || association === undefined || regNumber === undefined)
     return undefined;
 
-  const registrations = ((row["registrations"] as Row[] | undefined) ?? [])
+  const registrations = asRows(row["registrations"])
     .map((entry) => ({
       association: ourAssociation(asString(entry["association"]) ?? ""),
       regNumber: asString(entry["regNumber"]) ?? "",
     }))
     .filter((entry) => entry.association !== "" && entry.regNumber !== "");
 
-  const breedComposition = ((row["composition"] as Row[] | undefined) ?? [])
+  const breedComposition = asRows(row["composition"])
     .map((entry) => ({
       breed: asString(entry["breed"]) ?? "",
       percent: asNumber(entry["percent"]) ?? 0,
     }))
     .filter((entry) => entry.breed !== "");
 
-  const geneticTests = ((row["defects"] as Row[] | undefined) ?? [])
+  const geneticTests = asRows(row["defects"])
     .map((entry) => ({
       defect: asString(entry["defect"]) ?? "",
       status: asDefectStatus(entry["status"]),
@@ -155,8 +171,15 @@ function toAnimal(row: Row): RegistryAnimal | undefined {
     }))
     .filter((entry) => entry.defect !== "");
 
+  /**
+   * A parent, if the crawl has one on file.
+   *
+   * Absent far more often than not: every pedigree ends in animals whose own
+   * parents were never crawled, so the top row of any five-generation walk is
+   * all founders. Nothing is wrong with that, and it must not read as an error.
+   */
   const parent = (key: string) => {
-    const found = row[key] as Row | undefined;
+    const found = asRow(row[key]);
     if (found === undefined) return undefined;
     const parentAssociation = asString(found["association"]);
     const parentReg = asString(found["regNumber"]);
