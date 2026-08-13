@@ -19,7 +19,8 @@ import { ANGUS_PAGE } from "./fixtures/angus-page.js";
  * that agree with the parser prove nothing.
  */
 
-const read = () => parseAngusPage(ANGUS_PAGE, { registration: "13054003", url: angusUrl("13054003") });
+const read = () =>
+  parseAngusPage(ANGUS_PAGE, { registration: "13054003", url: angusUrl("13054003") });
 
 describe("the animal's own panel", () => {
   it("reads the name off the line above the registration, which has no label", () => {

@@ -58,7 +58,10 @@ export function sexFromPosition(position: string): AncestorSex | undefined {
  */
 export function inferAncestorSexes(
   outsiders: readonly ExternalAnimal[],
-  parentages: readonly { readonly sire?: ParentRef | undefined; readonly dam?: ParentRef | undefined }[],
+  parentages: readonly {
+    readonly sire?: ParentRef | undefined;
+    readonly dam?: ParentRef | undefined;
+  }[],
 ): Map<Ulid, SexVerdict> {
   const asSire = new Set<Ulid>();
   const asDam = new Set<Ulid>();
@@ -77,7 +80,13 @@ export function inferAncestorSexes(
       continue;
     }
 
-    const used = conflict ? undefined : asSire.has(animal.id) ? "male" : asDam.has(animal.id) ? "female" : undefined;
+    const used = conflict
+      ? undefined
+      : asSire.has(animal.id)
+        ? "male"
+        : asDam.has(animal.id)
+          ? "female"
+          : undefined;
     verdicts.set(animal.id, {
       ...(used === undefined ? {} : { sex: used }),
       inferred: true,

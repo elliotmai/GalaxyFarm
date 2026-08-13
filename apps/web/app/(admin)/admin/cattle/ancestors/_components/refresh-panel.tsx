@@ -206,7 +206,8 @@ export function RefreshFromAssociation({
       }
 
       show({
-        message: touched === 0 ? "Nothing ticked, so nothing changed" : `${touched} record(s) updated`,
+        message:
+          touched === 0 ? "Nothing ticked, so nothing changed" : `${touched} record(s) updated`,
         tone: touched === 0 ? "info" : "success",
       });
       onDone();
@@ -330,15 +331,12 @@ export function RefreshFromAssociation({
       )}
 
       {strangers.length === 0 ? null : (
-        <Callout
-          tone="action"
-          title={`${strangers.length} on this chart are not on file`}
-        >
+        <Callout tone="action" title={`${strangers.length} on this chart are not on file`}>
           {strangers.slice(0, 6).join(", ")}
-          {strangers.length > 6 ? `, and ${strangers.length - 6} more` : ""}. A refresh does not
-          add animals — importing this page does, and it shows every one for approval and wires the
-          whole tree at once. Use &ldquo;Import from Digital Beef&rdquo; with this
-          animal&apos;s number.
+          {strangers.length > 6 ? `, and ${strangers.length - 6} more` : ""}. A refresh does not add
+          animals — importing this page does, and it shows every one for approval and wires the
+          whole tree at once. Use &ldquo;Import from Digital Beef&rdquo; with this animal&apos;s
+          number.
         </Callout>
       )}
 

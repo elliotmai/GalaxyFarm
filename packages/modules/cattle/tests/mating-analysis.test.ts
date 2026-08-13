@@ -269,7 +269,10 @@ describe("where a breed makeup comes from", () => {
     // pedigree going back further than anything on this farm, and it is the
     // number a buyer checks. Recomputing it here would give a subtly different
     // figure, and the two disagreeing on a sale sheet is worse than either.
-    const papered = [{ breed: "MA", percent: 79.57 }, { breed: "AN", percent: 20.43 }];
+    const papered = [
+      { breed: "MA", percent: 79.57 },
+      { breed: "AN", percent: 20.43 },
+    ];
 
     expect(resolveComposition(papered, maine, chi)).toEqual({
       composition: papered,

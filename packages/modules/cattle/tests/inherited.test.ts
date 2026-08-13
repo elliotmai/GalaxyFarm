@@ -188,7 +188,10 @@ describe("what an animal can be carrying", () => {
 
   it("lists the roan pairs a mating can throw", () => {
     expect(
-      possibleRoan({ extension: ["ED", "ED"], roan: ["R", "r"] }, { extension: ["ED", "ED"], roan: ["R", "r"] }),
+      possibleRoan(
+        { extension: ["ED", "ED"], roan: ["R", "r"] },
+        { extension: ["ED", "ED"], roan: ["R", "r"] },
+      ),
     ).toEqual([
       { genotype: "R/r", chance: 0.5 },
       { genotype: "R/R", chance: 0.25 },

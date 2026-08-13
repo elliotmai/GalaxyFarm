@@ -109,7 +109,10 @@ export function GeneticsPanel({
    * the associations' own rule and getting it backwards is how a carrier gets
    * called clean.
    */
-  const inherited = useMemo(() => defectsFor(tests, parents, records), [tests, profile, profiles, outsiders]);
+  const inherited = useMemo(
+    () => defectsFor(tests, parents, records),
+    [tests, profile, profiles, outsiders],
+  );
 
   /** The red an animal can be hiding behind a black coat. */
   const carried = useMemo(
@@ -297,9 +300,7 @@ export function GeneticsPanel({
                   : "neutral"
             }
             title={
-              inferred.coat === undefined
-                ? "What is known so far"
-                : `Worked out: ${inferred.coat}`
+              inferred.coat === undefined ? "What is known so far" : `Worked out: ${inferred.coat}`
             }
           >
             <div className="flex flex-wrap items-center gap-2">
@@ -321,7 +322,8 @@ export function GeneticsPanel({
                     : `${Math.round(inferred.carriesRed.chance * 100)}% chance it is hiding red.`}
             </p>
 
-            {inferred.extension.because.length === 0 && inferred.roan.because.length === 0 ? null : (
+            {inferred.extension.because.length === 0 &&
+            inferred.roan.because.length === 0 ? null : (
               // Shown rather than hidden behind the answer. A genotype nobody
               // tested for is only worth as much as the reasoning under it,
               // and a person who can see the reasoning can spot the wrong coat
@@ -338,7 +340,10 @@ export function GeneticsPanel({
         )}
 
         {carried === undefined ? null : (
-          <Callout tone={carried.carriesRed > 0 ? "action" : "calm"} title="What its parents settle">
+          <Callout
+            tone={carried.carriesRed > 0 ? "action" : "calm"}
+            title="What its parents settle"
+          >
             {/*
               A recessive is invisible. A black cow out of a red-carrying bull
               looks exactly like one out of two homozygous blacks, and the two
@@ -349,7 +354,10 @@ export function GeneticsPanel({
             {describeCarried(carried) ??
               "Nothing hidden — its parents cannot have passed it a red allele."}
             <span className="block pt-2 text-sm text-muted">
-              Possible: {carried.possible.map((entry) => `${entry.genotype} (${Math.round(entry.chance * 100)}%)`).join(", ")}
+              Possible:{" "}
+              {carried.possible
+                .map((entry) => `${entry.genotype} (${Math.round(entry.chance * 100)}%)`)
+                .join(", ")}
               . Typing this animal settles it outright.
             </span>
           </Callout>

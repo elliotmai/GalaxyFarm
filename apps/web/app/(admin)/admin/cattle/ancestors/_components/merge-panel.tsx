@@ -2,14 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import {
-  Button,
-  Callout,
-  Pill,
-  SearchSelect,
-  useConfirmDelete,
-  useToast,
-} from "@galaxy-farm/ui";
+import { Button, Callout, Pill, SearchSelect, useConfirmDelete, useToast } from "@galaxy-farm/ui";
 import type { Ulid } from "@galaxy-farm/core";
 import {
   allRegistrations,
@@ -232,8 +225,8 @@ export function MergeAncestors({
                   <li key={warning}>{warning}</li>
                 ))}
               </ul>
-              Nothing on the kept record is overwritten — this is only so you know what is being
-              set aside. A merge cannot be undone.
+              Nothing on the kept record is overwritten — this is only so you know what is being set
+              aside. A merge cannot be undone.
             </Callout>
           )}
         </>

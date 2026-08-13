@@ -54,7 +54,6 @@ const TIMEOUT_MS = 20_000;
  */
 const MAX_SUB_DOCUMENTS = 2;
 
-
 export async function POST(request: Request) {
   const actor = await currentActor();
   if (actor === undefined) {
@@ -110,9 +109,10 @@ export async function POST(request: Request) {
     // hand that guarantee straight back.
     //
     // Angus needs none of this: its pedigree is on the animal's own page.
-    const subDocuments = parsed.ref.association === "AAA"
-      ? []
-      : pedigreeDocuments(html, parsed.ref.url).slice(0, MAX_SUB_DOCUMENTS);
+    const subDocuments =
+      parsed.ref.association === "AAA"
+        ? []
+        : pedigreeDocuments(html, parsed.ref.url).slice(0, MAX_SUB_DOCUMENTS);
     for (const extra of subDocuments) {
       try {
         const panel = await fetch(extra, {

@@ -451,27 +451,27 @@ export function PairingPlanner({
                 </Card>
 
                 {colour === undefined ? null : (
-                <Card title="Off the hair cards">
-                  <div className="flex flex-col gap-3">
-                    {colour.outcomes.map((outcome) => (
-                      <div key={outcome.label} className="flex flex-col gap-1">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-density text-ink">
-                            {outcome.label}
-                            {outcome.carriesRed === true ? (
-                              <span className="ml-2 text-sm text-muted">carries red</span>
-                            ) : null}
-                          </span>
-                          <span className="flex items-center gap-2">
-                            <Pill tone="action">{percent(outcome.chance)}</Pill>
-                          </span>
+                  <Card title="Off the hair cards">
+                    <div className="flex flex-col gap-3">
+                      {colour.outcomes.map((outcome) => (
+                        <div key={outcome.label} className="flex flex-col gap-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-density text-ink">
+                              {outcome.label}
+                              {outcome.carriesRed === true ? (
+                                <span className="ml-2 text-sm text-muted">carries red</span>
+                              ) : null}
+                            </span>
+                            <span className="flex items-center gap-2">
+                              <Pill tone="action">{percent(outcome.chance)}</Pill>
+                            </span>
+                          </div>
+                          <Meter value={outcome.chance} tone="action" />
+                          <p className="text-sm text-muted">{outcome.genotypes.join(" · ")}</p>
                         </div>
-                        <Meter value={outcome.chance} tone="action" />
-                        <p className="text-sm text-muted">{outcome.genotypes.join(" · ")}</p>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
+                      ))}
+                    </div>
+                  </Card>
                 )}
 
                 {/*

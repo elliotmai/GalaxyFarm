@@ -46,7 +46,10 @@ describe("the address", () => {
       "https://shorthorn.digitalbeef.com/modules.php?op=modload&name=_animal&file=_animal&animal_registration=4219133",
     );
 
-    expect(parsed).toMatchObject({ ok: true, ref: { association: "ASA", registration: "4219133" } });
+    expect(parsed).toMatchObject({
+      ok: true,
+      ref: { association: "ASA", registration: "4219133" },
+    });
   });
 
   it("refuses a host it does not know rather than guessing", () => {

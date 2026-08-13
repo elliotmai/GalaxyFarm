@@ -265,9 +265,14 @@ describe("walking a pedigree", () => {
   it("names each slot the way a breeder says it", async () => {
     // The path is walked from the ancestor down to the subject, so the steps
     // come out reversed — `[SIRE_OF, DAM_OF]` is the dam's sire.
-    const fetch = vi.fn().mockResolvedValue(
-      reply([...ANIMAL_FIELDS, "steps", "generation"], [[...montegoBay, ["SIRE_OF", "DAM_OF"], 2]]),
-    );
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        reply(
+          [...ANIMAL_FIELDS, "steps", "generation"],
+          [[...montegoBay, ["SIRE_OF", "DAM_OF"], 2]],
+        ),
+      );
 
     const found = await graphFor(fetch as never).pedigree("AMAA", "402303", 5);
 
@@ -300,9 +305,7 @@ describe("when the graph will not answer", () => {
       json: async () => ({}),
     });
 
-    await expect(graphFor(fetch as never).get("AMAA", "1")).rejects.toThrow(
-      /401.*Unauthorized/s,
-    );
+    await expect(graphFor(fetch as never).get("AMAA", "1")).rejects.toThrow(/401.*Unauthorized/s);
   });
 
   it("reports an error the query itself returned", async () => {

@@ -40,7 +40,9 @@ export async function GET(request: Request) {
 
   try {
     const result = await graph.search({
-      ...(url.searchParams.get("text") === null ? {} : { text: url.searchParams.get("text") as string }),
+      ...(url.searchParams.get("text") === null
+        ? {}
+        : { text: url.searchParams.get("text") as string }),
       ...(url.searchParams.get("association") === null
         ? {}
         : { association: url.searchParams.get("association") as string }),

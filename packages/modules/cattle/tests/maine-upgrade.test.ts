@@ -48,7 +48,13 @@ describe("the top of the chart", () => {
   });
 
   it("treats a Purebred sire the same as a Fullblood one below the top row", () => {
-    for (const dam of ["three_quarters", "five_eighths", "half", "three_eighths", "quarter"] as const) {
+    for (const dam of [
+      "three_quarters",
+      "five_eighths",
+      "half",
+      "three_eighths",
+      "quarter",
+    ] as const) {
       expect(maineProgeny("purebred", dam).progeny).toBe(maineProgeny("fullblood", dam).progeny);
     }
   });
@@ -69,9 +75,7 @@ describe("commercial and outside sires", () => {
   it("says an unregistered dam costs the calf its bred-and-owned standing", () => {
     // Separate from eligibility: the calf registers, it just is not bred and
     // owned, and that is what a show entry turns on.
-    expect(maineProgeny("fullblood", "commercial").conditions.join(" ")).toMatch(
-      /bred and owned/i,
-    );
+    expect(maineProgeny("fullblood", "commercial").conditions.join(" ")).toMatch(/bred and owned/i);
   });
 
   it("refuses a pairing the chart does not print", () => {

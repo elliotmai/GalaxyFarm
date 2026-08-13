@@ -593,7 +593,8 @@ function AddBreeding({
             than one admitting the other is open, and a blank space is worse
             than either.
           */}
-          {[...calfColour.blocked, ...(calfColour.prediction?.missing ?? [])].length === 0 ? null : (
+          {[...calfColour.blocked, ...(calfColour.prediction?.missing ?? [])].length ===
+          0 ? null : (
             <ul className="mt-2 flex flex-col gap-1 text-sm">
               {[...calfColour.blocked, ...(calfColour.prediction?.missing ?? [])].map((line) => (
                 <li key={line}>{line}</li>

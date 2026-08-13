@@ -20,35 +20,50 @@ describe("Chianina", () => {
   });
 
   it("calls 7/8 or better Purebred", () => {
-    expect(names([{ breed: "CA", percent: 87.5 }, { breed: "AN", percent: 12.5 }])).toContain(
-      "Purebred Chianina",
-    );
-    expect(names([{ breed: "CA", percent: 93 }, { breed: "AN", percent: 7 }])).toContain(
-      "Purebred Chianina",
-    );
+    expect(
+      names([
+        { breed: "CA", percent: 87.5 },
+        { breed: "AN", percent: 12.5 },
+      ]),
+    ).toContain("Purebred Chianina");
+    expect(
+      names([
+        { breed: "CA", percent: 93 },
+        { breed: "AN", percent: 7 },
+      ]),
+    ).toContain("Purebred Chianina");
   });
 
   it("does not call three-quarters Purebred", () => {
-    expect(names([{ breed: "CA", percent: 75 }, { breed: "AN", percent: 25 }])).not.toContain(
-      "Purebred Chianina",
-    );
+    expect(
+      names([
+        { breed: "CA", percent: 75 },
+        { breed: "AN", percent: 25 },
+      ]),
+    ).not.toContain("Purebred Chianina");
   });
 
   it("allows for the association and this farm rounding differently", () => {
     // 87.49 and 87.5 are the same animal. A strict comparison denies it a
     // class it plainly holds.
-    expect(names([{ breed: "CA", percent: 87.2 }, { breed: "AN", percent: 12.8 }])).toContain(
-      "Purebred Chianina",
-    );
+    expect(
+      names([
+        { breed: "CA", percent: 87.2 },
+        { breed: "AN", percent: 12.8 },
+      ]),
+    ).toContain("Purebred Chianina");
   });
 
   it("reads Chiangus as a ceiling on other breeds, not a floor on Chianina", () => {
     // The rule is "no more than 6.249% of another breed" — a quarter-Chi
     // animal on Angus qualifies, and a much higher-Chi animal with 10%
     // Shorthorn in it does not.
-    expect(names([{ breed: "CA", percent: 25 }, { breed: "AN", percent: 75 }])).toContain(
-      "Chiangus or Red Chiangus",
-    );
+    expect(
+      names([
+        { breed: "CA", percent: 25 },
+        { breed: "AN", percent: 75 },
+      ]),
+    ).toContain("Chiangus or Red Chiangus");
     expect(
       names([
         { breed: "CA", percent: 50 },
@@ -71,7 +86,12 @@ describe("Chianina", () => {
   });
 
   it("calls Chianina on Hereford a Chiford", () => {
-    expect(names([{ breed: "CA", percent: 50 }, { breed: "HH", percent: 50 }])).toContain("Chiford");
+    expect(
+      names([
+        { breed: "CA", percent: 50 },
+        { breed: "HH", percent: 50 },
+      ]),
+    ).toContain("Chiford");
   });
 
   it("falls back to Percentage Chianina", () => {
@@ -94,29 +114,41 @@ describe("Shorthorn", () => {
   });
 
   it("calls half or better ShorthornPlus", () => {
-    expect(names([{ breed: "SH", percent: 50 }, { breed: "MA", percent: 50 }])).toContain(
-      "ShorthornPlus",
-    );
+    expect(
+      names([
+        { breed: "SH", percent: 50 },
+        { breed: "MA", percent: 50 },
+      ]),
+    ).toContain("ShorthornPlus");
   });
 
   it("calls under half nothing at all", () => {
-    expect(names([{ breed: "SH", percent: 25 }, { breed: "MA", percent: 75 }])).not.toContain(
-      "ShorthornPlus",
-    );
+    expect(
+      names([
+        { breed: "SH", percent: 25 },
+        { breed: "MA", percent: 75 },
+      ]),
+    ).not.toContain("ShorthornPlus");
   });
 });
 
 describe("Maine-Anjou", () => {
   it("puts 3/4 and over on High Maine brown papers", () => {
     expect(
-      names([{ breed: "MA", percent: 79.57 }, { breed: "AN", percent: 20.43 }]).join(" "),
+      names([
+        { breed: "MA", percent: 79.57 },
+        { breed: "AN", percent: 20.43 },
+      ]).join(" "),
     ).toMatch(/High Maine — 3\/4/);
   });
 
   it("puts a half on MaineTainer green", () => {
-    expect(names([{ breed: "MA", percent: 50 }, { breed: "AN", percent: 50 }]).join(" ")).toMatch(
-      /MaineTainer — 1\/2/,
-    );
+    expect(
+      names([
+        { breed: "MA", percent: 50 },
+        { breed: "AN", percent: 50 },
+      ]).join(" "),
+    ).toMatch(/MaineTainer — 1\/2/);
   });
 
   it("mentions Maine Angus on the fractions it can apply to", () => {
@@ -131,9 +163,12 @@ describe("Maine-Anjou", () => {
   });
 
   it("refuses anything under a quarter", () => {
-    expect(names([{ breed: "MA", percent: 12.5 }, { breed: "AN", percent: 87.5 }])).toContain(
-      "Not eligible",
-    );
+    expect(
+      names([
+        { breed: "MA", percent: 12.5 },
+        { breed: "AN", percent: 87.5 },
+      ]),
+    ).toContain("Not eligible");
   });
 });
 
@@ -146,10 +181,12 @@ describe("what is not on file", () => {
 describe("an animal papered twice", () => {
   it("qualifies under both associations at once", () => {
     // Which is the ordinary case on this farm, not an edge one.
-    expect(names([{ breed: "CA", percent: 12.5 }, { breed: "SH", percent: 87.5 }])).toEqual([
-      "Percentage Chianina",
-      "ShorthornPlus",
-    ]);
+    expect(
+      names([
+        { breed: "CA", percent: 12.5 },
+        { breed: "SH", percent: 87.5 },
+      ]),
+    ).toEqual(["Percentage Chianina", "ShorthornPlus"]);
   });
 });
 
@@ -158,7 +195,10 @@ describe("the class an AMAA paper states", () => {
     // An animal upgraded years ago can hold a class its current makeup would
     // not earn on its own, and the registry's decision is the one that counts.
     const stated = registrationClasses(
-      [{ breed: "MA", percent: 50 }, { breed: "AN", percent: 50 }],
+      [
+        { breed: "MA", percent: 50 },
+        { breed: "AN", percent: 50 },
+      ],
       "PB",
     );
 
@@ -170,7 +210,10 @@ describe("the class an AMAA paper states", () => {
 
   it("falls back to the percentage when the papers say nothing", () => {
     expect(
-      registrationClasses([{ breed: "MA", percent: 50 }, { breed: "AN", percent: 50 }])
+      registrationClasses([
+        { breed: "MA", percent: 50 },
+        { breed: "AN", percent: 50 },
+      ])
         .classes.map((entry) => entry.name)
         .join(" "),
     ).toMatch(/MaineTainer — 1\/2/);
@@ -179,7 +222,13 @@ describe("the class an AMAA paper states", () => {
   it("falls back when the code belongs to another registry", () => {
     // `1CM` is a Chianina classification and says nothing about Maine-Anjou.
     expect(
-      registrationClasses([{ breed: "MA", percent: 50 }, { breed: "AN", percent: 50 }], "1CM")
+      registrationClasses(
+        [
+          { breed: "MA", percent: 50 },
+          { breed: "AN", percent: 50 },
+        ],
+        "1CM",
+      )
         .classes.map((entry) => entry.name)
         .join(" "),
     ).toMatch(/MaineTainer/);

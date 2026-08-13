@@ -240,8 +240,7 @@ export const externalAnimals = pgTable(
      * Maine-Anjou one. `regNumber` alone made those two pages import the same
      * cow twice, with each copy holding half her descendants.
      */
-    registrations:
-      jsonb("registrations").$type<{ association: string; regNumber: string }[]>(),
+    registrations: jsonb("registrations").$type<{ association: string; regNumber: string }[]>(),
     tattoo: text("tattoo"),
     sex: text("sex"),
     dob: timestamp("dob", { withTimezone: true }),

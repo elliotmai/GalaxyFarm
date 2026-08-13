@@ -231,7 +231,10 @@ function narrow<A extends string>(
   if (left.length === 0) {
     return {
       possible: [...current.possible],
-      because: [...current.because, `${reason} — but that disagrees with the rest, so it is ignored`],
+      because: [
+        ...current.because,
+        `${reason} — but that disagrees with the rest, so it is ignored`,
+      ],
     };
   }
   return {
@@ -540,7 +543,8 @@ function chanceOfCarryingRed(
     return { chance: carrying.reduce((sum, entry) => sum + (entry.chance ?? 0), 0) };
   }
 
-  const fromSire = evidence.sire === undefined ? undefined : transmits(evidence.sire.extension, "e");
+  const fromSire =
+    evidence.sire === undefined ? undefined : transmits(evidence.sire.extension, "e");
   const fromDam = evidence.dam === undefined ? undefined : transmits(evidence.dam.extension, "e");
   if (fromSire === undefined || fromDam === undefined) return undefined;
 
@@ -646,10 +650,7 @@ export function predictCalfColour(sire: CoatInference, dam: CoatInference): Calf
   const outcomes: { name: string; chance: number }[] = [];
   if (base !== undefined && pattern !== undefined) {
     // The loci are independent, so the coat is one multiplied by the other.
-    for (const [baseName, baseChance] of Object.entries(base) as [
-      "black" | "red",
-      number,
-    ][]) {
+    for (const [baseName, baseChance] of Object.entries(base) as ["black" | "red", number][]) {
       for (const [patternName, patternChance] of Object.entries(pattern) as [
         "solid" | "roan" | "white",
         number,

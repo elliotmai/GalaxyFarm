@@ -75,7 +75,10 @@ export function parseAngusUrl(
     };
   }
 
-  return { ok: true, ref: { url: url.toString(), association: "AAA", registration: registration.trim() } };
+  return {
+    ok: true,
+    ref: { url: url.toString(), association: "AAA", registration: registration.trim() },
+  };
 }
 
 /* ------------------------------------------------------------------ text */
@@ -398,7 +401,13 @@ export function parseAngusPage(
   // its own, and the heading above it is the search box.
   const lines = text.split("\n").map((line) => line.trim());
   const regLine = lines.findIndex((line) => /^Reg\s*:/i.test(line));
-  const name = regLine > 0 ? lines.slice(0, regLine).reverse().find((line) => line !== "") : undefined;
+  const name =
+    regLine > 0
+      ? lines
+          .slice(0, regLine)
+          .reverse()
+          .find((line) => line !== "")
+      : undefined;
   if (name === undefined) missing.push("Registered name");
 
   // Sex is on its own line under the number, unlabelled.

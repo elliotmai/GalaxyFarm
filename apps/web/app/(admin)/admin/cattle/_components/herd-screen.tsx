@@ -217,8 +217,7 @@ export function HerdScreen({
     .filter((zone) => zone.active)
     .map((zone) => ({ value: zone.id, label: zone.name }));
 
-  const profileOf = (animalId: Ulid) =>
-    profiles.find((profile) => profile.animalId === animalId);
+  const profileOf = (animalId: Ulid) => profiles.find((profile) => profile.animalId === animalId);
 
   const currentZone = (animalId: Ulid) => {
     const open = assignments.find((a) => a.animalId === animalId && a.periodTo === undefined);
@@ -352,7 +351,8 @@ export function HerdScreen({
         label: zones.find((zone) => zone.id === assignment.zoneId)?.name ?? "a zone",
         effect: "deleted" as const,
       })),
-      consequence: "Everything recorded about this animal goes to Trash with it, and can be restored.",
+      consequence:
+        "Everything recorded about this animal goes to Trash with it, and can be restored.",
     });
 
     if (!confirmed) return;

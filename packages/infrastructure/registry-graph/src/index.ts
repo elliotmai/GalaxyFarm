@@ -120,7 +120,8 @@ function toAnimal(row: Row): RegistryAnimal | undefined {
   const animal = row["animal"] as Record<string, unknown> | undefined;
   const association = asString(row["association"]);
   const regNumber = asString(row["regNumber"]);
-  if (animal === undefined || association === undefined || regNumber === undefined) return undefined;
+  if (animal === undefined || association === undefined || regNumber === undefined)
+    return undefined;
 
   const registrations = ((row["registrations"] as Row[] | undefined) ?? [])
     .map((entry) => ({
@@ -130,7 +131,10 @@ function toAnimal(row: Row): RegistryAnimal | undefined {
     .filter((entry) => entry.association !== "" && entry.regNumber !== "");
 
   const breedComposition = ((row["composition"] as Row[] | undefined) ?? [])
-    .map((entry) => ({ breed: asString(entry["breed"]) ?? "", percent: asNumber(entry["percent"]) ?? 0 }))
+    .map((entry) => ({
+      breed: asString(entry["breed"]) ?? "",
+      percent: asNumber(entry["percent"]) ?? 0,
+    }))
     .filter((entry) => entry.breed !== "");
 
   const geneticTests = ((row["defects"] as Row[] | undefined) ?? [])
@@ -330,10 +334,10 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
             generation: asNumber(row["generation"]) ?? steps.length,
           };
         })
-        .filter((entry): entry is RegistryAnimal & { position: string; generation: number } =>
-          entry !== undefined,
+        .filter(
+          (entry): entry is RegistryAnimal & { position: string; generation: number } =>
+            entry !== undefined,
         );
     },
   };
 }
-

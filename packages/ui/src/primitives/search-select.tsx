@@ -133,7 +133,9 @@ export function SearchSelect({
     // a filtered list means Enter on a search that found one animal picks
     // "Unknown" instead — which reads as the picker ignoring you.
     if (search.trim() === "") {
-      return clearLabel === undefined ? [...options] : [{ value: "", label: clearLabel }, ...options];
+      return clearLabel === undefined
+        ? [...options]
+        : [{ value: "", label: clearLabel }, ...options];
     }
     const found = options.filter((option) => matchesSearch(option, search));
     if (allowCustom === undefined) return found;

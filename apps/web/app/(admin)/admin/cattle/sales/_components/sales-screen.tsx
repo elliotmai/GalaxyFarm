@@ -474,8 +474,8 @@ function SalesTab({
             >
               <div className="flex flex-col gap-density pt-2">
                 <p>
-                  It must not enter the food chain before that date. A sale to another producer is
-                  a different matter — if that is what this is, say so and it goes on the record.
+                  It must not enter the food chain before that date. A sale to another producer is a
+                  different matter — if that is what this is, say so and it goes on the record.
                 </p>
                 <Checkbox
                   label="Sell it anyway"

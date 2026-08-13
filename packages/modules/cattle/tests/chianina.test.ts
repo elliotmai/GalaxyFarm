@@ -68,7 +68,9 @@ describe("a Chianina pedigree line", () => {
   });
 
   it("reads an empty tattoo as no tattoo", () => {
-    expect(parsePedigreeEntry("264745        FGJ HABANERO         [ ]", "")?.tattoo).toBeUndefined();
+    expect(
+      parsePedigreeEntry("264745        FGJ HABANERO         [ ]", "")?.tattoo,
+    ).toBeUndefined();
   });
 });
 

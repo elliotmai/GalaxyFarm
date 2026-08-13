@@ -23,7 +23,10 @@ export async function GET(request: Request) {
 
   const graph = registryGraph();
   if (graph === undefined) {
-    return NextResponse.json({ error: "The association catalogue is not set up." }, { status: 503 });
+    return NextResponse.json(
+      { error: "The association catalogue is not set up." },
+      { status: 503 },
+    );
   }
 
   const url = new URL(request.url);

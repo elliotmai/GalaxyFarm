@@ -838,7 +838,9 @@ export function HealthTab({
           columns={columns}
           rows={hers}
           rowKey={(record) => record.id}
-          empty={<EmptyState title="Nothing recorded" detail="No treatments on file for this animal." />}
+          empty={
+            <EmptyState title="Nothing recorded" detail="No treatments on file for this animal." />
+          }
         />
       </Card>
     </Section>

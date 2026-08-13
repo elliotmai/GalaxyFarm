@@ -85,9 +85,9 @@ describe("crossing both stores", () => {
     });
 
     const before: Herd = { profiles: [calf], outsiders: [sire, dam] };
-    expect(
-      coatResolver(before).of({ kind: "animal", id: calf.animalId })?.carriesRed.verdict,
-    ).toBe("maybe");
+    expect(coatResolver(before).of({ kind: "animal", id: calf.animalId })?.carriesRed.verdict).toBe(
+      "maybe",
+    );
 
     // A red full sibling turns up. Both parents must carry red, so the calf's
     // own odds move — without anybody touching the calf's record.

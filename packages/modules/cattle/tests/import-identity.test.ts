@@ -27,13 +27,17 @@ const external = (over: Partial<ExternalAnimal> & { name: string }): ExternalAni
     ...over,
   }) as ExternalAnimal;
 
-const chianina = () => parseDigitalBeefPage(CHIANINA_PAGE, { association: "ACA", registration: "359968" });
-const maine = () => parseDigitalBeefPage(MAINE_ANJOU_PAGE, { association: "AMAA", registration: "402303" });
+const chianina = () =>
+  parseDigitalBeefPage(CHIANINA_PAGE, { association: "ACA", registration: "359968" });
+const maine = () =>
+  parseDigitalBeefPage(MAINE_ANJOU_PAGE, { association: "AMAA", registration: "402303" });
 
 describe("every number an animal is known by", () => {
   it("reads a record written before there was more than one", () => {
     expect(
-      allRegistrations(external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "AMAA" })),
+      allRegistrations(
+        external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "AMAA" }),
+      ),
     ).toEqual([{ association: "AMAA", regNumber: "378987" }]);
   });
 
@@ -69,7 +73,12 @@ describe("recognising an animal already on file", () => {
     // Two cows called SWEET DANDY in one county is an ordinary Tuesday. A
     // wrong merge welds two animals' descendants together and nothing on any
     // screen looks unusual afterwards; a duplicate is visible and fixable.
-    const match = matchCandidate({ name: "ZNT JENNA 707T", regNumber: "337003" }, "ACA", [jenna], new Map());
+    const match = matchCandidate(
+      { name: "ZNT JENNA 707T", regNumber: "337003" },
+      "ACA",
+      [jenna],
+      new Map(),
+    );
 
     expect(match).toBeUndefined();
   });

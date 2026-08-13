@@ -53,9 +53,7 @@ describe("working out the sexes", () => {
   it("takes it from who names the animal as a parent", () => {
     const sexes = inferAncestorSexes(
       [bull, cow],
-      [
-        { sire: { kind: "external", id: bull.id }, dam: { kind: "external", id: cow.id } },
-      ],
+      [{ sire: { kind: "external", id: bull.id }, dam: { kind: "external", id: cow.id } }],
     );
 
     expect(sexes.get(bull.id)).toMatchObject({ sex: "male", inferred: true });
@@ -360,9 +358,18 @@ describe("folding two records for one animal into one", () => {
 
   it("finds everything that has to be repointed", () => {
     const calf = animal({ name: "HER CALF", dam: { kind: "external", id: drop.id } });
-    const plan = planAncestorMerge(keep, drop, [
-      { id: "01ARZ3NDEKTSV4RRFFQ69G5FZZ" as Ulid, label: "Star", dam: { kind: "external", id: drop.id } },
-    ], [calf]);
+    const plan = planAncestorMerge(
+      keep,
+      drop,
+      [
+        {
+          id: "01ARZ3NDEKTSV4RRFFQ69G5FZZ" as Ulid,
+          label: "Star",
+          dam: { kind: "external", id: drop.id },
+        },
+      ],
+      [calf],
+    );
 
     expect(plan.repoint).toEqual([
       { kind: "profile", id: "01ARZ3NDEKTSV4RRFFQ69G5FZZ", label: "Star", role: "dam" },
