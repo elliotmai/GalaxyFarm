@@ -96,3 +96,48 @@ export function poundsOf(
   if (feedType.estWeightLbPerUnit !== undefined) return amount * feedType.estWeightLbPerUnit;
   return measureToPounds(amount, feedType.unit);
 }
+
+/**
+ * Pounds in an amount of this feed, given in some *other* unit.
+ *
+ * A ration is written in what it is fed in and stock is counted in what it is
+ * bought in, and those are routinely different: cubes come in bags and go out
+ * in scoops. Everything downstream — the run-out date, the cost split — is in
+ * the unit the feed is counted in, so the two have to be reconciled somewhere,
+ * and pounds is the only thing they have in common.
+ *
+ * The feed's own weight per unit applies to the unit it is catalogued in and
+ * nowhere else. A 1,200 lb round bale says nothing about what a scoop of it
+ * weighs, and borrowing the figure would report a scoop as most of a ton.
+ */
+export function poundsIn(
+  feedType: Pick<FeedType, "unit" | "estWeightLbPerUnit">,
+  amount: number,
+  unit: Unit,
+): number | undefined {
+  if (unit === feedType.unit) return poundsOf(feedType, amount);
+  return measureToPounds(amount, unit);
+}
+
+/**
+ * An amount of this feed, restated in the unit the feed is counted in.
+ *
+ * Undefined when there is no honest answer — a feed catalogued in a unit
+ * nobody has given a weight for, fed in a different one. Undefined rather than
+ * the raw number, because passing scoops off as bags is an eighteen-fold error
+ * in the direction that empties a barn without warning, and it is the sort of
+ * error every screen downstream would render without comment.
+ */
+export function inFeedUnit(
+  feedType: Pick<FeedType, "unit" | "estWeightLbPerUnit">,
+  amount: number,
+  unit: Unit,
+): number | undefined {
+  if (unit === feedType.unit) return amount;
+
+  const pounds = poundsIn(feedType, amount, unit);
+  const perUnit = poundsOf(feedType, 1);
+  if (pounds === undefined || perUnit === undefined || perUnit === 0) return undefined;
+
+  return pounds / perUnit;
+}

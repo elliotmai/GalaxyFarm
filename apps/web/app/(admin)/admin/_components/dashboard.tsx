@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { Card, CardGrid, EmptyState, Pill, RecordCard, SafetyBadge, Tile } from "@galaxy-farm/ui";
 import {
+  coversToFit,
   effectiveSafetyLevel,
   freezeCheckTargets,
   type Animal,
@@ -61,7 +62,15 @@ export function Dashboard({
 
   const inUse = new Set(assignments.filter((a) => a.periodTo === undefined).map((a) => a.zoneId))
     .size;
-  const atRisk = water.filter((source) => source.active && !source.hasHeater).length;
+  /**
+   * Tanks that are out with nothing over them.
+   *
+   * Counted on the cover rather than on the heater, because no tank here has a
+   * heater and none is going to — a tile reading "4, no heater fitted" every
+   * day of the year is a tile that stops being looked at. A cover is the thing
+   * that changes and the thing somebody can go and do.
+   */
+  const uncovered = water.filter((source) => source.active && source.cover !== "on").length;
 
   if (zones.length === 0) {
     return (
@@ -98,11 +107,11 @@ export function Dashboard({
           hint={`of ${zones.filter((z) => z.active).length} active`}
         />
         <Tile
-          label="Tanks at risk"
-          value={atRisk}
-          tone={atRisk > 0 ? "danger" : "calm"}
-          emphasis={atRisk > 0}
-          hint={atRisk > 0 ? "No heater fitted" : "All heated"}
+          label="Tanks uncovered"
+          value={uncovered}
+          tone={uncovered > 0 ? "danger" : "calm"}
+          emphasis={uncovered > 0}
+          hint={uncovered > 0 ? "Nothing over them" : "All covered"}
         />
         <Tile label="Zones resting" value={zones.filter((z) => z.resting).length} tone="calm" />
       </div>
@@ -232,6 +241,12 @@ function PenBoard({
  * them serving three — a per-zone list would send someone to the same trough
  * three times on a freeze morning, and a chore list that does that stops being
  * trusted.
+ *
+ * The card leads with the covers because they are the only part of this
+ * anybody can act on ahead of time: no tank here is heated, so "without
+ * heaters" is a constant, and a constant at the top of a watch card is
+ * furniture. A cover that is off is a job, and it has to be done before the
+ * cold arrives rather than after.
  */
 function FreezeWatch({
   zones,
@@ -250,18 +265,28 @@ function FreezeWatch({
     })),
   );
 
-  const vulnerable = targets.filter((target) => target.vulnerable);
+  const toFit = coversToFit(targets);
+  /**
+   * "Covers on" has to mean there are covers and they are on.
+   *
+   * Said over a set of tanks that have no covers at all it is reassurance
+   * nobody earned — the honest reading of that state is that there is nothing
+   * to put on, and the ice gets broken instead.
+   */
+  const fitted = targets.filter((target) => target.waterSource.cover === "on").length;
 
   return (
     <Card
       title="Freeze watch"
       actions={
-        vulnerable.length > 0 ? (
+        toFit.length > 0 ? (
           <Pill tone="danger" dot>
-            {vulnerable.length} without heaters
+            {toFit.length} cover{toFit.length === 1 ? "" : "s"} to put on
           </Pill>
+        ) : fitted > 0 ? (
+          <Pill tone="calm">Covers on</Pill>
         ) : (
-          <Pill tone="calm">All heated</Pill>
+          <Pill tone="neutral">No covers to put on</Pill>
         )
       }
     >
@@ -274,9 +299,11 @@ function FreezeWatch({
         <ul className="flex flex-col gap-2">
           {targets.map((target) => (
             <li key={target.waterSource.id} className="flex flex-col gap-1">
-              <span className="flex items-center gap-2 text-density text-ink">
+              <span className="flex flex-wrap items-center gap-2 text-density text-ink">
                 {target.waterSource.name}
-                {target.vulnerable ? <Pill tone="danger">No heater</Pill> : null}
+                {target.needsCover ? <Pill tone="danger">Cover off</Pill> : null}
+                {target.waterSource.cover === "on" ? <Pill tone="calm">Covered</Pill> : null}
+                {target.vulnerable ? <Pill tone="neutral">No heater</Pill> : null}
               </span>
               <span className="text-sm text-muted">
                 Serves {target.zones.map((zone) => zone.name).join(", ")}
@@ -287,9 +314,10 @@ function FreezeWatch({
       )}
 
       <p className="mt-density text-sm text-muted">
-        One check per tank, not per zone.{" "}
-        <Link href="/admin/map" className="text-action underline underline-offset-2">
-          See them on the map
+        One check per tank, not per zone. Covers go on the evening before; the ice still gets
+        checked in the morning.{" "}
+        <Link href="/admin/pastures" className="text-action underline underline-offset-2">
+          Manage the tanks
         </Link>
       </p>
     </Card>

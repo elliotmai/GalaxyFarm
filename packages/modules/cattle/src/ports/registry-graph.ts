@@ -68,6 +68,36 @@ export type RegistryAnimal = Omit<
   readonly dam?: { association: string; regNumber: string } | undefined;
 };
 
+/** The fields on a catalogue animal that are `Date`s and survive JSON as strings. */
+const DATE_FIELDS = ["dob", "disposedOn"] as const;
+
+/**
+ * A catalogue animal, after it has been through JSON.
+ *
+ * This shape crosses the wire — the graph is searched on the server and read
+ * in a browser — and JSON has no date. A `Date` put through `stringify` and
+ * back is a *string wearing the type of a Date*: it type-checks everywhere,
+ * and the first thing to call `.toISOString()` on it throws.
+ *
+ * Everything that fetches one goes through here, so the promise the type makes
+ * is true again before anything reads it. An unparseable date is dropped
+ * rather than kept as `Invalid Date`, which fails later and further away.
+ */
+export function reviveRegistryAnimal<T extends RegistryAnimal>(animal: T): T {
+  const revived: Record<string, unknown> = { ...animal };
+
+  for (const field of DATE_FIELDS) {
+    const value = revived[field];
+    if (typeof value !== "string") continue;
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) delete revived[field];
+    else revived[field] = parsed;
+  }
+
+  return revived as T;
+}
+
 export interface RegistryGraph {
   /**
    * Find animals matching a query.

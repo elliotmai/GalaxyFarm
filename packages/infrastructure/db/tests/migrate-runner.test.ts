@@ -95,6 +95,67 @@ describe("the migration loop", () => {
     expect(ledger.rows.map((r) => r.name)).toEqual([...files].sort());
   }, 60_000);
 
+  it("backfills covers onto the auto-refill tanks and leaves the static one alone", async () => {
+    /*
+     * A data migration, unlike a schema one, can be wrong in a way nothing
+     * else notices: it runs, it succeeds, and it updates the wrong rows or no
+     * rows at all. So this applies everything up to the backfill, puts a tank
+     * of each type in the way, and then lets the backfill run over them.
+     *
+     * The `updated_at` assertion is the one that matters most. The sync cursor
+     * is `(updated_at, id)`, so a value changed underneath a row whose
+     * timestamp did not move is a value correct on the server and wrong on
+     * every device — and no pull would ever fetch it.
+     */
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+    const backfill = files.find((f) => f.includes("tank_covers_backfill"))!;
+    const before = files.slice(0, files.indexOf(backfill));
+
+    await db.exec(`create table _migrations (name text primary key, applied_at timestamptz)`);
+    for (const file of before) {
+      for (const statement of splitStatements(readFileSync(join(MIGRATIONS_DIR, file), "utf8"))) {
+        await db.exec(statement);
+      }
+      await db.query(`insert into _migrations (name) values ($1)`, [file]);
+    }
+
+    const stamped = "2026-01-01T00:00:00Z";
+    for (const [id, type, deletedAt] of [
+      ["auto-1", "auto_refill", null],
+      ["static-1", "static_tank", null],
+      ["auto-deleted", "auto_refill", stamped],
+    ] as const) {
+      await db.query(
+        `insert into water_sources
+           (id, property_id, created_at, updated_at, deleted_at, name, type, has_heater, active)
+         values ($1, 'p1', $2, $2, $3, $1, $4, false, true)`,
+        [id, stamped, deletedAt, type],
+      );
+    }
+
+    await runMigrations(db);
+
+    const rows = await db.query<{ id: string; cover: string; updated_at: Date }>(
+      `select id, cover, updated_at from water_sources order by id`,
+    );
+    const by = (id: string) => rows.rows.find((row) => row.id === id)!;
+
+    expect(by("auto-1").cover).toBe("off");
+    // Moved, or no device will ever hear about it.
+    expect(by("auto-1").updated_at.getTime()).toBeGreaterThan(new Date(stamped).getTime());
+
+    // Nothing to put on, so nothing claimed. This is the tank the cover list
+    // must never name.
+    expect(by("static-1").cover).toBe("none");
+    expect(by("static-1").updated_at.getTime()).toBe(new Date(stamped).getTime());
+
+    // A tombstone re-sent to every device is noise for a field nothing reads.
+    expect(by("auto-deleted").cover).toBe("none");
+    expect(by("auto-deleted").updated_at.getTime()).toBe(new Date(stamped).getTime());
+  }, 60_000);
+
   it("applies only what is missing when the ledger is partial", async () => {
     // The realistic case: a database that took the first migration months ago
     // and has never seen the ones added since.

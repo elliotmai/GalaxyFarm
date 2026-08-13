@@ -49,8 +49,16 @@ export function LandScreen({
   const live = zones.filter((zone) => zone.active);
   const resting = live.filter((zone) => zone.resting);
   const out = water.filter((source) => source.active);
-  // Heaterless *and* out: a stowed tank cannot freeze anything (§6).
-  const heaterless = out.filter((source) => !source.hasHeater);
+  /**
+   * Covers waiting to go on, among the tanks that are out.
+   *
+   * This is the tile rather than a heaterless count, because a heaterless
+   * count on this place reads "4" every day of the year and there is nothing
+   * to do about it — no tank here has a heater and none is wanted. What
+   * changes, and what somebody can act on before a cold night, is the covers.
+   */
+  const toFit = out.filter((source) => source.cover === "off");
+  const uncovered = out.filter((source) => (source.cover ?? "none") === "none");
   const due = seasonalCareDue(
     zones.map((zone) => ({
       id: zone.id,
@@ -84,11 +92,17 @@ export function LandScreen({
           hint={water.length === out.length ? undefined : `${water.length - out.length} stowed`}
         />
         <Tile
-          label="Without heaters"
-          value={heaterless.length}
-          tone={heaterless.length > 0 ? "danger" : "calm"}
-          emphasis={heaterless.length > 0}
-          hint={heaterless.length > 0 ? "Named in the freeze alert" : "All heated"}
+          label="Covers to put on"
+          value={toFit.length}
+          tone={toFit.length > 0 ? "action" : "calm"}
+          emphasis={toFit.length > 0}
+          hint={
+            uncovered.length > 0
+              ? `${uncovered.length} with no cover at all`
+              : toFit.length > 0
+                ? "Before the next hard freeze"
+                : "All fitted"
+          }
         />
         <Tile
           label="Seasonal work due"
