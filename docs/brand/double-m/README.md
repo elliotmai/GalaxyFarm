@@ -107,13 +107,13 @@ under the 1″ minimum.
 
 ## Screen
 
-Still deliberately secondary. These are much closer to square than the last set,
-so it's less bleak — but the notches are the new question. A ¼″ break is 6% of
-letter height, which at 16px is a fraction of a pixel and will vanish.
+Still deliberately secondary, but the picture improved a lot. These are close to
+square — 0.63:1 to 1.59:1 — and now that the corners are attached, there are no
+sub-pixel gaps to lose. The same artwork should carry to screen without a
+separate derivative, which was not true of either previous set.
 
-That isn't a fault; a screen mark has no heat to vent. But it means the burned
-brand and the drawn logo are not the same artwork, and a screen version should
-probably close the notches up.
+**Lazy Double M** at 0.63:1 is the only one that would sit comfortably in a square
+favicon slot. The rest will letterbox.
 
 ## Checking the geometry
 
