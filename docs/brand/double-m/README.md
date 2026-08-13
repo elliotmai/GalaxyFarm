@@ -1,6 +1,6 @@
 # Double M — logo concepts
 
-Sixteen candidate marks for a "Double M" identity, drawn in the same
+Twenty-four candidate marks for a "Double M" identity, read in the same
 livestock-brand grammar as the approved **Rocking Double Star** and coloured
 from `packages/config/tailwind.preset.ts`.
 
@@ -13,6 +13,10 @@ Open **[`concepts.html`](./concepts.html)** to see them — every mark rendered 
 both real grounds (Midnight Nebula and Bluebonnet Linen) at 96, 64, 40 and
 24&nbsp;px, plus two pixel tests of the leading candidates rasterised at true 24
 and 16&nbsp;px (`pixel-test.png`, `pixel-test-2.png`).
+
+Sixteen are drawn in the sheet's rounded brand-iron language. The last eight are
+vectorised from a hand-drawn sheet and keep that sketch's language instead —
+sharp mitred corners, flat stroke ends, a lighter 6-unit line.
 
 ## The brand grammar
 
@@ -57,11 +61,39 @@ that is the mark they fix.
 | **Crossed Double M** | Two whole M's, legs splayed, overlapped until the inner two cross — two longhorns standing side by side. Straight lines, no curves. | Tight — keeps two peaks, loses the crossing |
 | **… barred** | The crossed pair on a bar, which supplies the common ground the height offset takes away. | Tight — same, with an anchor |
 
+## The eight sketched bases
+
+Vectorised from a hand-drawn sheet, forms kept, proportions regularised.
+
+| Base | What it is |
+| --- | --- |
+| **Overlapped** | Two whole M's, half-overlapped, four legs down. The most literal "double" of the set. |
+| **Double-struck** | One M printed twice a few units apart — weight and shadow, not two letters. |
+| **Shallow middle** | Two M's meeting at a raised joint rather than a shared apex. |
+| **Splayed crown** | Three peaks, middle one dropped, legs kicked out. |
+| **Wide crown** | The same dropped-apex move on vertical legs. Cleanest of the eight small. |
+| **Nested V** | One M with a second V hung inside it — the only base that is not two M's. |
+| **Angular, wide** | Two all-diagonal M's overlapped, no verticals. Range and horizon before letters. |
+| **Angular, tight** | Same, second M smaller and dropped; the asymmetry does the dam-and-calf job. |
+
+Dropping the shared apex, which four of these do, turns out to be a second
+answer to the problem the vertical stem solved: it separates the two M's
+without adding a stroke.
+
+These are compared at 24&nbsp;px inside their own section rather than in the
+main bench, because a 6-unit mitred line and a 9-unit rounded one do not lose
+legibility at the same rate.
+
 ## Recommendation
 
 Not one mark — a family of three, because the app has a 24&nbsp;px nav, a
 512&nbsp;px maskable icon and a PDF that gets signed, and no single drawing is
 good at all three.
+
+This picks from the rounded marks only. Choosing between the two drawing
+languages is the prior question — if the answer is sharp, **Wide crown** is the
+one to build the family around and the three below get redrawn rather than
+reconsidered.
 
 - **Primary — Rocking Connected Double M, posted.** One connected object, so it
   cannot drift apart at any size, and the only candidate still reading as two

@@ -333,6 +333,36 @@
   }
   .evidence figcaption strong { color: var(--ink); font-weight: 600; }
 
+
+  /* ---------- take four: the sketched bases ---------- */
+
+  .bases {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 30px 26px;
+    margin-top: 28px;
+    padding-top: 30px;
+    border-top: 2px solid var(--rule-firm);
+  }
+  .base h3 {
+    font-family: var(--slab);
+    font-weight: 600;
+    font-size: 18px;
+    margin: 14px 0 6px;
+  }
+  .base p { margin: 0; font-size: 14.5px; color: var(--ink-soft); }
+  .base-marks { display: flex; gap: 8px; }
+  .base-ground {
+    flex: 1;
+    border-radius: 3px;
+    padding: 10px;
+    display: flex;
+    justify-content: center;
+  }
+  .base-ground--midnight { background: #0E1026; border: 1px solid #3D4478; --m1: #F2EFE6; --m2: #9D85E8; }
+  .base-ground--linen    { background: #F8F5EC; border: 1px solid #DFD8C6; --m1: #5F45B0; --m2: #35569E; }
+  .base-ground .mk { width: 100%; height: auto; aspect-ratio: 1; max-width: 96px; }
+
   /* ---------- recommendation ---------- */
 
   .picks {
@@ -526,6 +556,55 @@
     </g>
   </symbol>
 
+  <!-- Take four: vectorised from the hand-drawn sheet. Sharp joins and butt caps,
+       6-unit stroke -- the sketch's own drawing language, not the rounded
+       brand-iron treatment used everywhere above. -->
+  <symbol id="m-b1" viewBox="0 0 100 100">
+    <g fill="none" stroke="var(--m1)" stroke-width="6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="6">
+      <path d="M15 78 L15 26 L35 60 L55 26 L55 78"/>
+      <path d="M45 78 L45 26 L65 60 L85 26 L85 78"/>
+    </g>
+  </symbol>
+  <symbol id="m-b2" viewBox="0 0 100 100">
+    <g fill="none" stroke="var(--m1)" stroke-width="6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="6">
+      <path d="M26 78 L26 26 L46 60 L66 26 L66 78"/>
+      <path d="M35 78 L35 26 L55 60 L75 26 L75 78"/>
+    </g>
+  </symbol>
+  <symbol id="m-b3" viewBox="0 0 100 100">
+    <g fill="none" stroke="var(--m1)" stroke-width="6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="6">
+      <path d="M12 78 L12 26 L25 60 L38 26 L50 42 L62 26 L75 60 L88 26 L88 78"/>
+    </g>
+  </symbol>
+  <symbol id="m-b4" viewBox="0 0 100 100">
+    <g fill="none" stroke="var(--m1)" stroke-width="6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="6">
+      <path d="M16 78 L24 26 L38 62 L50 40 L62 62 L76 26 L84 78"/>
+    </g>
+  </symbol>
+  <symbol id="m-b5" viewBox="0 0 100 100">
+    <g fill="none" stroke="var(--m1)" stroke-width="6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="6">
+      <path d="M18 78 L18 26 L34 62 L50 40 L66 62 L82 26 L82 78"/>
+    </g>
+  </symbol>
+  <symbol id="m-b6" viewBox="0 0 100 100">
+    <g fill="none" stroke="var(--m1)" stroke-width="6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="6">
+      <path d="M24 80 L24 26 L50 52 L76 26 L76 80"/>
+      <path d="M24 56 L50 78 L76 56"/>
+    </g>
+  </symbol>
+  <symbol id="m-b7" viewBox="0 0 100 100">
+    <g fill="none" stroke="var(--m1)" stroke-width="6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="6">
+      <path d="M10 78 L26 30 L42 62 L58 30 L74 78"/>
+      <path d="M30 78 L46 26 L62 58 L78 26 L94 78"/>
+    </g>
+  </symbol>
+  <symbol id="m-b8" viewBox="0 0 100 100">
+    <g fill="none" stroke="var(--m1)" stroke-width="6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="6">
+      <path d="M8 74 L26 28 L40 56 L54 28 L70 74"/>
+      <path d="M44 82 L58 44 L68 64 L78 44 L92 82"/>
+    </g>
+  </symbol>
+
   <symbol id="m-longhorn" viewBox="0 0 100 100">
     <path d="M16 66 Q10 46 22 32 L36 52 L50 32 L64 52 L78 32 Q90 46 84 66"
           fill="none" stroke="var(--m1)" stroke-width="9"
@@ -554,7 +633,7 @@
     <p class="eyebrow">Brand concepts &middot; issue #26</p>
     <h1>Double&nbsp;M Brand Sheet</h1>
     <p class="standfirst">
-      Sixteen ways to burn two&nbsp;M&rsquo;s, drawn in the same livestock-brand grammar as the approved
+      Twenty-four ways to burn two&nbsp;M&rsquo;s, drawn in the same livestock-brand grammar as the approved
       <strong>Rocking Double Star</strong> and coloured from the locked palette in
       <code>packages/config/tailwind.preset.ts</code>. Nothing here replaces the star mark &mdash; these are
       candidates for the day the farm and business names land.
@@ -1146,9 +1225,186 @@
     </figcaption>
   </figure>
 
+  <h2>Take four: your eight bases</h2>
+  <p class="section-note">
+    Straight from the sketch sheet, vectorised and regularised &mdash; same forms, tidied proportions, legs
+    brought back to a normal M. These are drawn in the sketch&rsquo;s own language rather than the sheet&rsquo;s:
+    <strong>sharp mitred corners, flat stroke ends, and a lighter 6-unit line</strong>, where everything above
+    is rounded and heavy. That is a real fork. If one of these wins, the question stops being which mark and
+    becomes whether the whole system goes sharp.
+  </p>
+
+  <div class="bases">
+    <article class="base">
+      <div class="base-marks">
+        <div class="base-ground base-ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b1"/></svg>
+        </div>
+        <div class="base-ground base-ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b1"/></svg>
+        </div>
+      </div>
+      <h3>Overlapped</h3>
+      <p>Two whole M&rsquo;s, half-overlapped, four legs down. The most literal &ldquo;double&rdquo; here &mdash; and the narrow channel between the two inner legs is the first thing to fill in as it shrinks.</p>
+    </article>
+    <article class="base">
+      <div class="base-marks">
+        <div class="base-ground base-ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b2"/></svg>
+        </div>
+        <div class="base-ground base-ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b2"/></svg>
+        </div>
+      </div>
+      <h3>Double-struck</h3>
+      <p>One M printed twice, a few units apart. It reads as weight and shadow rather than as two letters &mdash; it says &ldquo;double&rdquo; without ever saying &ldquo;M&nbsp;M&rdquo;.</p>
+    </article>
+    <article class="base">
+      <div class="base-marks">
+        <div class="base-ground base-ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b3"/></svg>
+        </div>
+        <div class="base-ground base-ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b3"/></svg>
+        </div>
+      </div>
+      <h3>Shallow middle</h3>
+      <p>Two M&rsquo;s meeting at a raised joint instead of a shared apex. The shallow notch is the whole idea, and it is the first casualty: by 24&nbsp;px it has flattened into a plain zigzag.</p>
+    </article>
+    <article class="base">
+      <div class="base-marks">
+        <div class="base-ground base-ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b4"/></svg>
+        </div>
+        <div class="base-ground base-ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b4"/></svg>
+        </div>
+      </div>
+      <h3>Splayed crown</h3>
+      <p>Three peaks with the middle one dropped, legs kicked out. Lowering the shared apex is what separates the two M&rsquo;s &mdash; the same job the vertical stem did, done with geometry instead of an added stroke.</p>
+    </article>
+    <article class="base">
+      <div class="base-marks">
+        <div class="base-ground base-ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b5"/></svg>
+        </div>
+        <div class="base-ground base-ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b5"/></svg>
+        </div>
+      </div>
+      <h3>Wide crown</h3>
+      <p>The same dropped-apex move on vertical legs. Squarer, steadier, and the cleanest of the eight when it gets small.</p>
+    </article>
+    <article class="base">
+      <div class="base-marks">
+        <div class="base-ground base-ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b6"/></svg>
+        </div>
+        <div class="base-ground base-ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b6"/></svg>
+        </div>
+      </div>
+      <h3>Nested V</h3>
+      <p>One M with a second V hung inside it. The &ldquo;double&rdquo; lives in the repeated valley rather than in a repeated letter &mdash; the only base here that is not two M&rsquo;s.</p>
+    </article>
+    <article class="base">
+      <div class="base-marks">
+        <div class="base-ground base-ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b7"/></svg>
+        </div>
+        <div class="base-ground base-ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b7"/></svg>
+        </div>
+      </div>
+      <h3>Angular, wide</h3>
+      <p>Two all-diagonal M&rsquo;s overlapped, not a vertical anywhere. Reads as range and horizon before it reads as letters.</p>
+    </article>
+    <article class="base">
+      <div class="base-marks">
+        <div class="base-ground base-ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b8"/></svg>
+        </div>
+        <div class="base-ground base-ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b8"/></svg>
+        </div>
+      </div>
+      <h3>Angular, tight</h3>
+      <p>Same, with the second M smaller and dropped. The asymmetry does the dam-and-calf job the star mark does, without needing a second size of anything.</p>
+    </article>
+  </div>
+
+  <h3 class="evidence-head">The eight at 40 and 24&nbsp;px</h3>
+  <p class="section-note">
+    Compared inside their own section rather than in the main bench below, because a 6-unit mitred line and a
+    9-unit rounded one do not lose their legibility at the same rate &mdash; putting them in one row would
+    flatter the heavier drawing for reasons that have nothing to do with the shapes.
+  </p>
+
+  <div class="bench">
+    <div class="bench-grid">
+      <figure>
+        <div class="pair">
+          <svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b1"/></svg>
+          <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b1"/></svg>
+        </div>
+        <figcaption>Overlapped</figcaption>
+      </figure>
+      <figure>
+        <div class="pair">
+          <svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b2"/></svg>
+          <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b2"/></svg>
+        </div>
+        <figcaption>Double-struck</figcaption>
+      </figure>
+      <figure>
+        <div class="pair">
+          <svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b3"/></svg>
+          <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b3"/></svg>
+        </div>
+        <figcaption>Shallow middle</figcaption>
+      </figure>
+      <figure>
+        <div class="pair">
+          <svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b4"/></svg>
+          <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b4"/></svg>
+        </div>
+        <figcaption>Splayed crown</figcaption>
+      </figure>
+      <figure>
+        <div class="pair">
+          <svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b5"/></svg>
+          <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b5"/></svg>
+        </div>
+        <figcaption>Wide crown</figcaption>
+      </figure>
+      <figure>
+        <div class="pair">
+          <svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b6"/></svg>
+          <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b6"/></svg>
+        </div>
+        <figcaption>Nested V</figcaption>
+      </figure>
+      <figure>
+        <div class="pair">
+          <svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b7"/></svg>
+          <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b7"/></svg>
+        </div>
+        <figcaption>Angular, wide</figcaption>
+      </figure>
+      <figure>
+        <div class="pair">
+          <svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b8"/></svg>
+          <svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b8"/></svg>
+        </div>
+        <figcaption>Angular, tight</figcaption>
+      </figure>
+    </div>
+  </div>
+
   <h2>All sixteen at 24&nbsp;px</h2>
   <p class="section-note">
-    All sixteen on the admin ground where small sizes actually live, with 40&nbsp;px alongside for reference.
+    The sixteen rounded marks on the admin ground where small sizes actually live, with 40&nbsp;px alongside for
+    reference. The eight sketched bases have their own row above, for the drawing-language reason given there.
     Squint: whatever still has a shape here is a real candidate, and whatever turns to lint is a hero mark that
     needs a small companion &mdash; but keep the pixel test in mind while you squint, because several of these
     hold their shape without holding their letters.
@@ -1277,6 +1533,11 @@
     PDF that gets signed, and no single drawing is good at all three. The primary changed after the pixel
     test: <strong>Bar Double M</strong> held it until the raster showed it reading as a crown rather than as
     two letters at small sizes.
+  </p>
+  <p class="section-note">
+    This picks from the rounded marks only. The eight sketched bases are a different drawing language, and
+    choosing between the two is the prior question &mdash; if the answer is sharp, then <strong>Wide crown</strong>
+    is the one to build the family around, and the three below get redrawn rather than reconsidered.
   </p>
 
   <div class="picks">
