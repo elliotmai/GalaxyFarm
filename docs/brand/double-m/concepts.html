@@ -1,0 +1,888 @@
+<title>Double M Brand Sheet</title>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  /* ---- Light: the Bluebonnet Linen ground, straight from tailwind.preset.ts ---- */
+  :root {
+    --paper:      #F8F5EC;
+    --sheet:      #FFFFFF;
+    --ink:        #24243A;
+    --ink-soft:   #565669;
+    --rule:       #DFD8C6;
+    --rule-firm:  #B6AD9A;
+    --brass-text: #8A6714;
+    --brass-line: #C9A24B;
+    --holds:      #4C6446;
+    --tight:      #8A5A10;
+    --fails:      #A2352C;
+  }
+
+  /* System-default dark (no data-theme stamp) — an explicit light choice still wins. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0E1026;
+      --sheet:      #191C3C;
+      --ink:        #F2EFE6;
+      --ink-soft:   #B4B2C8;
+      --rule:       #2C3157;
+      --rule-firm:  #4A5083;
+      --brass-text: #DDBB6A;
+      --brass-line: #C9A24B;
+      --holds:      #A3BC9C;
+      --tight:      #E0B15C;
+      --fails:      #F08A84;
+    }
+  }
+
+  /* Explicit dark choice wins over a light OS. */
+  :root[data-theme="dark"] {
+    --paper:      #0E1026;
+    --sheet:      #191C3C;
+    --ink:        #F2EFE6;
+    --ink-soft:   #B4B2C8;
+    --rule:       #2C3157;
+    --rule-firm:  #4A5083;
+    --brass-text: #DDBB6A;
+    --brass-line: #C9A24B;
+    --holds:      #A3BC9C;
+    --tight:      #E0B15C;
+    --fails:      #F08A84;
+  }
+
+  :root {
+    --slab: "Zilla Slab", "Roboto Slab", Rockwell, "Bookman Old Style", Georgia, serif;
+    --sans: Inter, "Helvetica Neue", Arial, system-ui, sans-serif;
+    --mono: "Iosevka", "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: clamp(28px, 5vw, 72px) clamp(18px, 4vw, 48px) 96px;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead { border-bottom: 2px solid var(--rule-firm); padding-bottom: 28px; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--brass-text);
+    margin: 0 0 14px;
+  }
+
+  h1 {
+    font-family: var(--slab);
+    font-weight: 600;
+    font-size: clamp(34px, 6vw, 56px);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 18px;
+  }
+
+  .standfirst {
+    max-width: 62ch;
+    font-size: clamp(16px, 1.5vw, 18px);
+    color: var(--ink-soft);
+    margin: 0;
+  }
+  .standfirst + .standfirst { margin-top: 12px; }
+  .standfirst code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    color: var(--ink);
+  }
+
+  /* ---------- the grammar strip ---------- */
+
+  .grammar {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 2px 28px;
+    margin: 34px 0 0;
+    padding: 22px 0 0;
+    border-top: 1px solid var(--rule);
+    list-style: none;
+  }
+  .grammar li { font-size: 14px; color: var(--ink-soft); }
+  .grammar b {
+    font-family: var(--slab);
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 15px;
+  }
+
+  /* ---------- section headings ---------- */
+
+  h2 {
+    font-family: var(--slab);
+    font-weight: 600;
+    font-size: clamp(22px, 3vw, 28px);
+    letter-spacing: -0.01em;
+    margin: 72px 0 6px;
+  }
+  .section-note {
+    color: var(--ink-soft);
+    font-size: 15px;
+    max-width: 62ch;
+    margin: 0 0 8px;
+  }
+
+  /* ---------- registry entries ---------- */
+
+  .registry { border-top: 2px solid var(--rule-firm); margin-top: 26px; }
+
+  .entry {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 34px;
+    padding: 34px 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: start;
+  }
+
+  .grounds { display: flex; gap: 10px; }
+
+  .ground {
+    flex: 1;
+    margin: 0; /* <figure> ships 1em/40px from the UA sheet — it overflows the column */
+    border-radius: 3px;
+    padding: 14px 10px 9px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    transition: transform 140ms ease;
+  }
+  .ground:hover { transform: translateY(-2px); }
+
+  /* Fixed, on purpose: these are the two real brand surfaces, not the page theme. */
+  .ground--midnight {
+    background: #0E1026;
+    border: 1px solid #3D4478; /* holds an edge when the page itself is dark */
+    --m1: #F2EFE6;
+    --m2: #9D85E8;
+    --caption: #B4B2C8;
+  }
+  .ground--linen {
+    background: #F8F5EC;
+    border: 1px solid #DFD8C6;
+    --m1: #5F45B0;
+    --m2: #35569E;
+    --caption: #565669;
+  }
+
+  .ground figcaption {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--caption);
+  }
+
+  .mk { display: block; width: 96px; height: 96px; }
+  .mk-64 { width: 64px; height: 64px; }
+  .mk-40 { width: 40px; height: 40px; }
+  .mk-24 { width: 24px; height: 24px; }
+
+  /* ---------- entry body ---------- */
+
+  .read {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px 14px;
+    margin-bottom: 12px;
+  }
+  .read h3 {
+    font-family: var(--slab);
+    font-weight: 600;
+    font-size: 23px;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .chip--holds { color: var(--holds); }
+  .chip--tight { color: var(--tight); }
+  .chip--fails { color: var(--fails); }
+
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 7px 16px; }
+  dt {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--brass-text);
+    padding-top: 5px;
+  }
+  dd { margin: 0; max-width: 60ch; }
+  dd code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+    padding: 1px 4px;
+    border-radius: 2px;
+  }
+
+  .scale {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    margin-top: 18px;
+    padding: 12px 16px;
+    background: #0E1026;
+    border: 1px solid #2C3157;
+    border-radius: 3px;
+    --m1: #F2EFE6;
+    --m2: #9D85E8;
+  }
+  .scale span {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
+    color: #B4B2C8;
+  }
+
+  /* ---------- the 24px bench ---------- */
+
+  .bench {
+    margin-top: 26px;
+    padding: 26px 22px;
+    background: #0E1026;
+    border: 1px solid #2C3157;
+    border-radius: 3px;
+    --m1: #F2EFE6;
+    --m2: #9D85E8;
+    overflow-x: auto;
+  }
+  .bench-row {
+    display: flex;
+    gap: 24px;
+    align-items: flex-end;
+    min-width: max-content;
+  }
+  .bench-row + .bench-row { margin-top: 26px; }
+  .bench figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    width: 70px;
+  }
+  .bench figcaption {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #B4B2C8;
+    text-align: center;
+    line-height: 1.35;
+  }
+
+  /* ---------- recommendation ---------- */
+
+  .picks {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1px;
+    margin-top: 26px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .pick { background: var(--sheet); padding: 24px 22px; }
+  .pick .role {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--brass-text);
+    margin: 0 0 8px;
+  }
+  .pick h3 {
+    font-family: var(--slab);
+    font-weight: 600;
+    font-size: 19px;
+    margin: 0 0 8px;
+  }
+  .pick p { margin: 0; font-size: 15px; color: var(--ink-soft); }
+
+  .aside {
+    margin-top: 34px;
+    padding: 22px 24px;
+    border-left: 3px solid var(--brass-line);
+    background: color-mix(in srgb, var(--brass-line) 8%, transparent);
+  }
+  .aside h3 {
+    font-family: var(--slab);
+    font-weight: 600;
+    font-size: 17px;
+    margin: 0 0 8px;
+  }
+  .aside p { margin: 0 0 10px; font-size: 15px; max-width: 66ch; }
+  .aside p:last-child { margin-bottom: 0; }
+  .aside code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: color-mix(in srgb, var(--ink) 9%, transparent);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  a { color: inherit; }
+  a:focus-visible, .ground:focus-visible {
+    outline: 2px solid var(--brass-line);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ground { transition: none; }
+    .ground:hover { transform: none; }
+  }
+
+  @media (max-width: 760px) {
+    .entry { grid-template-columns: 1fr; gap: 22px; }
+    .grounds { max-width: 300px; }
+  }
+</style>
+
+<!-- Each mark drawn once; the grounds below set --m1 / --m2 and the <use> inherits them. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <g id="star-pts">
+      <polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08"/>
+    </g>
+  </defs>
+
+  <symbol id="m-rocking" viewBox="0 0 100 100">
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 78 Q50 98 88 78" stroke="var(--m2)" stroke-width="8"/>
+      <path d="M14 60 L14 26 L28 46 L42 26 L42 60" stroke="var(--m1)" stroke-width="8"/>
+      <path d="M58 60 L58 26 L72 46 L86 26 L86 60" stroke="var(--m1)" stroke-width="8"/>
+    </g>
+  </symbol>
+
+  <symbol id="m-connected" viewBox="0 0 100 100">
+    <path d="M12 68 L12 32 L31 54 L50 32 L69 54 L88 32 L88 68"
+          fill="none" stroke="var(--m1)" stroke-width="9"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+
+  <symbol id="m-damcalf" viewBox="0 0 100 100">
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 78 Q50 98 88 78" stroke="var(--m2)" stroke-width="8"/>
+      <path d="M18 62 L18 22 L35 46 L52 22 L52 62" stroke="var(--m1)" stroke-width="9"/>
+      <path d="M60 69 L60 48 L69 60.5 L78 48 L78 69" stroke="var(--m1)" stroke-width="6"/>
+    </g>
+  </symbol>
+
+  <symbol id="m-bar" viewBox="0 0 100 100">
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 62 L14 28 L32 48 L50 28 L68 48 L86 28 L86 62" stroke="var(--m1)" stroke-width="9"/>
+      <path d="M14 78 L86 78" stroke="var(--m2)" stroke-width="8"/>
+    </g>
+  </symbol>
+
+  <symbol id="m-stacked" viewBox="0 0 100 100">
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="9">
+      <path d="M24 46 L24 16 L50 34 L76 16 L76 46" stroke="var(--m1)"/>
+      <path d="M24 84 L24 54 L50 72 L76 54 L76 84" stroke="var(--m2)"/>
+    </g>
+  </symbol>
+
+  <symbol id="m-circle" viewBox="0 0 100 100">
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="50" cy="50" r="38" stroke="var(--m2)" stroke-width="6"/>
+      <path d="M24 63 L24 37 L37 52.6 L50 37 L63 52.6 L76 37 L76 63" stroke="var(--m1)" stroke-width="8"/>
+    </g>
+  </symbol>
+
+  <symbol id="m-constellation" viewBox="0 0 100 100">
+    <path d="M14 64 L14 32 L32 52 L50 32 L68 52 L86 32 L86 64"
+          fill="none" stroke="var(--m2)" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <g fill="var(--m1)">
+      <use href="#star-pts" transform="translate(14 32) scale(0.24) translate(-50 -50)"/>
+      <use href="#star-pts" transform="translate(50 32) scale(0.24) translate(-50 -50)"/>
+      <use href="#star-pts" transform="translate(86 32) scale(0.24) translate(-50 -50)"/>
+      <use href="#star-pts" transform="translate(32 52) scale(0.175) translate(-50 -50)"/>
+      <use href="#star-pts" transform="translate(68 52) scale(0.175) translate(-50 -50)"/>
+      <use href="#star-pts" transform="translate(14 64) scale(0.175) translate(-50 -50)"/>
+      <use href="#star-pts" transform="translate(86 64) scale(0.175) translate(-50 -50)"/>
+    </g>
+  </symbol>
+
+  <symbol id="m-longhorn" viewBox="0 0 100 100">
+    <path d="M16 66 Q10 46 22 32 L36 52 L50 32 L64 52 L78 32 Q90 46 84 66"
+          fill="none" stroke="var(--m1)" stroke-width="9"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+
+  <symbol id="m-lazy" viewBox="0 0 100 100">
+    <g fill="none" stroke="var(--m1)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 28 L44 28 L26 50 L44 72 L14 72"/>
+      <path d="M86 28 L56 28 L74 50 L56 72 L86 72"/>
+    </g>
+  </symbol>
+
+  <symbol id="m-star" viewBox="0 0 100 100">
+    <path d="M14 72 L14 42 L32 60 L50 42 L68 60 L86 42 L86 72"
+          fill="none" stroke="var(--m1)" stroke-width="9"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#star-pts" fill="var(--m2)" stroke="var(--m2)" stroke-width="5" stroke-linejoin="round"
+         transform="translate(50 20) scale(0.26) translate(-50 -50)"/>
+  </symbol>
+</svg>
+
+<div class="sheet">
+
+  <header class="masthead">
+    <p class="eyebrow">Brand concepts &middot; issue #26</p>
+    <h1>Double&nbsp;M Brand Sheet</h1>
+    <p class="standfirst">
+      Ten ways to burn two&nbsp;M&rsquo;s, drawn in the same livestock-brand grammar as the approved
+      <strong>Rocking Double Star</strong> and coloured from the locked palette in
+      <code>packages/config/tailwind.preset.ts</code>. Nothing here replaces the star mark &mdash; these are
+      candidates for the day the farm and business names land.
+    </p>
+    <p class="standfirst">
+      Every mark is shown on both real grounds, because theme is fixed per surface: Midnight Nebula for
+      <code>/admin</code> and <code>/kiosk</code>, Bluebonnet Linen for <code>/account</code>,
+      <code>/book</code>, <code>/sitter</code> and public pages. The verdict chip answers the one question the
+      brand README already put on the record &mdash; does it still hold together at 24&nbsp;px?
+    </p>
+
+    <ul class="grammar">
+      <li><b>Rocking</b> &mdash; set on a curve</li>
+      <li><b>Bar</b> &mdash; over or under a line</li>
+      <li><b>Connected</b> &mdash; sharing a stroke</li>
+      <li><b>Lazy</b> &mdash; lying on its side</li>
+      <li><b>Crazy</b> &mdash; turned upside down</li>
+      <li><b>Circle / Box / Diamond</b> &mdash; enclosed</li>
+    </ul>
+  </header>
+
+  <h2>The ten</h2>
+  <p class="section-note">Read each name the way a stockman would say it aloud &mdash; the modifier first, the letter last.</p>
+
+  <div class="registry">
+
+    <!-- 1 -->
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Rocking Double M</h3>
+          <span class="chip chip--tight">Tight at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>Straight translation of the mark already approved: same rocker, same shared ground, letters where the stars were. The least disruptive thing on this sheet.</dd>
+          <dt>Watch</dt>
+          <dd>Three elements to resolve instead of two. Below about 32&nbsp;px the gap between the M&rsquo;s closes and the pair reads as one long zigzag sitting on a smile.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- 2 -->
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-connected"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-connected"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Connected Double M</h3>
+          <span class="chip chip--holds">Holds at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>The stockman&rsquo;s default. One unbroken zigzag &mdash; three peaks, two valleys &mdash; two M&rsquo;s sharing a middle apex. This is what a brand inspector would draw if you told them &ldquo;Double M&rdquo; and nothing else.</dd>
+          <dt>Watch</dt>
+          <dd>Roughly 2:1. Fine in a nav bar, awkward in the square slots this repo already ships: <code>icon-512-maskable.png</code>, <code>apple-icon.png</code>, the favicon.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-connected"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-connected"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-connected"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- 3 -->
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-damcalf"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-damcalf"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Dam &amp; Calf Double M</h3>
+          <span class="chip chip--tight">Tight at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>The current mark&rsquo;s whole argument, kept intact: a big M and a small one at side, on shared ground. &ldquo;Double M&rdquo; and &ldquo;cow and calf&rdquo; turn out to be the same picture.</dd>
+          <dt>Watch</dt>
+          <dd>The calf has to stay near 52% &mdash; the ratio the stars already settled &mdash; or it stops being a calf and becomes a smudge. Same design question, second time asked.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-damcalf"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-damcalf"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-damcalf"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- 4 -->
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-bar"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-bar"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Bar Double M</h3>
+          <span class="chip chip--holds">Holds at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>Connected zigzag over a straight bar. The bar does the rocker&rsquo;s job &mdash; holding the letters down as one mark &mdash; with one less curve to resolve, so it survives further down the size scale than anything else here.</dd>
+          <dt>Watch</dt>
+          <dd>It trades the rocker&rsquo;s warmth for precision. Reads more brand registry than homestead, which may be exactly right on an invoice and slightly cold on the kiosk.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-bar"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-bar"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-bar"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- 5 -->
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-stacked"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-stacked"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Stacked Double M</h3>
+          <span class="chip chip--tight">Tight at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>One M over another. The only variant that genuinely fills a square, and the only one where two tones say something true: the farm name over the business name, which issue&nbsp;#26 may well decide are different names.</dd>
+          <dt>Watch</dt>
+          <dd>Two-tone breaks the mono-tone rule the brand README sets. That rule was an argument about cow and calf being the same kind of thing &mdash; two businesses are not, so the exception is arguable rather than sloppy.</dd>
+          <dt>Also</dt>
+          <dd>Halving the height costs it the small end: at 24&nbsp;px the two M&rsquo;s merge into one blob. That is survivable, because the slots this variant exists for are 180&nbsp;px and up.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-stacked"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-stacked"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-stacked"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- 6 -->
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-circle"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-circle"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Circle Double M</h3>
+          <span class="chip chip--tight">Tight at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>Enclosed, so it has an edge of its own. This is the seal &mdash; the mark for the signed liability PDF and the invoice, where a logo needs to look like it was stamped rather than placed.</dd>
+          <dt>Watch</dt>
+          <dd>The ring eats the letters below about 40&nbsp;px. Treat it as a document mark that lives alongside the primary, not as a candidate for the nav bar.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-circle"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-circle"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-circle"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- 7 -->
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-constellation"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-constellation"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Constellation Double M</h3>
+          <span class="chip chip--fails">Fails at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>The zigzag drawn as a star chart &mdash; seven stars, the three peaks brighter than the rest. It makes the logo and the pedigree screens the same visual idea, which is the strongest continuity argument on this sheet.</dd>
+          <dt>Watch</dt>
+          <dd>Genuinely beautiful at 96&nbsp;px on midnight and genuinely gone at 24. It needs a solid companion below about 48&nbsp;px, so picking it means shipping two drawings, not one.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-constellation"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-constellation"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-constellation"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- 8 -->
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-longhorn"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-longhorn"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Longhorn Double M</h3>
+          <span class="chip chip--holds">Holds at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>The connected zigzag with its outer legs swept out into horn tips. Says cattle before it says letters, which is the right order for a show-calf operation that has to look like it knows the business.</dd>
+          <dt>Watch</dt>
+          <dd>The sweep is the entire idea, and it is the first thing to disappear when the stroke has to thicken for small sizes. Check it at 24 before falling for it at 96.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-longhorn"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-longhorn"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-longhorn"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- 9 -->
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-lazy"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-lazy"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Lazy Double M</h3>
+          <span class="chip chip--tight">Tight at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>Two M&rsquo;s lying down, back to back &mdash; &ldquo;lazy&rdquo; in brand grammar. Perfectly symmetric, and it reads as a working chute, which is a nice accident for a boarding business.</dd>
+          <dt>Watch</dt>
+          <dd>The honest risk: it may not read as M at all. Ornament first, letters second. Include it so the shortlist has one mark that isn&rsquo;t a zigzag, then be willing to cut it.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-lazy"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-lazy"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-lazy"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- 10 -->
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-star"/></svg>
+          <figcaption>Admin</figcaption>
+        </figure>
+        <figure class="ground ground--linen">
+          <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-star"/></svg>
+          <figcaption>Customer</figcaption>
+        </figure>
+      </div>
+      <div>
+        <div class="read">
+          <h3>Double M Star</h3>
+          <span class="chip chip--tight">Tight at 24px</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>The letters under a single star. The bridge mark: it concedes that the star has already earned its place and the name simply needs saying out loud next to it.</dd>
+          <dt>Watch</dt>
+          <dd>Two ideas competing for the same 24&nbsp;px. Works from 40&nbsp;px up; below that, one of them has to go &mdash; and the star is the one with equity.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-star"/></svg>64</span>
+          <span><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-star"/></svg>40</span>
+          <span><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-star"/></svg>24</span>
+        </div>
+      </div>
+    </article>
+
+  </div>
+
+  <h2>All ten at 24&nbsp;px</h2>
+  <p class="section-note">
+    The nav-bar test, on the admin ground where small sizes actually live. Squint: whatever still has a shape
+    at this size is a real candidate, and whatever turns to lint is a hero mark that needs a small companion.
+  </p>
+
+  <div class="bench">
+    <div class="bench-row">
+      <figure><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg><figcaption>Rocking</figcaption></figure>
+      <figure><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-connected"/></svg><figcaption>Connected</figcaption></figure>
+      <figure><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-damcalf"/></svg><figcaption>Dam &amp; Calf</figcaption></figure>
+      <figure><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-bar"/></svg><figcaption>Bar</figcaption></figure>
+      <figure><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-stacked"/></svg><figcaption>Stacked</figcaption></figure>
+      <figure><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-circle"/></svg><figcaption>Circle</figcaption></figure>
+      <figure><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-constellation"/></svg><figcaption>Constellation</figcaption></figure>
+      <figure><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-longhorn"/></svg><figcaption>Longhorn</figcaption></figure>
+      <figure><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-lazy"/></svg><figcaption>Lazy</figcaption></figure>
+      <figure><svg class="mk mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-star"/></svg><figcaption>Star</figcaption></figure>
+    </div>
+    <div class="bench-row">
+      <figure><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg><figcaption>40&nbsp;px</figcaption></figure>
+      <figure><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-connected"/></svg><figcaption>40&nbsp;px</figcaption></figure>
+      <figure><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-damcalf"/></svg><figcaption>40&nbsp;px</figcaption></figure>
+      <figure><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-bar"/></svg><figcaption>40&nbsp;px</figcaption></figure>
+      <figure><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-stacked"/></svg><figcaption>40&nbsp;px</figcaption></figure>
+      <figure><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-circle"/></svg><figcaption>40&nbsp;px</figcaption></figure>
+      <figure><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-constellation"/></svg><figcaption>40&nbsp;px</figcaption></figure>
+      <figure><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-longhorn"/></svg><figcaption>40&nbsp;px</figcaption></figure>
+      <figure><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-lazy"/></svg><figcaption>40&nbsp;px</figcaption></figure>
+      <figure><svg class="mk mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-star"/></svg><figcaption>40&nbsp;px</figcaption></figure>
+    </div>
+  </div>
+
+  <h2>If you want a recommendation</h2>
+  <p class="section-note">
+    Not one mark &mdash; a family of three. This app has a 24&nbsp;px nav, a 512&nbsp;px maskable icon and a
+    PDF that gets signed, and no single drawing is good at all three.
+  </p>
+
+  <div class="picks">
+    <div class="pick">
+      <p class="role">Primary</p>
+      <h3>Bar Double M</h3>
+      <p>Survives the nav bar, stays one glyph, and keeps a horizontal ground element as an echo of the rocker. The safest thing that is still interesting.</p>
+    </div>
+    <div class="pick">
+      <p class="role">Square lockup</p>
+      <h3>Stacked Double M</h3>
+      <p>For the PWA and Apple touch icons, where the primary&rsquo;s 2:1 proportion would have to be letterboxed into a square and lose half its presence. Not the favicon &mdash; at 16&nbsp;px the primary still wins.</p>
+    </div>
+    <div class="pick">
+      <p class="role">Hero &amp; documents</p>
+      <h3>Constellation Double M</h3>
+      <p>For the kiosk splash, the login screen and the top of a PDF &mdash; anywhere it renders at 64&nbsp;px or more on midnight, where it ties the logo to the pedigree screens.</p>
+    </div>
+  </div>
+
+  <div class="aside">
+    <h3>One thing to settle first, whichever mark wins</h3>
+    <p>
+      The two shipped files disagree about colour roles, so any new mark inherits an unresolved question.
+      <code>rocking-double-star-customer.svg</code> draws the stars in identity purple with the rocker in
+      bluebonnet blue, while <code>logomark.tsx</code> draws the stars in <code>--gf-text</code> with the rocker
+      in <code>--gf-identity</code> &mdash; which is what the admin file does. The component and the customer
+      SVG therefore render different marks on a light ground.
+    </p>
+    <p>
+      These concepts follow the component: the letters take the text colour on midnight and identity purple on
+      linen, and the supporting element &mdash; rocker, bar, ring, star &mdash; takes the second colour. Worth
+      deciding deliberately rather than inheriting, since the README&rsquo;s own description matches neither file
+      exactly.
+    </p>
+  </div>
+
+</div>
