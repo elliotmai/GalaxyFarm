@@ -10,7 +10,7 @@ import { recordingNotifier, resendNotifier } from "../src/index.js";
  * the property these tests are really about.
  */
 
-const OPTIONS = { apiKey: "re_test", from: "Galaxy Farm <alerts@example.invalid>" };
+const OPTIONS = { apiKey: "re_test", from: "Flying Double M <alerts@example.invalid>" };
 const message = { to: "somebody@example.invalid", subject: "Calving watch", body: "Day 279." };
 
 describe("resendNotifier", () => {

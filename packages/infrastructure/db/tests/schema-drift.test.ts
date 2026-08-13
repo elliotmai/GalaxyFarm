@@ -149,7 +149,7 @@ describe("the failure it was written for", () => {
     // default would fail here rather than against the real database.
     await pg.exec(
       `insert into properties (id, property_id, created_at, updated_at, name, timezone)
-       values ('P1','P1', now(), now(), 'Galaxy Farm', 'America/Chicago')`,
+       values ('P1','P1', now(), now(), 'Flying Double M', 'America/Chicago')`,
     );
 
     await apply(pg, 3, migrations().length);

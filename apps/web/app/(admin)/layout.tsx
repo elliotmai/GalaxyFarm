@@ -6,9 +6,10 @@ import { AdminNav } from "@/app/(admin)/_components/admin-nav";
 import { Refreshable } from "@/app/(admin)/_components/refreshable";
 import { SyncProvider } from "@/app/_components/sync-provider";
 import { currentActor } from "@/lib/auth";
+import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
 
 /**
- * The admin surface. Theme is fixed per surface (spec §8): midnight-nebula.
+ * The admin surface. Theme is fixed per surface (spec §8): flying-day.
  *
  * The session is checked here as well as in the middleware. Middleware is a
  * routing concern and can be bypassed by anything that reaches a server
@@ -21,10 +22,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // Farm name is a BrandingConfig value (§5.1). Until the settings store is
   // wired it falls back to the environment, so there is still one place to
   // change it and no string literal in a component.
-  const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? "Galaxy Farm";
+  const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME;
 
   return (
-    <div data-surface="admin" data-theme="midnight-nebula">
+    <div data-surface="admin" data-theme="flying-day">
       <SyncProvider>
         <ToastProvider>
           <ConfirmProvider>

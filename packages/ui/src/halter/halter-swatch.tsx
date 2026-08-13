@@ -72,7 +72,7 @@ export function HalterSwatch({
           // Black on midnight and white on linen both vanish into the panel
           // without this. The ring is the theme's border token, so it is a
           // measured 3:1 against either surface rather than a guess.
-          boxShadow: "inset 0 0 0 1px var(--gf-border, #888897)",
+          boxShadow: "inset 0 0 0 1px var(--gf-border, #7f8b96)",
           flexShrink: 0,
         }}
       />

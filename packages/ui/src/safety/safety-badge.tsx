@@ -85,7 +85,7 @@ export function SafetyBadge({
           // actually use. So the boundary carries the requirement instead: the
           // theme's border token is a measured 3:1 against both canvas and
           // panel, and the number inside is legible against the fill.
-          boxShadow: "inset 0 0 0 1px var(--gf-border, #888897)",
+          boxShadow: "inset 0 0 0 1px var(--gf-border, #7f8b96)",
         }}
       >
         {level}

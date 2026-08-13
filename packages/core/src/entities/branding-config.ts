@@ -25,7 +25,7 @@ export const brandingConfigSchema = baseRecordSchema.extend({
   logoKey: z.string().optional(),
 }) as unknown as z.ZodType<BrandingConfig>;
 
-export const FALLBACK_FARM_NAME = "Galaxy Farm";
+export const FALLBACK_FARM_NAME = "Flying Double M";
 
 /**
  * Resolve the farm name from config, then environment, then a neutral fallback.

@@ -1,4 +1,5 @@
 import { Landing } from "@/app/(public)/_components/landing";
+import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
 
 export const metadata = {
   title: "Show calf boarding in Wise County, Texas",
@@ -15,7 +16,7 @@ export const metadata = {
  * when the business is named.
  */
 export default function LandingPage() {
-  const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? "Galaxy Farm";
+  const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME;
   const businessName = process.env["NEXT_PUBLIC_BUSINESS_NAME"];
 
   return <Landing farmName={farmName} {...(businessName === undefined ? {} : { businessName })} />;

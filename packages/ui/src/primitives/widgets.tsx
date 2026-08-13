@@ -116,7 +116,7 @@ export function Meter({ value, tone = "action", label, detail, marker }: MeterPr
         aria-valuemin={0}
         aria-valuemax={100}
         {...(label === undefined ? {} : { "aria-label": label })}
-        className="relative h-2 w-full overflow-hidden rounded-full bg-edge/30"
+        className="relative h-2 w-full overflow-hidden rounded-full bg-rule"
       >
         <div
           className={[
@@ -168,7 +168,7 @@ export function Tile({ label, value, hint, tone = "neutral", emphasis = false, b
   return (
     <div
       className={[
-        "relative flex flex-col gap-1 overflow-hidden rounded-density border border-edge bg-raised px-density py-3",
+        "relative flex flex-col gap-1 overflow-hidden rounded-density border border-rule bg-raised px-density py-3",
         "before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:content-['']",
         TONE_EDGE[tone],
       ].join(" ")}
@@ -230,7 +230,7 @@ export function RecordCard({
   return (
     <div
       className={[
-        "relative flex flex-col gap-3 overflow-hidden rounded-density border border-edge bg-panel p-density",
+        "relative flex flex-col gap-3 overflow-hidden rounded-density border border-rule bg-panel p-density",
         "before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:content-['']",
         TONE_EDGE[tone],
         interactive

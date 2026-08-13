@@ -281,7 +281,7 @@ describe("signedSnapshotSchema", () => {
       liabilityFormId: id(71),
       formVersion: 2,
       customerId: id(40),
-      businessNameAtSigning: "Galaxy Farm Show Cattle",
+      businessNameAtSigning: "Flying Double M Show Cattle",
       signature: { typedName: "A Customer", signedAt: AT },
     };
 

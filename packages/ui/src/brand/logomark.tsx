@@ -52,7 +52,7 @@ export function Logomark({ size = "default", decorative = false, className }: Lo
       className={className}
       {...(decorative
         ? { "aria-hidden": true as const, role: "presentation" }
-        : { role: "img" as const, "aria-label": "Galaxy Farm" })}
+        : { role: "img" as const, "aria-label": "Flying Double M" })}
     >
       {/*
         One colour, one width. A brand is a burn: the iron does not change

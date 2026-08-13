@@ -5,6 +5,7 @@ import { Card, Logomark } from "@galaxy-farm/ui";
 import { InviteForm } from "@/app/(public)/invite/[token]/invite-form";
 import { withDeadline } from "@/lib/deadline";
 import { findPendingInvitation, type PendingInvitation } from "@/lib/user-store";
+import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
 
 export const metadata = { title: "Set your password" };
 
@@ -41,7 +42,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     unreachable = true;
   }
 
-  const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? "Galaxy Farm";
+  const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME;
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-density p-6">

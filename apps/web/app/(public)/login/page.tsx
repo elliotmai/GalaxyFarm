@@ -1,6 +1,7 @@
 import { Logomark } from "@galaxy-farm/ui";
 
 import { LoginForm } from "./login-form";
+import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
 
 export const metadata = { title: "Sign In" };
 
@@ -23,7 +24,7 @@ export default async function LoginPage({
 
   // A BrandingConfig value (§5.1), never a literal. Reads from the environment
   // until the settings store is wired, so there is still one place to change it.
-  const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? "Galaxy Farm";
+  const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME;
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-density p-6">

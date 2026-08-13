@@ -1,10 +1,10 @@
 /**
  * public surface. Theme is fixed per surface (spec §8): this one renders
- * bluebonnet-linen.
+ * flying-day.
  */
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div data-surface="public" data-theme="bluebonnet-linen">
+    <div data-surface="public" data-theme="flying-day">
       {children}
     </div>
   );

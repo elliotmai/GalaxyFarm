@@ -102,23 +102,28 @@ describe("route implementation hygiene", () => {
       const source = readText(layout);
       expect(source, `${layout} must declare its surface`).toMatch(/data-surface=/);
       expect(source, `${layout} must pin a theme`).toMatch(
-        /data-theme="(midnight-nebula|bluebonnet-linen)"/,
+        /data-theme="(flying-day|flying-night)"/,
       );
     }
   });
 
-  it("admin and kiosk render dark; customer-facing surfaces render light", () => {
-    const expected: Record<string, string> = {
-      "apps/web/app/(admin)/layout.tsx": "midnight-nebula",
-      "apps/web/app/(kiosk)/layout.tsx": "midnight-nebula",
-      "apps/web/app/(account)/layout.tsx": "bluebonnet-linen",
-      "apps/web/app/(sitter)/layout.tsx": "bluebonnet-linen",
-      "apps/web/app/(public)/layout.tsx": "bluebonnet-linen",
-    };
+  it("every surface renders in daylight", () => {
+    // Spec §8 v0.9. The mark is a brand iron and the world it comes from is
+    // paperwork, which is a daylight world — and the jobs agree: printing a
+    // pedigree, showing a buyer a screen, reading a kiosk in a sunlit barn.
+    // `flying-night` is entered deliberately for the barn after dark; no
+    // surface is pinned to it, which is what this asserts.
+    const surfaces = [
+      "apps/web/app/(admin)/layout.tsx",
+      "apps/web/app/(kiosk)/layout.tsx",
+      "apps/web/app/(account)/layout.tsx",
+      "apps/web/app/(sitter)/layout.tsx",
+      "apps/web/app/(public)/layout.tsx",
+    ];
 
-    for (const [file, theme] of Object.entries(expected)) {
-      expect(readText(file), `${file} should render ${theme} per spec §8`).toContain(
-        `data-theme="${theme}"`,
+    for (const file of surfaces) {
+      expect(readText(file), `${file} should render flying-day per spec §8`).toContain(
+        'data-theme="flying-day"',
       );
     }
   });

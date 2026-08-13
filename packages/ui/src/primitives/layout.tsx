@@ -37,7 +37,7 @@ export interface PageHeaderProps {
  */
 export function PageHeader({ title, subtitle, eyebrow, actions, meta }: PageHeaderProps) {
   return (
-    <header className="flex flex-col gap-3 border-b border-edge pb-density">
+    <header className="flex flex-col gap-3 border-b border-rule pb-density">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           {eyebrow === undefined ? null : (
@@ -164,7 +164,7 @@ export interface StatProps {
  */
 export function Stat({ label, value, hint, emphasis = false }: StatProps) {
   return (
-    <div className="flex flex-col gap-1 rounded-density border border-edge bg-raised px-density py-3">
+    <div className="flex flex-col gap-1 rounded-density border border-rule bg-raised px-density py-3">
       <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
       <span
         className={`[font-variant-numeric:tabular-nums] ${
@@ -191,12 +191,12 @@ export function StatRow({ children }: { readonly children: ReactNode }) {
  * For splitting a long form without giving each part a border of its own.
  */
 export function Divider({ label }: { readonly label?: string }) {
-  if (label === undefined) return <hr className="border-edge" />;
+  if (label === undefined) return <hr className="border-rule" />;
 
   return (
     <div className="flex items-center gap-3" role="separator" aria-label={label}>
       <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
-      <span className="h-px flex-1 bg-edge" />
+      <span className="h-px flex-1 bg-rule" />
     </div>
   );
 }

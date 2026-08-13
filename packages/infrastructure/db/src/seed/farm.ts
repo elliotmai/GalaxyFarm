@@ -224,7 +224,7 @@ export const SEED_ANIMALS = [
 ];
 
 export const SEED_PROPERTY = {
-  name: "Galaxy Farm",
+  name: "Flying Double M",
   address: "1220 County Road 4651, Rhome TX 76078",
   timezone: "America/Chicago",
   // Wise County reads 8a on the 2023 USDA map, against Fort Worth's 8a/8b.

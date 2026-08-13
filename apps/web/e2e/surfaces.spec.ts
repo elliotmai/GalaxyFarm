@@ -70,7 +70,7 @@ test.describe("admin surface", () => {
 
     await expect(page.locator('[data-surface="admin"]')).toHaveAttribute(
       "data-theme",
-      "midnight-nebula",
+      "flying-day",
     );
   });
 
@@ -100,7 +100,7 @@ test.describe("kiosk surface", () => {
 
     await expect(page.locator('[data-surface="kiosk"]')).toHaveAttribute(
       "data-theme",
-      "midnight-nebula",
+      "flying-day",
     );
   });
 
@@ -135,7 +135,7 @@ test.describe("public surfaces", () => {
       expect(response?.status()).toBe(200);
       await expect(page.locator('[data-surface="public"]')).toHaveAttribute(
         "data-theme",
-        "bluebonnet-linen",
+        "flying-day",
       );
     });
   }
@@ -152,7 +152,7 @@ test.describe("the customer portal", () => {
     expect(response?.status()).toBe(200);
     await expect(page.locator('[data-surface="account"]')).toHaveAttribute(
       "data-theme",
-      "bluebonnet-linen",
+      "flying-day",
     );
   });
 });
@@ -166,7 +166,7 @@ test.describe("the housesitter surface", () => {
     expect(response?.status()).toBe(200);
     await expect(page.locator('[data-surface="sitter"]')).toHaveAttribute(
       "data-theme",
-      "bluebonnet-linen",
+      "flying-day",
     );
   });
 

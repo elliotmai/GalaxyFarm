@@ -1,41 +1,33 @@
 /**
- * Shared Tailwind preset — the "Midnight Nebula / Bluebonnet Linen" design
- * language locked in spec §8.
+ * Shared Tailwind preset — the "Flying Double M" design language (spec §8, v0.9).
  *
- * One brand, two modes sharing the same hue anchors. Theme is a property of the
- * surface, not a user preference: `/admin` and `/kiosk` render Midnight Nebula,
- * everything customer-facing renders Bluebonnet Linen. The neutrals mirror each
- * other — admin's starlight text is the customer's linen canvas.
+ * Light by default, on every surface. The farm's mark is a brand iron, and the
+ * world it comes from is paperwork: registration certificates, sale
+ * catalogues, herd ledgers. That is a daylight world, and it is also the right
+ * one for the jobs — printing a pedigree, showing a buyer a screen, a kiosk in
+ * a sunlit barn. `flying-night` exists for the barn after dark and is a mode,
+ * not the default look of a surface.
+ *
+ * The palette is deliberately narrow. A neutral ground, one accent that is both
+ * the brand and every primary action, and two more colours that mean exactly
+ * one thing each — confirm and alert. When every surface is tinted, tint stops
+ * carrying information; that is what the previous language got wrong.
  *
  * Components never name a theme. They use the semantic colours below, which
  * resolve through CSS custom properties set by `data-theme` on the route-group
  * layout (`packages/ui/src/tokens/theme.css`). A component that branched on the
- * theme would need to be revisited every time a surface moved, and one that
- * hard-coded `midnight.*` would be wrong the first time it appeared on the
- * customer portal.
+ * theme would need to be revisited every time a surface moved.
  */
 
 export const palette = {
-  linen: {
-    canvas: "#F8F5EC",
-    panel: "#FFFFFF",
-    text: "#24243A",
-    action: "#35569E",
-    identity: "#5F45B0",
-    // Darkened from #67805F, which came out at 3.99 against the linen canvas —
-    // under AA for body text. Same hue and saturation, so it stays the
-    // gray-leaning sage that must not be mistaken for safety-scale green.
-    calm: "#5B7154",
-  },
-  midnight: {
-    canvas: "#0E1026",
-    panel: "#191C3C",
-    text: "#F2EFE6",
-    action: "#8CA3E8",
-    identity: "#9D85E8",
-    calm: "#A3BC9C",
-  },
-  /** Held in reserve for wins — show results, milestones. Currently unused. */
+  /** Ink Navy. One accent, carrying the mark and every primary action. */
+  navy: "#1B3A5C",
+  /** Its counterpart after dark — lifted until it reads on a near-black ground. */
+  navyNight: "#8FB3D9",
+  /**
+   * Held in reserve for wins — show results, milestones. Still unused, and it
+   * cannot carry text: #C9A24B is 2.0:1 on white. It is a fill or a rule.
+   */
   brass: "#C9A24B",
 } as const;
 
@@ -57,6 +49,13 @@ export const chipInk = { light: "#FFFFFF", dark: "#14141F" } as const;
  * `ink` is per level because no single choice works: white fails AA on levels
  * 2, 3 and 4, and near-black fails on 1 and 5. Measured, not guessed — see
  * `packages/ui/tests/contrast.test.ts`.
+ *
+ * The fills are unchanged by the move to a light ground, and three of them do
+ * not clear 3:1 against it — the light green, the amber and the orange land at
+ * 2.32, 1.82 and 2.85. Darkening them would flatten the green-to-red
+ * progression the scale exists for, so the ring `SafetyBadge` already draws
+ * carries §1.4.11 instead. `border` is a measured 3:1 on both themes, which is
+ * what makes that ring load-bearing rather than decorative.
  */
 export const safetyScale = {
   1: { label: "Safe for anyone", color: "#2E7D32", ink: chipInk.light },
@@ -79,45 +78,96 @@ export const safetyScale = {
  * is text and clears 4.5.
  */
 export const themes = {
-  "midnight-nebula": {
-    canvas: palette.midnight.canvas,
-    panel: palette.midnight.panel,
+  "flying-day": {
+    canvas: "#F5F6F8",
+    panel: "#FFFFFF",
     // A step above panel, for anything sitting *on* a panel — a table head, a
-    // selected row, a nested well. §8 locks canvas and panel and says nothing
-    // about a third; without one, every surface on this theme is one of two
-    // near-identical values and the screen reads as flat dark-on-dark.
-    raised: "#242A52",
-    text: palette.midnight.text,
-    muted: "#B4B2C8",
-    border: "#7C80A6",
-    action: palette.midnight.action,
-    actionInk: chipInk.dark,
-    identity: palette.midnight.identity,
-    calm: palette.midnight.calm,
-    danger: "#F08A84",
-  },
-  "bluebonnet-linen": {
-    canvas: palette.linen.canvas,
-    panel: palette.linen.panel,
-    raised: "#F1EEE4",
-    text: palette.linen.text,
-    muted: "#565669",
-    border: "#888897",
-    action: palette.linen.action,
+    // selected row, a nested well. Without a third surface the screen is one
+    // of two near-identical values and reads as flat.
+    raised: "#EDEFF3",
+    text: "#14171B",
+    muted: "#525860",
+    // Two edges, not one. `border` bounds a control — an input, a button, a
+    // chip — which §1.4.11 treats as information, so it is a measured 3:1
+    // against canvas, panel and raised alike. `rule` only separates one group
+    // of content from the next, and holding that to 3:1 was what made the old
+    // screens read as a grid of outlines: the border was four times more
+    // visible than the surface it outlined.
+    border: "#7F8B96",
+    rule: "#DDE1E6",
+    action: palette.navy,
     actionInk: chipInk.light,
-    identity: palette.linen.identity,
-    calm: palette.linen.calm,
-    danger: "#B3261E",
+    // The same navy as `action`, deliberately. The mark and the primary action
+    // are one colour because there is one brand colour; a separate identity
+    // hue would be a second accent competing with the first.
+    identity: palette.navy,
+    calm: "#4E6654",
+    danger: "#A8321F",
+  },
+  "flying-night": {
+    canvas: "#0F1419",
+    panel: "#171D24",
+    raised: "#1F2831",
+    text: "#E8EBEF",
+    muted: "#9BA5B0",
+    border: "#63727B",
+    rule: "#2A333D",
+    action: palette.navyNight,
+    actionInk: "#0F1419",
+    identity: palette.navyNight,
+    calm: "#A3BCA9",
+    danger: "#E8897C",
   },
 } as const;
 
 export type ThemeName = keyof typeof themes;
 export type DensityName = keyof typeof density;
 
+/**
+ * Type is a property of the density, not of the app (spec §8, v0.9).
+ *
+ * The three surfaces are not one layout at three sizes; each answers a
+ * different question, so each gets its own treatment on the one palette.
+ *
+ * **Desktop** is the herd book: a text serif carries names and figures with the
+ * authority a registration certificate has, over a neutral grotesque for
+ * controls. **Mobile** drops the serif — a phone is read at arm's length in
+ * sunlight and one grotesque at two weights is more legible there than any
+ * pairing. **Kiosk** is signage: condensed caps, because a label has to be read
+ * from the alley and a condensed face buys the width to do it.
+ *
+ * These are the *loaded* families. `apps/web/app/layout.tsx` fetches them with
+ * `next/font` and points `--font-display-loaded` and friends at them; the
+ * fallbacks here are what shows for the one paint before the file arrives.
+ */
 export const fontFamily = {
-  heading: ["Zilla Slab", "Georgia", "serif"],
-  body: ["Inter", "system-ui", "sans-serif"],
+  display: ["var(--gf-font-display)"],
+  ui: ["var(--gf-font-ui)"],
+  numeric: ["var(--gf-font-numeric)"],
+  mono: ["var(--gf-font-mono)"],
 } as const;
+
+/** What each density sets those four to. */
+export const densityFonts = {
+  desktop: {
+    display: 'var(--font-serif-loaded, "Source Serif 4"), Georgia, serif',
+    ui: 'var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif',
+    numeric: 'var(--font-serif-loaded, "Source Serif 4"), Georgia, serif',
+  },
+  mobile: {
+    display: 'var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif',
+    ui: 'var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif',
+    numeric: 'var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif',
+  },
+  kiosk: {
+    display: 'var(--font-cond-loaded, "Barlow Condensed"), "Arial Narrow", sans-serif',
+    ui: 'var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif',
+    numeric: 'var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif',
+  },
+} as const;
+
+/** Tag numbers, registration numbers, serials. The same on every surface. */
+export const monoFamily = 'var(--font-mono-loaded, "IBM Plex Mono"), ui-monospace, monospace';
 
 /**
  * Density is a layout, not a font scale (spec §8).
@@ -126,11 +176,15 @@ export const fontFamily = {
  * winter, by someone who is not looking closely — well past the 44px the
  * platform guidelines ask for. Mobile is one-thumb logging; desktop is
  * data-dense tables with side panels.
+ *
+ * Radius travels with the density and with the treatment it carries: a herd
+ * book is a document and keeps its corners tight, a phone is a phone, and
+ * signage has no radius at all.
  */
 export const density = {
-  desktop: { control: "36px", touchTarget: "36px", textSize: "15px", gap: "12px", radius: "6px" },
+  desktop: { control: "36px", touchTarget: "36px", textSize: "15px", gap: "12px", radius: "3px" },
   mobile: { control: "44px", touchTarget: "44px", textSize: "16px", gap: "14px", radius: "10px" },
-  kiosk: { control: "64px", touchTarget: "64px", textSize: "20px", gap: "20px", radius: "14px" },
+  kiosk: { control: "64px", touchTarget: "64px", textSize: "20px", gap: "20px", radius: "0px" },
 } as const;
 
 /** Semantic colours, resolved at runtime from the surface's `data-theme`. */
@@ -141,6 +195,7 @@ const semanticColors = {
   text: "var(--gf-text)",
   muted: "var(--gf-muted)",
   border: "var(--gf-border)",
+  rule: "var(--gf-rule)",
   action: "var(--gf-action)",
   "action-ink": "var(--gf-action-ink)",
   identity: "var(--gf-identity)",
@@ -154,11 +209,9 @@ const preset = {
     extend: {
       colors: {
         ...semanticColors,
-        // The raw ramps stay available for the few places that legitimately
-        // need one specific theme — the brand assets, and the theme file that
-        // defines the variables above.
-        linen: palette.linen,
-        midnight: palette.midnight,
+        // The raw values stay available for the few places that legitimately
+        // need one specific colour rather than a semantic role.
+        navy: palette.navy,
         safety: Object.fromEntries(Object.entries(safetyScale).map(([k, v]) => [k, v.color])),
       },
       fontFamily,

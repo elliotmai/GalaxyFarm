@@ -1,9 +1,10 @@
 /*
- * The app's stylesheet (spec §8, "Midnight Nebula / Bluebonnet Linen").
+ * The app's stylesheet (spec §8, v0.9 — "Flying Double M").
  *
- * Tokens ship from @galaxy-farm/ui as custom properties; theme and density are
- * set on the route-group layouts and read from there. Nothing below this line
- * knows which surface it is on.
+ * Tokens ship from @galaxy-farm/ui as custom properties; theme, density and the
+ * type treatment that travels with the density are set on the route-group
+ * layouts and read from there. Nothing below this line knows which surface it
+ * is on.
  */
 @import "tailwindcss";
 @import "@galaxy-farm/ui/theme.css";
@@ -30,7 +31,13 @@
   --color-raised: var(--gf-raised);
   --color-ink: var(--gf-text);
   --color-muted: var(--gf-muted);
+  /*
+   * `edge` bounds a control and is a measured 3:1; `rule` only separates one
+   * group of content from the next and is much quieter. Reaching for `edge`
+   * where `rule` belongs is how a page turns back into a grid of boxes.
+   */
   --color-edge: var(--gf-border);
+  --color-rule: var(--gf-rule);
   --color-action: var(--gf-action);
   --color-action-ink: var(--gf-action-ink);
   --color-identity: var(--gf-identity);
@@ -38,8 +45,15 @@
   --color-danger: var(--gf-danger);
   --color-brass: #c9a24b;
 
-  --font-heading: "Zilla Slab", Georgia, serif;
-  --font-body: Inter, system-ui, sans-serif;
+  /*
+   * The families resolve per density, so a heading is a text serif on a
+   * laptop, a grotesque on a phone and condensed caps on the barn screen —
+   * without a single component knowing which surface it is on.
+   */
+  --font-heading: var(--gf-font-display);
+  --font-body: var(--gf-font-ui);
+  --font-numeric: var(--gf-font-numeric);
+  --font-mono: var(--gf-font-mono);
 
   --spacing-density: var(--gf-gap);
   --spacing-target: var(--gf-touch-target);
@@ -50,13 +64,21 @@
 
 html {
   /* The ground behind the surfaces. Without it a short page shows the
-     browser's own white below the fold, a bright band on the admin theme. */
-  background-color: var(--gf-canvas, #0e1026);
+     browser's own white below the fold, which is a visible seam wherever the
+     canvas is not pure white — and it never is. */
+  background-color: var(--gf-canvas, #f5f6f8);
 }
 
 body {
   margin: 0;
-  font-family: var(--font-body);
+  /*
+   * The loaded face directly, not `--gf-font-ui`. That token is declared on
+   * `[data-theme]`, which is a *descendant* of body — custom properties
+   * inherit down, so body cannot see it and would silently fall through to
+   * system-ui. Everything visible lives inside a surface and takes the token
+   * there; this is only the ground beneath them.
+   */
+  font-family: var(--font-sans-loaded), system-ui, sans-serif;
 }
 
 /*
@@ -80,12 +102,7 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-h1,
-h2,
-h3,
-h4 {
-  font-family: var(--font-heading);
-}
+/* Headings take the display face from theme.css, which sets it per density. */
 
 /*
  * Print (spec §5.10).

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { can, choreDaySheet, startOfDay } from "@galaxy-farm/core";
+import { can, choreDaySheet, FALLBACK_FARM_NAME, startOfDay } from "@galaxy-farm/core";
 
 import { SitterScreen } from "@/app/(sitter)/sitter/_components/sitter-screen";
 import { currentActor } from "@/lib/auth";
@@ -34,7 +34,7 @@ export default async function SitterPage() {
   if (actor === undefined) redirect("/login?next=/sitter");
 
   const now = new Date();
-  const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? "Galaxy Farm";
+  const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME;
 
   // Outside the window there is nothing to fetch, so nothing is fetched.
   if (!can(actor, "care.read", now)) {

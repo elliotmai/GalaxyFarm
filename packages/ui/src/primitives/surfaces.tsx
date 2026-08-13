@@ -20,10 +20,13 @@ export function Card({ title, actions, children, className, ...rest }: CardProps
   return (
     <section
       className={[
-        // A hairline plus a soft drop. Two near-identical dark surfaces need
-        // an edge *and* a shadow to read apart; on the light theme the shadow
-        // does most of the work and the border does the rest.
-        "rounded-density border border-edge bg-panel p-density text-ink shadow-[0_1px_2px_rgba(0,0,0,0.28),0_8px_24px_-12px_rgba(0,0,0,0.45)]",
+        // `rule`, not `edge`. A card is not a control: its boundary separates
+        // one group of content from the next, and holding that to the 3:1 a
+        // control needs is what made the old screens read as a grid of
+        // outlines. The panel is white on a light grey canvas, so the surface
+        // itself now does the separating and the hairline only tidies it.
+        "rounded-density border border-rule bg-panel p-density text-ink",
+        "shadow-[0_1px_2px_rgba(20,23,27,0.04),0_8px_20px_-14px_rgba(20,23,27,0.16)]",
         className ?? "",
       ]
         .filter(Boolean)
@@ -136,7 +139,7 @@ export function DataTable<T>({
         {rows.map((row) => (
           <li
             key={rowKey(row)}
-            className="flex flex-col gap-2 rounded-density border border-edge bg-raised p-density"
+            className="flex flex-col gap-2 rounded-density border border-rule bg-raised p-density"
           >
             {identity === undefined ? null : (
               <div className="text-density font-medium text-ink">{identity.render(row)}</div>
@@ -181,7 +184,7 @@ export function DataTable<T>({
           {/* Named for screen readers; a page of unlabelled tables is a maze. */}
           <caption className="sr-only">{caption}</caption>
           <thead>
-            <tr className="border-b border-edge text-left text-muted">
+            <tr className="border-b border-rule text-left text-muted">
               {columns.map((column) => (
                 <th
                   key={column.key}
@@ -197,7 +200,7 @@ export function DataTable<T>({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={rowKey(row)} className="border-b border-edge/40 last:border-0">
+              <tr key={rowKey(row)} className="border-b border-rule/70 last:border-0">
                 {columns.map((column) => (
                   <td
                     key={column.key}
@@ -227,7 +230,7 @@ export interface EmptyStateProps {
 
 export function EmptyState({ title, detail, action }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-density border border-dashed border-edge p-8 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-density border border-dashed border-rule p-8 text-center">
       <h3 className="text-density font-semibold text-ink">{title}</h3>
       {detail === undefined ? null : <p className="max-w-prose text-sm text-muted">{detail}</p>}
       {action}

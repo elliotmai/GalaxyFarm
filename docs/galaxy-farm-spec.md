@@ -437,20 +437,42 @@ Route: `/admin/supplies`. Builds in Phase 2.
 
 ## 8. UI/UX notes
 
-### Design language (locked v0.8) — "Midnight Nebula / Bluebonnet Linen"
+### Design language (locked v0.9) — "Flying Double M"
 
-One brand, two modes sharing the same hue anchors. **Theme per surface:** `/admin` and `/kiosk` render Midnight Nebula (dark); `/account`, `/book`, `/sitter`, and public pages render Bluebonnet Linen (light). The neutrals mirror: admin's starlight text is the customer's linen sky, and the customer's violet ink is the admin's night surface.
+Supersedes v0.8's "Midnight Nebula / Bluebonnet Linen", which was retired because it read as a hobby project rather than a working business. The cause was a misreading of the name: the mark is a **brand iron** — a registered livestock brand, as "Flying Double M" says outright — and the world it comes from is paperwork, not outer space. v0.8 had drawn a starfield, two nebula washes and a ninety-second drift animation behind screens somebody reads a weight off.
 
-| Role | Bluebonnet Linen (light) | Midnight Nebula (dark) |
+**Light on every surface.** `flying-day` renders on `/admin`, `/kiosk`, `/account`, `/book`, `/sitter` and public pages alike. Registration certificates, sale catalogues and herd ledgers are daylight objects, and so are the jobs: printing a pedigree, showing a buyer a screen, reading a kiosk in a sunlit barn. `flying-night` is defined for the barn after dark and is entered deliberately — a mode, never the fixed look of a surface. (Wiring the switch is outstanding; the tokens are not.)
+
+| Role | `flying-day` | `flying-night` |
 |---|---|---|
-| Canvas | `#F8F5EC` linen | `#0E1026` midnight |
-| Panel / card | `#FFFFFF` | `#191C3C` |
-| Text | `#24243A` ink | `#F2EFE6` starlight |
-| Action — bluebonnet blue | `#35569E` | `#8CA3E8` |
-| Identity — nebula purple | `#5F45B0` | `#9D85E8` |
-| Calm — sage green | `#67805F` | `#A3BC9C` |
+| Canvas | `#F5F6F8` | `#0F1419` |
+| Panel / card | `#FFFFFF` | `#171D24` |
+| Raised | `#EDEFF3` | `#1F2831` |
+| Text | `#14171B` | `#E8EBEF` |
+| Muted | `#525860` | `#9BA5B0` |
+| Border — bounds a control | `#7F8B96` | `#63727B` |
+| Rule — separates content | `#DDE1E6` | `#2A333D` |
+| Action & identity — ink navy | `#1B3A5C` | `#8FB3D9` |
+| Calm — sage | `#4E6654` | `#A3BCA9` |
+| Danger | `#A8321F` | `#E8897C` |
 
-Role assignments: **bluebonnet blue** = every primary action, link, and interactive control on both sides; **nebula purple** = brand and identity moments (star mark, constellation pedigree lines, milestones, headers); **sage green** = calm states (resting pastures, signed forms, quiet confirmations). Sage is deliberately gray-leaning so the **safety scale (unchanged, saturated green→red, always numbered)** never competes with it. Brass gold `#C9A24B` is held in reserve as an optional "champion" accent for wins (show results, milestones) — currently unused. Signature elements: the **Double M brand logomark** and **pedigrees drawn as constellations** (ancestors as stars, descent as connecting lines — at full glory in dark mode). Typography across both modes: **Zilla Slab** for headings, **Inter** for UI and body, tabular figures wherever numbers carry meaning (weights, tags, straw counts).
+**One accent.** Ink navy is both the brand mark and every primary action, link and interactive control; a separate identity hue would be a second accent competing with the first. Sage is calm states and stays gray-leaning — under half the safety scale's saturation, asserted in `contrast.test.ts` — so it is never mistaken for "safe to handle". Brass `#C9A24B` remains the reserved champion accent and remains unused; it cannot carry text at 2.0:1 on white.
+
+**Two edges, not one.** `border` bounds a control and is a measured 3:1 against canvas, panel and raised, because §1.4.11 treats a control's boundary as information. `rule` only separates one group of content from the next and is deliberately far quieter. v0.8 had a single edge held to the control standard, which is why its cards read as outlines: its panel was 1.13:1 against its canvas while that border was 4.36:1 against the panel.
+
+**The safety scale is unchanged** — saturated green→red, always numbered. Three of its five fills do not clear 3:1 against a light ground (2.32, 1.82 and 2.85 for levels 2, 3 and 4); darkening them would flatten the progression the scale exists for, so the ring `SafetyBadge` already draws carries §1.4.11 instead, in the border token that is measured for it.
+
+**Type is a property of the density**, not of the app — the three surfaces are not one layout at three sizes:
+
+| Density | Treatment | Display face | Targets |
+|---|---|---|---|
+| Desktop | Herd book — ledger tables, hairline rules | **Source Serif 4** over IBM Plex Sans | 36 px |
+| Mobile | One grotesque, soft cards, bottom bar | **IBM Plex Sans** | 44 px |
+| Kiosk | Signage — condensed caps, hard rules | **Barlow Condensed** over IBM Plex Sans | 64 px |
+
+IBM Plex Mono carries tag numbers, registration numbers and serials on all three. Tabular figures wherever numbers carry meaning. All four faces are SIL Open Font License and are committed under `apps/web/app/fonts/` and loaded with `next/font/local` — a build that must reach Google for a typeface is the same bargain this project refuses for its database.
+
+Signature elements: the **Flying Double M Connected** mark, and pedigrees drawn as a **three-generation certificate grid** rather than v0.8's constellation — on paper it has been that grid for a century, and the grid is what a buyer can read.
 
 - **Design system first** (`packages/ui`): tokens above, then components. Clean, professional, generous whitespace; no template feel. Distinct density modes: desktop (data-dense tables + side panels), mobile (card stacks, bottom nav, one-thumb logging), kiosk (oversized type + targets).
 - **The Pen Board is the heart of the app** — the property map with live animal positions, merged instructions, halter-color swatches, and **safety-level color coding** (pen borders show effective level; chips show each animal's) is what you'll glance at ten times a day and what barn screens show by default.
@@ -580,3 +602,10 @@ The point of expressing §4.1 and §4.5 as *executable* checks rather than prose
 27. **`updatedAt` is server arrival time, not device edit time** (§4.2) — it is the pull cursor, and a record stamped with a past timestamp would land behind cursors other devices already hold and never be delivered. The device's own edit time is preserved in `sync_field_meta`, which is where the merge reads it from, so nothing is lost by the distinction.
 28. **Patch, merge, cursors, and the transport shapes live in the kernel** (§4.1, §4.2) — not in the sync adapter. The server runs the same merge the device runs, and §4.1 forbids one adapter importing another; two implementations of who-wins would agree until the afternoon somebody changed one of them.
 29. **Every import must be declared, third-party as well as workspace** (§11.1) — `tests/architecture/boundaries.test.ts` fails the build on any package importing something its `package.json` does not list. Written while trying to make a checkout work on an exFAT volume, where `node-linker=hoisted` flattens `node_modules` and lets an undeclared import resolve anyway. That attempt was abandoned — pnpm symlinks workspace packages regardless of the linker, so exFAT cannot host this repo at all — but the check earned its place independently: it is the difference between a dependency graph that is declared and one that merely happens to work.
+
+**v1.5 additions:**
+
+30. **Design language replaced: "Flying Double M" supersedes "Midnight Nebula / Bluebonnet Linen"** (§8, v0.9). v0.8 read as a hobby project, and the cause was a misreading of the name: the mark is a brand iron, so the world it belongs to is paperwork rather than outer space. The starfield, the nebula washes and the ninety-second drift animation are gone; every surface renders light, on a neutral ground with one accent that is both the brand and every primary action. `flying-night` is defined for the barn after dark but no surface is pinned to it. The palette layer cost almost nothing to swap — 786 uses of semantic token classes across 68 screens and zero hardcoded colours — which is what made a change this size a two-file edit rather than a rewrite.
+31. **The typefaces are loaded, and loaded locally** (§8). Zilla Slab and Inter had been named in `globals.css` since the first day and never fetched — no `next/font`, no `@font-face`, no link — so every heading in the app rendered in Georgia and the design language had never once reached a browser. They are now four faces committed under `apps/web/app/fonts/` and loaded with `next/font/local`. `next/font/google` would be identical at runtime but makes `pnpm build` require a network, and taking a third party as a build dependency for a typeface is the same bargain this project already refuses for its database.
+32. **Type is a property of the density** (§8) — a text serif for the herd book on a laptop, one grotesque for a phone at arm's length, condensed caps for signage read from the alley, all on one palette. The three surfaces are not one layout at three sizes, and the token layer already had the mechanism: the families are set in the `[data-density]` blocks beside the targets and the gaps, so no component knows which surface it is on.
+33. **`border` and `rule` are separate tokens** (§8) — a control's boundary is information under WCAG 2.1 §1.4.11 and is held to 3:1; a separator between two groups of content is not, and holding it to the same bar is what made v0.8 read as a grid of outlines. Its panel was 1.13:1 against its canvas while its border was 4.36:1 against that panel, so every card's outline was four times more visible than the card itself.

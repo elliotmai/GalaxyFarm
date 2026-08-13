@@ -1,53 +1,62 @@
 /*
- * Theme and density tokens (spec §8).
+ * Theme, density and type tokens (spec §8, v0.9 — "Flying Double M").
  *
  * Theme is a property of the surface, not a user preference, so it is set once
  * on the route-group layout and read from there by everything inside. A
  * component that branched on the theme would have to be revisited every time a
- * surface moved; a component that named `midnight` would be wrong the first
- * time it appeared on the customer portal.
+ * surface moved.
  *
- * Density is the same idea for layout: `desktop` is data-dense tables with side
- * panels, `mobile` is one-thumb logging, `kiosk` is a 64px target pressed with
- * a gloved hand in February by someone who is not looking closely.
+ * Light on every surface. The farm's mark is a brand iron and the world it
+ * comes from is paperwork — registration certificates, sale catalogues, herd
+ * ledgers — which is a daylight world, and also the right one for printing a
+ * pedigree, showing a buyer a screen, or reading a kiosk in a sunlit barn.
+ * `flying-night` is for the barn after dark: a mode, not the look of a surface.
  *
- * The values here mirror `themes` and `density` in
+ * Density carries more than size here. Each of the three answers a different
+ * question, so each gets its own type treatment on the one palette: a text
+ * serif for the herd book on a laptop, one grotesque for a phone held at arm's
+ * length, condensed caps for signage read from the alley. That is why the font
+ * tokens live in the density blocks rather than at the top.
+ *
+ * The values here mirror `themes`, `density` and `densityFonts` in
  * `@galaxy-farm/config/tailwind`. That file is what the contrast tests read and
  * this file is what ships, so `tests/theme-tokens.test.ts` asserts the two
  * still agree — a token changed in one place and not the other is otherwise
  * invisible until someone photographs a badge that has gone unreadable.
  */
 
-[data-theme="midnight-nebula"] {
-  --gf-canvas: #0e1026;
-  --gf-panel: #191c3c;
-  --gf-raised: #242a52;
-  --gf-text: #f2efe6;
-  --gf-muted: #b4b2c8;
-  --gf-border: #7c80a6;
-  --gf-action: #8ca3e8;
-  --gf-action-ink: #14141f;
-  --gf-identity: #9d85e8;
-  --gf-calm: #a3bc9c;
-  --gf-danger: #f08a84;
-
-  color-scheme: dark;
-}
-
-[data-theme="bluebonnet-linen"] {
-  --gf-canvas: #f8f5ec;
+[data-theme="flying-day"] {
+  --gf-canvas: #f5f6f8;
   --gf-panel: #ffffff;
-  --gf-raised: #f1eee4;
-  --gf-text: #24243a;
-  --gf-muted: #565669;
-  --gf-border: #888897;
-  --gf-action: #35569e;
+  --gf-raised: #edeff3;
+  --gf-text: #14171b;
+  --gf-muted: #525860;
+  --gf-border: #7f8b96;
+  --gf-rule: #dde1e6;
+  --gf-action: #1b3a5c;
   --gf-action-ink: #ffffff;
-  --gf-identity: #5f45b0;
-  --gf-calm: #5b7154;
-  --gf-danger: #b3261e;
+  --gf-identity: #1b3a5c;
+  --gf-calm: #4e6654;
+  --gf-danger: #a8321f;
 
   color-scheme: light;
+}
+
+[data-theme="flying-night"] {
+  --gf-canvas: #0f1419;
+  --gf-panel: #171d24;
+  --gf-raised: #1f2831;
+  --gf-text: #e8ebef;
+  --gf-muted: #9ba5b0;
+  --gf-border: #63727b;
+  --gf-rule: #2a333d;
+  --gf-action: #8fb3d9;
+  --gf-action-ink: #0f1419;
+  --gf-identity: #8fb3d9;
+  --gf-calm: #a3bca9;
+  --gf-danger: #e8897c;
+
+  color-scheme: dark;
 }
 
 /* Surfaces paint their own ground; nothing inherits a colour from the host. */
@@ -57,95 +66,19 @@
 }
 
 /*
- * The sky (spec §8, "Midnight Nebula").
+ * Two edges, and the difference between them is the whole reason the old
+ * screens read as boxes.
  *
- * A flat navy field is what makes a dark theme read as *unfinished* rather
- * than as dark — there is nothing for the eye to land on between the panels,
- * so the panels look like boxes floating on nothing. Stars and two soft nebula
- * washes give the ground depth, and every card on top then reads as sitting
- * *in* something rather than on nothing.
+ * `--gf-border` bounds a control — an input, a button, a chip — which WCAG 2.1
+ * §1.4.11 treats as information rather than decoration, so it is a measured 3:1
+ * against canvas, panel and raised alike. `--gf-rule` only separates one group
+ * of content from the next, and is deliberately far quieter.
  *
- * Gradients rather than an image: no request, no cache, no second file to keep
- * in step with the tokens, and it stays crisp at any pixel density.
- *
- * A fixed pseudo-element rather than `background-attachment: fixed`. The
- * shorthand is the obvious way to hold a sky still while content scrolls over
- * it, and it is unreliable on iOS Safari — it degrades to `scroll`, or
- * flickers on every scroll frame. A fixed layer behaves the same everywhere.
- *
- * `isolation: isolate` is what makes `z-index: -1` safe here: it confines the
- * layer to this element's stacking context, so it sits above the surface's own
- * background colour and below everything inside it, without any child needing
- * a z-index of its own.
- *
- * Only the admin and kiosk theme. The customer-facing linen is a daylight
- * surface, and a starfield on it would be a costume.
+ * The previous language had one edge and held it to the control standard. Its
+ * panel was 1.13:1 against its canvas while that border was 4.36:1 against the
+ * panel, so every card's outline was four times more visible than the card, and
+ * the eye read a grid of rectangles before it read a word.
  */
-[data-theme="midnight-nebula"] {
-  position: relative;
-  isolation: isolate;
-}
-
-[data-theme="midnight-nebula"]::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    /* Two nebula washes, in the identity violet and the action blue. Very low
-       alpha on purpose — anything stronger tints the text sitting on it. */
-    radial-gradient(60rem 40rem at 15% -10%, rgb(157 133 232 / 16%), transparent 70%),
-    radial-gradient(45rem 35rem at 95% 12%, rgb(140 163 232 / 12%), transparent 70%),
-    radial-gradient(50rem 40rem at 50% 108%, rgb(157 133 232 / 10%), transparent 70%),
-    /* Two star fields at different tile sizes, so the pattern does not read as
-       a grid at any one scale. */
-    radial-gradient(1.6px 1.6px at 12% 18%, rgb(242 239 230 / 70%), transparent),
-    radial-gradient(1.2px 1.2px at 74% 8%, rgb(242 239 230 / 55%), transparent),
-    radial-gradient(1.4px 1.4px at 38% 62%, rgb(242 239 230 / 60%), transparent),
-    radial-gradient(1px 1px at 88% 46%, rgb(242 239 230 / 45%), transparent),
-    radial-gradient(1.8px 1.8px at 62% 88%, rgb(157 133 232 / 65%), transparent),
-    radial-gradient(1px 1px at 24% 92%, rgb(242 239 230 / 40%), transparent),
-    radial-gradient(1.2px 1.2px at 92% 74%, rgb(140 163 232 / 50%), transparent),
-    radial-gradient(1px 1px at 6% 54%, rgb(242 239 230 / 35%), transparent);
-  background-size:
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    23rem 23rem,
-    23rem 23rem,
-    23rem 23rem,
-    23rem 23rem,
-    31rem 31rem,
-    31rem 31rem,
-    31rem 31rem,
-    31rem 31rem;
-  background-repeat:
-    no-repeat, no-repeat, no-repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat;
-}
-
-/*
- * The stars breathe, very slowly.
- *
- * Ninety seconds a cycle and eight percent of opacity — far too slow to
- * notice while looking at it, which is the point. Anything faster is a
- * distraction on a screen somebody is reading a weight off.
- */
-@media (prefers-reduced-motion: no-preference) {
-  [data-theme="midnight-nebula"]::before {
-    animation: gf-drift 90s ease-in-out infinite;
-  }
-}
-
-@keyframes gf-drift {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.92;
-  }
-}
 
 /*
  * No explicit density means "follow the viewport": a phone gets the mobile
@@ -159,6 +92,9 @@
   --gf-text-size: 16px;
   --gf-gap: 14px;
   --gf-radius: 10px;
+  --gf-font-display: var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif;
+  --gf-font-ui: var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif;
+  --gf-font-numeric: var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif;
 }
 
 @media (min-width: 48rem) {
@@ -167,7 +103,10 @@
     --gf-touch-target: 36px;
     --gf-text-size: 15px;
     --gf-gap: 12px;
-    --gf-radius: 6px;
+    --gf-radius: 3px;
+    --gf-font-display: var(--font-serif-loaded, "Source Serif 4"), Georgia, serif;
+    --gf-font-ui: var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif;
+    --gf-font-numeric: var(--font-serif-loaded, "Source Serif 4"), Georgia, serif;
   }
 }
 
@@ -176,7 +115,10 @@
   --gf-touch-target: 36px;
   --gf-text-size: 15px;
   --gf-gap: 12px;
-  --gf-radius: 6px;
+  --gf-radius: 3px;
+  --gf-font-display: var(--font-serif-loaded, "Source Serif 4"), Georgia, serif;
+  --gf-font-ui: var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif;
+  --gf-font-numeric: var(--font-serif-loaded, "Source Serif 4"), Georgia, serif;
 }
 
 [data-density="mobile"] {
@@ -185,6 +127,9 @@
   --gf-text-size: 16px;
   --gf-gap: 14px;
   --gf-radius: 10px;
+  --gf-font-display: var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif;
+  --gf-font-ui: var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif;
+  --gf-font-numeric: var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif;
 }
 
 [data-density="kiosk"] {
@@ -192,11 +137,33 @@
   --gf-touch-target: 64px;
   --gf-text-size: 20px;
   --gf-gap: 20px;
-  --gf-radius: 14px;
+  --gf-radius: 0px;
+  --gf-font-display: var(--font-cond-loaded, "Barlow Condensed"), "Arial Narrow", sans-serif;
+  --gf-font-ui: var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif;
+  --gf-font-numeric: var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif;
 }
 
+/* Tag numbers, registration numbers, serials — the same on every surface. */
 [data-theme] {
+  --gf-font-mono: var(--font-mono-loaded, "IBM Plex Mono"), ui-monospace, monospace;
   font-size: var(--gf-text-size);
+  font-family: var(--gf-font-ui);
+}
+
+[data-theme] :is(h1, h2, h3, h4) {
+  font-family: var(--gf-font-display);
+}
+
+/*
+ * The one thing the kiosk does to the display face.
+ *
+ * Condensed caps are signage, not prose: the case change is what makes a label
+ * readable from the alley rather than at arm's length, and the letterspacing
+ * opens up because capitals set tight are a wall.
+ */
+[data-density="kiosk"] :is(h1, h2, h3, h4) {
+  text-transform: uppercase;
+  letter-spacing: 0.015em;
 }
 
 /*
@@ -205,6 +172,7 @@
  * to scan, and scanning is the whole reason the column exists.
  */
 .gf-numeric {
+  font-family: var(--gf-font-numeric);
   font-variant-numeric: tabular-nums;
 }
 
@@ -230,17 +198,19 @@
  * and page breaks, which is a great deal of work not to redo in a PDF library.
  *
  * What it needs from us is that the page stop being an application on paper:
- * no navigation to a site the reader is holding, no buttons they cannot press,
- * and dark themes rendered as ink on white rather than as a solid black sheet
- * that empties a cartridge.
+ * no navigation to a site the reader is holding, and no buttons they cannot
+ * press. The ground is already white, so unlike the old dark theme there is no
+ * cartridge to save here.
  */
 @media print {
   [data-theme] {
     --gf-canvas: #ffffff;
     --gf-panel: #ffffff;
-    --gf-ink: #111111;
+    --gf-raised: #ffffff;
+    --gf-text: #111111;
     --gf-muted: #444444;
-    --gf-edge: #999999;
+    --gf-border: #767676;
+    --gf-rule: #cccccc;
   }
 
   .gf-no-print,

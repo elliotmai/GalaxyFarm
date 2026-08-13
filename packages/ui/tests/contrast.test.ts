@@ -138,8 +138,7 @@ describe("the safety scale", () => {
     // carries the requirement instead: SafetyBadge rings every chip in the
     // theme's border token, which is a measured 3:1 on both grounds.
     const weak = levels.filter(
-      (level) =>
-        contrastRatio(safetyScale[level].color, themes["bluebonnet-linen"].canvas) < AA_NON_TEXT,
+      (level) => contrastRatio(safetyScale[level].color, themes["flying-day"].canvas) < AA_NON_TEXT,
     );
     expect(weak.length, "if every fill now passes, the ring can be reconsidered").toBeGreaterThan(
       0,
@@ -179,8 +178,8 @@ describe("halter colours", () => {
     const black = HALTER_COLORS.find((h) => h.name === "Black")!;
     const white = HALTER_COLORS.find((h) => h.name === "White")!;
 
-    expect(contrastRatio(black.color, themes["midnight-nebula"].panel)).toBeLessThan(AA_NON_TEXT);
-    expect(contrastRatio(white.color, themes["bluebonnet-linen"].panel)).toBeLessThan(AA_NON_TEXT);
+    expect(contrastRatio(black.color, themes["flying-night"].panel)).toBeLessThan(AA_NON_TEXT);
+    expect(contrastRatio(white.color, themes["flying-day"].panel)).toBeLessThan(AA_NON_TEXT);
 
     for (const theme of Object.values(themes)) {
       expect(contrastRatio(theme.border, theme.panel)).toBeGreaterThanOrEqual(AA_NON_TEXT);
