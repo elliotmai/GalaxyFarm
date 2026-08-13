@@ -44,9 +44,18 @@ hard freeze, and it lands in the same window as calving (see below).
 **What is actually done about it is covers** (confirmed 13 August 2026). Each
 tank's cover is tracked as one of three states — `none`, `off`, `on` — and the
 freeze alert raises "put the cover on" the evening before the first forecast
-freeze, separately from the ice-breaking chore on the morning itself. Which of
-the four tanks have covers is not recorded here yet; the seed assumes all four
-do and that they are off out of season.
+freeze, separately from the ice-breaking chore on the morning itself.
+
+**The three auto-refill tanks have covers. The West Pen's static tank does
+not**, so it can only be broken open, and it is the one tank the cover list
+should never name. All three covers are currently off.
+
+| Tank | Type | Cover |
+|---|---|---|
+| 1 — Pasture + Hay Field | Auto-refill | Yes, off |
+| 2 — Pen 1 + 2nd Pen + Randy's | Auto-refill | Yes, off |
+| 3 — Pen A + Pen B | Auto-refill | Yes, off |
+| 4 — West Pen | Static, seasonal | None |
 
 ## Livestock
 

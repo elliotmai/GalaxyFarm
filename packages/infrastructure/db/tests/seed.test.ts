@@ -74,6 +74,23 @@ describe("seed", () => {
     expect(tanks.every((tank) => !tank.hasHeater)).toBe(true);
   });
 
+  it("gives the auto-refill tanks covers and the static one none", async () => {
+    // Covers are what this place does about a freeze, and the distinction is
+    // the point: three tanks have something to put on before the cold, and the
+    // West Pen's does not. Seeding all four with covers would send somebody out
+    // to fit one that does not exist, which is how a chore list stops being
+    // read.
+    await seed(db, { now: NOW });
+
+    const tanks = await db.select().from(waterSources);
+    const auto = tanks.filter((tank) => tank.type === "auto_refill");
+    const statics = tanks.filter((tank) => tank.type === "static_tank");
+
+    expect(auto).toHaveLength(3);
+    expect(auto.every((tank) => tank.cover === "off")).toBe(true);
+    expect(statics.every((tank) => tank.cover === "none")).toBe(true);
+  });
+
   it("shares tanks between zones instead of giving each one its own", async () => {
     // The modelling decision this whole entity exists for: four tanks serve
     // eight zones, one of them serving three. Per-zone water would fire eight
