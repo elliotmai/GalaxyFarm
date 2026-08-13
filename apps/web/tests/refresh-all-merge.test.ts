@@ -28,7 +28,7 @@ const change = (field: string, kind: "fill" | "change" = "fill"): FieldChange =>
   value: "something",
 });
 
-const paper = { association: "AMAA", regNumber: "402303" };
+const paper = { association: "Maine-Anjou", regNumber: "402303" };
 
 describe("folding a page's proposals in", () => {
   it("adds an animal nothing has proposed for yet", () => {
@@ -49,7 +49,7 @@ describe("folding a page's proposals in", () => {
     const tyson = animal("a", "TYSON");
 
     recordInto(found, ticked, tyson, paper, [{ ...change("colour"), after: "Black" }]);
-    recordInto(found, ticked, tyson, { association: "ACA", regNumber: "359968" }, [
+    recordInto(found, ticked, tyson, { association: "Chianina", regNumber: "359968" }, [
       { ...change("colour"), after: "Blk" },
       change("dob"),
     ]);

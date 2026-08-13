@@ -74,7 +74,7 @@ export function DigitalBeefImport({
   );
   const { show } = useToast();
 
-  const [association, setAssociation] = useState<string>(READABLE_REGISTRIES[0] ?? "AMAA");
+  const [association, setAssociation] = useState<string>(READABLE_REGISTRIES[0] ?? "Maine-Anjou");
   const [registration, setRegistration] = useState("");
   /** An address typed in whole, for the day one of the three changes its shape. */
   const [pasted, setPasted] = useState("");

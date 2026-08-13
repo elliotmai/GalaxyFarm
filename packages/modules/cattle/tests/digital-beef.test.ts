@@ -28,16 +28,16 @@ import { SHORTHORN_PAGE } from "./fixtures/shorthorn-pages.js";
  * generations of ancestors. Fixtures that agree with the parser prove nothing.
  */
 
-const read = (page: string, association: "AMAA" | "ACA" | "ASA", registration: string) =>
+const read = (page: string, association: "Maine-Anjou" | "Chianina" | "Shorthorn", registration: string) =>
   parseDigitalBeefPage(page, { association, registration });
 
 const at = (animal: ImportedAnimal, position: string) =>
   animal.ancestors.find((ancestor) => ancestor.position === position);
 
 const everyPage = () => [
-  read(CHIANINA_PAGE, "ACA", "359968"),
-  read(MAINE_ANJOU_PAGE, "AMAA", "402303"),
-  read(SHORTHORN_PAGE, "ASA", "4219133"),
+  read(CHIANINA_PAGE, "Chianina", "359968"),
+  read(MAINE_ANJOU_PAGE, "Maine-Anjou", "402303"),
+  read(SHORTHORN_PAGE, "Shorthorn", "4219133"),
 ];
 
 describe("the address", () => {
@@ -46,10 +46,14 @@ describe("the address", () => {
       "https://shorthorn.digitalbeef.com/modules.php?op=modload&name=_animal&file=_animal&animal_registration=4219133",
     );
 
+<<<<<<< HEAD
     expect(parsed).toMatchObject({
       ok: true,
       ref: { association: "ASA", registration: "4219133" },
     });
+=======
+    expect(parsed).toMatchObject({ ok: true, ref: { association: "Shorthorn", registration: "4219133" } });
+>>>>>>> 77ed80d (Name a registry by its breed, not the association's initials)
   });
 
   it("refuses a host it does not know rather than guessing", () => {
@@ -69,7 +73,7 @@ describe("the detail panel", () => {
     // `Sex: Bull   Sire: MA364424 CMAC TYSON ET`. Reading to the end of the
     // line gives the sire's name as the animal's sex — which is what the
     // owner saw on the first real page he tried.
-    const animal = read(CHIANINA_PAGE, "ACA", "359968");
+    const animal = read(CHIANINA_PAGE, "Chianina", "359968");
 
     expect(animal.sex).toBe("Bull");
     expect(animal.name).toBe("ZNT MONTEGO BAY 901W");
@@ -78,9 +82,9 @@ describe("the detail panel", () => {
   });
 
   it("finds the horn status on all three, which spell it the same way", () => {
-    expect(read(CHIANINA_PAGE, "ACA", "359968").hornStatus).toBe("Polled");
-    expect(read(MAINE_ANJOU_PAGE, "AMAA", "402303").hornStatus).toBe("Polled");
-    expect(read(SHORTHORN_PAGE, "ASA", "4219133").hornStatus).toBe("Scurred");
+    expect(read(CHIANINA_PAGE, "Chianina", "359968").hornStatus).toBe("Polled");
+    expect(read(MAINE_ANJOU_PAGE, "Maine-Anjou", "402303").hornStatus).toBe("Polled");
+    expect(read(SHORTHORN_PAGE, "Shorthorn", "4219133").hornStatus).toBe("Scurred");
   });
 
   it("finds a tattoo on all three, which do not spell it the same way", () => {
@@ -91,7 +95,7 @@ describe("the detail panel", () => {
   });
 
   it("takes the parents from the panel, where they are named outright", () => {
-    const animal = read(CHIANINA_PAGE, "ACA", "359968");
+    const animal = read(CHIANINA_PAGE, "Chianina", "359968");
 
     expect(animal.sire).toEqual({ regNumber: "MA364424", name: "CMAC TYSON ET" });
     expect(animal.dam).toEqual({ regNumber: "337003", name: "ZNT JENNA 707T" });
@@ -120,8 +124,8 @@ describe("the pedigree chart", () => {
   it("reads the same bull off two association pages into the same shape", () => {
     // The point of the whole exercise: two registries, two sets of numbers,
     // one animal. The slots have to agree or nothing downstream can join them.
-    const chianina = read(CHIANINA_PAGE, "ACA", "359968");
-    const maine = read(MAINE_ANJOU_PAGE, "AMAA", "402303");
+    const chianina = read(CHIANINA_PAGE, "Chianina", "359968");
+    const maine = read(MAINE_ANJOU_PAGE, "Maine-Anjou", "402303");
 
     expect(at(chianina, "dam")?.name).toBe(at(maine, "dam")?.name);
     expect(at(chianina, "dam")?.regNumber).toBe("337003");
@@ -154,7 +158,7 @@ describe("the defect flags", () => {
   });
 
   it("carries a carrier through to the animal it belongs to", () => {
-    const animal = read(CHIANINA_PAGE, "ACA", "359968");
+    const animal = read(CHIANINA_PAGE, "Chianina", "359968");
     const flagged = [...animal.ancestors, ...animal.unplacedAncestors].filter(
       (ancestor) => ancestor.geneticTests.length > 0,
     );

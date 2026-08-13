@@ -1,5 +1,6 @@
 import {
   MAX_CATALOGUE_GENERATIONS,
+  registryCode,
   type RegistryAnimal,
   type RegistryGraph,
   type RegistryQuery,
@@ -29,30 +30,40 @@ import {
  * that (§4.1), and an adapter that reaches for `process.env` is one that
  * cannot be tested twice with two different instances.
  *
- * ## The two codes for one association
+ * ## The two names for one registry
  *
- * The graph names associations `MAINE`, `CHIA`, `SHORT`, `ANGUS`; this app has
- * always called them `AMAA`, `ACA`, `ASA`, `AAA`, and those codes are written
- * into every registration on file. Translating at the boundary is the only
- * honest option — renaming ours would rewrite historical records to match a
- * crawler, and passing the graph's codes inwards would put two vocabularies in
- * the same field.
+ * The graph abbreviates associations — `MAINE`, `CHIA`, `SHORT`, `ANGUS` — and
+ * this app names them by their breed, because association initials collide
+ * (`ASA` is Shorthorn here and Simmental elsewhere) and a breed does not.
+ * Translating at the boundary keeps one vocabulary in the field and one in the
+ * crawler, so neither has to be rebuilt to suit the other.
+ *
+ * The crawler's own abbreviations are not immune to the same collision, which
+ * is the reason this map is written out by hand rather than derived: `SHORT`
+ * means the American Shorthorn Association *in this graph*, and that is a fact
+ * about the crawl, not something to infer from a string.
  */
 
-/** Graph code → the code this app files registrations under. */
+/** Graph code → the breed this app files that registry's numbers under. */
 const TO_OURS: Record<string, string> = {
-  MAINE: "AMAA",
-  CHIA: "ACA",
-  SHORT: "ASA",
-  ANGUS: "AAA",
+  MAINE: "Maine-Anjou",
+  CHIA: "Chianina",
+  SHORT: "Shorthorn",
+  ANGUS: "Angus",
 };
 
 const TO_GRAPH: Record<string, string> = Object.fromEntries(
   Object.entries(TO_OURS).map(([graph, ours]) => [ours, graph]),
 );
 
-/** Ours → the graph's. Anything unrecognised is passed through untranslated. */
-export const graphAssociation = (code: string): string => TO_GRAPH[code] ?? code;
+/**
+ * Ours → the graph's. Anything unrecognised is passed through untranslated.
+ *
+ * Through `registryCode` first, so a filter carrying a registration's stored
+ * spelling still translates when that record predates the rename.
+ */
+export const graphAssociation = (code: string): string =>
+  TO_GRAPH[registryCode(code)] ?? code;
 export const ourAssociation = (code: string): string => TO_OURS[code] ?? code;
 
 export interface RegistryGraphOptions {

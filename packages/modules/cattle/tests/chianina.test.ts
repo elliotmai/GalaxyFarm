@@ -14,7 +14,7 @@ import { CHIANINA_PAGE, CHIANINA_SPARSE_PAGE } from "./fixtures/chianina-pages.j
  */
 
 const read = (page: string, registration: string) =>
-  parseDigitalBeefPage(page, { association: "ACA", registration });
+  parseDigitalBeefPage(page, { association: "Chianina", registration });
 
 const at = (animal: ReturnType<typeof read>, position: string) =>
   animal.ancestors.find((ancestor) => ancestor.position === position);

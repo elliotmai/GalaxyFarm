@@ -95,7 +95,7 @@ function chianina(composition: readonly BreedShare[]): RegistrationClass[] {
 
   const both = (name: string, because: string, alsoRequires?: readonly string[]) =>
     found.push({
-      association: "ACA",
+      association: "Chianina",
       name,
       because,
       ...(alsoRequires === undefined ? {} : { alsoRequires }),
@@ -172,7 +172,7 @@ function maine(
     const paper = mainePaper(recorded);
     return [
       {
-        association: "AMAA",
+        association: "Maine-Anjou",
         name: `${paper ?? "Maine-Anjou"} — ${MAINE_CLASS_LABELS[recorded]}`,
         because: `The papers state ${stated as string}.`,
         alsoRequires: paper === "MaineTainer" ? [MAINE_ANGUS_NOTE] : ["Registered with the AMAA"],
@@ -186,7 +186,7 @@ function maine(
   if (!meetsMaineMinimum(percent)) {
     return [
       {
-        association: "AMAA",
+        association: "Maine-Anjou",
         name: "Not eligible",
         because: `${Math.round(percent * 100) / 100}% Maine-Anjou — under the quarter that is the least the AMAA will register.`,
       },
@@ -202,7 +202,7 @@ function maine(
 
   return [
     {
-      association: "AMAA",
+      association: "Maine-Anjou",
       name: `${paper ?? "Maine-Anjou"} — ${MAINE_CLASS_LABELS[maineClass]}`,
       because: `${Math.round(percent * 100) / 100}% Maine-Anjou.`,
       alsoRequires,
@@ -215,12 +215,12 @@ function shorthorn(composition: readonly BreedShare[]): RegistrationClass[] {
   const shorthorn = percentOf(composition, "SH", "SHORTHORN");
 
   if (atLeast(shorthorn, 100)) {
-    return [{ association: "ASA", name: "Purebred Shorthorn", because: "100% Shorthorn." }];
+    return [{ association: "Shorthorn", name: "Purebred Shorthorn", because: "100% Shorthorn." }];
   }
   if (atLeast(shorthorn, 50)) {
     return [
       {
-        association: "ASA",
+        association: "Shorthorn",
         name: "ShorthornPlus",
         because: `${Math.round(shorthorn * 100) / 100}% Shorthorn — at least half, with other breeds allowed.`,
       },

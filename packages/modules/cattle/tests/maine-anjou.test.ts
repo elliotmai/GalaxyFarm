@@ -14,7 +14,7 @@ import { MAINE_ANJOU_PAGE } from "./fixtures/maine-anjou-pages.js";
  */
 
 const read = (registration = "402303") =>
-  parseDigitalBeefPage(MAINE_ANJOU_PAGE, { association: "AMAA", registration });
+  parseDigitalBeefPage(MAINE_ANJOU_PAGE, { association: "Maine-Anjou", registration });
 
 const at = (animal: ReturnType<typeof read>, position: string) =>
   animal.ancestors.find((ancestor) => ancestor.position === position);

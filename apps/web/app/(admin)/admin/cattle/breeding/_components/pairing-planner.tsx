@@ -375,7 +375,7 @@ export function PairingPlanner({
                   {upgrade === undefined ? null : (
                     <div className="flex flex-col gap-1 border-t border-edge pt-3">
                       <span className="flex flex-wrap items-center gap-2">
-                        <Pill tone="identity">AMAA</Pill>
+                        <Pill tone="identity">Maine-Anjou</Pill>
                         <span className="text-density font-medium text-ink">
                           Upgrading chart: {upgrade.label}
                         </span>

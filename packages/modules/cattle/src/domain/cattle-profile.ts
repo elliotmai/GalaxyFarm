@@ -4,6 +4,7 @@ import { baseRecordSchema, ulidSchema, type BaseRecord, type Ulid } from "@galax
 
 import { coatGenotypeSchema, type CoatGenotype } from "./coat-colour.js";
 import { geneticTestSchema, type GeneticTest } from "./genetics.js";
+import { registryCode } from "./registries.js";
 
 /**
  * What makes a cattle animal a *cattle* animal (spec §5.2).
@@ -14,7 +15,20 @@ import { geneticTestSchema, type GeneticTest } from "./genetics.js";
  * breeding.
  */
 
-export const ASSOCIATIONS = ["AMAA", "ACA", "ASA", "other"] as const;
+/**
+ * The registries an animal here can be papered with, named by their breed.
+ *
+ * Not by the association's initials, which is how this started: `ASA` is the
+ * American Shorthorn Association on this farm's papers and the American
+ * Simmental Association elsewhere, so a registration filed under it did not say
+ * which herdbook it came from. Every registry here keeps one breed's herdbook,
+ * so the breed names it unambiguously. `registries.ts` holds the association
+ * names themselves, and reads the old initials for records written before this.
+ *
+ * Angus is on the list because an Angus page is one this app can read, and a
+ * registration read off one had nowhere valid to be filed until now.
+ */
+export const ASSOCIATIONS = ["Maine-Anjou", "Chianina", "Shorthorn", "Angus", "other"] as const;
 export type Association = (typeof ASSOCIATIONS)[number];
 
 export const HORN_STATUSES = ["polled", "horned", "scurred", "dehorned"] as const;
@@ -86,8 +100,23 @@ export const breedShareSchema = z.object({
   percent: z.number().min(0).max(100),
 });
 
+/**
+ * A registry named however the record spelled it, narrowed to how we file it.
+ *
+ * Every registration written before registries were named by breed holds the
+ * association's initials. Those records are rewritten in the database by
+ * migration 0019, but a device that has been offline since is still holding the
+ * old spelling, and it has to be able to save an edit when it comes back — a
+ * validator that rejects what the device already has would strand exactly the
+ * work this app exists to keep.
+ */
+const associationSchema = z.preprocess(
+  (value) => (typeof value === "string" ? registryCode(value) : value),
+  z.enum(ASSOCIATIONS),
+);
+
 export const registrationSchema = z.object({
-  association: z.enum(ASSOCIATIONS),
+  association: associationSchema,
   regNumber: z.string().min(1, "A registration needs its number").max(60),
   registeredName: z.string().max(160).optional(),
   tattoo: z.string().max(40).optional(),

@@ -110,7 +110,7 @@ describe("finding one", () => {
   const solution = animal({
     name: "SULL TINA'S SOLUTION ET",
     regNumber: "*x4157771",
-    association: "ASA",
+    association: "Shorthorn",
     tattoo: "9213",
     colour: "Red",
   });
@@ -128,7 +128,7 @@ describe("finding one", () => {
   it("finds an animal by its registration number", () => {
     // Often the only part of a worn certificate anybody can read.
     expect(ancestorMatches(solution, "4157771")).toBe(true);
-    expect(ancestorMatches(solution, "asa")).toBe(true);
+    expect(ancestorMatches(solution, "shorthorn")).toBe(true);
   });
 
   it("finds one by tattoo or colour", () => {
@@ -142,8 +142,8 @@ describe("finding one", () => {
 });
 
 describe("the filtered list", () => {
-  const bull = animal({ name: "CMAC TYSON ET", regNumber: "364424", association: "AMAA" });
-  const cow = animal({ name: "ZNT JENNA 707T", association: "ACA", regNumber: "337003" });
+  const bull = animal({ name: "CMAC TYSON ET", regNumber: "364424", association: "Maine-Anjou" });
+  const cow = animal({ name: "ZNT JENNA 707T", association: "Chianina", regNumber: "337003" });
   const nameOnly = animal({ name: "GRANDMA'S RED COW" });
 
   const herd = [bull, cow, nameOnly];
@@ -182,18 +182,18 @@ describe("the filtered list", () => {
     const both = animal({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
-      registrations: [{ association: "ACA", regNumber: "359968" }],
+      association: "Maine-Anjou",
+      registrations: [{ association: "Chianina", regNumber: "359968" }],
     });
 
     expect(
-      filterAncestors([both], { ...NO_FILTER, association: "ACA" }, sexes, usedBy),
+      filterAncestors([both], { ...NO_FILTER, association: "Chianina" }, sexes, usedBy),
     ).toHaveLength(1);
     expect(
-      filterAncestors([both], { ...NO_FILTER, association: "AMAA" }, sexes, usedBy),
+      filterAncestors([both], { ...NO_FILTER, association: "Maine-Anjou" }, sexes, usedBy),
     ).toHaveLength(1);
     expect(
-      filterAncestors([both], { ...NO_FILTER, association: "ASA" }, sexes, usedBy),
+      filterAncestors([both], { ...NO_FILTER, association: "Shorthorn" }, sexes, usedBy),
     ).toHaveLength(0);
   });
 
@@ -249,7 +249,7 @@ describe("the filtered list", () => {
         {
           search: "tyson",
           sex: "male",
-          association: "AMAA",
+          association: "Maine-Anjou",
           breed: "",
           usage: "used",
           papers: "registered",
@@ -265,10 +265,10 @@ describe("animals registered in more than one place", () => {
   const both = animal({
     name: "ZNT MONTEGO BAY 901W",
     regNumber: "402303",
-    association: "AMAA",
-    registrations: [{ association: "ACA", regNumber: "359968" }],
+    association: "Maine-Anjou",
+    registrations: [{ association: "Chianina", regNumber: "359968" }],
   });
-  const one = animal({ name: "CMAC HARD CORE", regNumber: "323178", association: "AMAA" });
+  const one = animal({ name: "CMAC HARD CORE", regNumber: "323178", association: "Maine-Anjou" });
 
   it("finds the ones held in two registries", () => {
     expect(
@@ -282,7 +282,7 @@ describe("animals registered in more than one place", () => {
     // The bug this covers: filtering on a single `regNumber`/`association`
     // pair hid every dual-registered animal from whichever of the two
     // happened not to be the primary one.
-    for (const association of ["AMAA", "ACA"]) {
+    for (const association of ["Maine-Anjou", "Chianina"]) {
       expect(
         filterAncestors([both], { ...NO_FILTER, association }, new Map(), new Map()),
       ).toHaveLength(1);
@@ -299,13 +299,13 @@ describe("folding two records for one animal into one", () => {
   const keep = animal({
     name: "ZNT JENNA 707T",
     regNumber: "378987",
-    association: "AMAA",
+    association: "Maine-Anjou",
     colour: "Black",
   });
   const drop = animal({
     name: "ZNT JENNA 707T",
     regNumber: "337003",
-    association: "ACA",
+    association: "Chianina",
     tattoo: "707T",
     colour: "Black",
   });
@@ -314,8 +314,8 @@ describe("folding two records for one animal into one", () => {
     // The whole point: one cow, two registries, and until now two records
     // each holding half her descendants.
     expect(planAncestorMerge(keep, drop, [], []).patch.registrations).toEqual([
-      { association: "AMAA", regNumber: "378987" },
-      { association: "ACA", regNumber: "337003" },
+      { association: "Maine-Anjou", regNumber: "378987" },
+      { association: "Chianina", regNumber: "337003" },
     ]);
   });
 

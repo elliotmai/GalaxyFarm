@@ -67,18 +67,27 @@ const graphFor = (fetch: typeof globalThis.fetch) =>
   });
 
 describe("the two vocabularies", () => {
-  it("translates the graph's association codes to this app's", () => {
-    // The graph says MAINE, every registration on file here says AMAA, and
-    // renaming ours would rewrite historical records to match a crawler.
-    expect(ourAssociation("MAINE")).toBe("AMAA");
-    expect(ourAssociation("CHIA")).toBe("ACA");
-    expect(ourAssociation("SHORT")).toBe("ASA");
-    expect(ourAssociation("ANGUS")).toBe("AAA");
+  it("translates the graph's abbreviations to the breeds this app files under", () => {
+    // The graph abbreviates; this app names a registry by its breed, because
+    // association initials collide — `ASA` is Shorthorn here and Simmental
+    // elsewhere — and a breed does not.
+    expect(ourAssociation("MAINE")).toBe("Maine-Anjou");
+    expect(ourAssociation("CHIA")).toBe("Chianina");
+    expect(ourAssociation("SHORT")).toBe("Shorthorn");
+    expect(ourAssociation("ANGUS")).toBe("Angus");
   });
 
   it("translates back on the way in", () => {
-    expect(graphAssociation("AMAA")).toBe("MAINE");
+    expect(graphAssociation("Maine-Anjou")).toBe("MAINE");
+    expect(graphAssociation("Shorthorn")).toBe("SHORT");
+  });
+
+  it("translates a filter carrying a record's old initials", () => {
+    // A record written before the rename can still be the thing somebody
+    // searches from, and it would otherwise reach the graph as a literal `ASA`
+    // and match nothing at all.
     expect(graphAssociation("ASA")).toBe("SHORT");
+    expect(graphAssociation("AAA")).toBe("ANGUS");
   });
 
   it("passes an unrecognised code straight through", () => {
@@ -113,10 +122,10 @@ describe("reading an animal", () => {
   it("turns a row into the shape the rest of the app already speaks", async () => {
     const fetch = vi.fn().mockResolvedValue(reply(ANIMAL_FIELDS, [montegoBay]));
 
-    const found = await graphFor(fetch as never).get("AMAA", "402303");
+    const found = await graphFor(fetch as never).get("Maine-Anjou", "402303");
 
     expect(found).toMatchObject({
-      association: "AMAA",
+      association: "Maine-Anjou",
       regNumber: "402303",
       name: "ZNT MONTEGO BAY 901W",
       sex: "male",
@@ -130,11 +139,11 @@ describe("reading an animal", () => {
   it("carries every registry the animal is papered in, in our codes", async () => {
     const fetch = vi.fn().mockResolvedValue(reply(ANIMAL_FIELDS, [montegoBay]));
 
-    const found = await graphFor(fetch as never).get("AMAA", "402303");
+    const found = await graphFor(fetch as never).get("Maine-Anjou", "402303");
 
     expect(found?.registrations).toEqual([
-      { association: "AMAA", regNumber: "402303" },
-      { association: "ACA", regNumber: "359968" },
+      { association: "Maine-Anjou", regNumber: "402303" },
+      { association: "Chianina", regNumber: "359968" },
     ]);
   });
 
@@ -144,16 +153,16 @@ describe("reading an animal", () => {
     // only place that knows how.
     const fetch = vi.fn().mockResolvedValue(reply(ANIMAL_FIELDS, [montegoBay]));
 
-    const found = await graphFor(fetch as never).get("AMAA", "402303");
+    const found = await graphFor(fetch as never).get("Maine-Anjou", "402303");
 
-    expect(found?.sire).toEqual({ association: "ACA", regNumber: "MA364424" });
-    expect(found?.dam).toEqual({ association: "AMAA", regNumber: "378987" });
+    expect(found?.sire).toEqual({ association: "Chianina", regNumber: "MA364424" });
+    expect(found?.dam).toEqual({ association: "Maine-Anjou", regNumber: "378987" });
   });
 
   it("reads F as free and C as a carrier", async () => {
     const fetch = vi.fn().mockResolvedValue(reply(ANIMAL_FIELDS, [montegoBay]));
 
-    const found = await graphFor(fetch as never).get("AMAA", "402303");
+    const found = await graphFor(fetch as never).get("Maine-Anjou", "402303");
 
     expect(found?.geneticTests).toEqual([
       expect.objectContaining({ defect: "TH", status: "free" }),
@@ -169,7 +178,7 @@ describe("reading an animal", () => {
     row[5] = [{ defect: "TH", status: "?" }];
     const fetch = vi.fn().mockResolvedValue(reply(ANIMAL_FIELDS, [row]));
 
-    const found = await graphFor(fetch as never).get("AMAA", "402303");
+    const found = await graphFor(fetch as never).get("Maine-Anjou", "402303");
 
     expect(found?.geneticTests?.[0]?.status).toBe("suspect");
   });
@@ -177,7 +186,7 @@ describe("reading an animal", () => {
   it("says nothing for a number the graph does not hold", async () => {
     const fetch = vi.fn().mockResolvedValue(reply(ANIMAL_FIELDS, []));
 
-    expect(await graphFor(fetch as never).get("AMAA", "000000")).toBeUndefined();
+    expect(await graphFor(fetch as never).get("Maine-Anjou", "000000")).toBeUndefined();
   });
 });
 
@@ -222,7 +231,7 @@ describe("searching", () => {
       .mockResolvedValueOnce(reply(["total"], [[0]]))
       .mockResolvedValueOnce(reply(ANIMAL_FIELDS, []));
 
-    await graphFor(fetch as never).search({ association: "ASA", sex: "male" });
+    await graphFor(fetch as never).search({ association: "Shorthorn", sex: "male" });
 
     const body = JSON.parse((fetch.mock.calls[0]?.[1] as { body: string }).body) as {
       parameters: Record<string, unknown>;
@@ -274,7 +283,7 @@ describe("walking a pedigree", () => {
         ),
       );
 
-    const found = await graphFor(fetch as never).pedigree("AMAA", "402303", 5);
+    const found = await graphFor(fetch as never).pedigree("Maine-Anjou", "402303", 5);
 
     expect(found[0]?.position).toBe("dam's sire");
     expect(found[0]?.generation).toBe(2);
@@ -285,7 +294,7 @@ describe("walking a pedigree", () => {
     // unbounded walk on that never returns.
     const fetch = vi.fn().mockResolvedValue(reply([...ANIMAL_FIELDS, "steps", "generation"], []));
 
-    await graphFor(fetch as never).pedigree("AMAA", "402303", 99);
+    await graphFor(fetch as never).pedigree("Maine-Anjou", "402303", 99);
 
     const body = JSON.parse((fetch.mock.calls[0]?.[1] as { body: string }).body) as {
       statement: string;
@@ -305,7 +314,9 @@ describe("when the graph will not answer", () => {
       json: async () => ({}),
     });
 
-    await expect(graphFor(fetch as never).get("AMAA", "1")).rejects.toThrow(/401.*Unauthorized/s);
+    await expect(graphFor(fetch as never).get("Maine-Anjou", "1")).rejects.toThrow(
+      /401.*Unauthorized/s,
+    );
   });
 
   it("reports an error the query itself returned", async () => {
@@ -316,7 +327,7 @@ describe("when the graph will not answer", () => {
       text: async () => "",
     });
 
-    await expect(graphFor(fetch as never).get("AMAA", "1")).rejects.toThrow(
+    await expect(graphFor(fetch as never).get("Maine-Anjou", "1")).rejects.toThrow(
       "Database does not exist",
     );
   });

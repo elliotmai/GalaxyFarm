@@ -157,7 +157,7 @@ describe("Maine-Anjou", () => {
     const half = registrationClasses([
       { breed: "MA", percent: 50 },
       { breed: "AN", percent: 50 },
-    ]).classes.find((entry) => entry.association === "AMAA");
+    ]).classes.find((entry) => entry.association === "Maine-Anjou");
 
     expect(half?.alsoRequires?.join(" ")).toMatch(/Maine Angus/);
   });
@@ -203,7 +203,7 @@ describe("the class an AMAA paper states", () => {
     );
 
     expect(stated.classes.map((entry) => entry.name).join(" ")).toMatch(/High Maine — Purebred/);
-    expect(stated.classes.find((entry) => entry.association === "AMAA")?.because).toMatch(
+    expect(stated.classes.find((entry) => entry.association === "Maine-Anjou")?.because).toMatch(
       /papers state PB/,
     );
   });

@@ -9,6 +9,7 @@ import {
   type ParentRef,
 } from "./cattle-profile.js";
 import { geneticTestSchema, type GeneticTest } from "./genetics.js";
+import { registryCode } from "./registries.js";
 
 /**
  * A registration number reduced to what can be compared.
@@ -144,21 +145,32 @@ export const externalAnimalSchema = baseRecordSchema.extend({
  * Records written before `registrations` existed carry a single
  * `regNumber`/`association` pair, and a lookup that only reads the array would
  * stop finding them. One accessor, so nothing has to remember that.
+ *
+ * Registries come back named the way this app files them, whatever the record
+ * spells them. Migration 0019 rewrote the stored rows from the associations'
+ * initials to their breeds, but a device that has been offline since still
+ * holds the old spelling — and until it syncs, `ASA 4219133` and
+ * `Shorthorn 4219133` would be two registrations on one cow rather than one
+ * seen twice. Normalising before the deduplication is what collapses them, so
+ * every screen reading this shows one row and one name for one paper.
  */
 export function allRegistrations(
   animal: Pick<ExternalAnimal, "regNumber" | "association" | "registrations">,
 ): ExternalRegistration[] {
   const found = new Map<string, ExternalRegistration>();
 
-  if (animal.regNumber !== undefined && animal.regNumber !== "") {
-    found.set(`${animal.association ?? "other"}:${normaliseRegistration(animal.regNumber)}`, {
-      association: animal.association ?? "other",
-      regNumber: animal.regNumber,
+  const remember = (association: string, regNumber: string): void => {
+    const named = registryCode(association);
+    found.set(`${named}:${normaliseRegistration(regNumber)}`, {
+      association: named,
+      regNumber,
     });
+  };
+
+  if (animal.regNumber !== undefined && animal.regNumber !== "") {
+    remember(animal.association ?? "other", animal.regNumber);
   }
-  for (const entry of animal.registrations ?? []) {
-    found.set(`${entry.association}:${normaliseRegistration(entry.regNumber)}`, entry);
-  }
+  for (const entry of animal.registrations ?? []) remember(entry.association, entry.regNumber);
 
   return [...found.values()];
 }
