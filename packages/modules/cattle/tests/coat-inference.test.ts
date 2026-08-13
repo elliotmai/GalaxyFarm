@@ -293,13 +293,62 @@ describe("what colour the calf can be", () => {
     expect(calf.outcomes.every((outcome) => outcome.chance === 0.5)).toBe(true);
   });
 
+  it("gives all four when a carrier bull meets a red roan cow", () => {
+    // The pairing the owner checked by hand: a black bull out of a red dam
+    // (so `ED/e` or `E/e`, solid) over a red roan cow (`e/e`, `R/r`). Four
+    // outcomes at a quarter each — red roan, red, blue roan, black.
+    const bull = inferCoat({
+      observed: readPhenotype("Black"),
+      sire: seen("Black"),
+      dam: seen("Red"),
+    });
+    const cow = seen("Red Roan");
+
+    const calf = predictCalfColour(bull, cow);
+
+    expect(
+      Object.fromEntries(calf.outcomes.map((outcome) => [outcome.name, outcome.chance])),
+    ).toEqual({
+      "red roan": 0.25,
+      red: 0.25,
+      "blue roan": 0.25,
+      black: 0.25,
+    });
+    expect(calf.missing).toEqual([]);
+  });
+
+  it("does not let a half-answer read as a whole one", () => {
+    // Only the base can be worked out here. "black 50%" beside "red 50%"
+    // looks exactly like a finished prediction — solid black or solid red —
+    // when every one of those calves could still arrive roan.
+    const carrier = inferCoat({
+      observed: readPhenotype("Black"),
+      progeny: [readPhenotype("Red")],
+      // A hair card for Extension and nothing for roan: settled at one locus,
+      // wide open at the other.
+      tested: { extension: ["ED", "e"] },
+    });
+    const red = inferCoat({ tested: { extension: ["e", "e"] } });
+
+    const calf = predictCalfColour(carrier, red);
+
+    expect(calf.outcomes.map((outcome) => outcome.name).sort()).toEqual([
+      "black — solid, roan or white",
+      "red — solid, roan or white",
+    ]);
+    // The bull's coat settles his roan; the red cow here has a card for
+    // Extension only, so hers is the pair nobody knows.
+    expect(calf.missing.join(" ")).toContain("Solid, roan or white is open");
+    expect(calf.missing.join(" ")).toContain("the dam's");
+  });
+
   it("says which half of the answer is missing rather than half-answering", () => {
     // Two black animals with no pedigree: the pattern is settled by their
     // coats, the base is not.
     const calf = predictCalfColour(seen("Black"), seen("Black"));
 
-    expect(calf.outcomes.map((outcome) => outcome.name)).toEqual(["solid"]);
-    expect(calf.missing.join(" ")).toContain("Extension");
+    expect(calf.outcomes.map((outcome) => outcome.name)).toEqual(["solid — red or black"]);
+    expect(calf.missing.join(" ")).toContain("Red or black is open");
   });
 
   it("never offers an outcome that cannot happen", () => {
@@ -307,5 +356,18 @@ describe("what colour the calf can be", () => {
     const calf = predictCalfColour(red, red);
 
     expect(calf.outcomes.map((outcome) => outcome.name)).toEqual(["red"]);
+  });
+
+  it("names the side that is actually short, not both", () => {
+    // A red roan cow is settled at both loci. If the bull is the one nobody
+    // has recorded, saying "neither parent" sends somebody to the wrong
+    // record — and a message pointing at the wrong record gets ignored.
+    const cow = seen("Red Roan");
+    const bull = inferCoat({});
+
+    const calf = predictCalfColour(bull, cow);
+
+    expect(calf.missing.join(" ")).toContain("the sire's");
+    expect(calf.missing.join(" ")).not.toContain("neither parent");
   });
 });

@@ -524,6 +524,21 @@ export interface CalfColour {
  * instead of showing a confident-looking list that is only half the story.
  */
 export function predictCalfColour(sire: CoatInference, dam: CoatInference): CalfColour {
+  /**
+   * Which side is actually short.
+   *
+   * "Neither parent's roan pair is pinned down" is plainly wrong when the cow
+   * is a roan and it is the bull nobody has recorded a colour for — and it
+   * sends somebody to the wrong record. Naming the side is the difference
+   * between a message that gets acted on and one that gets ignored.
+   */
+  const shortOf = (fromSire: number | undefined, fromDam: number | undefined): string =>
+    fromSire === undefined && fromDam === undefined
+      ? "neither parent's"
+      : fromSire === undefined
+        ? "the sire's"
+        : "the dam's";
+
   const missing: string[] = [];
 
   const redFromSire = transmits(sire.extension, "e");
@@ -539,7 +554,10 @@ export function predictCalfColour(sire: CoatInference, dam: CoatInference): Calf
         : redFromSire * redFromDam;
   const base = red === undefined ? undefined : { red, black: 1 - red };
   if (base === undefined) {
-    missing.push("Neither parent's Extension can be pinned down, so red or black is open.");
+    missing.push(
+      `Red or black is open — ${shortOf(redFromSire, redFromDam)} Extension is not pinned down.` +
+        " A colour on the animal usually settles it: red is e/e outright, and a black one out of a red parent carries red.",
+    );
   }
 
   const roanFromSire = transmits(sire.roan, "r");
@@ -553,7 +571,10 @@ export function predictCalfColour(sire: CoatInference, dam: CoatInference): Calf
           solid: (1 - roanFromSire) * (1 - roanFromDam),
         };
   if (pattern === undefined) {
-    missing.push("Neither parent's roan pair can be pinned down, so the pattern is open.");
+    missing.push(
+      `Solid, roan or white is open — ${shortOf(roanFromSire, roanFromDam)} roan pair is not pinned down.` +
+        " A colour settles this one outright, because roan hides nothing: roan is R/r, solid is R/R and white is r/r.",
+    );
   }
 
   // Representative pairs, only so the naming lives in one place — `coatName`
@@ -586,12 +607,16 @@ export function predictCalfColour(sire: CoatInference, dam: CoatInference): Calf
       }
     }
   } else if (base !== undefined) {
+    // Named so a half-answer cannot be read as a whole one. "black 50%" beside
+    // "red 50%" looks exactly like a finished prediction — solid black or
+    // solid red — when what it actually means is that the pattern is still
+    // open and every one of these could arrive roan.
     for (const [name, chance] of Object.entries(base)) {
-      if (chance > 0) outcomes.push({ name, chance });
+      if (chance > 0) outcomes.push({ name: `${name} — solid, roan or white`, chance });
     }
   } else if (pattern !== undefined) {
     for (const [name, chance] of Object.entries(pattern)) {
-      if (chance > 0) outcomes.push({ name, chance });
+      if (chance > 0) outcomes.push({ name: `${name} — red or black`, chance });
     }
   }
 
