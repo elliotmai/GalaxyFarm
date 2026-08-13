@@ -417,7 +417,11 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/equipment                fleet · /admin/equipment/[id] · /admin/equipment/roadmap
 /admin/equipment/candidates     purchase candidates: compare units, true cost, links, decision log
 /admin/pets
-/admin/horses                   placeholder shells · /admin/horses/roadmap (active)
+/admin/horses                   what is live and what is coming · /admin/horses/roadmap (active)
+/admin/horses/herd              shell (§5.9) — who is here and what each is like to handle
+/admin/horses/pens              shell — which horse is in which trap
+/admin/horses/feeding           shell — rations, and what a horse costs to keep
+/admin/horses/breeding          shell — covers, foaling dates, what a cross was for
 /admin/horses/candidates        horses under consideration (active)
 /admin/business/*               scaffold: bookings · clients · program roster (own + client,
                                 halter colors) · day schedule · forms · invoices

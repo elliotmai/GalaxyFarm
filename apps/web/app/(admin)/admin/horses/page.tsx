@@ -1,7 +1,13 @@
-import { PagePlaceholder } from "../../../_components/page-placeholder";
+import { redirect } from "next/navigation";
+
+import { HorsesScreen } from "@/app/(admin)/admin/horses/_components/horses-screen";
+import { currentActor } from "@/lib/auth";
 
 export const metadata = { title: "Horses" };
 
-export default function AdminHorsesPage() {
-  return <PagePlaceholder title={"Horses"} route={"/admin/horses"} phase={"a later phase"} />;
+export default async function AdminHorsesPage() {
+  const actor = await currentActor();
+  if (actor === undefined) redirect("/login?next=/admin/horses");
+
+  return <HorsesScreen propertyId={actor.propertyId} />;
 }

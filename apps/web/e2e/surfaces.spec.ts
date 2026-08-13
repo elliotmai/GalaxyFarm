@@ -36,6 +36,10 @@ const ADMIN_ROUTES = [
   "/admin/settings",
   "/admin/equipment/candidates",
   "/admin/cattle/candidates",
+  "/admin/horses",
+  "/admin/horses/roadmap",
+  "/admin/horses/candidates",
+  "/admin/horses/herd",
 ];
 
 const KIOSK_BOARDS = [
