@@ -43,3 +43,4 @@ export * from "./domain/semen-inventory.js";
 export * from "./domain/sync-protocol.js";
 export * from "./domain/transactions.js";
 export * from "./domain/weight-record.js";
+export * from "./ports/registry-graph.js";

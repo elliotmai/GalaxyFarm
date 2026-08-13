@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ancestorMatches,
+  ancestorsInUse,
   canBe,
   filterAncestors,
   inferAncestorSexes,
@@ -373,5 +374,44 @@ describe("folding two records for one animal into one", () => {
     const selfRef = { ...drop, dam: { kind: "external" as const, id: drop.id } };
 
     expect(planAncestorMerge(keep, selfRef, [], [selfRef]).repoint).toEqual([]);
+  });
+});
+
+describe("the ones this farm actually uses", () => {
+  it("keeps everything the herd descends from, however far up", () => {
+    const grandsire = animal({ name: "A GRANDSIRE" });
+    const sire = animal({ name: "A SIRE", sire: { kind: "external", id: grandsire.id } });
+    const ourCow = { sire: { kind: "external" as const, id: sire.id } };
+
+    const used = ancestorsInUse([ourCow], [sire, grandsire]);
+
+    expect(used.has(sire.id)).toBe(true);
+    expect(used.has(grandsire.id)).toBe(true);
+  });
+
+  it("drops an imported tree nothing here descends from", () => {
+    // The case that makes "named by anything" the wrong rule: importing a
+    // bull's page brings thirty ancestors who all name each other, and every
+    // one of them would look used on its own merits.
+    const stranger = animal({ name: "A STRANGER" });
+    const hisSire = animal({ name: "HIS SIRE" });
+    const linked = { ...stranger, sire: { kind: "external" as const, id: hisSire.id } };
+
+    const used = ancestorsInUse([], [linked, hisSire]);
+
+    expect(used.size).toBe(0);
+  });
+
+  it("stops on a pedigree that loops back on itself", () => {
+    const a = animal({ name: "A" });
+    const b = animal({ name: "B" });
+    const looped = [
+      { ...a, sire: { kind: "external" as const, id: b.id } },
+      { ...b, sire: { kind: "external" as const, id: a.id } },
+    ];
+
+    const used = ancestorsInUse([{ sire: { kind: "external", id: a.id } }], looped);
+
+    expect(used.size).toBe(2);
   });
 });
