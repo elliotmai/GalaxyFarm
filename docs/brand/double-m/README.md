@@ -1,6 +1,6 @@
 # Double M
 
-Four **Double M** irons, drawn to the grammar in _How to Design a Brand_ (Texas
+Five **Double M** irons, drawn to the grammar in _How to Design a Brand_ (Texas
 & Southwestern Cattle Raisers Association), shown at every size they have to
 survive and on the eight things they would actually go on.
 
@@ -10,14 +10,15 @@ Double Star in `packages/ui/src/brand/`, and nothing here touches it.
 Open `contact-sheet.html` for the whole set — the marks, the size ladder, and
 the mockups with a switcher that puts any of the four onto all eight surfaces.
 
-## The four
+## The five
 
 | Reading            | File                       | Units | Strokes | At 16px                              |
 | ------------------ | -------------------------- | ----- | ------- | ------------------------------------ |
 | Double M Connected | `double-m-connected.svg`   | 2     | 7       | Holds. Reads as one mark.            |
 | M Bar M            | `m-bar-m.svg`              | 3     | 9       | Best of the four. Nothing touches.   |
 | Rocking Double M   | `rocking-double-m.svg`     | 3     | 9       | Holds. The rocker keeps it together. |
-| Flying Double M    | `flying-double-m.svg`      | 3     | 10      | Wings soften. Legible, not crisp.    |
+| Flying Double M    | `flying-double-m.svg`      | 3     | 10      | Crest blurs into the corners.        |
+| Flying Double M Connected | `flying-double-m-connected.svg` | 4 | 9   | Crests close up. Reads as Connected. |
 
 Each name is the brand's **reading** — what it would be called out as and
 recorded as, not a label. Brands are read left to right, top to bottom, outside
@@ -35,10 +36,17 @@ and nothing else: eight becomes seven. The reason to want it is that it is about
 a third narrower on the animal and reads as one mark rather than two things
 standing near each other.
 
-**Flying Double M was redrawn.** Its wings used to sweep out sideways and hook
-down, and at 24px they fused with the letters' top corners into a blot. They are
-now shorter and rise steeply, so the wing mass sits above the pair rather than
-beside it. It survives small — it is still the busiest of the four.
+**Flying Double M's wings are a crest.** Drawn rising steeply they set off almost
+the way the outer leg is already going, the two read as one swoosh, and the M
+loses a stroke. Turning the wing outward into a crest that hooks back keeps the
+letter whole. The crest is the first thing to blur, which makes it the weakest of
+the set under about 24px.
+
+**Flying Double M Connected is the late addition.** The crest on the connected
+pair, which works better than it should because the pair is narrow enough to
+leave room either side. It costs Connected the thing Connected was winning on:
+two units become four, seven strokes become nine. Strongest of the set above
+about 48px and the softest below it.
 
 ## What the M costs
 
@@ -103,9 +111,9 @@ Each is grammatical. Each fails on something else.
 
 - **No colour in the marks.** Every one is stroked in `currentColor`. A brand is
   a burn: one colour, one iron. Colourways are a question for whichever variant
-  wins, and answering it four times would be four chances to answer it
+  wins, and answering it five times would be five chances to answer it
   differently.
-- **Edit the script, not the SVGs.** These are one M placed four ways, and the
+- **Edit the script, not the SVGs.** These are one M placed five ways, and the
   mockups are drawn from the same geometry.
 
   ```

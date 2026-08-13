@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-The four Double M brands still in the running — drawn, sized, and put in use.
+The five Double M brands still in the running — drawn, sized, and put in use.
 
 Narrowed from the thirteen in an earlier commit. The nine that were cut and the
 four that were never drawn are listed below with their reasons, because the
@@ -12,7 +12,7 @@ Double Star in `packages/ui/src/brand/` and nothing here touches it.
     python3 tools/generate-double-m-brands.py
 
 A script rather than hand-drawn files, for the same reason the icons are a
-script: the M is one shape placed four ways, and hand-drawn copies drift the
+script: the M is one shape placed five ways, and hand-drawn copies drift the
 first time the letter is adjusted. Change `M_SPLAY` here and everything follows,
 including the eight application mockups.
 
@@ -144,7 +144,7 @@ def bounds(variant):
 
 
 # ---------------------------------------------------------------------------
-# The four
+# The five
 # ---------------------------------------------------------------------------
 #
 # Each name is the brand's *reading*, not a label: brands are read left to
@@ -158,7 +158,7 @@ VARIANTS = [
         "slug": "double-m-connected",
         "name": "Double M Connected",
         "units": "2 units",
-        "character": "One figure. The narrowest of the four.",
+        "character": "One figure. The narrowest of the five.",
         "note": (
             "The M's share a leg, so the pair is one mark rather than two things standing "
             "near each other — and it is about a third narrower on the animal, which is "
@@ -236,7 +236,7 @@ VARIANTS = [
             "on. Drawn rising steeply, it sets off almost the way the outer leg is already "
             "going, the two read as one long swoosh, and the M loses a stroke. Turning it "
             "outward into a crest instead keeps the letter whole. The cost is at the small "
-            "end: the crest is the first thing to blur, so this is the weakest of the four "
+            "end: the crest is the first thing to blur, so this is the weakest of the five "
             "under about 24px, and the busiest anywhere at ten strokes."
         ),
         "paths": [
@@ -244,6 +244,31 @@ VARIANTS = [
             m(73, 54, 30, 36),
             curve((18, 36), (10, 22), (4, 28)),
             curve((82, 36), (90, 22), (96, 28)),
+        ],
+    },
+    {
+        "slug": "flying-double-m-connected",
+        "name": "Flying Double M Connected",
+        "units": "4 units · wings, M M connected",
+        "character": "The hybrid. Strongest large, softest small.",
+        "note": (
+            "Connected with the flying crest on it. The two get on better than they have any "
+            "right to: the connected pair is narrow, so there is room either side for a crest "
+            "that would crowd a wider mark, and each one turns outward against the way the "
+            "outer leg splays, so nothing merges into anything."
+        ),
+        "watch": (
+            "It spends the very thing Connected was winning on. Two units become four and "
+            "seven strokes become nine, which puts it past where the association says most "
+            "brands stop. The crests are also the first thing to close: above about 48px this "
+            "is the best mark on the sheet, and at 24px it is plain Connected with thickened "
+            "shoulders."
+        ),
+        "paths": [
+            polyline([(25, 70), (30, 30), (40, 49), (50, 30), (60, 49), (70, 30), (75, 70)]),
+            polyline([(50, 30), (50, 70)]),
+            curve((30, 30), (22, 16), (16, 22)),
+            curve((70, 30), (78, 16), (84, 22)),
         ],
     },
 ]
@@ -296,16 +321,17 @@ NEVER_DRAWN = [
 # What each one is like at 16px, from looking at it rather than from hoping.
 SMALL_SIZE = {
     "double-m-connected": "Holds. Reads as one mark.",
-    "m-bar-m": "Best of the four. Nothing touches.",
+    "m-bar-m": "Best of the set. Nothing touches.",
     "rocking-double-m": "Holds. The rocker keeps the pair together.",
     "flying-double-m": "Crest blurs into the corners. Weakest small.",
+    "flying-double-m-connected": "Crests close up. Reads as plain Connected.",
 }
 
 LADDER = [16, 24, 32, 48, 72, 120, 200]
 
 # Widths for `--export`. Cropped to the mark's own bounds rather than padded out
 # to a square, so "256" means the mark is 256 across — which is what somebody
-# placing it on a photograph is actually asking for. It also means the four have
+# placing it on a photograph is actually asking for. It also means they have
 # different heights at the same size, because they are different shapes.
 EXPORT_SIZES = [16, 24, 32, 48, 64, 128, 256, 512, 1024]
 EXPORT_INKS = {"black": "#000000", "white": "#FFFFFF"}
@@ -1030,7 +1056,7 @@ def body():
     <header class="masthead">
       <p class="eyebrow">Shortlist · narrowed from thirteen</p>
       <h1>Double M</h1>
-      <p class="lead">Four <strong>Double M</strong> irons, in the grammar the Texas &amp;
+      <p class="lead">Five <strong>Double M</strong> irons, in the grammar the Texas &amp;
         Southwestern Cattle Raisers Association publishes — at every size they have to
         survive, and on the eight things they would actually go on. Each name is the brand's
         <strong>reading</strong>: what it would be called out as, recorded as, and argued
@@ -1043,7 +1069,7 @@ def body():
 
     <section>
       <div class="section-head">
-        <h2>The four</h2>
+        <h2>The five</h2>
         <p>Strokes are counted, not estimated — one per segment the iron has to draw.
           A plain pair of M's is eight before anything is added to it.</p>
       </div>
@@ -1057,7 +1083,7 @@ def body():
         <h2>At size</h2>
         <p>16 to 200 pixels, on a common baseline. 16 is a browser tab and an ear-tag
           stamp; 24 is the app; 200 is the gate. Where a mark stops working is the
-          decision, and it is not the same size for all four.</p>
+          decision, and it is not the same size for all five.</p>
       </div>
       <div class="ladder">
 {ladder}
@@ -1082,7 +1108,8 @@ def body():
     <section>
       <div class="section-head">
         <h2>Side by side</h2>
-        <p>Two or three units each, and all four survive small — though not equally.</p>
+        <p>Two, three or four units. All five survive small, but not equally — and the two
+          carrying crests are the two that give way first.</p>
       </div>
       <div class="scroller">
         <table>
@@ -1161,13 +1188,14 @@ def export_svg(variant, ink, width=None):
 EXPORT_README = """Double M — brand marks
 ======================
 
-Four candidate Double M irons, drawn to the grammar in "How to Design a Brand"
+Five candidate Double M irons, drawn to the grammar in "How to Design a Brand"
 (Texas & Southwestern Cattle Raisers Association).
 
-  double-m-connected   Double M Connected   2 units,  7 strokes
-  m-bar-m              M Bar M              3 units,  9 strokes
-  rocking-double-m     Rocking Double M     3 units,  9 strokes
-  flying-double-m      Flying Double M      3 units, 10 strokes
+  double-m-connected         Double M Connected         2 units,  7 strokes
+  m-bar-m                    M Bar M                    3 units,  9 strokes
+  rocking-double-m           Rocking Double M           3 units,  9 strokes
+  flying-double-m            Flying Double M            3 units, 10 strokes
+  flying-double-m-connected  Flying Double M Connected  4 units,  9 strokes
 
 Files
 -----
@@ -1184,7 +1212,7 @@ Every file has a transparent background and no background shape. Black is for
 light surfaces, white for dark ones.
 
 Sizes are WIDTHS, and each mark is cropped to its own outline — no padding, no
-square canvas. So "-256" means the artwork is 256 pixels across, and the four
+square canvas. So "-256" means the artwork is 256 pixels across, and the marks
 have different heights at the same size, because they are different shapes.
 Nothing is clipped: the crop already allows for the round stroke ends.
 
