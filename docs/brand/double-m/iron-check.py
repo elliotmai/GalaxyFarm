@@ -13,6 +13,9 @@ Rules follow TSCRA's brand-design guidance and standard iron-making practice:
     corner does not make it a second piece of iron.
   - Closed counters (B, O, R, 8, 6, 9) need a gap cut for the same reason.
   - Face of the bar 1/4" to 1/2" wide, edges slightly rounded.
+  - Corners are attached and turned through an arc. A round has to be round on
+    the INSIDE edge too: the centreline radius must clear half the bar, or the
+    inner edge collapses to a cusp and the corner is a point again.
   - Characters about 4" x 3" for calves, 6" x 3.5" for grown cattle.
   - At least 1" between characters, and between any two parallel lines.
 
@@ -30,13 +33,19 @@ import math, json, os
 # Constants, per 100 units of letter height (a 4 inch character)
 # ---------------------------------------------------------------------------
 
-BAR      = 10.0     # face width; 1/4"-1/2" on a 4" character is 6.25%-12.5%
+BAR      = 7.0      # face width. 1/4" on a 4" character. An earlier pass took this to
+                    # 10 because thin strokes "looked light" -- that aesthetic call is
+                    # what made a round corner impossible, since the minimum radius
+                    # scales with the bar while the letter does not.
 NOTCH    = 6.25     # 1/4" -- the gap left at a sharp corner or a joint
 MIN_SEP  = 25.0     # 1"   -- between characters, and between parallel lines
 SPREAD   = 1.7      # the scar spreads to about this much of the bar face
 SHARP    = 90.0     # corners under this get a notch filed in the iron's face
-BEND_R   = 10.0     # corner radius, capped per-corner so it cannot eat the letter
+BEND_R   = 7.0      # centreline radius = one bar width, so the inner edge is a real
+                    # arc of half a bar and the apex still keeps its point
 MAX_UNITS = 3       # "few brands have more than 3 units"
+MIN_STRAIGHT = 0.22 # each arm must keep this much straight run, or the corners
+                    # meet and the letter turns into an arch
 
 
 def _n(v):
@@ -61,29 +70,47 @@ def unpack(piece):
     return piece, False, False
 
 
-def render(piece, r=BEND_R, gap=NOTCH, sharp=SHARP):
-    """Polyline -> SVG path, continuous, every corner attached and rounded.
+def corners(pts, r=BEND_R):
+    """Per-vertex (angle, tangent length, centreline radius).
 
-    The bar runs through a corner without a break -- a brand is one unbroken
-    drawing, and rounded angles are what the trade calls a `running` letter.
-    The 1/4" notch is real but it is a cut in the FACE of the iron, a groove
-    that lets heat out; it is not a gap in the design and does not appear here.
+    Adjacent corners share the arm between them, so the tangents are budgeted
+    against that arm rather than capped at a flat fraction of it. Capping each
+    corner independently is what drove the radius below half the bar and left
+    every M apex a cusp -- attached, but not round."""
+    n = len(pts)
+    ang = [0.0]*n
+    t   = [0.0]*n
+    for i in range(1, n-1):
+        ang[i] = _ang(pts[i], pts[i-1], pts[i+1])
+        t[i] = r / math.tan(math.radians(ang[i])/2)
+    for _ in range(3):
+        for i in range(n-1):
+            arm = math.dist(pts[i], pts[i+1])
+            need = t[i] + t[i+1]
+            if need > 0.9*arm and need > 0:
+                k = 0.9*arm/need
+                if i > 0:     t[i]   *= k
+                if i+1 < n-1: t[i+1] *= k
+    rr = [t[i]*math.tan(math.radians(ang[i])/2) if ang[i] else 0.0 for i in range(n)]
+    return ang, t, rr
 
-    Radius is capped at a quarter of the shorter arm so an acute corner is
-    softened rather than swallowed -- the mistake an earlier pass made when it
-    let a fixed radius eat the letterforms."""
+
+def render(piece, r=BEND_R):
+    """Polyline -> SVG path. One unbroken run, every corner attached and turned
+       through a real arc -- round on the inside edge as well as the outside.
+
+       The 1/4" notch is real but it is a groove cut in the FACE of the iron so
+       heat can escape a corner. It is a fabrication detail, not a gap in the
+       design, and it is not drawn."""
     pts, ns, ne = unpack(piece)
+    ang, t, rr = corners(pts, r)
     d = [f"M{pts[0][0]:.1f} {pts[0][1]:.1f}"]
     for i in range(1, len(pts)-1):
         P, A, B = pts[i], pts[i-1], pts[i+1]
-        th = _ang(P, A, B)
         u, v = _n((A[0]-P[0], A[1]-P[1])), _n((B[0]-P[0], B[1]-P[1]))
-        half = math.tan(math.radians(th)/2)
-        t = min(r/half, 0.25*min(math.dist(P, A), math.dist(P, B)))
-        rr = t*half
         sw = 1 if (u[0]*v[1] - u[1]*v[0]) > 0 else 0
-        d.append(f"L{P[0]+u[0]*t:.1f} {P[1]+u[1]*t:.1f}")
-        d.append(f"A{rr:.1f} {rr:.1f} 0 0 {sw} {P[0]+v[0]*t:.1f} {P[1]+v[1]*t:.1f}")
+        d.append(f"L{P[0]+u[0]*t[i]:.1f} {P[1]+u[1]*t[i]:.1f}")
+        d.append(f"A{rr[i]:.1f} {rr[i]:.1f} 0 0 {sw} {P[0]+v[0]*t[i]:.1f} {P[1]+v[1]*t[i]:.1f}")
     d.append(f"L{pts[-1][0]:.1f} {pts[-1][1]:.1f}")
     return " ".join(d)
 
@@ -121,9 +148,24 @@ def check(pieces, units):
             segs.append((pi, i, pts[i], pts[i+1]))
             arc[(pi, i)] = run
             run += math.dist(pts[i], pts[i+1])
+        ang, t2, rr = corners(pts)
         for i in range(1, len(pts)-1):
-            if _ang(pts[i], pts[i-1], pts[i+1]) < SHARP:
+            if ang[i] < SHARP:
                 notched += 1
+            inner = rr[i] - BAR/2
+            if inner <= 0:
+                probs.append(f"corner at ({pts[i][0]:.0f},{pts[i][1]:.0f}) is a cusp on the inside "
+                             f"edge -- centre radius {rr[i]:.1f} against a {BAR/2:.1f} half-bar")
+            elif inner < BAR/2 - 1e-6:
+                probs.append(f"corner at ({pts[i][0]:.0f},{pts[i][1]:.0f}) turns too tight -- "
+                             f"inner radius {inner:.1f}, want {BAR/2:.1f}")
+        for i in range(len(pts)-1):
+            arm = math.dist(pts[i], pts[i+1])
+            left = (arm - t2[i] - t2[i+1]) / arm
+            if left < MIN_STRAIGHT:
+                probs.append(f"arm ({pts[i][0]:.0f},{pts[i][1]:.0f})-({pts[i+1][0]:.0f},"
+                             f"{pts[i+1][1]:.0f}) is {left:.0%} straight -- under {MIN_STRAIGHT:.0%}, "
+                             f"the corners meet and it reads as an arch, not a letter")
 
     worst = 1e9
     for a in range(len(segs)):
@@ -156,13 +198,19 @@ def check(pieces, units):
 # The marks. Normal letterforms -- the notch does the work, not the shape.
 # ---------------------------------------------------------------------------
 
-H, MW = 100.0, 72.0          # 4" tall, 3" wide: the character size TSCRA gives
-VD    = 0.58*H               # how far the middle of the M descends
+H, MW = 100.0, 84.0          # the M is wider than a 4x3 character, and has to be:
+                             # the bar needs room to turn, and a narrower M leaves no
+                             # straight run between the arcs -- it reads as an arch
+VD    = 0.42*H               # a 45 degree apex: deep enough to read as an M, open
+                             # enough that rounding the corner does not eat the peak
 
-def M(x, y=0.0, w=MW, h=H, vd=None):
-    """A plain M. Vertical legs, pointed apexes, pointed valley -- every one of
-       those corners gets a notch when it is drawn."""
-    vd = VD if vd is None else vd*h/H
+def M(x, y=0.0, w=MW, h=H, vd=VD):
+    """A plain M: upright legs, apexes and valley turned through real arcs.
+
+       Width and valley depth are given outright rather than scaled from the
+       height, because the bar does not shrink with the letter. A smaller M has
+       to be squatter -- a shallower, wider valley opens the apex enough for the
+       bar to get round it."""
     return [(x, y+h), (x, y), (x+w/2, y+vd), (x+w, y), (x+w, y+h)]
 
 def M_connected(x, y=0.0, w=MW, h=H):
@@ -204,7 +252,7 @@ SPEC = [
  ("Dropped Double M",           2,
   lambda: [M(0), M(MW+GAPC, MIN_SEP)]),
  ("Dam and Calf Double M",      2,
-  lambda: [M(0), M(MW+GAPC, H*0.30, MW*0.70, H*0.70)]),
+  lambda: [M(0), M(MW+GAPC, H*0.20, w=78, h=80, vd=40)]),
  ("Lazy Double M",              2,
   lambda: [[(y, x) for (x, y) in M(0)], [(y, x) for (x, y) in M(MW+GAPC)]]),
 ]

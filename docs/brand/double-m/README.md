@@ -56,9 +56,10 @@ Per 100 units of letter height, so a 4″ character puts 1″ at 25 and ¼″ at
 | --- | --- | --- |
 | Reading order | left to right, top to bottom, outside in | joined characters read "connected" |
 | Units | 2 or more, rarely over 3 | simple brands read better and hurt the animal less |
-| Corners | attached, rounded | the bar runs through; rounded angles are *running* |
+| Corners | attached, rounded | round on the **inside** edge too, or it is a cusp |
+| Straight run | 22% of every arm | below this the arcs meet and the letter reads as an arch |
 | Notch | ¼ inch, in the face | filed at sharp corners and joints so heat escapes — not drawn |
-| Bar face | ¼ to ½ inch | edges slightly rounded; this sheet uses 10% of letter height |
+| Bar face | ¼ inch | 7% of letter height — a fatter bar cannot turn a round corner |
 | Character | 4×3 inch | calves under a year; 6×3½ for grown cattle |
 | Clear space | 1 inch | between characters and between any two parallel lines |
 
@@ -66,15 +67,15 @@ Per 100 units of letter height, so a 4″ character puts 1″ at 25 and ¼″ at
 
 | Mark | Units | Filed corners | Ratio |
 | --- | --- | --- | --- |
-| **Rocking Double M** | 3 | 6 | 1.31:1 |
-| **Double M** | 2 | 6 | 1.59:1 |
-| **Bar Double M** | 3 | 6 | 1.45:1 |
-| **Rocking Connected Double M** | 2 | 5 | 1.15:1 |
-| **Connected Double M** | 1 | 5 | 1.38:1 |
-| **Bar Connected Double M** | 2 | 5 | 1.28:1 |
-| **Dropped Double M** | 2 | 6 | 1.31:1 |
-| **Dam and Calf Double M** | 2 | 6 | 1.41:1 |
-| **Lazy Double M** | 2 | 6 | 0.63:1 |
+| **Rocking Double M** | 3 | 4 | 1.46:1 |
+| **Double M** | 2 | 4 | 1.82:1 |
+| **Bar Double M** | 3 | 4 | 1.64:1 |
+| **Rocking Connected Double M** | 2 | 2 | 1.31:1 |
+| **Connected Double M** | 1 | 2 | 1.60:1 |
+| **Bar Connected Double M** | 2 | 2 | 1.46:1 |
+| **Dropped Double M** | 2 | 4 | 1.49:1 |
+| **Dam and Calf Double M** | 2 | 5 | 1.77:1 |
+| **Lazy Double M** | 2 | 4 | 0.55:1 |
 
 - **Connected Double M** is the cheapest iron and the only single-unit mark — one
   zigzag of bar plus a welded spur for the shared leg.
