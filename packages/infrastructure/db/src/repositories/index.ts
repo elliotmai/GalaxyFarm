@@ -56,6 +56,8 @@ export const SEARCHABLE_FIELDS = {
   feedingPlans: ["name", "specialNotes"],
   contacts: ["name", "company", "address", "notes"],
   attachments: ["filename", "caption"],
+  careGuides: ["title", "intro"],
+  guideSections: ["title", "bodyMarkdown"],
   choreTemplates: ["title", "detail"],
   tasks: ["title", "detail"],
   calendarEvents: ["title", "detail"],

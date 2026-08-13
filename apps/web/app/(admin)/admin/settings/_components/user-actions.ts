@@ -72,6 +72,20 @@ function isRole(value: string): value is Role {
   return (ROLES as readonly string[]).includes(value);
 }
 
+/**
+ * Both screens that read the people list.
+ *
+ * `/admin/housesitter` shows the sitter accounts and their access windows
+ * (§7), and it reads the same server-rendered list this file writes to.
+ * Revalidating only settings left it showing yesterday's window until
+ * somebody happened to hard-refresh — the sort of staleness nobody notices
+ * until the person at the gate cannot sign in.
+ */
+function revalidated(): void {
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/housesitter");
+}
+
 /** `""` from an empty date input is "not set", not "the epoch". */
 function dateOrUndefined(value: string | undefined): Date | undefined {
   if (value === undefined || value.trim() === "") return undefined;
@@ -157,7 +171,7 @@ export async function invitePerson(input: InviteInput): Promise<ActionResult> {
     now,
   );
 
-  revalidatePath("/admin/settings");
+  revalidated();
   return {
     ok: true,
     message: `${user.name} added. Send them this link — it is the only time it is shown.`,
@@ -184,7 +198,7 @@ export async function resendInvitation(id: Ulid): Promise<ActionResult> {
 
   const token = await reinviteUser(id, now);
 
-  revalidatePath("/admin/settings");
+  revalidated();
   return {
     ok: true,
     message: `New link for ${found.user.name}. Any earlier one has stopped working.`,
@@ -250,7 +264,7 @@ export async function editPerson(id: Ulid, input: EditInput): Promise<ActionResu
     now,
   );
 
-  revalidatePath("/admin/settings");
+  revalidated();
   return { ok: true, message: `${found.user.name} saved.` };
 }
 
@@ -282,7 +296,7 @@ export async function setPersonActive(id: Ulid, active: boolean): Promise<Action
 
   await updateUser(id, { active }, now);
 
-  revalidatePath("/admin/settings");
+  revalidated();
   return {
     ok: true,
     message: `${found.user.name} ${active ? "switched back on" : "switched off"}.`,
@@ -320,7 +334,7 @@ export async function deletePerson(id: Ulid, reason?: string): Promise<ActionRes
 
   await tombstoneUser(id, actor.id, now, reason);
 
-  revalidatePath("/admin/settings");
+  revalidated();
   return { ok: true, message: `${found.user.name} deleted.` };
 }
 
@@ -336,7 +350,7 @@ export async function restorePerson(id: Ulid): Promise<ActionResult> {
 
   await restoreUser(id, now);
 
-  revalidatePath("/admin/settings");
+  revalidated();
   return {
     ok: true,
     // Said out loud because the invitation went with the tombstone: a restored

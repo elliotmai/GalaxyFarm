@@ -722,6 +722,39 @@ export const attachments = pgTable(
   baseIndexes("attachments"),
 );
 
+/**
+ * The care guide, and only the half of it somebody writes (spec §5.10).
+ *
+ * The pens, the chores, the emergency numbers and the vet are composed from
+ * live records every time the guide is opened — a guide that was generated
+ * once and saved would be wrong the first time an animal moved, which is the
+ * week it is most likely to be read. What is stored is the title, the intro,
+ * which auto-sections to include, and the sections written by hand.
+ */
+export const careGuides = pgTable(
+  "care_guides",
+  {
+    ...baseColumns,
+    title: text("title").notNull(),
+    intro: text("intro"),
+    includes: text("includes").array().notNull().default([]),
+    active: boolean("active").notNull(),
+  },
+  baseIndexes("care_guides"),
+);
+
+export const guideSections = pgTable(
+  "guide_sections",
+  {
+    ...baseColumns,
+    careGuideId: text("care_guide_id").notNull(),
+    title: text("title").notNull(),
+    bodyMarkdown: text("body_markdown").notNull(),
+    order: integer("order").notNull(),
+  },
+  baseIndexes("guide_sections"),
+);
+
 export const choreTemplates = pgTable(
   "chore_templates",
   {
@@ -997,6 +1030,8 @@ export const allTables = {
   fertilityTests,
   contacts,
   attachments,
+  careGuides,
+  guideSections,
   choreTemplates,
   tasks,
   calendarEvents,

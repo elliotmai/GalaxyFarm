@@ -93,6 +93,9 @@ const FALSE_FRIENDS = new Set([
   "removeItem",
   "clearAll",
   "voidElement",
+  // Releases a blob URL the page minted a moment ago. Nothing persisted has
+  // ever been reachable through one, and every CSV export ends with this call.
+  "revokeObjectURL",
 ]);
 
 function lineOf(source: string, index: number): number {

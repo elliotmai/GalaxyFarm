@@ -46,6 +46,8 @@ import {
   feedTypeSchema,
 } from "@galaxy-farm/module-feed";
 
+import { careGuideSchema, guideSectionSchema } from "@galaxy-farm/module-housesitting";
+
 import { allTables } from "../src/schema/index.js";
 import { REPOSITORY_TABLES } from "../src/sync/entities.js";
 
@@ -97,6 +99,8 @@ const SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   feedingPlans: feedingPlanSchema,
   contacts: contactSchema,
   attachments: attachmentSchema,
+  careGuides: careGuideSchema,
+  guideSections: guideSectionSchema,
   choreTemplates: choreTemplateSchema,
   tasks: taskSchema,
   calendarEvents: calendarEventSchema,

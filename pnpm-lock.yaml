@@ -92,6 +92,12 @@ importers:
       '@galaxy-farm/module-feed':
         specifier: workspace:*
         version: link:../../packages/modules/feed
+      '@galaxy-farm/module-housesitting':
+        specifier: workspace:*
+        version: link:../../packages/modules/housesitting
+      '@galaxy-farm/module-pets':
+        specifier: workspace:*
+        version: link:../../packages/modules/pets
       '@galaxy-farm/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -195,6 +201,9 @@ importers:
       '@galaxy-farm/module-feed':
         specifier: workspace:*
         version: link:../../modules/feed
+      '@galaxy-farm/module-housesitting':
+        specifier: workspace:*
+        version: link:../../modules/housesitting
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1

@@ -74,6 +74,8 @@ const NOT_COLOURS = new Set([
   "border-b-0",
   "border-t-2",
   "border-b-2",
+  "border-l-2",
+  "border-r-2",
   "border-solid",
   "border-dashed",
   "border-dotted",

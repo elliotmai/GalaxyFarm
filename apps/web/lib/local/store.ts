@@ -52,6 +52,8 @@ export const LOCAL_STORES = [
   "feedingPlans",
   "contacts",
   "attachments",
+  "careGuides",
+  "guideSections",
   "choreTemplates",
   "tasks",
   "calendarEvents",
@@ -80,8 +82,9 @@ export type LocalStoreName = (typeof LOCAL_STORES)[number];
  *     sync protocols, processing, what animals cost and brought, and the
  *     genetic plan.
  * 8 — the feed catalogue, so a plan's lines can name what they feed (§5.3).
+ * 12 — the care guide and its hand-written sections (§5.10).
  */
-export const LOCAL_SCHEMA_VERSION = 11;
+export const LOCAL_SCHEMA_VERSION = 12;
 
 /**
  * Which fields each entity's search box looks at.
@@ -121,6 +124,8 @@ const SEARCHABLE: Readonly<Record<LocalStoreName, readonly string[]>> = {
   feedingPlans: ["name", "specialNotes"],
   contacts: ["name", "company", "address", "notes"],
   attachments: ["filename", "caption"],
+  careGuides: ["title", "intro"],
+  guideSections: ["title", "bodyMarkdown"],
   choreTemplates: ["title", "detail"],
   tasks: ["title", "detail"],
   calendarEvents: ["title", "detail"],

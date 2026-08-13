@@ -86,3 +86,66 @@ h3,
 h4 {
   font-family: var(--font-heading);
 }
+
+/*
+ * Print (spec §5.10).
+ *
+ * The care guide is one composition with three outputs, and this is the one
+ * that ends up folded on somebody's kitchen counter. "Print-perfect PDF" needs
+ * no PDF library: the browser's own print dialog saves to PDF, and what makes
+ * that output good is a stylesheet that takes the app off the page.
+ *
+ * Hiding by visibility rather than by naming the chrome. A rule that listed
+ * the nav, the tab strip and the buttons would be a rule somebody has to
+ * remember to extend every time a control is added — and the failure mode is
+ * a sidebar printed down the left of a document nobody notices until it comes
+ * out of the printer.
+ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  [data-print="guide"],
+  [data-print="guide"] * {
+    visibility: visible;
+  }
+
+  [data-print="guide"] {
+    /* Ink on paper, whichever theme the screen was in. Midnight Nebula costs
+       a cartridge and reads worse than plain black on white. */
+    --gf-canvas: #ffffff;
+    --gf-panel: #ffffff;
+    --gf-raised: #ffffff;
+    --gf-text: #111111;
+    --gf-muted: #444444;
+    --gf-border: #999999;
+
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 0;
+    background: #ffffff;
+    color: #111111;
+  }
+
+  /*
+   * A pen's section must not break across a page. Half a safety warning at
+   * the foot of sheet two is worse than none: the reader has no way to know
+   * the rest of it exists.
+   */
+  [data-print="guide"] section,
+  [data-print="guide"] > header,
+  [data-print="guide"] section > div {
+    break-inside: avoid;
+  }
+
+  [data-print="guide"] h3,
+  [data-print="guide"] h4 {
+    break-after: avoid;
+  }
+
+  @page {
+    margin: 18mm;
+  }
+}

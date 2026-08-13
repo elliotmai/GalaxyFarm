@@ -19,7 +19,13 @@ import { measureToPounds } from "./grain-measures.js";
  * animal type so the run-out projection is written once.
  */
 
-export const FEED_CATEGORIES = ["hay", "grain", "mineral", "creep", "supplement"] as const;
+/**
+ * `pet` earns its place for the same reason the module is cross-species: a bag
+ * of kibble is bought, run down, and reordered exactly like a bag of creep,
+ * and §5.8 has pets carry a real FeedingPlan rather than a note. Filing dog
+ * food under `supplement` would have put it in the cattle ration's totals.
+ */
+export const FEED_CATEGORIES = ["hay", "grain", "mineral", "creep", "supplement", "pet"] as const;
 export type FeedCategory = (typeof FEED_CATEGORIES)[number];
 
 /**
