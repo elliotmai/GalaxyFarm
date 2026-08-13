@@ -1,6 +1,6 @@
 # Double M — logo concepts
 
-Twenty-four candidate marks for a "Double M" identity, read in the same
+Twenty-seven candidate marks for a "Double M" identity, read in the same
 livestock-brand grammar as the approved **Rocking Double Star** and coloured
 from `packages/config/tailwind.preset.ts`.
 
@@ -12,11 +12,12 @@ business names.
 Open **[`concepts.html`](./concepts.html)** to see them — every mark rendered on
 both real grounds (Midnight Nebula and Bluebonnet Linen) at 96, 64, 40 and
 24&nbsp;px, plus three pixel tests of the leading candidates rasterised at true
-24 and 16&nbsp;px (`pixel-test.png`, `pixel-test-2.png`, `pixel-test-3.png`).
+24 and 16&nbsp;px (`pixel-test.png` … `pixel-test-4.png`).
 
-Sixteen are drawn in the sheet's rounded brand-iron language. The last eight are
+Sixteen are drawn in the sheet's rounded brand-iron language. Eight are
 vectorised from a hand-drawn sheet and keep that sketch's language instead —
-sharp mitred corners, flat stroke ends, a lighter 6-unit line.
+sharp mitred corners, flat stroke ends, a lighter line. The last three are those
+sketched bases redrawn to brand-iron tolerances.
 
 ## The brand grammar
 
@@ -108,6 +109,44 @@ Fixes, if any of these is the direction: **Overlapped** wants a wider overlap so
 the inner legs sit as far apart as the outer ones. **Double-struck** is a
 large-format mark or nothing — reserve it for 64&nbsp;px and up, because widening
 the offset enough to save it turns it into Overlapped.
+
+## Made brandable
+
+Three of the sketched bases — **Overlapped**, **Double-struck** and **Angular
+tight** — redrawn so they work small *and* work as an actual iron.
+
+These turn out to be one requirement, not two. A hot iron and a small raster
+destroy the same thing first: the narrow gap between two roughly-parallel
+strokes. Heat spreads into it and closes it; a 24px grid has no pixel to spare
+for it. So one set of rules serves both.
+
+**The rules**
+
+- Stroke 9 units, and no two roughly-parallel strokes closer than twice that,
+  centre to centre.
+- Vertices may be acute; channels may not be narrow. A sharp point blunts under
+  the iron and survives as a point. A long thin gap fills and never comes back.
+- Flat ends, mitred corners — a brand iron is cut and bent bar.
+- Tested by thickening every stroke from 9 to 15 (a 1.7× spread) to stand in for
+  the burn, and by rasterising at 24 and 16px. Not eyeballed.
+
+**What changed**
+
+| Mark | Change | Result |
+| --- | --- | --- |
+| **Overlapped, opened** | Overlap opened to exactly half the letter, spacing all four legs evenly at 26 units. | The two V's clear by 11 units where they ran nearly parallel. Each valley now welds to its neighbour's leg — a T-junction, which an iron makes happily. |
+| **Double-struck, vertical** | Second strike moved from beside the first to below it. | Legs coincide and reinforce; the two V's stack 28 units apart, a 12-unit clearance where there was none. |
+| **Angular, opened** | Valleys opened to 72°, small M widened to 22 units across the apexes, its outer stroke laid shallower. | The crossing meets at 45° instead of 34°. At 45° it burns as a crossing; at 34° it burns as a blot. |
+
+All three now hold at 16px, where two of them previously failed at 24.
+
+**Why Double-struck had to move vertically** — arithmetic, not taste. The
+horizontal offset has to reach 18 units to clear the legs, but at anything short
+of exactly half the letter width the first M's valley lands within 4 units of the
+second M's leg. At exactly half, the legs space evenly and you have Overlapped.
+There is no horizontal double-strike that is neither blotchy nor already
+Overlapped. The vertical form lands on the same construction as base six,
+reached from the opposite direction.
 
 ## Recommendation
 
