@@ -48,15 +48,17 @@ export interface SeedZone {
 }
 
 /**
- * Four tanks, none heated, and covers instead.
+ * Four tanks, none heated, and covers on three of them.
  *
  * §6 treats a heaterless tank as the vulnerable one and names it in the freeze
  * alert. Here that is every tank on the place, which is worth knowing before
  * the first hard freeze — and that lands in the same window as calving.
  *
  * Heaters are not coming: they are not used here and none is wanted. What
- * happens ahead of a freeze is that the covers go on, so the covers are seeded
- * `off` — they exist, and in August they are not on anything.
+ * happens ahead of a freeze is that the covers go on. **The three auto-refill
+ * tanks have covers; the West Pen's static tank does not** — so that one can
+ * only be broken open, and saying so is what keeps it off the list of covers
+ * to fit. All three are seeded `off`, since they are not on anything in August.
  */
 export const SEED_WATER_SOURCES: readonly SeedWaterSource[] = [
   {
@@ -90,10 +92,11 @@ export const SEED_WATER_SOURCES: readonly SeedWaterSource[] = [
     name: "West Pen tank",
     type: "static_tank",
     hasHeater: false,
-    cover: "off",
+    // The one without a cover. Nothing to fit, so nothing to ask for.
+    cover: "none",
     // Seasonal: false while it is stowed, so it raises no freeze chore.
     active: false,
-    notes: "Static tank, put out only when the West Pen is in use.",
+    notes: "Static tank, put out only when the West Pen is in use. No cover for this one.",
   },
 ];
 
