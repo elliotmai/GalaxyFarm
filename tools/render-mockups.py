@@ -167,19 +167,11 @@ def button(d, k, text, primary=True):
 
 
 def mark(d, size, color=None):
-    """The Rocking Double Star, taking the direction's colours."""
+    """Flying Double M Connected, taking the direction's identity colour."""
     c = color or d["i"]
-    a = color or d["a"]
-    star = ("50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 "
-            "50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08")
     return (f'<svg viewBox="0 0 100 100" width="{size}" height="{size}" aria-hidden="true" '
             f'style="flex:none;display:block">'
-            f'<path d="M12 78 Q50 98 88 78" fill="none" stroke="{a}" stroke-width="8" '
-            f'stroke-linecap="round" stroke-linejoin="round"/>'
-            f'<polygon points="{star}" fill="{c}" stroke="{c}" stroke-width="5" stroke-linejoin="round" '
-            f'transform="translate(40 42) scale(0.7059) translate(-50 -50)"/>'
-            f'<polygon points="{star}" fill="{c}" stroke="{c}" stroke-width="5" stroke-linejoin="round" '
-            f'transform="translate(72 62) scale(0.3676) translate(-50 -50)"/></svg>')
+            f'<g fill="none" stroke="{{c}}" stroke-width="7.84" stroke-linecap="round" stroke-linejoin="round"><path d="M22 77.89 L27.6 33.09 L38.8 54.37 L50 33.09 L61.2 54.37 L72.4 33.09 L78 77.89"/><path d="M50 33.09 L50 77.89"/><path d="M27.6 33.09 Q18.64 17.41 11.92 24.13 M72.4 33.09 Q81.36 17.41 88.08 24.13"/></g></svg>')
 
 
 def safety_mark(d, level, k, size=None):

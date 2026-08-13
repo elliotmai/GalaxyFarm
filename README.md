@@ -190,7 +190,7 @@ The §4.5 guards are convention checks over source text, not type-level proofs. 
 - **`packages/infrastructure/sync`** — field-level patches, last-write-wins per field with an audit trail, an outbox with capped exponential backoff, per-entity cursors, and the engine that drives push and pull against a transport port.
 - **`packages/infrastructure/local`** — the IndexedDB store, a device-persisted outbox that survives the app being killed, and live queries so a barn kiosk redraws when someone moves an animal from the house.
 - **`packages/infrastructure/db`** — the Drizzle schema and migrations, the Postgres repository, and the server side of sync. Verified against real PostgreSQL 18 in CI via PGlite. No extensions, integer cents, timezone-aware timestamps throughout.
-- **The logomark** — **Rocking Double Star**, in `packages/ui/src/brand/`, paired for both surface themes. No wordmark; the names are still open (#26).
+- **The logomark** — **Flying Double M Connected**, in `packages/ui/src/brand/`, paired for both surface themes. No wordmark; the names are still open (#26).
 
 One repository contract is shared by all three implementations — in-memory, IndexedDB, and Postgres. A disagreement between the local store and the server store shows up as data appearing on one device and not another, which is the hardest class of bug to notice here, so the contract is written once and run three times rather than written three times.
 

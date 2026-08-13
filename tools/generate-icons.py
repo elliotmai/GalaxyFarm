@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Raster app icons, drawn from the same geometry as the Rocking Double Star.
+Raster app icons, drawn from the same geometry as Flying Double M Connected.
 
 Committed as a script rather than the PNGs being hand-made once, because the
 mark is a design decision that will be revisited and three icons redrawn by
@@ -28,27 +28,24 @@ OUT = ROOT / "apps" / "web" / "public" / "icons"
 # Kept identical to theme.css. Literals here because a browser's home screen
 # and app switcher paint this with no theme of ours in scope.
 GROUND = (14, 16, 38, 255)  # --gf-canvas, midnight nebula
-IDENTITY = (157, 133, 232, 255)  # --gf-identity, the rocker
-INK = (242, 239, 230, 255)  # --gf-text, the stars
+IDENTITY = (157, 133, 232, 255)  # --gf-identity, the mark
+INK = (242, 239, 230, 255)  # --gf-text, the sky
 
-# The five-pointed star from `logomark.tsx`, in the 100x100 viewBox.
-STAR = [
-    (50, 16), (57.94, 39.08), (82.34, 39.49), (62.84, 54.17), (69.99, 77.51),
-    (50, 63.5), (30.01, 77.51), (37.16, 54.17), (17.66, 39.49), (42.06, 39.08),
-]
+# The mark from `logomark.tsx`, in the 100x100 viewBox. The pair and its shared
+# leg are drawn; the crests are curves, flattened below.
+PAIR = [(22, 77.89), (27.6, 33.09), (38.8, 54.37), (50, 33.09),
+        (61.2, 54.37), (72.4, 33.09), (78, 77.89)]
+LEG = [(50, 33.09), (50, 77.89)]
+CRESTS = [((27.6, 33.09), (18.64, 17.41), (11.92, 24.13)),
+          ((72.4, 33.09), (81.36, 17.41), (88.08, 24.13))]
+STROKE = 7.84
 
 # Faint stars, so the mark reads as a sky rather than a shape on navy.
 SKY = [(17, 20, 1.6, INK), (83, 26, 1.2, INK), (28, 86, 1.1, INK), (88, 82, 1.5, IDENTITY)]
 
-# Supersampled, then reduced. Pillow has no antialiasing on polygons, and the
-# star's points are exactly where the jaggies would show.
+# Supersampled, then reduced. Pillow has no antialiasing on lines, and a mark
+# made entirely of diagonals is nothing but places for jaggies to show.
 SUPERSAMPLE = 8
-
-
-def placed(points, translate, scale):
-    """The SVG `translate(t) scale(s) translate(-50 -50)` transform."""
-    tx, ty = translate
-    return [((x - 50) * scale + tx, (y - 50) * scale + ty) for x, y in points]
 
 
 def quadratic(start, control, end, steps=64):
@@ -67,7 +64,7 @@ def draw_icon(size, maskable):
 
     `maskable` inflates the ground and shrinks the mark into the middle 80%,
     which is the safe zone Android crops a maskable icon to. Without it the
-    rocker loses its ends on a device that prefers circles.
+    crests lose their tips on a device that prefers circles.
     """
     scale = (size * SUPERSAMPLE) / 100
     canvas = size * SUPERSAMPLE
@@ -97,17 +94,19 @@ def draw_icon(size, maskable):
         r = radius * scale * inset
         draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=colour)
 
-    # The rocker: a quadratic curve with a round-capped 8-unit stroke.
-    curve = [point(x, y) for x, y in quadratic((12, 78), (50, 98), (88, 78))]
-    draw.line(curve, fill=IDENTITY, width=int(8 * scale * inset), joint="curve")
-    cap = 4 * scale * inset
-    for cx, cy in (curve[0], curve[-1]):
-        draw.ellipse([cx - cap, cy - cap, cx + cap, cy + cap], fill=IDENTITY)
+    # Every stroke, then a disc at every vertex of it. The discs are not only
+    # for the round ends: Pillow leaves a wedge open on the outside of each
+    # turn, which on a flattened curve is a row of them, and the crests come
+    # out visibly serrated without this.
+    width = max(1, round(STROKE * scale * inset))
+    cap = STROKE / 2 * scale * inset
+    runs = [[point(x, y) for x, y in PAIR], [point(x, y) for x, y in LEG]]
+    runs += [[point(x, y) for x, y in quadratic(*crest)] for crest in CRESTS]
 
-    # The cow, then the calf. Both are drawn with the stroke folded into the
-    # fill — a 5-unit round join on a star this size only softens the points.
-    for translate, factor in (((40, 42), 0.7059), ((72, 62), 0.3676)):
-        draw.polygon([point(x, y) for x, y in placed(STAR, translate, factor)], fill=INK)
+    for run in runs:
+        draw.line(run, fill=IDENTITY, width=width, joint="curve")
+        for cx, cy in run:
+            draw.ellipse([cx - cap, cy - cap, cx + cap, cy + cap], fill=IDENTITY)
 
     return image.resize((size, size), Image.LANCZOS)
 
