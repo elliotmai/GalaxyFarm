@@ -1,6 +1,6 @@
 # Double M — logo concepts
 
-Six candidate marks for a "Double M" identity, shortlisted from twenty-seven,
+Nine candidate marks for a "Double M" identity, shortlisted from twenty-seven,
 read in the same livestock-brand grammar as the approved **Rocking Double Star**
 and coloured from `packages/config/tailwind.preset.ts`.
 
@@ -62,12 +62,11 @@ widened, its outer stroke laid shallower so the crossing meets at 45° not 34°.
 ## What the iron test exposed
 
 **The four sharp marks pass. The two rounded ones fail.** Not dramatically — they
-do not vanish. Under the spread the V inside each M closes from the valley upward
-and survives only as a nick at the top, and the rocker crowds the letters above
-it. At 1.7× the V in number 1 has about 14 units of clear space at the apexes and
-none by half its depth, against a rule that wants at least one stroke width the
-whole way. Number 11 is tighter still: its stem sits 18 units from each valley,
-leaving 4 units clear once the stroke has spread.
+do not vanish. Each fails at a different place: in number 1 the 16-unit channel
+*between* the two letters comes down to 2.4 units under the spread, while the V
+inside each M stays open through its top half; in number 11 it is the 42° wedge
+where the stem meets the diagonals, open through only 29% of its length. The rule
+wants at least one stroke width of clearance the whole way, and neither holds it.
 
 The cause is proportion, not language. Numbers 1 and 11 pack two whole M's into
 the same box the sharp marks give to one-and-a-bit, so each letter is about half
@@ -81,6 +80,42 @@ rocker — but that is a redraw, not a tweak, and a wider mark sits differently
 next to the approved star mark. Worth deciding whether a physical brand is in
 scope before spending it.
 
+## Sharpened, rocker removed
+
+New versions of 1 and 11: mitred corners and flat stroke ends, rocker taken off.
+All three pass both tests, which neither parent did.
+
+| # | Mark | Box | Ink | Tightest feature at the iron |
+| --- | --- | --- | --- | --- |
+| 1a | **Double M, sharp** | square | 26% | channel between the M's, +6.7 |
+| 1b | **Double M, sharp, wide** | 1.32:1 | 19% | channel between the M's, +8.7 |
+| 11a | **Connected Double M, sharp** | square | 20% | stem-to-diagonal wedge, 35% open |
+
+**Removing the rocker is not what fixed the iron.** Both failures were horizontal
+— the channel between the letters in 1, the stem wedge in 11 — and neither has
+anything to do with what sits underneath. The fix came from widening the channel
+(16 → 22/24 units) and opening the valleys to 72°, and could have been done with
+the rocker left on.
+
+What removing it bought is **size**. The rocker occupied the bottom 40% of the
+box, so the letters had 34 units of height; without it they have 64. That is why
+the sharpened versions render *larger* at 24 and 16px than their parents
+(`sharpened-test.png`) — which was not the stated goal and is the clearest thing
+in the comparison.
+
+What it costs: the rocker was the visual tie to the approved **Rocking Double
+Star**. Without it these stop being the same family as the mark in
+`packages/ui/src/brand/` and become a separate identity sharing a palette.
+Whether that is a cost depends on whether issue #26 keeps the star mark alongside.
+
+Ranked by margin: **1b** has the most room by a distance and is the only one not
+square; **11a** is comfortable except at the stem wedge, improved from 29% to 35%
+open but still its tightest feature; **1a** passes with the least margin on the
+sheet, because two whole M's in a square box is close to a geometric floor.
+
+If the square matters, 1a and 11a are the replacements. If it does not, 1b is the
+better drawing and it is not close.
+
 ## Where that leaves it
 
 - **If the mark has to be burnable:** pick from 25, 26, 27. All three hold at
@@ -88,6 +123,8 @@ scope before spending it.
   needed the least work; 25 is the most literally a double M.
 - **If it is a screen mark only:** 1 and 11 are the clearest pair of letters here
   and the only survivors that keep the approved rocker.
+- **If the rocker is negotiable:** 1a, 1b and 11a pass both tests and read larger
+  small than anything else on the sheet.
 - **24 and 27 are one drawing at two weights** — decide them together.
 
 ## One thing to settle whichever wins
