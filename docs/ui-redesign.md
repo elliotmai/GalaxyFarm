@@ -138,9 +138,58 @@ Two things this genuinely does cost:
   portal and print, but somebody checking a calving pen at 2am should not get a
   white screen. Build the night mode alongside, rather than promising it.
 
+## Every direction at every density
+
+All three directions are drawn at all three densities by
+[`tools/render-mockups.py`](../tools/render-mockups.py), which builds each frame
+at true device pixel size from the tokens in `theme.css` — a 64 px kiosk target
+in the output is a real 64 px target. Run it to regenerate
+[`ui-mockups.html`](./ui-mockups.html); a presented version is at
+<https://claude.ai/code/artifact/b39673ae-f081-4b65-af91-76eefb493b31>.
+
+The three surfaces are not one layout at three scales. Each drops something the
+others keep:
+
+- **Desktop** keeps the side rail and the table. 236 px of navigation is
+  affordable, and a five-column table is the right shape when the job is
+  comparing pens against each other.
+- **Mobile** trades the table for entries and the rail for a bottom bar, and
+  gains a persistent log button — §8 asks for every frequent action within two
+  taps of its context.
+- **Kiosk** drops navigation entirely. A barn screen is not browsed: it shows
+  the pen board all day and offers four things you might do standing in front of
+  it. Everything else is a phone's job.
+
+One thing is identical in all nine: the safety ramp, saturated green through red
+and always numbered. §8 puts it outside the palette so nothing competes with it,
+and restyling it per direction would break the rule the whole colour system is
+built on.
+
+Reading across:
+
+| Direction  | Desktop                                                                    | Mobile                                                                        | Kiosk                                                                          |
+| ---------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Herd Book  | Strongest of the three — the ledger table is what the direction is for.     | Holds well; the serif gives a small screen hierarchy that grey text can't.     | Weakest of its three. A text serif at four feet is doing work it wasn't cut for. |
+| Operations | Very good, and the densest. Nothing wasted, nothing memorable.              | Best mobile of the nine. This is the language phones were designed in.         | Reads as a big web page. Rounded cards at 64 px look inflated.                  |
+| Stockman   | A dispatch board — fast, but shouty for a screen a client may see.          | Condensed labels buy real estate a phone badly needs.                          | Clearly the best kiosk; the only one that looks like equipment.                  |
+
 ## Recommendation
 
-**Direction 01, held to Direction 02's density.**
+**Direction 01, held to Direction 02's density — and Direction 03 on the kiosk.**
+
+The density read-across sharpens the earlier recommendation rather than changing
+it. Herd Book wins desktop and mobile; Stockman wins the kiosk outright, and it
+is not close. That pairing is not a compromise between two directions —
+`theme.css` already has the mechanism, `[data-density="kiosk"]`, and the kiosk
+route group already sets it.
+
+What has to be true for it to stay one design system: the two share one palette
+and one set of semantic roles, and only the type treatment and the container
+shape change at the kiosk breakpoint. Herd Book's registry green and oxide carry
+over unchanged; the condensed face and the hard rules come in. That is a
+variant, not a second system.
+
+The original argument for Herd Book stands on its own:
 
 Herd Book is the only one of the three that could not belong to another company.
 It takes an identity that already exists and gives it the visual world it came
@@ -149,11 +198,13 @@ failure mode is prettiness, so borrow Operations' rigour for the data-dense
 screens — the same tight grid, the same restraint about colour, the same refusal
 to draw a box where a rule will do.
 
-Keep Stockman in reserve for the barn kiosk. The density system in `theme.css`
-already has a `kiosk` mode to put it in: oversized condensed labels and hard
-rules at a 64 px touch target, on the same tokens.
-
 ## Caveat
+
+The nine mockups are static compositions of one screen on one morning. They say
+nothing yet about a fourteen-field form, a three-generation pedigree, or an
+eleven-tab animal profile — and those are where a direction usually breaks.
+Before committing, the next thing worth drawing is the animal detail page in
+whichever direction wins, because it is the hardest screen in the product.
 
 This is a proposal about surface, and surface is the part that can be argued
 from the code. Whether Herd Book is *right* depends on things not in the
