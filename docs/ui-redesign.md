@@ -226,6 +226,38 @@ which is the whole problem with it; Harbor reads as a utility blue rather than a
 brand one, which helps on the kiosk and does nothing on the customer portal —
 the surface that actually has to sell something.
 
+## Try them: working prototypes
+
+Self-contained, responsive, offline. One file per palette, built by
+[`tools/render-prototypes.py`](../tools/render-prototypes.py) into
+[`docs/prototypes/`](./prototypes/):
+
+| Palette         | File                                                 | Open on a phone                                                   |
+| --------------- | ---------------------------------------------------- | ----------------------------------------------------------------- |
+| **Field Olive** | [`prototypes/olive.html`](./prototypes/olive.html)   | <https://claude.ai/code/artifact/8da2849f-7e0e-4799-85de-41cf049d7798> |
+| **Ink Navy**    | [`prototypes/navy.html`](./prototypes/navy.html)     | <https://claude.ai/code/artifact/e6db82af-3338-4187-9b41-3d28d7f28b91> |
+| **Harbor**      | [`prototypes/harbor.html`](./prototypes/harbor.html) | <https://claude.ai/code/artifact/33904511-fe96-4415-bbf3-eceb07320a91> |
+
+These are not the presentation boards in [`docs/mockups/`](./mockups/). Those
+show fixed-size device frames scaled down, which is the wrong thing to open on a
+phone. These respond: the layout switches at the same **48rem** `theme.css`
+already switches at, so a phone gets Operations at true size with a bottom bar
+and a laptop gets Herd Book with a sidebar. The control strip in the corner
+forces the kiosk density, or append `?kiosk` to the URL.
+
+Which makes the prototype a test of the proposal itself: one set of colour
+tokens, three type-and-shape treatments selected by density, nothing branching
+on which palette is in use.
+
+Working: the bottom bar and sidebar, tapping a pen or an animal through to the
+detail page, the tab strip, and the log sheet — which slides up from the bottom
+on a phone and in from the right on a laptop, with a keypad that actually edits
+the number.
+
+The webfonts are inlined, so a file works with no network at all. That is what
+makes each one about 760 KB, and it is what lets you open one off the filesystem
+or in a barn at zero bars.
+
 ## Shortlist: Field Olive, Ink Navy, Harbor
 
 Narrowed from the six. Each has a comprehensive mockup page — eleven screens
