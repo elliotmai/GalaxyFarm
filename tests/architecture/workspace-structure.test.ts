@@ -37,6 +37,11 @@ const EXPECTED_INFRASTRUCTURE = [
   "geocoding",
   "auth",
   "quickbooks",
+  // The crawled association graph. Its own adapter rather than a corner of
+  // `db`, because it is a different store answering a different question: the
+  // catalogue of every animal in the registries, read-only, beside the
+  // Postgres that holds this farm's own records.
+  "registry-graph",
 ] as const;
 
 describe("workspace shape", () => {

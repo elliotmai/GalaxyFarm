@@ -278,6 +278,90 @@ export function transmits<A extends string>(
   return counts.every((count) => count === counts[0]) ? (counts[0] as number) / 2 : undefined;
 }
 
+/**
+ * What the parents alone say this animal could be.
+ *
+ * Undefined when neither parent is known, which is not the same as "anything
+ * is possible" — it means the parents have no vote, and the animal's own coat
+ * should not be second-guessed by a set nobody derived.
+ */
+function fromParents<A extends string>(
+  sire: LocusInference<A> | undefined,
+  dam: LocusInference<A> | undefined,
+  order: readonly A[],
+  universe: readonly [A, A][],
+): { possible: Possible<A>[]; weighted: boolean; because: string[] } | undefined {
+  if (sire !== undefined && dam !== undefined) {
+    const crossed = crossPossible(sire, dam, order);
+    return { ...crossed, because: ["One allele from each parent."] };
+  }
+
+  const known = sire ?? dam;
+  if (known === undefined) return undefined;
+
+  // One parent known: the calf holds at least one allele that parent could
+  // give. Nothing can be said about the other side.
+  const givable = new Set(known.possible.flatMap((entry) => entry.pair));
+  return {
+    possible: universe
+      .filter((pair) => pair.some((allele) => givable.has(allele)))
+      .map((pair) => ({ pair })),
+    weighted: false,
+    because: ["One parent's alleles are known; the other side is not."],
+  };
+}
+
+/**
+ * Put the two kinds of evidence together, and decide which wins when they
+ * disagree.
+ *
+ * **What the animal itself proves beats what its parents imply**, and getting
+ * that backwards was a real bug with real consequences. A cow recorded as roan
+ * out of two parents that both came out solid was being *forced* to solid —
+ * her own coat discarded in favour of an inference — and every calf predicted
+ * off her came out solid too, so a roan cow could never throw a roan.
+ *
+ * The coat is a fact about the animal standing in front of you. The parents'
+ * cross is a deduction, and it rests on things that are often wrong: a colour
+ * nobody recorded on a grandparent, a sire linked to the wrong bull, a page
+ * misread. When a deduction contradicts an observation, it is the deduction
+ * that is unsafe.
+ *
+ * So a disagreement keeps the observation and says so. That message is worth
+ * more than the genotype it accompanies — a roan out of two solid parents
+ * means something in that pedigree is wrong, and this is the only place that
+ * would ever notice.
+ */
+function settle<A extends string>(
+  direct: { possible: readonly Possible<A>[]; because: readonly string[] },
+  parental: { possible: Possible<A>[]; weighted: boolean; because: string[] } | undefined,
+): LocusInference<A> {
+  if (parental === undefined) return finish(direct.possible, false, direct.because);
+
+  const allowed = new Set(parental.possible.map((entry) => entry.pair.join("|")));
+  const both = direct.possible.filter((entry) => allowed.has(entry.pair.join("|")));
+
+  if (both.length === 0) {
+    return finish(direct.possible, false, [
+      ...direct.because,
+      "Its parents cannot account for that coat — one of the three records is wrong. What the animal itself shows is kept; the pedigree is the part worth checking.",
+    ]);
+  }
+
+  // Weights come from the cross, since that is the only side that has any.
+  const weights = new Map(parental.possible.map((entry) => [entry.pair.join("|"), entry.chance]));
+  return finish(
+    both.map((entry) => ({
+      pair: entry.pair,
+      ...(weights.get(entry.pair.join("|")) === undefined
+        ? {}
+        : { chance: weights.get(entry.pair.join("|")) as number }),
+    })),
+    parental.weighted,
+    [...direct.because, ...parental.because],
+  );
+}
+
 /* --------------------------------------------------------------- the animal */
 
 export interface CoatEvidence {
@@ -317,56 +401,39 @@ function inferExtension(evidence: CoatEvidence): LocusInference<ExtensionAllele>
     };
   }
 
-  let possible: Possible<ExtensionAllele>[];
-  let because: string[] = [];
-  let weighted = false;
-
-  if (evidence.sire !== undefined && evidence.dam !== undefined) {
-    const crossed = crossPossible(evidence.sire.extension, evidence.dam.extension, EXTENSION_ALLELES);
-    possible = crossed.possible;
-    weighted = crossed.weighted;
-    because = ["One allele from each parent."];
-  } else {
-    const known = evidence.sire?.extension ?? evidence.dam?.extension;
-    possible = EXTENSION_PAIRS.map((pair) => ({ pair }));
-    if (known !== undefined) {
-      // One parent known: the calf holds at least one allele that parent could
-      // give. Nothing can be said about the other side.
-      const givable = new Set(known.possible.flatMap((entry) => entry.pair));
-      const state = narrow(
-        { possible, because },
-        (pair) => pair.some((allele) => givable.has(allele)),
-        "One parent's alleles are known; the other side is not.",
-      );
-      possible = state.possible;
-      because = state.because;
-    }
-  }
+  // What this animal itself proves, before anybody looks at its relatives.
+  let direct: { possible: Possible<ExtensionAllele>[]; because: string[] } = {
+    possible: EXTENSION_PAIRS.map((pair) => ({ pair })),
+    because: [],
+  };
 
   if (evidence.observed?.base !== undefined) {
     const base = evidence.observed.base;
-    const state = narrow(
-      { possible, because },
+    direct = narrow(
+      direct,
       (pair) => extensionColour(pair) === base,
       base === "red"
         ? "It is red, and red is e/e — there is nothing else it can be."
         : "It is black, so it holds at least one ED or E.",
     );
-    possible = state.possible;
-    because = state.because;
   }
 
   if ((evidence.progeny ?? []).some((calf) => calf.base === "red")) {
-    const state = narrow(
-      { possible, because },
+    direct = narrow(
+      direct,
       (pair) => pair.includes("e"),
       "It has thrown a red calf, so it handed over an e whatever it looks like.",
     );
-    possible = state.possible;
-    because = state.because;
   }
 
-  return finish(possible, weighted, because);
+  const parental = fromParents(
+    evidence.sire?.extension,
+    evidence.dam?.extension,
+    EXTENSION_ALLELES,
+    EXTENSION_PAIRS,
+  );
+
+  return settle(direct, parental);
 }
 
 function inferRoan(evidence: CoatEvidence): LocusInference<RoanAllele> {
@@ -379,25 +446,17 @@ function inferRoan(evidence: CoatEvidence): LocusInference<RoanAllele> {
     };
   }
 
-  let possible: Possible<RoanAllele>[];
-  let because: string[] = [];
-  let weighted = false;
-
-  if (evidence.sire !== undefined && evidence.dam !== undefined) {
-    const crossed = crossPossible(evidence.sire.roan, evidence.dam.roan, ROAN_ALLELES);
-    possible = crossed.possible;
-    weighted = crossed.weighted;
-    because = ["One allele from each parent."];
-  } else {
-    possible = ROAN_PAIRS.map((pair) => ({ pair }));
-  }
+  let direct: { possible: Possible<RoanAllele>[]; because: string[] } = {
+    possible: ROAN_PAIRS.map((pair) => ({ pair })),
+    because: [],
+  };
 
   // Roan is co-dominant, so the coat *is* the genotype. This is the locus that
   // needs no testing at all: three phenotypes, three genotypes, no hiding.
   if (evidence.observed?.pattern !== undefined) {
     const pattern = evidence.observed.pattern;
-    const state = narrow(
-      { possible, because },
+    direct = narrow(
+      direct,
       (pair) => roanColour(pair) === pattern,
       pattern === "roan"
         ? "It is roan, and roan is R/r — roan shows itself, so there is no other pair it can be."
@@ -405,8 +464,6 @@ function inferRoan(evidence: CoatEvidence): LocusInference<RoanAllele> {
           ? "It is white, which is r/r."
           : "It is solid, which is R/R.",
     );
-    possible = state.possible;
-    because = state.because;
   }
 
   // A calf's coat proves what each parent could give, the same way a red calf
@@ -416,16 +473,12 @@ function inferRoan(evidence: CoatEvidence): LocusInference<RoanAllele> {
     ["solid", "R", "It has thrown a solid calf, so it handed over an R."],
   ] as const) {
     if (!(evidence.progeny ?? []).some((calf) => calf.pattern === pattern)) continue;
-    const state = narrow(
-      { possible, because },
-      (pair) => pair.includes(allele),
-      reason,
-    );
-    possible = state.possible;
-    because = state.because;
+    direct = narrow(direct, (pair) => pair.includes(allele), reason);
   }
 
-  return finish(possible, weighted, because);
+  const parental = fromParents(evidence.sire?.roan, evidence.dam?.roan, ROAN_ALLELES, ROAN_PAIRS);
+
+  return settle(direct, parental);
 }
 
 /**
