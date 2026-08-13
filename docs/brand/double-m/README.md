@@ -12,7 +12,7 @@ business names.
 Open **[`concepts.html`](./concepts.html)** to see them — every mark rendered on
 both real grounds (Midnight Nebula and Bluebonnet Linen) at 96, 64, 40 and
 24&nbsp;px, plus two pixel tests of the leading candidates rasterised at true 24
-and 16&nbsp;px (`pixel-test.png`, `pixel-test-2.png`).
+and 16&nbsp;px (`pixel-test.png`, `pixel-test-2.png`, `pixel-test-3.png`).
 
 Sixteen are drawn in the sheet's rounded brand-iron language. The last eight are
 vectorised from a hand-drawn sheet and keep that sketch's language instead —
@@ -83,6 +83,31 @@ without adding a stroke.
 These are compared at 24&nbsp;px inside their own section rather than in the
 main bench, because a 6-unit mitred line and a 9-unit rounded one do not lose
 legibility at the same rate.
+
+### Three of them, up close
+
+**Overlapped**, **Double-struck** and **Angular tight** are shown at every size
+and rasterised at true 24 and 16&nbsp;px. One thing decides all three, and it is
+not complexity:
+
+| Base | At 24px | Why |
+| --- | --- | --- |
+| **Overlapped** | Tight | The two inner legs sit closer than any other pair of strokes; that channel greys over at 24px and has closed by 16. |
+| **Double-struck** | Fails | Every stroke has a twin a few units away — the worst possible case. At 24px the pairs have merged into a solid mass; at 16 it is a filled block with a hole in it. |
+| **Angular, tight** | Tight | Survives smallest of the three despite being the busiest drawing, because nothing in it runs parallel and close. |
+
+**Count the narrowest gap, not the number of strokes.** The gap between two
+parallel strokes is the first thing a small raster throws away, which is why the
+busiest of the three outlasts the other two.
+
+Worth noting separately: the 6-unit line goes noticeably grey at 24&nbsp;px next
+to the 8- and 9-unit rounded marks. The lighter line is the sketch language's
+real cost, and it is paid at exactly the size the nav bar uses.
+
+Fixes, if any of these is the direction: **Overlapped** wants a wider overlap so
+the inner legs sit as far apart as the outer ones. **Double-struck** is a
+large-format mark or nothing — reserve it for 64&nbsp;px and up, because widening
+the offset enough to save it turns it into Overlapped.
 
 ## Recommendation
 
