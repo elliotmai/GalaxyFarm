@@ -86,6 +86,7 @@ export async function seed(db: Database, options: SeedOptions): Promise<SeedSumm
         name: source.name,
         type: source.type,
         hasHeater: source.hasHeater,
+        cover: source.cover,
         active: source.active,
         notes: source.notes ?? null,
       })
@@ -93,7 +94,10 @@ export async function seed(db: Database, options: SeedOptions): Promise<SeedSumm
         target: waterSources.id,
         // Deliberately narrow: `active` is not overwritten, because whether
         // the seasonal tank is currently out is a fact about today that
-        // somebody set in the app, not something a seed file knows.
+        // somebody set in the app, not something a seed file knows. Neither is
+        // the cover — *whether there is one* is a fact about the tank, but
+        // whether it is on right now is today's, and a re-seed in January
+        // would pull every cover back off.
         set: { name: source.name, type: source.type, hasHeater: source.hasHeater, updatedAt: now },
       });
   }

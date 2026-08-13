@@ -19,10 +19,12 @@ import {
   useToast,
 } from "@galaxy-farm/ui";
 import {
+  coversToFit,
   freezeCheckTargets,
   WATER_SOURCE_TYPES,
   waterSourceSchema,
   zoneSchema,
+  type TankCover,
   type Ulid,
   type WaterSource,
   type WaterSourceType,
@@ -36,11 +38,14 @@ import { useMutations } from "@/lib/local/mutations";
  *
  * Water is its own record because tanks are shared: four of them serve eight
  * zones here, one serving three. That is what makes this a screen rather than
- * a checkbox on a zone — a tank has a heater or does not, is out or stowed,
- * and serves a list of places, and all three of those are facts about the tank.
+ * a checkbox on a zone — a tank is out or stowed, covered or not, and serves a
+ * list of places, and all three of those are facts about the tank.
  *
- * The freeze chore in §6 is derived per tank from exactly these fields, so
- * what this screen shows is what somebody will be sent to break ice on.
+ * Covers, not heaters, are what this place does about a freeze: nothing here
+ * is heated and nothing is going to be. So the cover is the state this screen
+ * leads with, and the one it makes changeable in a single tap — it is the
+ * thing somebody walks out and changes twice a year, and again on the evening
+ * a hard freeze is forecast.
  */
 
 const TYPE_OPTIONS = WATER_SOURCE_TYPES.map((type) => ({
@@ -55,10 +60,23 @@ const TYPE_LABEL: Readonly<Record<WaterSourceType, string>> = {
   creek: "Creek",
 };
 
+const COVER_OPTIONS = [
+  { value: "none", label: "No cover for this tank" },
+  { value: "off", label: "Has a cover — currently off" },
+  { value: "on", label: "Has a cover — currently on" },
+];
+
+const COVER_PILL: Readonly<Record<TankCover, string>> = {
+  none: "no cover",
+  off: "cover off",
+  on: "covered",
+};
+
 interface Draft {
   readonly name: string;
   readonly type: WaterSourceType;
   readonly hasHeater: boolean;
+  readonly cover: TankCover;
   readonly active: boolean;
   readonly notes: string;
 }
@@ -67,6 +85,7 @@ const BLANK: Draft = {
   name: "",
   type: "auto_refill",
   hasHeater: false,
+  cover: "off",
   active: true,
   notes: "",
 };
@@ -116,6 +135,8 @@ export function WaterPanel({
     })),
   );
   const vulnerable = targets.filter((target) => target.vulnerable);
+  /** Covers that exist and are not on — the job before the freeze, not during. */
+  const toFit = coversToFit(targets);
 
   function startCreate() {
     setEditing(undefined);
@@ -129,6 +150,9 @@ export function WaterPanel({
       name: source.name,
       type: source.type,
       hasHeater: source.hasHeater,
+      // A tank recorded before covers existed reads as having none, which is
+      // the honest answer to a question nobody was asked.
+      cover: source.cover ?? "none",
       active: source.active,
       notes: source.notes ?? "",
     });
@@ -142,6 +166,7 @@ export function WaterPanel({
       name: draft.name.trim(),
       type: draft.type,
       hasHeater: draft.hasHeater,
+      cover: draft.cover,
       active: draft.active,
       ...(draft.notes.trim() === "" ? {} : { notes: draft.notes.trim() }),
     };
@@ -189,6 +214,29 @@ export function WaterPanel({
         ? `${source.name} stowed — no freeze chore while it is in`
         : `${source.name} is out and in use`,
     });
+  }
+
+  /**
+   * On, or off — one tap.
+   *
+   * The whole point of tracking the cover is that somebody moves it, and the
+   * moment they move it is the moment the app should hear about it. A form
+   * standing between the barn and that fact is how the record ends up saying
+   * the cover is on all summer.
+   */
+  async function toggleCover(source: WaterSource) {
+    const next: TankCover = source.cover === "on" ? "off" : "on";
+    const result = await mutations.update(source.id, { cover: next });
+    if (!result.ok) {
+      show({ message: "Could not change that", tone: "danger" });
+      return;
+    }
+
+    show(
+      next === "on"
+        ? { message: `${source.name} is covered`, tone: "success" }
+        : { message: `${source.name} uncovered — it goes back on before the next freeze` },
+    );
   }
 
   async function removeSource(source: WaterSource) {
@@ -254,12 +302,26 @@ export function WaterPanel({
 
   return (
     <div className="flex flex-col gap-density">
+      {toFit.length === 0 ? null : (
+        <Callout
+          tone="action"
+          title={`${toFit.length} cover${toFit.length === 1 ? "" : "s"} to put on before a freeze`}
+        >
+          {toFit.map((target) => target.waterSource.name).join(", ")}.{" "}
+          {toFit.length === 1 ? "It has a cover" : "They have covers"} and{" "}
+          {toFit.length === 1 ? "it is" : "they are"} off. This is the job that has to happen the
+          evening before rather than the morning after — put {toFit.length === 1 ? "it" : "them"} on
+          and mark {toFit.length === 1 ? "it" : "them"} covered here.
+        </Callout>
+      )}
+
       {vulnerable.length === 0 ? null : (
         <Callout tone="danger" title={`${vulnerable.length} in use with no heater`}>
           {vulnerable.map((target) => target.waterSource.name).join(", ")} —{" "}
           {vulnerable.length === 1 ? "this is the tank" : "these are the tanks"} §6 names in the
           freeze alert, and {vulnerable.length === 1 ? "it is" : "they are"} where the ice-breaking
-          chores land on a hard-freeze morning.
+          chores land on a hard-freeze morning. A cover slows the ice; it does not stop it, so the
+          morning walk still happens.
         </Callout>
       )}
 
@@ -286,12 +348,15 @@ export function WaterPanel({
           <CardGrid columns={3}>
             {water.map((source) => {
               const drinkers = servedBy(source);
-              const atRisk = source.active && !source.hasHeater && drinkers.length > 0;
+              const cover: TankCover = source.cover ?? "none";
+              // What the freeze alert will say about it: in use, serving
+              // something, and with nothing over it.
+              const exposed = source.active && drinkers.length > 0 && cover !== "on";
 
               return (
                 <RecordCard
                   key={source.id}
-                  tone={!source.active ? "neutral" : atRisk ? "danger" : "calm"}
+                  tone={!source.active ? "neutral" : exposed ? "danger" : "calm"}
                   title={source.name}
                   subtitle={TYPE_LABEL[source.type]}
                   actions={
@@ -301,9 +366,13 @@ export function WaterPanel({
                   }
                   meta={
                     <>
-                      <Pill tone={source.hasHeater ? "calm" : "danger"}>
-                        {source.hasHeater ? "heated" : "no heater"}
+                      <Pill
+                        tone={cover === "on" ? "calm" : cover === "off" ? "action" : "neutral"}
+                        dot={cover === "off"}
+                      >
+                        {COVER_PILL[cover]}
                       </Pill>
+                      {source.hasHeater ? <Pill tone="calm">heated</Pill> : null}
                       <Pill tone="neutral">
                         {drinkers.length === 0
                           ? "serves nothing"
@@ -316,6 +385,11 @@ export function WaterPanel({
                     <p className="text-sm text-muted">{source.notes}</p>
                   )}
                   <div className="flex flex-wrap gap-2">
+                    {cover === "none" ? null : (
+                      <Button variant="ghost" onClick={() => void toggleCover(source)}>
+                        {cover === "on" ? "Take the cover off" : "Put the cover on"}
+                      </Button>
+                    )}
                     <Button variant="ghost" onClick={() => void toggleActive(source)}>
                       {source.active ? "Stow it" : "Put it out"}
                     </Button>
@@ -357,9 +431,16 @@ export function WaterPanel({
                 setDraft({ ...draft, type: event.target.value as WaterSourceType })
               }
             />
+            <Select
+              label="Cover"
+              options={COVER_OPTIONS}
+              value={draft.cover}
+              hint="A cover that is off before a hard freeze becomes a chore the evening before."
+              onChange={(event) => setDraft({ ...draft, cover: event.target.value as TankCover })}
+            />
             <Checkbox
               label="Has a heater"
-              hint="Heaterless tanks are the ones the freeze alert calls out by name."
+              hint="Nothing on this place does. Heaterless tanks are the ones the freeze alert calls out by name."
               checked={draft.hasHeater}
               onChange={(event) => setDraft({ ...draft, hasHeater: event.target.checked })}
             />

@@ -20,6 +20,7 @@ import {
   allocateFeedCost,
   allocationFor,
   costPerHead,
+  herdDemand,
   resolvedDemandFor,
 } from "../src/domain/allocation.js";
 
@@ -283,7 +284,10 @@ const plan = (over: Partial<FeedingPlan> = {}): FeedingPlan => ({
 describe("resolvedDemandFor", () => {
   it("takes the zone plan for an animal with no plan of its own", () => {
     const demand = resolvedDemandFor([plan()], id(50), [id(40)]);
-    expect(demand.get(HAY)).toBe(0.25);
+    // The unit travels with the amount. A ration written in scoops against
+    // stock counted in bags is an eighteen-fold error, and a bare number gives
+    // nothing downstream any way to notice.
+    expect(demand.get(HAY)).toEqual({ amount: 0.25, unit: "round_bale" });
   });
 
   it("lets an animal plan override the pen's ration for the same feed", () => {
@@ -301,7 +305,7 @@ describe("resolvedDemandFor", () => {
       ],
     });
 
-    expect(resolvedDemandFor([plan(), own], id(50), [id(40)]).get(HAY)).toBe(0.4);
+    expect(resolvedDemandFor([plan(), own], id(50), [id(40)]).get(HAY)?.amount).toBe(0.4);
   });
 
   it("extends rather than replaces for a feed the specific plan does not mention", () => {
@@ -323,12 +327,152 @@ describe("resolvedDemandFor", () => {
 
     const demand = resolvedDemandFor([plan(), own], id(50), [id(40)]);
 
-    expect(demand.get(HAY)).toBe(0.25);
-    expect(demand.get(GRAIN)).toBe(12);
+    expect(demand.get(HAY)?.amount).toBe(0.25);
+    expect(demand.get(GRAIN)?.amount).toBe(12);
   });
 
   it("gives nothing to an animal no plan covers", () => {
     expect(resolvedDemandFor([plan()], id(51), [id(99)]).size).toBe(0);
+  });
+});
+
+/**
+ * The herd's demand (spec §5.3).
+ *
+ * Two defects lived here and both emptied a barn without saying anything.
+ * A group plan reached nobody, so the commonest kind of plan contributed
+ * nothing to the run-out date at all; and the plan's unit was dropped, so a
+ * ration in scoops was counted against stock in bags — eighteen times too
+ * fast, in the direction that runs a place out.
+ */
+describe("herdDemand", () => {
+  const CUBES = id(3);
+  const cubes: FeedType = {
+    id: CUBES,
+    ...base,
+    name: "Range cubes",
+    category: "grain",
+    unit: "bag",
+    reorderLeadDays: 7,
+    active: true,
+  };
+
+  const groupPlan = (over: Partial<FeedingPlan> = {}): FeedingPlan =>
+    plan({
+      id: id(35),
+      target: "group",
+      targetId: base.propertyId,
+      lines: [
+        {
+          feedTypeId: CUBES,
+          amount: quantity(3, "scoop"),
+          frequency: "twice_daily",
+          timeOfDay: "morning",
+        },
+      ],
+      ...over,
+    });
+
+  const head = (n: number) => ({ id: id(50 + n), zoneIds: [] as Ulid[] });
+
+  it("restates a ration in the unit its feed is counted in", () => {
+    // Six scoops is a third of a bag. Counted as six *bags* — which is what a
+    // dropped unit amounts to — ten bags on hand runs out this afternoon.
+    const demand = herdDemand({
+      plans: [groupPlan()],
+      feeds: [cubes],
+      animals: [head(0)],
+      propertyId: base.propertyId,
+    });
+
+    expect(demand.perDay.get(CUBES)).toBeCloseTo(6 / 18, 6);
+  });
+
+  it("counts a group plan once per head, not once", () => {
+    // A pen of forty runs the barn down forty times as fast, and a sum over
+    // plans is not what anybody is carrying to the trough.
+    const demand = herdDemand({
+      plans: [groupPlan()],
+      feeds: [cubes],
+      animals: [head(0), head(1), head(2)],
+      propertyId: base.propertyId,
+    });
+
+    expect(demand.perDay.get(CUBES)).toBeCloseTo((6 / 18) * 3, 6);
+  });
+
+  it("gives a group plan nobody without the property to target through", () => {
+    // The defect, kept as a test: `plansForAnimal` matches a group plan against
+    // the ids it is handed, and the property is not one of them. Left out, the
+    // commonest kind of plan is invisible to the run-out projection.
+    const demand = herdDemand({ plans: [groupPlan()], feeds: [cubes], animals: [head(0)] });
+
+    expect(demand.perDay.size).toBe(0);
+  });
+
+  it("leaves a zone plan's animals alone that the zone does not cover", () => {
+    expect(
+      herdDemand({
+        plans: [plan()],
+        feeds: [hay],
+        animals: [head(0)],
+        propertyId: base.propertyId,
+      }).perDay.size,
+    ).toBe(0);
+  });
+
+  it("takes a ration already in the feed's own unit at face value", () => {
+    const demand = herdDemand({
+      plans: [plan()],
+      feeds: [hay],
+      animals: [{ id: id(50), zoneIds: [id(40)] }],
+      propertyId: base.propertyId,
+    });
+
+    expect(demand.perDay.get(HAY)).toBe(0.25);
+  });
+
+  it("names a ration it cannot convert rather than counting it wrongly", () => {
+    // Cubes catalogued by the bag with no weight given, fed by the... bale.
+    // There is no honest number, and both alternatives — dropping it, or
+    // passing the raw figure through — look completely ordinary on screen.
+    const odd: FeedType = { ...cubes, unit: "block" };
+    const demand = herdDemand({
+      plans: [groupPlan()],
+      feeds: [odd],
+      animals: [head(0)],
+      propertyId: base.propertyId,
+    });
+
+    expect(demand.perDay.size).toBe(0);
+    expect(demand.unconvertible).toEqual([CUBES]);
+  });
+
+  it("uses the feed's own weight per unit over the standard one", () => {
+    // A forty-pound bag rather than a fifty-pound one: six scoops is a larger
+    // share of it, and the feed is the only thing that knows.
+    const light: FeedType = { ...cubes, estWeightLbPerUnit: 40 };
+    const demand = herdDemand({
+      plans: [groupPlan()],
+      feeds: [light],
+      animals: [head(0)],
+      propertyId: base.propertyId,
+    });
+
+    expect(demand.perDay.get(CUBES)).toBeCloseTo((6 * 50) / 18 / 40, 6);
+  });
+
+  it("takes a ration for a feed that has left the catalogue at face value", () => {
+    // Nothing to convert to, and dropping it would understate a barn that is
+    // genuinely being emptied.
+    const demand = herdDemand({
+      plans: [groupPlan()],
+      feeds: [],
+      animals: [head(0)],
+      propertyId: base.propertyId,
+    });
+
+    expect(demand.perDay.get(CUBES)).toBe(6);
   });
 });
 
@@ -417,6 +561,86 @@ describe("allocateFeedCost", () => {
 
     expect(allocations[0]?.cost).toEqual(fromDollars(0));
     expect(allocations[0]?.costComplete).toBe(true);
+  });
+});
+
+describe("what the feed bill is measured in", () => {
+  const CUBES = id(3);
+  const cubes: FeedType = {
+    id: CUBES,
+    ...base,
+    name: "Range cubes",
+    category: "grain",
+    unit: "bag",
+    reorderLeadDays: 7,
+    active: true,
+  };
+
+  const scoopPlan = plan({
+    id: id(36),
+    target: "group",
+    targetId: base.propertyId,
+    lines: [
+      {
+        feedTypeId: CUBES,
+        amount: quantity(9, "scoop"),
+        frequency: "once_daily",
+        timeOfDay: "morning",
+      },
+    ],
+  });
+
+  const bought = purchase({
+    id: id(15),
+    feedTypeId: CUBES,
+    quantity: 20,
+    unitCost: fromDollars(18),
+  });
+
+  it("prices a ration in the unit the feed was bought by", () => {
+    // A unit cost is per bag. Nine scoops a day is half a bag, so a week is
+    // three and a half bags at $18 — not nine bags a day at $18, which is the
+    // bill a dropped unit produces.
+    const [allocation] = allocateFeedCost({
+      plans: [scoopPlan],
+      purchases: [bought],
+      feeds: [cubes],
+      animals: [{ id: id(50), zoneIds: [] }],
+      propertyId: base.propertyId,
+      days: 7,
+    });
+
+    expect(allocation?.quantityByFeedType.get(CUBES)).toBeCloseTo(3.5, 6);
+    expect(allocation?.cost.cents).toBe(Math.round(3.5 * fromDollars(18).cents));
+  });
+
+  it("bills nobody for a group plan with no property to target through", () => {
+    const [allocation] = allocateFeedCost({
+      plans: [scoopPlan],
+      purchases: [bought],
+      feeds: [cubes],
+      animals: [{ id: id(50), zoneIds: [] }],
+      days: 7,
+    });
+
+    expect(allocation?.quantityByFeedType.size).toBe(0);
+  });
+
+  it("says the cost is incomplete rather than inventing a quantity", () => {
+    // No weight for the unit it is counted in, so there is no honest quantity
+    // — and a bill that quietly leaves an animal's grain out is one somebody
+    // gets invoiced under.
+    const [allocation] = allocateFeedCost({
+      plans: [scoopPlan],
+      purchases: [bought],
+      feeds: [{ ...cubes, unit: "block" }],
+      animals: [{ id: id(50), zoneIds: [] }],
+      propertyId: base.propertyId,
+      days: 7,
+    });
+
+    expect(allocation?.quantityByFeedType.size).toBe(0);
+    expect(allocation?.costComplete).toBe(false);
   });
 });
 

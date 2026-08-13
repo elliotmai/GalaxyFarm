@@ -29,14 +29,22 @@ const ADMIN_ROUTES = [
   "/admin/cattle/breeding",
   "/admin/cattle/calving",
   "/admin/feed",
+  "/admin/chickens/flock",
+  "/admin/chickens/eggs",
   "/admin/supplies",
   "/admin/contacts",
   "/admin/pets",
   "/admin/housesitter",
   "/admin/reports",
   "/admin/settings",
+  "/admin/equipment",
+  "/admin/equipment/roadmap",
   "/admin/equipment/candidates",
   "/admin/cattle/candidates",
+  "/admin/horses",
+  "/admin/horses/roadmap",
+  "/admin/horses/candidates",
+  "/admin/horses/herd",
 ];
 
 const KIOSK_BOARDS = [

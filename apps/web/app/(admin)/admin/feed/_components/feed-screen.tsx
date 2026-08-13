@@ -46,6 +46,7 @@ import {
   feedPurchaseSchema,
   feedTypeSchema,
   projectFeed,
+  herdDemand,
   resolvedDemandFor,
   weightedAverageCost,
   type ConsumptionKind,
@@ -142,15 +143,11 @@ export function FeedScreen({
    * actually on. Two cows on the same pen plan contribute twice, which is what
    * makes a pen of forty run the barn down forty times as fast.
    */
-  const demandByFeedType = useMemo(() => {
-    const total = new Map<Ulid, number>();
-    for (const scope of animalScopes) {
-      for (const [feedTypeId, perDay] of resolvedDemandFor(activePlans, scope.id, scope.zoneIds)) {
-        total.set(feedTypeId, (total.get(feedTypeId) ?? 0) + perDay);
-      }
-    }
-    return total;
-  }, [animalScopes, activePlans]);
+  const demand = useMemo(
+    () => herdDemand({ plans: activePlans, feeds, animals: animalScopes, propertyId }),
+    [animalScopes, activePlans, feeds, propertyId],
+  );
+  const demandByFeedType = demand.perDay;
 
   // Not memoised. It depends on `now`, which is a new object every render, so
   // a memo would recompute anyway while looking as though it did not. This is
@@ -199,13 +196,28 @@ export function FeedScreen({
           label="Head being fed"
           value={
             animalScopes.filter(
-              (scope) => resolvedDemandFor(activePlans, scope.id, scope.zoneIds).size > 0,
+              (scope) =>
+                resolvedDemandFor(activePlans, scope.id, scope.zoneIds, [propertyId]).size > 0,
             ).length
           }
           tone="identity"
         />
         <Tile label="Spent on feed" value={money({ cents: Math.round(spend) })} />
       </div>
+
+      {demand.unconvertible.length === 0 ? null : (
+        <Callout
+          tone="danger"
+          title={`${demand.unconvertible.length} ration${demand.unconvertible.length === 1 ? "" : "s"} is not counted against the barn`}
+        >
+          {demand.unconvertible
+            .map((feedTypeId) => feeds.find((feed) => feed.id === feedTypeId)?.name ?? "a feed")
+            .join(", ")}
+          . The plan is written in one unit and the feed is counted in another, and nothing says
+          what one of those weighs. Give the feed its <em>lb each</em> on the Feed plans screen —
+          until then the run-out date below leaves it out rather than counting it wrongly.
+        </Callout>
+      )}
 
       {toOrder.length === 0 ? null : (
         <Callout
@@ -258,6 +270,7 @@ export function FeedScreen({
                 purchases={purchases}
                 animals={liveAnimals}
                 scopes={animalScopes}
+                propertyId={propertyId}
               />
             )}
           </div>
@@ -879,18 +892,20 @@ function CostPerHead({
   purchases,
   animals,
   scopes,
+  propertyId,
 }: {
   readonly feeds: readonly FeedType[];
   readonly plans: readonly FeedingPlan[];
   readonly purchases: readonly FeedPurchase[];
   readonly animals: readonly Animal[];
   readonly scopes: readonly { id: Ulid; zoneIds: readonly Ulid[] }[];
+  readonly propertyId: Ulid;
 }) {
   const [days, setDays] = useState(30);
 
   const allocations = useMemo(
-    () => allocateFeedCost({ plans, purchases, animals: scopes, days }),
-    [plans, purchases, scopes, days],
+    () => allocateFeedCost({ plans, purchases, feeds, animals: scopes, propertyId, days }),
+    [plans, purchases, feeds, scopes, propertyId, days],
   );
 
   const byId = useMemo(() => new Map(animals.map((animal) => [animal.id, animal])), [animals]);

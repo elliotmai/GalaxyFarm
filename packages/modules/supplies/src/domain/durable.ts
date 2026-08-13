@@ -22,8 +22,16 @@ export interface DurableAssignment extends BaseRecord {
   readonly animalId?: Ulid | undefined;
   readonly zoneId?: Ulid | undefined;
   readonly condition: DurableCondition;
-  readonly from: Date;
-  readonly to?: Date | undefined;
+  /**
+   * Named the way `ZoneAssignment` names its period, and for a reason beyond
+   * symmetry: a bare `from` is not recognisable as a timestamp by name, and
+   * the sync client has to go by name — it runs in the browser and cannot ask
+   * the schema. An unrecognised timestamp arrives as a string and every
+   * comparison against it is NaN, which here would mean a halter quietly
+   * never being out with anybody.
+   */
+  readonly periodFrom: Date;
+  readonly periodTo?: Date | undefined;
   readonly notes?: string | undefined;
 }
 
@@ -34,22 +42,23 @@ export const durableAssignmentSchema = baseRecordSchema
     animalId: ulidSchema.optional(),
     zoneId: ulidSchema.optional(),
     condition: z.enum(DURABLE_CONDITIONS),
-    from: z.coerce.date(),
-    to: z.coerce.date().optional(),
+    periodFrom: z.coerce.date(),
+    periodTo: z.coerce.date().optional(),
     notes: z.string().max(2000).optional(),
   })
-  .refine((assignment) => assignment.to === undefined || assignment.to >= assignment.from, {
-    message: "An assignment cannot end before it starts",
-    path: ["to"],
-  })
+  .refine(
+    (assignment) =>
+      assignment.periodTo === undefined || assignment.periodTo >= assignment.periodFrom,
+    { message: "An assignment cannot end before it starts", path: ["periodTo"] },
+  )
   .refine(
     (assignment) =>
       assignment.condition !== "retired" && assignment.condition !== "lost"
         ? true
-        : assignment.to !== undefined,
+        : assignment.periodTo !== undefined,
     // Retiring something without closing the assignment leaves a retired halter
     // still showing as being on a calf.
-    { message: "Close the assignment when something is retired or lost", path: ["to"] },
+    { message: "Close the assignment when something is retired or lost", path: ["periodTo"] },
   ) as unknown as z.ZodType<DurableAssignment>;
 
 /** Open assignments — where things are right now. */
@@ -58,7 +67,9 @@ export function currentlyAssigned(
   at: Date,
 ): DurableAssignment[] {
   return assignments.filter(
-    (assignment) => assignment.from <= at && (assignment.to === undefined || assignment.to > at),
+    (assignment) =>
+      assignment.periodFrom <= at &&
+      (assignment.periodTo === undefined || assignment.periodTo > at),
   );
 }
 

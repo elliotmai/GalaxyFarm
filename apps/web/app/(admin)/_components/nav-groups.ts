@@ -107,10 +107,16 @@ export const NAV: readonly NavGroup[] = [
   {
     label: "Horses",
     collapsedByDefault: true,
+    // The live two first, then the shells §5.9 asks for. There are no horses
+    // here for years yet; what gets used in the meantime goes at the top.
     items: [
       { href: "/admin/horses", label: "Horses" },
-      { href: "/admin/horses/roadmap", label: "Horse roadmap" },
-      { href: "/admin/horses/candidates", label: "Horse candidates" },
+      { href: "/admin/horses/roadmap", label: "Roadmap" },
+      { href: "/admin/horses/candidates", label: "Candidates" },
+      { href: "/admin/horses/herd", label: "Herd" },
+      { href: "/admin/horses/pens", label: "Pens" },
+      { href: "/admin/horses/feeding", label: "Feeding" },
+      { href: "/admin/horses/breeding", label: "Breeding" },
     ],
   },
   {

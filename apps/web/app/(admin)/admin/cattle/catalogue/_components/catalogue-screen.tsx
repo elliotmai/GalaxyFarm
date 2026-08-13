@@ -29,6 +29,7 @@ import {
   planCatalogueImport,
   READABLE_REGISTRIES,
   registrationUrl,
+  reviveRegistryAnimal,
   type CataloguePlan,
   type CatalogueRow,
   type ExternalAnimal,
@@ -72,17 +73,14 @@ interface Found {
   readonly total: number;
 }
 
-/** What the API says when the graph is not configured, said in plainer words. */
-const NOT_SET_UP =
-  "The association catalogue is not connected on this server. Everything else on the site works without it — it is the crawled herdbooks that are missing, not your own records.";
-
 async function ask<T>(url: string): Promise<T> {
   const response = await fetch(url);
   const body = (await response.json()) as T & { error?: string };
 
-  if (!response.ok) {
-    throw new Error(response.status === 503 ? NOT_SET_UP : (body.error ?? "That did not work."));
-  }
+  // The route's own words either way. A 503 here means the graph is not
+  // configured, and it names which settings are missing — which is the whole
+  // difference between "nothing is set up" and "you set three of the four".
+  if (!response.ok) throw new Error(body.error ?? "That did not work.");
   return body;
 }
 
@@ -137,7 +135,8 @@ export function CatalogueScreen({
     if (search.sex !== "") query.set("sex", search.sex);
 
     try {
-      setResult(await ask<Found>(`/api/registry/search?${query.toString()}`));
+      const answer = await ask<Found>(`/api/registry/search?${query.toString()}`);
+      setResult({ ...answer, found: answer.found.map(reviveRegistryAnimal) });
     } catch (caught) {
       setResult(undefined);
       setError(caught instanceof Error ? caught.message : "That search did not work.");
@@ -160,8 +159,13 @@ export function CatalogueScreen({
             `&regNumber=${encodeURIComponent(animal.regNumber)}&generations=${generations}`,
         );
 
-        const plan = planCatalogueImport(detail.animal, detail.pedigree, onFile);
-        setOpened({ animal: detail.animal, plan, generations });
+        // Dates back into dates before anything reads them. JSON has no date,
+        // so what arrives is a string wearing the type of one.
+        const subject = reviveRegistryAnimal(detail.animal);
+        const pedigree = detail.pedigree.map(reviveRegistryAnimal);
+
+        const plan = planCatalogueImport(subject, pedigree, onFile);
+        setOpened({ animal: subject, plan, generations });
         // Certain matches are not a decision — they are the same animal. Only
         // the proposals start unticked.
         setMerging(new Set());

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import {
   Button,
+  Callout,
   CardGrid,
   EmptyState,
   PageBody,
@@ -20,8 +21,8 @@ import {
   useToast,
 } from "@galaxy-farm/ui";
 import {
-  dailyDemandOf,
   displayName,
+  openAssignments,
   FEEDING_FREQUENCIES,
   feedingPlanSchema,
   TIMES_OF_DAY,
@@ -33,9 +34,11 @@ import {
   type Ulid,
   type Unit,
   type Zone,
+  type ZoneAssignment,
 } from "@galaxy-farm/core";
 import {
   describeGrain,
+  herdDemand,
   FEED_CATEGORIES,
   FEED_UNITS,
   feedTypeSchema,
@@ -78,6 +81,7 @@ export function CattleFeedScreen({
   const { records: zones } = useRecords<Zone>("zones", query);
   const { records: feeds } = useRecords<FeedType>("feedTypes", query);
   const { records: plans, loading } = useRecords<FeedingPlan>("feedingPlans", query);
+  const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
 
   const plansApi = useMutations<FeedingPlan>(
     "feedingPlans",
@@ -107,25 +111,47 @@ export function CattleFeedScreen({
   const zoneById = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
 
   /**
-   * Daily demand across every active plan, per feed type.
+   * Daily demand across the herd, per feed type.
    *
    * Summed per type rather than overall, for the reason above — and only over
    * active plans, because a plan switched off out of season is not feed
    * anybody is putting out.
+   *
+   * Worked out by `herdDemand` rather than here, so this screen and the feed
+   * inventory give the same answer. Two things it does that summing the plans
+   * did not: it counts heads, so a group plan feeding forty is forty rations
+   * rather than one, and it restates each ration in the unit its feed is
+   * counted in, so a plan written in scoops does not read as bags.
    */
-  const demand = useMemo(() => {
-    const totals = new Map<Ulid, number>();
+  const animalScopes = useMemo(
+    () =>
+      animals
+        .filter((animal) => animal.status === "active")
+        .map((animal) => ({
+          id: animal.id,
+          zoneIds: openAssignments(assignments, animal.id).map((entry) => entry.zoneId),
+        })),
+    [animals, assignments],
+  );
 
-    for (const plan of plans) {
-      for (const [feedTypeId, quantity] of dailyDemandOf(plan)) {
-        totals.set(feedTypeId, (totals.get(feedTypeId) ?? 0) + quantity.amount);
-      }
-    }
+  const herd = useMemo(
+    () =>
+      herdDemand({
+        plans: plans.filter((plan) => plan.active),
+        feeds,
+        animals: animalScopes,
+        propertyId,
+      }),
+    [plans, feeds, animalScopes, propertyId],
+  );
 
-    return [...totals.entries()]
-      .map(([feedTypeId, amount]) => ({ feed: feedById.get(feedTypeId), amount }))
-      .filter((entry): entry is { feed: FeedType; amount: number } => entry.feed !== undefined);
-  }, [plans, feedById]);
+  const demand = useMemo(
+    () =>
+      [...herd.perDay.entries()]
+        .map(([feedTypeId, amount]) => ({ feed: feedById.get(feedTypeId), amount }))
+        .filter((entry): entry is { feed: FeedType; amount: number } => entry.feed !== undefined),
+    [herd, feedById],
+  );
 
   function describeTarget(plan: FeedingPlan): string {
     if (plan.target === "animal") {
@@ -190,6 +216,20 @@ export function CattleFeedScreen({
           hint="Counted per type, never summed"
         />
       </div>
+
+      {herd.unconvertible.length === 0 ? null : (
+        <Callout
+          tone="danger"
+          title={`${herd.unconvertible.length} ration${herd.unconvertible.length === 1 ? "" : "s"} cannot be counted against the barn`}
+        >
+          {herd.unconvertible
+            .map((feedTypeId) => feedById.get(feedTypeId)?.name ?? "a feed")
+            .join(", ")}
+          . The plan is written in one unit and the feed is counted in another, and nothing says
+          what one of those weighs. Give the feed its <em>lb each</em> and both numbers work — until
+          then it is left out of the daily demand rather than counted wrongly.
+        </Callout>
+      )}
 
       {demand.length === 0 ? null : (
         <Section
@@ -267,7 +307,13 @@ export function CattleFeedScreen({
       </Section>
 
       <Section title="Add a plan">
-        <PlanForm animals={animals} zones={zones} feeds={feeds} api={plansApi} />
+        <PlanForm
+          animals={animals}
+          zones={zones}
+          feeds={feeds}
+          api={plansApi}
+          propertyId={propertyId}
+        />
       </Section>
 
       <Section title="Every plan">
@@ -361,6 +407,7 @@ export function CattleFeedScreen({
             zones={zones}
             feeds={feeds}
             api={plansApi}
+            propertyId={propertyId}
             onSaved={() => setEditing(undefined)}
           />
         </Modal>
@@ -527,6 +574,7 @@ function PlanForm({
   zones,
   feeds,
   api,
+  propertyId,
   onSaved,
 }: {
   readonly plan?: FeedingPlan | undefined;
@@ -534,6 +582,8 @@ function PlanForm({
   readonly zones: readonly Zone[];
   readonly feeds: readonly FeedType[];
   readonly api: ReturnType<typeof useMutations<FeedingPlan>>;
+  /** What a "whole group" plan targets — the group every animal here is in. */
+  readonly propertyId: Ulid;
   readonly onSaved?: (() => void) | undefined;
 }) {
   const { show } = useToast();
@@ -601,11 +651,9 @@ function PlanForm({
         name: name.trim(),
         target,
         // A group plan still needs a target id; the herd is the property.
-        targetId: (target === "group"
-          ? plan?.target === "group"
-            ? plan.targetId
-            : feeds[0]?.propertyId
-          : targetId) as Ulid,
+        // A group plan targets the property: it is the group every animal on
+        // the place belongs to, and `herdDemand` resolves it that way.
+        targetId: (target === "group" ? propertyId : targetId) as Ulid,
         lines: written,
         ...(notes.trim() === "" ? {} : { specialNotes: notes.trim() }),
       };

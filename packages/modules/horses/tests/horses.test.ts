@@ -5,7 +5,10 @@ import type { Ulid } from "@galaxy-farm/core";
 import {
   concerns,
   describeHeight,
+  describeHorse,
+  disciplineFit,
   horseCandidateSchema,
+  isHandsFraction,
   type HorseCandidateDetail,
 } from "../src/domain/horse-candidate.js";
 
@@ -72,6 +75,57 @@ describe("describeHeight", () => {
 
   it("says nothing for an unstated height", () => {
     expect(describeHeight(undefined)).toBeUndefined();
+  });
+});
+
+describe("isHandsFraction", () => {
+  it("is the rule the schema enforces, available to a form as it is typed", () => {
+    // Same predicate, two callers: the message on the field and the reason a
+    // save was refused cannot say different things.
+    expect(isHandsFraction(15.3)).toBe(true);
+    expect(isHandsFraction(16)).toBe(true);
+    expect(isHandsFraction(15.4)).toBe(false);
+    expect(isHandsFraction(15.9)).toBe(false);
+  });
+
+  it("refuses a number that is not one", () => {
+    // A half-typed box reads back as NaN, and "not a height yet" is the right
+    // answer to that rather than a crash or a quiet pass.
+    expect(isHandsFraction(Number.NaN)).toBe(false);
+  });
+});
+
+describe("describeHorse", () => {
+  it("says what it is in the order a listing is skimmed", () => {
+    expect(describeHorse(detail)).toBe("8 yo gelding · 15.2 hh · Quarter Horse · solid");
+  });
+
+  it("leaves out what the listing does not say", () => {
+    // Four "unknown"s say less than a short line, and most listings start
+    // this sparse.
+    expect(
+      describeHorse({
+        candidateId: id(3),
+        sex: "mare",
+        disciplines: [],
+        soundness: "unknown",
+        vetCheckDone: false,
+      }),
+    ).toBe("mare");
+  });
+
+  it("writes a training level the way it is said, not the way it is stored", () => {
+    expect(describeHorse({ ...detail, trainingLevel: "green_broke" })).toContain("green broke");
+  });
+});
+
+describe("disciplineFit", () => {
+  it("distinguishes a horse that does not do this from one nobody has said", () => {
+    // A listing naming no disciplines has not said no. Hiding it would lose
+    // the horse you have not asked about yet.
+    expect(disciplineFit(detail, "ranch")).toBe("listed");
+    expect(disciplineFit(detail, "reining")).toBe("not_listed");
+    expect(disciplineFit({ ...detail, disciplines: [] }, "ranch")).toBe("unstated");
   });
 });
 

@@ -147,7 +147,7 @@ const assignment = (over: Partial<DurableAssignment> = {}): DurableAssignment =>
   quantity: 1,
   animalId: id(50),
   condition: "good",
-  from: new Date("2026-06-01"),
+  periodFrom: new Date("2026-06-01"),
   ...over,
 });
 
@@ -158,7 +158,7 @@ describe("durable assignments", () => {
   });
 
   it("stops counting one that has been handed back", () => {
-    const closed = assignment({ to: new Date("2026-07-01") });
+    const closed = assignment({ periodTo: new Date("2026-07-01") });
     expect(currentlyAssigned([closed], AT)).toEqual([]);
   });
 
@@ -172,7 +172,7 @@ describe("durable assignments", () => {
     const result = durableAssignmentSchema.safeParse({
       ...assignment(),
       condition: "retired",
-      to: new Date("2026-08-01"),
+      periodTo: new Date("2026-08-01"),
     });
     expect(result.success).toBe(true);
   });
@@ -184,7 +184,7 @@ describe("durable assignments", () => {
       id: id(31),
       quantity: 2,
       condition: "retired",
-      to: new Date("2026-07-01"),
+      periodTo: new Date("2026-07-01"),
     });
 
     expect(inService(id(2), 24, [assignment(), scrapped])).toBe(22);

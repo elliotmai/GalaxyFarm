@@ -89,15 +89,27 @@ importers:
       '@galaxy-farm/module-cattle':
         specifier: workspace:*
         version: link:../../packages/modules/cattle
+      '@galaxy-farm/module-equipment':
+        specifier: workspace:*
+        version: link:../../packages/modules/equipment
       '@galaxy-farm/module-feed':
         specifier: workspace:*
         version: link:../../packages/modules/feed
+      '@galaxy-farm/module-horses':
+        specifier: workspace:*
+        version: link:../../packages/modules/horses
       '@galaxy-farm/module-housesitting':
         specifier: workspace:*
         version: link:../../packages/modules/housesitting
       '@galaxy-farm/module-pets':
         specifier: workspace:*
         version: link:../../packages/modules/pets
+      '@galaxy-farm/module-poultry':
+        specifier: workspace:*
+        version: link:../../packages/modules/poultry
+      '@galaxy-farm/module-supplies':
+        specifier: workspace:*
+        version: link:../../packages/modules/supplies
       '@galaxy-farm/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -198,12 +210,21 @@ importers:
       '@galaxy-farm/module-cattle':
         specifier: workspace:*
         version: link:../../modules/cattle
+      '@galaxy-farm/module-equipment':
+        specifier: workspace:*
+        version: link:../../modules/equipment
       '@galaxy-farm/module-feed':
         specifier: workspace:*
         version: link:../../modules/feed
       '@galaxy-farm/module-housesitting':
         specifier: workspace:*
         version: link:../../modules/housesitting
+      '@galaxy-farm/module-poultry':
+        specifier: workspace:*
+        version: link:../../modules/poultry
+      '@galaxy-farm/module-supplies':
+        specifier: workspace:*
+        version: link:../../modules/supplies
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1

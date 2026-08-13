@@ -104,6 +104,22 @@ type Row = Record<string, unknown>;
 const asString = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() !== "" ? value : undefined;
 
+/**
+ * A map from the graph, or nothing.
+ *
+ * Cypher's absent value is `null`, not `undefined`, and it arrives over JSON as
+ * literal `null` — so `head([])` on an animal with no recorded sire returns a
+ * field that is present and null. Checking for `undefined` alone lets that
+ * through to be read as an object. Everything the graph might not have goes
+ * through here, and `typeof null === "object"` is exactly the trap being shut.
+ */
+const asRow = (value: unknown): Row | undefined =>
+  typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Row) : undefined;
+
+/** A list from the graph, with anything unreadable in it dropped. */
+const asRows = (value: unknown): Row[] =>
+  Array.isArray(value) ? value.map(asRow).filter((entry): entry is Row => entry !== undefined) : [];
+
 const asNumber = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) ? value : undefined;
 
@@ -126,28 +142,51 @@ const asDefectStatus = (value: unknown): "free" | "carrier" | "suspect" => {
   return found === "F" ? "free" : found === "C" ? "carrier" : "suspect";
 };
 
+/**
+ * One row per animal, keeping the first of any repeats.
+ *
+ * The query collapses this itself; this is the net under it. Any `MATCH` that
+ * fans out over a relationship — and every one here does — returns the same
+ * animal once per match unless something says otherwise, and the failure looks
+ * exactly like a crawl that holds a bull twice. Keyed on the crawler's own id,
+ * which is what makes one animal one animal across every registry it is
+ * papered in.
+ */
+function oncePerAnimal(rows: readonly Row[]): Row[] {
+  const seen = new Set<string>();
+
+  return rows.filter((row) => {
+    const uid = asString(asRow(row["animal"])?.["uid"]);
+    // Without an id there is nothing safe to compare, and dropping a row on a
+    // guess is worse than showing it.
+    if (uid === undefined || seen.has(uid)) return uid === undefined;
+    seen.add(uid);
+    return true;
+  });
+}
+
 function toAnimal(row: Row): RegistryAnimal | undefined {
-  const animal = row["animal"] as Record<string, unknown> | undefined;
+  const animal = asRow(row["animal"]);
   const association = asString(row["association"]);
   const regNumber = asString(row["regNumber"]);
   if (animal === undefined || association === undefined || regNumber === undefined)
     return undefined;
 
-  const registrations = ((row["registrations"] as Row[] | undefined) ?? [])
+  const registrations = asRows(row["registrations"])
     .map((entry) => ({
       association: ourAssociation(asString(entry["association"]) ?? ""),
       regNumber: asString(entry["regNumber"]) ?? "",
     }))
     .filter((entry) => entry.association !== "" && entry.regNumber !== "");
 
-  const breedComposition = ((row["composition"] as Row[] | undefined) ?? [])
+  const breedComposition = asRows(row["composition"])
     .map((entry) => ({
       breed: asString(entry["breed"]) ?? "",
       percent: asNumber(entry["percent"]) ?? 0,
     }))
     .filter((entry) => entry.breed !== "");
 
-  const geneticTests = ((row["defects"] as Row[] | undefined) ?? [])
+  const geneticTests = asRows(row["defects"])
     .map((entry) => ({
       defect: asString(entry["defect"]) ?? "",
       status: asDefectStatus(entry["status"]),
@@ -155,8 +194,15 @@ function toAnimal(row: Row): RegistryAnimal | undefined {
     }))
     .filter((entry) => entry.defect !== "");
 
+  /**
+   * A parent, if the crawl has one on file.
+   *
+   * Absent far more often than not: every pedigree ends in animals whose own
+   * parents were never crawled, so the top row of any five-generation walk is
+   * all founders. Nothing is wrong with that, and it must not read as an error.
+   */
   const parent = (key: string) => {
-    const found = row[key] as Row | undefined;
+    const found = asRow(row[key]);
     if (found === undefined) return undefined;
     const parentAssociation = asString(found["association"]);
     const parentReg = asString(found["regNumber"]);
@@ -284,8 +330,19 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
           parameters,
         ),
         run(
+          // One row per animal, not per paper. The match fans out over
+          // registrations, so a bull papered in two associations came back
+          // twice — and the count above says `DISTINCT a`, so the header and
+          // the table disagreed about how many animals there were.
+          //
+          // Collapsed by keeping the first registration that satisfied the
+          // filter, ordered so the choice is the same on every run rather than
+          // whichever the planner reached first. `LIMIT` then bounds animals,
+          // which is what a page of results is measured in.
           `MATCH (a:Animal)-[:HAS_REGISTRATION]->(reg:Registration) ${WHERE}
-           WITH a, reg ORDER BY a.name, reg.regNumber
+           WITH a, reg ORDER BY reg.association, reg.regNumber
+           WITH a, head(collect(reg)) AS reg
+           ORDER BY a.name, reg.regNumber
            LIMIT $limit
            RETURN ${RETURN_ANIMAL}`,
           { ...parameters, limit },
@@ -293,7 +350,9 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
       ]);
 
       return {
-        found: page.map(toAnimal).filter((entry): entry is RegistryAnimal => entry !== undefined),
+        found: oncePerAnimal(page)
+          .map(toAnimal)
+          .filter((entry): entry is RegistryAnimal => entry !== undefined),
         total: asNumber(counted[0]?.["total"]) ?? 0,
       };
     },

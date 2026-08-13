@@ -83,6 +83,8 @@ export const waterSources = pgTable(
     name: text("name").notNull(),
     type: text("type").notNull(),
     hasHeater: boolean("has_heater").notNull(),
+    /** `none | off | on` — the mitigation actually used here (§5.1, §6). */
+    cover: text("cover").notNull().default("none"),
     /** False while a seasonal tank is stowed — raises no freeze chore (§6). */
     active: boolean("active").notNull(),
     notes: text("notes"),
@@ -668,6 +670,170 @@ export const feedConsumption = pgTable(
 );
 
 /**
+ * The fleet, and everything that decides when it is due (§5.6).
+ *
+ * Four ledgers around one machine, and none of them is a field on it. What is
+ * *due* is derived from the readings and the service history against the
+ * rules, so a `next_service_at` column would be a second answer that goes
+ * stale the moment somebody logs an oil change from the barn.
+ */
+export const equipment = pgTable(
+  "equipment",
+  {
+    ...baseColumns,
+    name: text("name").notNull(),
+    category: text("category").notNull(),
+    make: text("make"),
+    model: text("model"),
+    year: integer("year"),
+    vin: text("vin"),
+    status: text("status").notNull(),
+    purchasedOn: timestamp("purchased_on", { withTimezone: true, mode: "date" }),
+    purchasePrice: jsonb("purchase_price").$type<{ cents: number }>(),
+    photoKeys: text("photo_keys").array().notNull().default([]),
+    notes: text("notes"),
+  },
+  baseIndexes("equipment"),
+);
+
+export const meterReadings = pgTable(
+  "meter_readings",
+  {
+    ...baseColumns,
+    equipmentId: text("equipment_id").notNull(),
+    kind: text("kind").notNull(),
+    /**
+     * Fractional on purpose: a tractor's hour meter reads 412.7, and rounding
+     * it to 413 moves an interval by twenty minutes of running.
+     */
+    value: doublePrecision("value").notNull(),
+    readOn: timestamp("read_on", { withTimezone: true, mode: "date" }).notNull(),
+    notes: text("notes"),
+  },
+  baseIndexes("meter_readings"),
+);
+
+export const maintenanceRules = pgTable(
+  "maintenance_rules",
+  {
+    ...baseColumns,
+    equipmentId: text("equipment_id").notNull(),
+    task: text("task").notNull(),
+    /** Any combination; the rule comes due at whichever arrives first (§5.6). */
+    everyHours: doublePrecision("every_hours"),
+    everyMiles: doublePrecision("every_miles"),
+    everyMonths: doublePrecision("every_months"),
+    parts: text("parts"),
+    active: boolean("active").notNull(),
+  },
+  baseIndexes("maintenance_rules"),
+);
+
+export const maintenanceLogs = pgTable(
+  "maintenance_logs",
+  {
+    ...baseColumns,
+    equipmentId: text("equipment_id").notNull(),
+    ruleId: text("rule_id"),
+    task: text("task").notNull(),
+    performedOn: timestamp("performed_on", { withTimezone: true, mode: "date" }).notNull(),
+    cost: jsonb("cost").$type<{ cents: number }>(),
+    parts: text("parts"),
+    /** The meter at the time, so the next interval measures from the right place. */
+    hours: doublePrecision("hours"),
+    miles: doublePrecision("miles"),
+    notes: text("notes"),
+  },
+  baseIndexes("maintenance_logs"),
+);
+
+export const fuelLogs = pgTable(
+  "fuel_logs",
+  {
+    ...baseColumns,
+    equipmentId: text("equipment_id").notNull(),
+    gallons: doublePrecision("gallons").notNull(),
+    cost: jsonb("cost").$type<{ cents: number }>().notNull(),
+    filledOn: timestamp("filled_on", { withTimezone: true, mode: "date" }).notNull(),
+    hours: doublePrecision("hours"),
+    miles: doublePrecision("miles"),
+    notes: text("notes"),
+  },
+  baseIndexes("fuel_logs"),
+);
+
+/**
+ * Everything the ranch runs on that is not feed, medicine, or engine-bearing
+ * (§5.11).
+ *
+ * `opening_qty` rather than a live count, for the reason feed keeps none: the
+ * total is purchases less usage over the opening figure, and a stored count
+ * drifts the first time somebody corrects a purchase.
+ */
+export const supplyItems = pgTable(
+  "supply_items",
+  {
+    ...baseColumns,
+    name: text("name").notNull(),
+    kind: text("kind").notNull(),
+    category: text("category").notNull(),
+    unit: text("unit").notNull(),
+    openingQty: doublePrecision("opening_qty").notNull(),
+    reorderThreshold: doublePrecision("reorder_threshold"),
+    storageLocation: text("storage_location"),
+    photoKey: text("photo_key"),
+    notes: text("notes"),
+  },
+  baseIndexes("supply_items"),
+);
+
+export const supplyPurchases = pgTable(
+  "supply_purchases",
+  {
+    ...baseColumns,
+    supplyItemId: text("supply_item_id").notNull(),
+    quantity: doublePrecision("quantity").notNull(),
+    unitCost: jsonb("unit_cost").$type<{ cents: number }>().notNull(),
+    vendorContactId: text("vendor_contact_id"),
+    purchasedOn: timestamp("purchased_on", { withTimezone: true, mode: "date" }).notNull(),
+    notes: text("notes"),
+  },
+  baseIndexes("supply_purchases"),
+);
+
+export const supplyUsage = pgTable(
+  "supply_usage",
+  {
+    ...baseColumns,
+    supplyItemId: text("supply_item_id").notNull(),
+    quantity: doublePrecision("quantity").notNull(),
+    usedOn: timestamp("used_on", { withTimezone: true, mode: "date" }).notNull(),
+    /** Tagged usage is what puts a client calf's shavings on its invoice (§5.11). */
+    animalId: text("animal_id"),
+    zoneId: text("zone_id"),
+    notes: text("notes"),
+  },
+  baseIndexes("supply_usage"),
+);
+
+export const durableAssignments = pgTable(
+  "durable_assignments",
+  {
+    ...baseColumns,
+    supplyItemId: text("supply_item_id").notNull(),
+    quantity: integer("quantity").notNull(),
+    animalId: text("animal_id"),
+    zoneId: text("zone_id"),
+    condition: text("condition").notNull(),
+    /** The open assignment is the current one; history is never overwritten. */
+    periodFrom: timestamp("period_from", { withTimezone: true, mode: "date" }).notNull(),
+    periodTo: timestamp("period_to", { withTimezone: true, mode: "date" }),
+    notes: text("notes"),
+  },
+  baseIndexes("durable_assignments"),
+);
+
+/**
  * Breeding soundness exams (§5.2).
  *
  * The cheapest insurance on a cattle operation and the one most often skipped
@@ -688,6 +854,90 @@ export const fertilityTests = pgTable(
     notes: text("notes"),
   },
   baseIndexes("fertility_tests"),
+);
+
+/**
+ * Poultry (§5.4).
+ *
+ * A flock rather than a row per bird: eighteen hens are one record with a
+ * headcount, and §5.4 makes quail a value in `species` rather than a second
+ * module — which is why nothing here is named for chickens.
+ *
+ * `opening_count` is the count when the flock was first written down. It is
+ * not the count now: that derives from this plus the adjustment log, per
+ * §4.5's rule for a running total. A stored headcount would answer "how many
+ * birds" and nothing else; the log answers "we lost four to something on
+ * Tuesday", which is the fact worth keeping.
+ */
+export const flocks = pgTable(
+  "flocks",
+  {
+    ...baseColumns,
+    name: text("name").notNull(),
+    species: text("species").notNull(),
+    /** The coop, as a Zone. */
+    zoneId: text("zone_id"),
+    breedMix: text("breed_mix"),
+    openingCount: integer("opening_count").notNull(),
+    active: boolean("active").notNull(),
+    notes: text("notes"),
+  },
+  baseIndexes("flocks"),
+);
+
+export const flockAdjustments = pgTable(
+  "flock_adjustments",
+  {
+    ...baseColumns,
+    flockId: text("flock_id").notNull(),
+    reason: text("reason").notNull(),
+    quantity: integer("quantity").notNull(),
+    occurredOn: timestamp("occurred_on", { withTimezone: true, mode: "date" }).notNull(),
+    notes: text("notes"),
+  },
+  baseIndexes("flock_adjustments"),
+);
+
+/**
+ * A collection (§5.4).
+ *
+ * The total is the required field and the breakdown is optional, because the
+ * kiosk entry for this is a row of +1 buttons at the coop (§4.4) and a log that
+ * demanded a colour and a size per egg is a log nobody fills in. The breakdown
+ * is one jsonb column rather than a child table for the reason §4.2 gives:
+ * sync patches *fields*, and a morning's rows change as a unit.
+ */
+export const eggLogs = pgTable(
+  "egg_logs",
+  {
+    ...baseColumns,
+    flockId: text("flock_id"),
+    zoneId: text("zone_id"),
+    collectedOn: timestamp("collected_on", { withTimezone: true, mode: "date" }).notNull(),
+    total: integer("total").notNull(),
+    breakdown: jsonb("breakdown")
+      .$type<{ colour: string; size: string; count: number }[]>()
+      .notNull()
+      .default([]),
+    notes: text("notes"),
+  },
+  baseIndexes("egg_logs"),
+);
+
+/** Where the eggs went (§5.4) — kept, given, or sold, with the money if sold. */
+export const eggDispositions = pgTable(
+  "egg_dispositions",
+  {
+    ...baseColumns,
+    disposedOn: timestamp("disposed_on", { withTimezone: true, mode: "date" }).notNull(),
+    quantity: integer("quantity").notNull(),
+    kind: text("kind").notNull(),
+    contactId: text("contact_id"),
+    /** What that lot brought, not a price per egg. Only a sale carries one. */
+    price: jsonb("price").$type<{ cents: number }>(),
+    notes: text("notes"),
+  },
+  baseIndexes("egg_dispositions"),
 );
 
 export const contacts = pgTable(
@@ -1027,7 +1277,20 @@ export const allTables = {
   feedingPlans,
   feedPurchases,
   feedConsumption,
+  equipment,
+  meterReadings,
+  maintenanceRules,
+  maintenanceLogs,
+  fuelLogs,
+  supplyItems,
+  supplyPurchases,
+  supplyUsage,
+  durableAssignments,
   fertilityTests,
+  flocks,
+  flockAdjustments,
+  eggLogs,
+  eggDispositions,
   contacts,
   attachments,
   careGuides,

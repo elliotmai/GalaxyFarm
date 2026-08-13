@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { MAX_CATALOGUE_GENERATIONS } from "@galaxy-farm/module-cattle";
 
 import { currentActor } from "@/lib/auth";
-import { registryGraph } from "@/lib/registry";
+import { registryGraph, registryNotConfigured } from "@/lib/registry";
 
 /**
  * /api/registry/animal — one animal and, on request, what is above it (§5.2).
@@ -23,10 +23,7 @@ export async function GET(request: Request) {
 
   const graph = registryGraph();
   if (graph === undefined) {
-    return NextResponse.json(
-      { error: "The association catalogue is not set up." },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: registryNotConfigured() }, { status: 503 });
   }
 
   const url = new URL(request.url);

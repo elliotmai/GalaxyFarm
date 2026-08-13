@@ -159,6 +159,41 @@ describe("reading an animal", () => {
     expect(found?.dam).toEqual({ association: "Maine-Anjou", regNumber: "378987" });
   });
 
+  it("reads a founder, whose parents come back as null rather than absent", async () => {
+    // Cypher's absent value is null, and `head([])` on an animal with no
+    // crawled sire returns a field that is present and null. Every pedigree
+    // ends in animals like this — the top row of any five-generation walk is
+    // all founders — so it is the ordinary case, not the edge one.
+    const row: unknown[] = [...montegoBay];
+    row[6] = null;
+    row[7] = null;
+    const fetch = vi.fn().mockResolvedValue(reply(ANIMAL_FIELDS, [row]));
+
+    const found = await graphFor(fetch as never).get("Maine-Anjou", "402303");
+
+    expect(found?.name).toBe("ZNT MONTEGO BAY 901W");
+    expect(found?.sire).toBeUndefined();
+    expect(found?.dam).toBeUndefined();
+  });
+
+  it("survives a row whose lists came back null", async () => {
+    // Same reason: a comprehension over no relationships is an empty list, but
+    // a field the query did not produce at all is null, and one malformed row
+    // must not take a whole page of search results down with it.
+    const row: unknown[] = [...montegoBay];
+    row[3] = null;
+    row[4] = null;
+    row[5] = null;
+    const fetch = vi.fn().mockResolvedValue(reply(ANIMAL_FIELDS, [row]));
+
+    const found = await graphFor(fetch as never).get("Maine-Anjou", "402303");
+
+    expect(found?.regNumber).toBe("402303");
+    expect(found?.registrations).toBeUndefined();
+    expect(found?.breedComposition).toBeUndefined();
+    expect(found?.geneticTests).toBeUndefined();
+  });
+
   it("reads F as free and C as a carrier", async () => {
     const fetch = vi.fn().mockResolvedValue(reply(ANIMAL_FIELDS, [montegoBay]));
 
@@ -191,6 +226,37 @@ describe("reading an animal", () => {
 });
 
 describe("searching", () => {
+  it("shows a bull papered twice once, not once per paper", async () => {
+    // The match fans out over registrations, so an animal in two associations
+    // came back on two rows — while the count beside it said DISTINCT, and the
+    // header and the table disagreed about how many animals there were.
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(reply(["total"], [[8]]))
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, [montegoBay, montegoBay]));
+
+    const result = await graphFor(fetch as never).search({ text: "znt" });
+
+    expect(result.found).toHaveLength(1);
+    expect(result.total).toBe(8);
+  });
+
+  it("keeps two different animals that happen to share a name", async () => {
+    // The crawl holds genuine near-duplicates — the same cow under two
+    // associations, never merged onto one node. Those are two animals as far
+    // as this is concerned, and hiding one would hide a real record.
+    const other: unknown[] = [...montegoBay];
+    other[0] = { ...(montegoBay[0] as object), uid: "USAM20090619Z002" };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(reply(["total"], [[2]]))
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, [montegoBay, other]));
+
+    const result = await graphFor(fetch as never).search({ text: "znt" });
+
+    expect(result.found).toHaveLength(2);
+  });
+
   it("reports the whole count alongside the page", async () => {
     // A search that silently truncates is one that lies about what is out
     // there — "25 results" out of four thousand sends somebody away.
