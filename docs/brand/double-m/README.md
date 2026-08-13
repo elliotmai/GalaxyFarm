@@ -1,8 +1,9 @@
 # Double M — logo concepts
 
-Nine candidate marks for a "Double M" identity, shortlisted from twenty-seven,
-read in the same livestock-brand grammar as the approved **Rocking Double Star**
-and coloured from `packages/config/tailwind.preset.ts`.
+Nine candidate marks for a "Double M" identity: six shortlisted from twenty-seven,
+plus three sharpened, rocker-less versions of two of those six. All read in the
+same livestock-brand grammar as the approved **Rocking Double Star** and coloured
+from `packages/config/tailwind.preset.ts`.
 
 **Status: exploration.** Nothing here is approved and nothing here replaces the
 star mark in `packages/ui/src/brand/`. These are candidates for whenever issue
@@ -13,8 +14,9 @@ Open **[`concepts.html`](./concepts.html)** to see them — each on both real
 grounds (Midnight Nebula and Bluebonnet Linen) at 96, 64, 40 and 24&nbsp;px, plus
 the two tests below.
 
-Numbering is the original twenty-seven-mark sheet's, so the gaps are the cuts.
-The full set is in git history if a dropped one is wanted back.
+Numbering is the original twenty-seven-mark sheet's, so the gaps are the cuts; a
+letter suffix (1a, 1b, 11a) means a mark derived from the number it carries. The
+full set is in git history if a dropped one is wanted back.
 
 ## The two tests
 
@@ -27,7 +29,7 @@ Each mark carries two verdicts, and they are not the same threshold.
 
 Both destroy the same thing first: the narrow gap between two roughly-parallel
 strokes. But heat spreads further than a pixel grid rounds, so a mark can pass
-one and fail the other — and two of these six do.
+one and fail the other — and two of the six do.
 
 ## The six
 
