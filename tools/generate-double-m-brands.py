@@ -223,23 +223,27 @@ VARIANTS = [
         "slug": "flying-double-m",
         "name": "Flying Double M",
         "units": "3 units · wings, M, M",
-        "character": "The most decorated. Wings, not a frame.",
+        "character": "The most decorated. A crest, not a frame.",
         "note": (
             "Wings on the outside tops, so the pair flies rather than each letter flying "
-            "separately — two units of decoration for the price of one. Nothing crosses the "
-            "gap between the letters, which is what keeps a mark this busy readable."
+            "separately — two units of decoration for the price of one. Each one rises off "
+            "the outer leg, turns back over itself and drops, which is what keeps it read "
+            "as a wing rather than as a longer leg. Nothing crosses the gap between the "
+            "letters, which is what keeps a mark this busy readable."
         ),
         "watch": (
-            "Redrawn since the survey. The wings used to sweep out sideways and hook down, "
-            "and at 24px they fused with the letters' top corners into a blot. These are "
-            "shorter and rise steeply, so the wing mass sits above the pair instead of "
-            "beside it. It is still the busiest of the four at ten strokes."
+            "A wing has to leave the letter in a different direction from the leg it lands "
+            "on. Drawn rising steeply, it sets off almost the way the outer leg is already "
+            "going, the two read as one long swoosh, and the M loses a stroke. Turning it "
+            "outward into a crest instead keeps the letter whole. The cost is at the small "
+            "end: the crest is the first thing to blur, so this is the weakest of the four "
+            "under about 24px, and the busiest anywhere at ten strokes."
         ),
         "paths": [
-            m(27, 58, 28, 34),
-            m(73, 58, 28, 34),
-            curve((18.6, 41), (11, 33), (7, 23)),
-            curve((81.4, 41), (89, 33), (93, 23)),
+            m(27, 54, 30, 36),
+            m(73, 54, 30, 36),
+            curve((18, 36), (10, 22), (4, 28)),
+            curve((82, 36), (90, 22), (96, 28)),
         ],
     },
 ]
@@ -294,7 +298,7 @@ SMALL_SIZE = {
     "double-m-connected": "Holds. Reads as one mark.",
     "m-bar-m": "Best of the four. Nothing touches.",
     "rocking-double-m": "Holds. The rocker keeps the pair together.",
-    "flying-double-m": "Wings soften. Legible, not crisp.",
+    "flying-double-m": "Crest blurs into the corners. Weakest small.",
 }
 
 LADDER = [16, 24, 32, 48, 72, 120, 200]
