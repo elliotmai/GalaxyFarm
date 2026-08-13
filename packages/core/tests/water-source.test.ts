@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  coverChoreTitle,
+  coversToFit,
   freezeCheckTargets,
   freezeChoreTitle,
   vulnerableToFreezing,
@@ -73,6 +75,71 @@ describe("WaterSource", () => {
 
   it("requires a name, since the chore says which tank to walk to", () => {
     expect(waterSourceSchema.safeParse(source(TANK_PASTURE, "")).success).toBe(false);
+  });
+
+  it("reads a tank recorded before covers existed as having none", () => {
+    // Not a nicety. A required enum here would refuse the first edit to every
+    // tank already sitting in a device's store, and "nobody has said" is
+    // honestly "none" — it is the answer that raises no chore.
+    const parsed = waterSourceSchema.safeParse(source(TANK_PASTURE, "Pasture tank"));
+
+    expect(parsed.success && parsed.data.cover).toBe("none");
+  });
+
+  it("refuses a cover state that is not one of the three", () => {
+    const parsed = waterSourceSchema.safeParse({
+      ...source(TANK_PASTURE, "Pasture tank"),
+      cover: "maybe",
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe("covers — the job that has to happen before the freeze, not during it", () => {
+  const covered = (cover: WaterSource["cover"]) =>
+    freezeCheckTargets(
+      [source(TANK_PASTURE, "Pasture tank", { cover })],
+      [zone("Pasture", [TANK_PASTURE])],
+    );
+
+  it("asks for the cover that exists and is off", () => {
+    const targets = covered("off");
+
+    expect(targets[0]?.needsCover).toBe(true);
+    expect(coversToFit(targets)).toHaveLength(1);
+    expect(coverChoreTitle(targets[0]!)).toBe("Put the cover on Pasture tank — serves Pasture");
+  });
+
+  it("asks for nothing once it is on", () => {
+    expect(coversToFit(covered("on"))).toEqual([]);
+  });
+
+  it("asks for nothing from a tank that has no cover to put on", () => {
+    // The distinction the three states exist for: a chore telling somebody to
+    // fit a cover that does not exist is a chore they learn to skip, and a
+    // list with one of those in it is a list read less carefully.
+    expect(coversToFit(covered("none"))).toEqual([]);
+  });
+
+  it("still wants the morning check on a covered tank", () => {
+    // A cover slows ice. It does not stop it, and a screen that said otherwise
+    // would be the reason nobody walked out to look.
+    const [target] = covered("on");
+
+    expect(target?.vulnerable).toBe(true);
+    expect(freezeChoreTitle(target!)).toBe(
+      "Lift the cover and check Pasture tank — serves Pasture",
+    );
+  });
+
+  it("raises no cover chore for a tank that is stowed for the season", () => {
+    const targets = freezeCheckTargets(
+      [source(TANK_WEST, "West Pen tank", { cover: "off", active: false })],
+      [zone("West Pen", [TANK_WEST])],
+    );
+
+    expect(coversToFit(targets)).toEqual([]);
   });
 });
 

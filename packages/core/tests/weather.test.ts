@@ -11,6 +11,7 @@ import {
 import {
   DEFAULT_CALF_CHILL_F,
   DEFAULT_HARD_FREEZE_F,
+  coverChores,
   freezeChores,
   freezeDays,
   frostRisk,
@@ -153,6 +154,7 @@ describe("freezeChores", () => {
     name: `Tank ${n}`,
     type: "auto_refill",
     hasHeater: false,
+    cover: "none",
     active: true,
     ...over,
   });
@@ -209,6 +211,57 @@ describe("freezeChores", () => {
     );
 
     expect(chores).toHaveLength(6);
+  });
+
+  describe("coverChores", () => {
+    // The place as it is: no heaters anywhere, covers on two of the tanks.
+    const withCovers = [
+      source(1, { cover: "off" }),
+      source(2, { cover: "on" }),
+      source(3, { cover: "none" }),
+      source(4, { cover: "off", active: false }),
+    ];
+
+    it("asks for the covers that are off, the day before the cold arrives", () => {
+      const chores = coverChores({ daily: [day("2026-12-01", 25)], hourly: [] }, withCovers, zones);
+
+      expect(chores).toHaveLength(1);
+      expect(chores[0]?.target.waterSource.id).toBe(id(1));
+      expect(chores[0]?.freezeDate).toEqual(day("2026-12-01", 25).date);
+      // A cover fitted the morning after the freeze prevented nothing.
+      expect(chores[0]?.date.getTime()).toBe(day("2026-12-01", 25).date.getTime() - 86_400_000);
+    });
+
+    it("does not ask three times for a three-day cold spell", () => {
+      // The same failure the per-tank freeze chore exists to avoid, one step
+      // earlier: nobody puts the same cover on three nights running.
+      const chores = coverChores(
+        {
+          daily: [day("2026-12-01", 25), day("2026-12-02", 24), day("2026-12-03", 26)],
+          hourly: [],
+        },
+        withCovers,
+        zones,
+      );
+
+      expect(chores).toHaveLength(1);
+    });
+
+    it("gets ahead of the first freeze even when a colder day follows it", () => {
+      const chores = coverChores(
+        { daily: [day("2026-12-05", 18), day("2026-12-02", 27)], hourly: [] },
+        withCovers,
+        zones,
+      );
+
+      expect(chores[0]?.freezeDate).toEqual(day("2026-12-02", 27).date);
+    });
+
+    it("asks for nothing when the forecast is warm", () => {
+      expect(
+        coverChores({ daily: [day("2026-12-01", 48)], hourly: [] }, withCovers, zones),
+      ).toEqual([]);
+    });
   });
 });
 

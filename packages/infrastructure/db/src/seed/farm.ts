@@ -31,6 +31,7 @@ export interface SeedWaterSource {
   readonly name: string;
   readonly type: "auto_refill" | "static_tank" | "pond" | "creek";
   readonly hasHeater: boolean;
+  readonly cover: "none" | "off" | "on";
   readonly active: boolean;
   readonly notes?: string;
 }
@@ -47,11 +48,15 @@ export interface SeedZone {
 }
 
 /**
- * Four tanks, none heated.
+ * Four tanks, none heated, and covers instead.
  *
  * §6 treats a heaterless tank as the vulnerable one and names it in the freeze
  * alert. Here that is every tank on the place, which is worth knowing before
  * the first hard freeze — and that lands in the same window as calving.
+ *
+ * Heaters are not coming: they are not used here and none is wanted. What
+ * happens ahead of a freeze is that the covers go on, so the covers are seeded
+ * `off` — they exist, and in August they are not on anything.
  */
 export const SEED_WATER_SOURCES: readonly SeedWaterSource[] = [
   {
@@ -59,6 +64,7 @@ export const SEED_WATER_SOURCES: readonly SeedWaterSource[] = [
     name: "Pasture tank",
     type: "auto_refill",
     hasHeater: false,
+    cover: "off",
     active: true,
     notes: "Shared with the hay field.",
   },
@@ -67,6 +73,7 @@ export const SEED_WATER_SOURCES: readonly SeedWaterSource[] = [
     name: "Pen 1 / 2nd Pen tank",
     type: "auto_refill",
     hasHeater: false,
+    cover: "off",
     active: true,
     notes: "Also serves Randy's pasture.",
   },
@@ -75,6 +82,7 @@ export const SEED_WATER_SOURCES: readonly SeedWaterSource[] = [
     name: "Pen A / Pen B tank",
     type: "auto_refill",
     hasHeater: false,
+    cover: "off",
     active: true,
   },
   {
@@ -82,6 +90,7 @@ export const SEED_WATER_SOURCES: readonly SeedWaterSource[] = [
     name: "West Pen tank",
     type: "static_tank",
     hasHeater: false,
+    cover: "off",
     // Seasonal: false while it is stowed, so it raises no freeze chore.
     active: false,
     notes: "Static tank, put out only when the West Pen is in use.",

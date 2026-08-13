@@ -91,6 +91,7 @@ describe("seed", () => {
       name: row.name,
       type: row.type as WaterSource["type"],
       hasHeater: row.hasHeater,
+      cover: row.cover as WaterSource["cover"],
       active: row.active,
     }));
 
