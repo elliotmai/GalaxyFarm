@@ -98,6 +98,9 @@ importers:
       '@galaxy-farm/module-horses':
         specifier: workspace:*
         version: link:../../packages/modules/horses
+      '@galaxy-farm/module-poultry':
+        specifier: workspace:*
+        version: link:../../packages/modules/poultry
       '@galaxy-farm/module-supplies':
         specifier: workspace:*
         version: link:../../packages/modules/supplies
@@ -207,6 +210,9 @@ importers:
       '@galaxy-farm/module-feed':
         specifier: workspace:*
         version: link:../../modules/feed
+      '@galaxy-farm/module-poultry':
+        specifier: workspace:*
+        version: link:../../modules/poultry
       '@galaxy-farm/module-supplies':
         specifier: workspace:*
         version: link:../../modules/supplies

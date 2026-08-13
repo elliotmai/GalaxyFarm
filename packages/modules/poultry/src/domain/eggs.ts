@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   baseRecordSchema,
   moneySchema,
+  sumMoney,
   ulidSchema,
   type BaseRecord,
   type Money,
@@ -133,6 +134,69 @@ export function layRate(
     .reduce((total, log) => total + log.total, 0);
 
   return collected / headCount / days;
+}
+
+/**
+ * What is still in the basket: collected, less everything that left it.
+ *
+ * Derived from the two logs rather than stored, for §4.5's reason — the log
+ * entries carry the CRUD and the total re-derives, so correcting a miscounted
+ * Tuesday corrects the basket rather than leaving a stored number that
+ * disagrees with its own history.
+ *
+ * It can go negative, and is not clamped. A negative basket means the two logs
+ * disagree with the fridge — eggs given away that nobody logged collecting —
+ * and that is worth seeing rather than hiding behind a zero.
+ *
+ * `at` is required rather than defaulting to now, like `headCountOn` next
+ * door. Both of these logs carry *dates*, which are stored at midday, so a
+ * caller asking as of this instant at six in the morning silently leaves out
+ * everything logged today. Making the date explicit is what forces that
+ * question to be answered rather than defaulted past.
+ */
+export function eggsOnHand(
+  logs: readonly EggLog[],
+  dispositions: readonly EggDisposition[],
+  at: Date,
+): number {
+  const collected = logs
+    .filter((log) => log.collectedOn <= at)
+    .reduce((total, log) => total + log.total, 0);
+
+  return dispositions
+    .filter((entry) => entry.disposedOn <= at)
+    .reduce((remaining, entry) => remaining - entry.quantity, collected);
+}
+
+/**
+ * Where the eggs went, and what the sold ones brought.
+ *
+ * `price` is the money for that entry, not a price per egg or per dozen — a
+ * dozen sold for six dollars is one entry of twelve at six, so the revenue is
+ * the sum and never a multiplication. §5.4 keeps the door open to selling eggs
+ * "without pretending it's a business", and a per-unit price is the first step
+ * into pretending.
+ */
+export function dispositionTotals(
+  dispositions: readonly EggDisposition[],
+  window?: { from: Date; to: Date },
+): { byKind: Map<EggDispositionKind, number>; revenue: Money } {
+  const inWindow = dispositions.filter(
+    (entry) =>
+      window === undefined || (entry.disposedOn >= window.from && entry.disposedOn <= window.to),
+  );
+
+  const byKind = new Map<EggDispositionKind, number>();
+  for (const entry of inWindow) {
+    byKind.set(entry.kind, (byKind.get(entry.kind) ?? 0) + entry.quantity);
+  }
+
+  return {
+    byKind,
+    revenue: sumMoney(
+      inWindow.flatMap((entry) => (entry.price === undefined ? [] : [entry.price])),
+    ),
+  };
 }
 
 /** Totals by colour and size, for the breakdown §6's report asks for. */

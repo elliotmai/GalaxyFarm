@@ -24,6 +24,7 @@
     "@galaxy-farm/module-equipment": "workspace:*",
     "@galaxy-farm/module-feed": "workspace:*",
     "@galaxy-farm/module-horses": "workspace:*",
+    "@galaxy-farm/module-poultry": "workspace:*",
     "@galaxy-farm/module-supplies": "workspace:*",
     "@galaxy-farm/ui": "workspace:*",
     "dexie": "^4.4.4",

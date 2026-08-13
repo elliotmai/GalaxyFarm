@@ -54,6 +54,12 @@ export const SEARCHABLE_FIELDS = {
   feedPurchases: ["notes"],
   feedConsumption: ["notes"],
   feedingPlans: ["name", "specialNotes"],
+  flocks: ["name", "breedMix", "notes"],
+  // An adjustment is found through its flock and its date. What is worth
+  // typing at is the note saying what got into the run.
+  flockAdjustments: ["notes"],
+  eggLogs: ["notes"],
+  eggDispositions: ["notes"],
   // A serial number is what somebody has in their hand at a parts counter, so
   // it is searchable alongside the name the machine is never remembered by.
   equipment: ["name", "make", "model", "vin", "notes"],

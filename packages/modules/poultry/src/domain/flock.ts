@@ -95,6 +95,23 @@ export function headCountOn(
     );
 }
 
+/**
+ * Every bird on the property as of a date.
+ *
+ * Retired flocks are left out: a flock that has been switched off is one whose
+ * birds are gone, and counting them would put birds in the feed demand and in
+ * the eggs-per-bird figure that nobody is feeding or collecting from.
+ */
+export function totalBirdsOn(
+  flocks: readonly Flock[],
+  adjustments: readonly FlockAdjustment[],
+  at: Date,
+): number {
+  return flocks
+    .filter((flock) => flock.active)
+    .reduce((birds, flock) => birds + headCountOn(flock, adjustments, at), 0);
+}
+
 /** Losses over a window, which is the number that says whether to fix a fence. */
 export function lossesIn(
   flockId: Ulid,

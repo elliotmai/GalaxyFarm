@@ -26,6 +26,7 @@
     "@galaxy-farm/module-cattle": "workspace:*",
     "@galaxy-farm/module-equipment": "workspace:*",
     "@galaxy-farm/module-feed": "workspace:*",
+    "@galaxy-farm/module-poultry": "workspace:*",
     "@galaxy-farm/module-supplies": "workspace:*",
     "dotenv": "^16.4.7",
     "drizzle-kit": "^0.30.1",

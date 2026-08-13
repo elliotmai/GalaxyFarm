@@ -856,6 +856,90 @@ export const fertilityTests = pgTable(
   baseIndexes("fertility_tests"),
 );
 
+/**
+ * Poultry (§5.4).
+ *
+ * A flock rather than a row per bird: eighteen hens are one record with a
+ * headcount, and §5.4 makes quail a value in `species` rather than a second
+ * module — which is why nothing here is named for chickens.
+ *
+ * `opening_count` is the count when the flock was first written down. It is
+ * not the count now: that derives from this plus the adjustment log, per
+ * §4.5's rule for a running total. A stored headcount would answer "how many
+ * birds" and nothing else; the log answers "we lost four to something on
+ * Tuesday", which is the fact worth keeping.
+ */
+export const flocks = pgTable(
+  "flocks",
+  {
+    ...baseColumns,
+    name: text("name").notNull(),
+    species: text("species").notNull(),
+    /** The coop, as a Zone. */
+    zoneId: text("zone_id"),
+    breedMix: text("breed_mix"),
+    openingCount: integer("opening_count").notNull(),
+    active: boolean("active").notNull(),
+    notes: text("notes"),
+  },
+  baseIndexes("flocks"),
+);
+
+export const flockAdjustments = pgTable(
+  "flock_adjustments",
+  {
+    ...baseColumns,
+    flockId: text("flock_id").notNull(),
+    reason: text("reason").notNull(),
+    quantity: integer("quantity").notNull(),
+    occurredOn: timestamp("occurred_on", { withTimezone: true, mode: "date" }).notNull(),
+    notes: text("notes"),
+  },
+  baseIndexes("flock_adjustments"),
+);
+
+/**
+ * A collection (§5.4).
+ *
+ * The total is the required field and the breakdown is optional, because the
+ * kiosk entry for this is a row of +1 buttons at the coop (§4.4) and a log that
+ * demanded a colour and a size per egg is a log nobody fills in. The breakdown
+ * is one jsonb column rather than a child table for the reason §4.2 gives:
+ * sync patches *fields*, and a morning's rows change as a unit.
+ */
+export const eggLogs = pgTable(
+  "egg_logs",
+  {
+    ...baseColumns,
+    flockId: text("flock_id"),
+    zoneId: text("zone_id"),
+    collectedOn: timestamp("collected_on", { withTimezone: true, mode: "date" }).notNull(),
+    total: integer("total").notNull(),
+    breakdown: jsonb("breakdown")
+      .$type<{ colour: string; size: string; count: number }[]>()
+      .notNull()
+      .default([]),
+    notes: text("notes"),
+  },
+  baseIndexes("egg_logs"),
+);
+
+/** Where the eggs went (§5.4) — kept, given, or sold, with the money if sold. */
+export const eggDispositions = pgTable(
+  "egg_dispositions",
+  {
+    ...baseColumns,
+    disposedOn: timestamp("disposed_on", { withTimezone: true, mode: "date" }).notNull(),
+    quantity: integer("quantity").notNull(),
+    kind: text("kind").notNull(),
+    contactId: text("contact_id"),
+    /** What that lot brought, not a price per egg. Only a sale carries one. */
+    price: jsonb("price").$type<{ cents: number }>(),
+    notes: text("notes"),
+  },
+  baseIndexes("egg_dispositions"),
+);
+
 export const contacts = pgTable(
   "contacts",
   {
@@ -1170,6 +1254,10 @@ export const allTables = {
   supplyUsage,
   durableAssignments,
   fertilityTests,
+  flocks,
+  flockAdjustments,
+  eggLogs,
+  eggDispositions,
   contacts,
   attachments,
   choreTemplates,

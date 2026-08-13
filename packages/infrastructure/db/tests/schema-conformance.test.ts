@@ -55,6 +55,13 @@ import {
 } from "@galaxy-farm/module-equipment";
 
 import {
+  eggDispositionSchema,
+  eggLogSchema,
+  flockAdjustmentSchema,
+  flockSchema,
+} from "@galaxy-farm/module-poultry";
+
+import {
   durableAssignmentSchema,
   supplyItemSchema,
   supplyPurchaseSchema,
@@ -110,6 +117,10 @@ const SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   feedPurchases: feedPurchaseSchema,
   feedConsumption: feedConsumptionSchema,
   feedingPlans: feedingPlanSchema,
+  flocks: flockSchema,
+  flockAdjustments: flockAdjustmentSchema,
+  eggLogs: eggLogSchema,
+  eggDispositions: eggDispositionSchema,
   equipment: equipmentSchema,
   meterReadings: meterReadingSchema,
   maintenanceRules: maintenanceRuleSchema,
