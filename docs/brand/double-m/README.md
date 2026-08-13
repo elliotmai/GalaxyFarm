@@ -8,14 +8,14 @@ An exploration, not a decision. The approved logomark is still the Rocking
 Double Star in `packages/ui/src/brand/`, and nothing here touches it.
 
 Open `contact-sheet.html` for the whole set — the marks, the size ladder, and
-the mockups with a switcher that puts any of the four onto all eight surfaces.
+the mockups with a switcher that puts any of the five onto all eight surfaces.
 
 ## The five
 
 | Reading            | File                       | Units | Strokes | At 16px                              |
 | ------------------ | -------------------------- | ----- | ------- | ------------------------------------ |
 | Double M Connected | `double-m-connected.svg`   | 2     | 7       | Holds. Reads as one mark.            |
-| M Bar M            | `m-bar-m.svg`              | 3     | 9       | Best of the four. Nothing touches.   |
+| M Bar M            | `m-bar-m.svg`              | 3     | 9       | Best of the set. Nothing touches.    |
 | Rocking Double M   | `rocking-double-m.svg`     | 3     | 9       | Holds. The rocker keeps it together. |
 | Flying Double M    | `flying-double-m.svg`      | 3     | 10      | Crest blurs into the corners.        |
 | Flying Double M Connected | `flying-double-m-connected.svg` | 4 | 9   | Crests close up. Reads as Connected. |
@@ -60,7 +60,7 @@ before a single modifier, where the star mark put two shapes on the hide.
 - **The legs splay and the valley stops short of the baseline.** Both open the
   junctions where a hot iron pools.
 - **Where a mark stops working is the decision**, and it is not the same size
-  for all four. That is what the size ladder in the contact sheet is for.
+  for all five. That is what the size ladder in the contact sheet is for.
 
 ## The mockups
 
