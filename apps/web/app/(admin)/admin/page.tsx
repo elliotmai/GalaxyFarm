@@ -17,5 +17,5 @@ export default async function AdminHomePage() {
   const actor = await currentActor();
   if (actor === undefined) redirect("/login?next=/admin");
 
-  return <Dashboard propertyId={actor.propertyId} />;
+  return <Dashboard propertyId={actor.propertyId} actorId={actor.id} />;
 }

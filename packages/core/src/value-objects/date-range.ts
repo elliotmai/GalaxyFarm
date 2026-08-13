@@ -59,6 +59,65 @@ export function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * MS_PER_DAY);
 }
 
+/**
+ * Step by a calendar day rather than by twenty-four hours.
+ *
+ * `addDays` adds milliseconds, which is what gestation and withdrawal
+ * arithmetic want. Walking a calendar is a different question: on the Sunday
+ * the clocks go back, local midnight plus 86,400,000 ms is 11pm *the same
+ * evening*, so a loop over "the next seven days" visits that day twice and
+ * never reaches the seventh. Twice a year the chore list would be wrong, which
+ * is the kind of bug that gets blamed on the person who ticked it.
+ */
+export function addCalendarDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+/**
+ * Local midnight, and the instant before the next one.
+ *
+ * Local, deliberately. A chore due "today" is due on the day the person
+ * standing in the barn is having, and a UTC day boundary puts every evening
+ * chore on tomorrow's list for six hours — which on this farm is exactly the
+ * hours the evening chores happen in.
+ *
+ * `endOfDay` is the last millisecond rather than the next midnight, so a due
+ * time built from it compares as inside the day under `<=` and outside it
+ * under `<` — the half-open convention `DateRange` uses everywhere else.
+ */
+export function startOfDay(date: Date): Date {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+export function endOfDay(date: Date): Date {
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+export function isSameDay(left: Date, right: Date): boolean {
+  return dayKey(left) === dayKey(right);
+}
+
+/**
+ * `YYYY-MM-DD` in local time.
+ *
+ * The key everything that groups by day agrees on. `toISOString().slice(0, 10)`
+ * is the tempting one-liner and it is wrong for the same reason as above: it
+ * answers in UTC, so an 8pm chore in Texas files itself under tomorrow.
+ */
+export function dayKey(date: Date): string {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
 export function daysBetween(from: Date, to: Date): number {
   return Math.round((to.getTime() - from.getTime()) / MS_PER_DAY);
 }

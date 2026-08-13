@@ -28,14 +28,19 @@ import {
   toDollars,
 } from "../src/value-objects/money.js";
 import {
+  addCalendarDays,
   addDays,
   close,
   contains,
   dateRange,
+  dayKey,
   daysBetween,
   durationDays,
+  endOfDay,
   isOpenRange,
+  isSameDay,
   overlaps,
+  startOfDay,
 } from "../src/value-objects/date-range.js";
 
 describe("safety level", () => {
@@ -198,5 +203,46 @@ describe("date range", () => {
 
     expect(closed.to).toEqual(jan10);
     expect(() => close(closed, jan20)).toThrow(/already closed/);
+  });
+});
+
+describe("local days", () => {
+  // Built from local parts throughout. A literal like "2026-03-08T00:00:00Z"
+  // is a different wall-clock day in half the world, and these are exactly the
+  // functions whose job is to answer in the reader's own day.
+  const marchEighth = new Date(2026, 2, 8, 13, 45, 30, 250);
+
+  it("brackets the day the person is actually having", () => {
+    expect(startOfDay(marchEighth)).toEqual(new Date(2026, 2, 8, 0, 0, 0, 0));
+    expect(endOfDay(marchEighth)).toEqual(new Date(2026, 2, 8, 23, 59, 59, 999));
+  });
+
+  it("keys and compares by local date", () => {
+    expect(dayKey(marchEighth)).toBe("2026-03-08");
+    expect(dayKey(new Date(2026, 11, 1, 0, 0, 0))).toBe("2026-12-01");
+
+    expect(isSameDay(marchEighth, endOfDay(marchEighth))).toBe(true);
+    expect(isSameDay(marchEighth, addCalendarDays(marchEighth, 1))).toBe(false);
+  });
+
+  it("steps a calendar day without drifting off the clock", () => {
+    // 8 March 2026 is the US spring-forward. Adding 86,400,000 ms to local
+    // midnight lands at 1am on the 9th; adding a calendar day lands on
+    // midnight, which is what a loop over a week has to do to visit seven
+    // distinct days.
+    expect(addCalendarDays(new Date(2026, 2, 8, 0, 0, 0), 1)).toEqual(
+      new Date(2026, 2, 9, 0, 0, 0),
+    );
+    expect(addCalendarDays(marchEighth, -1)).toEqual(new Date(2026, 2, 7, 13, 45, 30, 250));
+  });
+
+  it("visits every date exactly once across a year of stepping", () => {
+    // The property the chore sheet depends on, and the one millisecond
+    // arithmetic breaks twice a year in any zone that observes DST.
+    const start = startOfDay(new Date(2026, 0, 1));
+    const keys = Array.from({ length: 365 }, (_, offset) => dayKey(addCalendarDays(start, offset)));
+
+    expect(new Set(keys).size).toBe(365);
+    expect(keys.at(-1)).toBe("2026-12-31");
   });
 });

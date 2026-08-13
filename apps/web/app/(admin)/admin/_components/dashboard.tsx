@@ -15,6 +15,7 @@ import {
 } from "@galaxy-farm/core";
 
 import { CalvingWatchCard } from "@/app/(admin)/admin/_components/calving-watch-card";
+import { ChoresCard } from "@/app/(admin)/admin/_components/chores-card";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -30,7 +31,13 @@ import { useRecords } from "@/lib/local/use-records";
  * no signal as with five bars.
  */
 
-export function Dashboard({ propertyId }: { readonly propertyId: Ulid }) {
+export function Dashboard({
+  propertyId,
+  actorId,
+}: {
+  readonly propertyId: Ulid;
+  readonly actorId: Ulid;
+}) {
   const query = { propertyId };
   const { records: zones, loading: zonesLoading } = useRecords<Zone>("zones", query);
   const { records: animals } = useRecords<Animal>("animals", query);
@@ -99,6 +106,14 @@ export function Dashboard({ propertyId }: { readonly propertyId: Ulid }) {
         />
         <Tile label="Zones resting" value={zones.filter((z) => z.resting).length} tone="calm" />
       </div>
+
+      {/*
+        Above the pen board, because it is the card somebody acts on. The pen
+        board answers "where is everything"; this one answers "what has not
+        been done yet", and that is the question being asked on the way out of
+        the door.
+      */}
+      <ChoresCard propertyId={propertyId} actorId={actorId} />
 
       <PenBoard zones={zones} animals={animals} assignments={assignments} />
       <FreezeWatch zones={zones} water={water} />

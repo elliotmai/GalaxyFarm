@@ -23,6 +23,7 @@ const ADMIN_ROUTES = [
   "/admin",
   "/admin/map",
   "/admin/calendar",
+  "/admin/chores",
   "/admin/cattle",
   "/admin/cattle/breeding",
   "/admin/cattle/calving",

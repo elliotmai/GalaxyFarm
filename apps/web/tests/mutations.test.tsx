@@ -170,6 +170,25 @@ describe("useMutations", () => {
     if (!missing.ok) expect(missing.error.kind).toBe("not-found");
   });
 
+  it("clears a field when the patch names it as undefined", async () => {
+    // What un-ticking a chore depends on. `diff` walks the record's keys, so a
+    // field the caller merely leaves out is not a change and never travels —
+    // the record would keep the old value on every other device. Naming it
+    // explicitly has to survive validation and reach the store as cleared.
+    const { result } = harness();
+    await ready(result);
+    const created = await result.current.create({ ...zone, customInstructions: "Latch sticks" });
+    if (!created.ok) throw new Error("setup failed");
+
+    const cleared = await result.current.update(created.value.id, {
+      customInstructions: undefined,
+    });
+
+    expect(cleared.ok).toBe(true);
+    const [saved] = await localStore().repository<Zone>("zones").list({ propertyId: PROPERTY });
+    expect(saved?.customInstructions).toBeUndefined();
+  });
+
   it("stamps the property from the session, not from the form", async () => {
     const { result } = harness();
     await ready(result);

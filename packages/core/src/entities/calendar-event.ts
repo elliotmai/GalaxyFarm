@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { contains, overlaps, type DateRange } from "../value-objects/date-range.js";
+import { contains, dayKey, overlaps, type DateRange } from "../value-objects/date-range.js";
 import { ulidSchema, type Ulid } from "../types/ids.js";
 import { baseRecordSchema, type BaseRecord } from "./record.js";
 
@@ -202,11 +202,7 @@ export function groupByDay(entries: readonly CalendarEntry[]): Map<string, Calen
   const days = new Map<string, CalendarEntry[]>();
 
   for (const entry of entries) {
-    const key = [
-      entry.at.getFullYear(),
-      String(entry.at.getMonth() + 1).padStart(2, "0"),
-      String(entry.at.getDate()).padStart(2, "0"),
-    ].join("-");
+    const key = dayKey(entry.at);
     const bucket = days.get(key);
     if (bucket === undefined) days.set(key, [entry]);
     else bucket.push(entry);
