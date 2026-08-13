@@ -299,6 +299,14 @@ SMALL_SIZE = {
 
 LADDER = [16, 24, 32, 48, 72, 120, 200]
 
+# Widths for `--export`. Cropped to the mark's own bounds rather than padded out
+# to a square, so "256" means the mark is 256 across — which is what somebody
+# placing it on a photograph is actually asking for. It also means the four have
+# different heights at the same size, because they are different shapes.
+EXPORT_SIZES = [16, 24, 32, 48, 64, 128, 256, 512, 1024]
+EXPORT_INKS = {"black": "#000000", "white": "#FFFFFF"}
+EXPORT_PAD = 0.5
+
 
 def mark_group(variant):
     elements = "".join(f'<path d="{d}"/>' for d in variant["paths"])
@@ -1120,6 +1128,88 @@ def visibility_css():
     )
 
 
+def export_svg(variant, ink, width=None):
+    """
+    One mark, one colour, cropped to itself and with no background.
+
+    A hard colour rather than `currentColor`, because these leave the repo: a
+    file that inherits its colour from a stylesheet it will never meet renders
+    black in some places and invisible in others.
+    """
+    x0, y0, x1, y1 = bounds(variant)
+    x0, y0 = x0 - EXPORT_PAD, y0 - EXPORT_PAD
+    box_w, box_h = (x1 - x0) + EXPORT_PAD, (y1 - y0) + EXPORT_PAD
+    size = ""
+    if width:
+        size = f' width="{f(width)}" height="{f(round(width * box_h / box_w, 2))}"'
+    elements = "".join(f'<path d="{d}"/>' for d in variant["paths"])
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" '
+        f'viewBox="{f(x0)} {f(y0)} {f(box_w)} {f(box_h)}"{size} '
+        f'role="img" aria-label="{variant["name"]}">\n'
+        f"  <title>{variant['name']}</title>\n"
+        f'  <g fill="none" stroke="{ink}" stroke-width="{STROKE}" '
+        f'stroke-linecap="round" stroke-linejoin="round">{elements}</g>\n'
+        "</svg>\n"
+    )
+
+
+EXPORT_README = """Double M — brand marks
+======================
+
+Four candidate Double M irons, drawn to the grammar in "How to Design a Brand"
+(Texas & Southwestern Cattle Raisers Association).
+
+  double-m-connected   Double M Connected   2 units,  7 strokes
+  m-bar-m              M Bar M              3 units,  9 strokes
+  rocking-double-m     Rocking Double M     3 units,  9 strokes
+  flying-double-m      Flying Double M      3 units, 10 strokes
+
+Files
+-----
+  svg/black/<mark>.svg         scalable, no width or height — scales to any box
+  svg/black/<mark>-<n>.svg     <n> pixels WIDE
+  svg/white/...                same, in white
+  png/black/<mark>-<n>.png     <n> pixels wide, transparent
+  png/white/...                same, in white
+
+  n = 16, 24, 32, 48, 64, 128, 256, 512, 1024 — and 2048 for the PNGs, which is
+  the one to reach for when compositing onto a photograph.
+
+Every file has a transparent background and no background shape. Black is for
+light surfaces, white for dark ones.
+
+Sizes are WIDTHS, and each mark is cropped to its own outline — no padding, no
+square canvas. So "-256" means the artwork is 256 pixels across, and the four
+have different heights at the same size, because they are different shapes.
+Nothing is clipped: the crop already allows for the round stroke ends.
+
+The SVGs are strokes, not filled outlines. If you need to recolour one, change
+the `stroke` attribute; if your tool needs outlines, convert stroke-to-path
+first or the recolour will do nothing.
+
+Redraw everything from tools/generate-double-m-brands.py in the GalaxyFarm
+repository — these are one M placed four ways, not four drawings.
+"""
+
+
+def export(directory):
+    for ink_name, ink in EXPORT_INKS.items():
+        for kind in ("svg",):
+            (directory / kind / ink_name).mkdir(parents=True, exist_ok=True)
+        for variant in VARIANTS:
+            folder = directory / "svg" / ink_name
+            (folder / f"{variant['slug']}.svg").write_text(
+                export_svg(variant, ink), encoding="utf-8"
+            )
+            for width in EXPORT_SIZES:
+                (folder / f"{variant['slug']}-{width}.svg").write_text(
+                    export_svg(variant, ink, width), encoding="utf-8"
+                )
+    (directory / "README.txt").write_text(EXPORT_README, encoding="utf-8")
+    return len(EXPORT_INKS) * len(VARIANTS) * (len(EXPORT_SIZES) + 1)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -1130,7 +1220,19 @@ def main():
             "that supplies its own <head>."
         ),
     )
+    parser.add_argument(
+        "--export",
+        type=Path,
+        help=(
+            "Write a hand-off set to this directory: every mark in black and white, "
+            "cropped to itself, scalable and at each size in EXPORT_SIZES."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.export:
+        count = export(args.export)
+        print(f"{count} svgs -> {args.export}")
 
     OUT.mkdir(parents=True, exist_ok=True)
     for variant in VARIANTS:
