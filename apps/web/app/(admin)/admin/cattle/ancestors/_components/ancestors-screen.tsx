@@ -26,6 +26,7 @@ import {
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
   allRegistrations,
+  ancestorsInUse,
   ASSOCIATIONS,
   BREEDS,
   breedsInUse,
@@ -248,10 +249,39 @@ export function AncestorsScreen({
     return { male: build("male"), female: build("female") };
   }, [animals, outsiders, sexes]);
 
+  /**
+   * The outside animals this herd actually descends from.
+   *
+   * This screen is the pedigree behind *these cattle*, not a directory of the
+   * breed. Everything the crawler found is queryable elsewhere; listing it
+   * here would bury the few dozen records that matter under everything that
+   * does not.
+   *
+   * Reachability from our own cattle, not "named by something" — importing one
+   * bull's page brings in thirty ancestors who all name each other, and a
+   * looser rule would keep that whole tree here even when nothing of ours
+   * descends from any of it.
+   */
+  const inUse = useMemo(() => ancestorsInUse(profiles, outsiders), [profiles, outsiders]);
+  const used = useMemo(() => outsiders.filter((entry) => inUse.has(entry.id)), [outsiders, inUse]);
+  /**
+   * Imported but not wired to anything here yet.
+   *
+   * Counted and offered rather than hidden. An animal imported five minutes
+   * ago and not yet set as somebody's sire would otherwise vanish, and the
+   * only thing worse than a cluttered list is one that quietly loses what you
+   * just put in it.
+   */
+  const loose = useMemo(
+    () => outsiders.filter((entry) => !inUse.has(entry.id)),
+    [outsiders, inUse],
+  );
+  const [showLoose, setShowLoose] = useState(false);
+
   /** The list the table shows, after the filter bar. */
   const shown = useMemo(
-    () => filterAncestors(outsiders, filter, sexes, dependentsOf),
-    [outsiders, filter, sexes, dependentsOf],
+    () => filterAncestors(showLoose ? outsiders : used, filter, sexes, dependentsOf),
+    [outsiders, used, showLoose, filter, sexes, dependentsOf],
   );
 
   const bulls = shown.filter((animal) => sexes.get(animal.id)?.sex === "male");
@@ -579,7 +609,7 @@ export function AncestorsScreen({
       <PageHeader
         eyebrow="Cattle"
         title="Ancestors"
-        subtitle="Animals on the papers that are not ours. Entered by hand, because no association exposes them any other way."
+        subtitle="The pedigree behind this herd — outside animals these cattle actually descend from."
         actions={
           <span className="flex flex-wrap gap-2">
             {checkable(outsiders).length === 0 ? null : (
@@ -593,6 +623,22 @@ export function AncestorsScreen({
           </span>
         }
       />
+
+      {loose.length === 0 ? null : (
+        <Callout tone="neutral" title={`${loose.length} on file that nothing here descends from`}>
+          <p>
+            Imported or entered but not yet set as anybody&apos;s sire or dam. They are kept — an
+            animal added five minutes ago should not vanish because it has not been wired up yet —
+            but they are out of the way, because this list is the pedigree behind these cattle
+            rather than a directory of the breed.
+          </p>
+          <div className="mt-2">
+            <Button variant="ghost" onClick={() => setShowLoose(!showLoose)}>
+              {showLoose ? "Hide them again" : "Show them with the rest"}
+            </Button>
+          </div>
+        </Callout>
+      )}
 
       {checking === undefined ? null : (
         <Modal

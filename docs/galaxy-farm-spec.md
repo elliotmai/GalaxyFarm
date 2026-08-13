@@ -218,7 +218,7 @@ Shared fields, identical across every domain: `roadmapItemId` (optional — the 
 
 ### 5.2 Cattle module
 
-**CattleProfile** extends Animal — breed composition as percentages (e.g., ½ Maine-Anjou ¼ Chi ¼ Shorthorn — show cattle are rarely purebred), polled/horned, color/markings, **registrations[]**: `{association: AMAA | ACA | ASA | other, regNumber, tattoo, registeredName, epdSnapshot?}` — an animal can be papered in multiple associations.
+**CattleProfile** extends Animal — breed composition as percentages (e.g., ½ Maine-Anjou ¼ Chi ¼ Shorthorn — show cattle are rarely purebred), polled/horned, color/markings, **registrations[]**: `{association: Maine-Anjou | Chianina | Shorthorn | Angus | other, regNumber, tattoo, registeredName, epdSnapshot?}` — an animal can be papered in multiple associations. Registries are named by the breed whose herdbook they keep, not by the association's initials: `ASA` is the American Shorthorn Association here and the American Simmental Association elsewhere, and the two herdbooks have overlapping numbers.
 
 **Pedigree** — sire/dam references resolving to either an on-farm Animal or an **ExternalAnimal** (name, regNumber, association, own sire/dam refs). External ancestors chain recursively, giving "all the way back" depth without requiring every ancestor to be a farm record. Pedigree view renders the standard 3/4/5-generation tree with drill-down.
 
@@ -403,6 +403,7 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/cattle/roadmap           genetic goals, target size, planned matings
 /admin/cattle/candidates        breeding stock & show prospects under consideration
 /admin/cattle/ancestors         external animals: ancestors on paper that are not ours
+/admin/cattle/catalogue         search the crawled association herdbooks; bring an animal across
 /admin/cattle/risks             eight checks across the herd: open cows, rebreeds, losses, defects
 
 /admin/feed                     inventory, purchases, run-out projections, cost per head

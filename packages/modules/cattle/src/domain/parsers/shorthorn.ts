@@ -36,7 +36,7 @@ import type { DigitalBeefBreed } from "./digital-beef-breed.js";
  */
 
 export const SHORTHORN: DigitalBeefBreed = {
-  association: "ASA",
+  association: "Shorthorn",
   breed: "Shorthorn",
   host: "shorthorn.digitalbeef.com",
   /** `reg  [ tattoo ]  name`, then the colour-and-date line under it. */

@@ -10,6 +10,7 @@ import {
   DataTable,
   EmptyState,
   Modal,
+  Pill,
   SafetyBadge,
   Select,
   TextArea,
@@ -19,6 +20,7 @@ import {
   type Column,
 } from "@galaxy-farm/ui";
 import {
+  isOverCapacity,
   SAFETY_LEVEL_DEFAULTS,
   ZONE_TYPES,
   zoneSchema,
@@ -32,7 +34,6 @@ import {
 } from "@galaxy-farm/core";
 
 import { useMutations } from "@/lib/local/mutations";
-import { useRecords } from "@/lib/local/use-records";
 
 /**
  * Zones — the full §4.5 surface (list, create, edit, delete, restore).
@@ -61,6 +62,7 @@ interface Draft {
   readonly name: string;
   readonly type: ZoneType;
   readonly indoor: boolean;
+  readonly capacity: string;
   readonly baselineSafetyLevel: SafetyLevel;
   readonly waterSourceIds: readonly Ulid[];
   readonly customInstructions: string;
@@ -71,28 +73,38 @@ const BLANK: Draft = {
   name: "",
   type: "pen",
   indoor: false,
+  capacity: "",
   baselineSafetyLevel: 2,
   waterSourceIds: [],
   customInstructions: "",
   resting: false,
 };
 
-export function ZonesScreen({
+export function ZonesPanel({
+  zones,
+  water,
+  assignments,
+  animals,
+  loading,
   propertyId,
   actorId,
 }: {
+  readonly zones: readonly Zone[];
+  readonly water: readonly WaterSource[];
+  readonly assignments: readonly ZoneAssignment[];
+  readonly animals: readonly Animal[];
+  readonly loading: boolean;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
 }) {
-  const { records: zones, loading } = useRecords<Zone>("zones", { propertyId });
-  const { records: water } = useRecords<WaterSource>("waterSources", { propertyId });
-  const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", { propertyId });
-  const { records: animals } = useRecords<Animal>("animals", { propertyId });
-
   const animalName = (id: Ulid) => {
     const animal = animals.find((candidate) => candidate.id === id);
     return animal?.name ?? animal?.tagNumber ?? "Untagged animal";
   };
+
+  /** Who is standing in a zone right now — an assignment with no end date. */
+  const occupantsOf = (zone: Zone) =>
+    assignments.filter((a) => a.zoneId === zone.id && a.periodTo === undefined);
 
   const mutations = useMutations<Zone>("zones", "zones", zoneSchema, propertyId, actorId);
   const confirmDelete = useConfirmDelete();
@@ -114,6 +126,7 @@ export function ZonesScreen({
       name: zone.name,
       type: zone.type,
       indoor: zone.indoor,
+      capacity: zone.capacity === undefined ? "" : String(zone.capacity),
       baselineSafetyLevel: zone.baselineSafetyLevel,
       waterSourceIds: zone.waterSourceIds,
       customInstructions: zone.customInstructions ?? "",
@@ -133,6 +146,7 @@ export function ZonesScreen({
       waterSourceIds: draft.waterSourceIds,
       resting: draft.resting,
       active: editing?.active ?? true,
+      ...(draft.capacity.trim() === "" ? {} : { capacity: Number(draft.capacity) }),
       ...(draft.customInstructions.trim() === ""
         ? {}
         : { customInstructions: draft.customInstructions.trim() }),
@@ -161,14 +175,32 @@ export function ZonesScreen({
     setEditing(undefined);
   }
 
+  /**
+   * Rest, in one tap.
+   *
+   * Resting is a status that changes with the season and back again, and
+   * §5.1 hangs real behaviour off it — resting ground renders dimmed on the
+   * Pen Board and challenges a move into it. Something toggled that often
+   * does not belong three clicks deep inside an edit dialog.
+   */
+  async function toggleResting(zone: Zone) {
+    const result = await mutations.update(zone.id, { resting: !zone.resting });
+    if (!result.ok) {
+      show({ message: "Could not change that", tone: "danger" });
+      return;
+    }
+
+    show({
+      message: zone.resting ? `${zone.name} is back in rotation` : `${zone.name} is resting`,
+    });
+  }
+
   async function remove(zone: Zone) {
     // What else this touches, looked up before asking. §4.5 clause 3 requires
     // the dialog to name the dependents — "delete North Trap?" and "delete
     // North Trap, 4 animals are assigned to it" are different questions, and
     // only one of them can be answered.
-    const occupants = assignments
-      .filter((a) => a.zoneId === zone.id && a.periodTo === undefined)
-      .map((a) => animalName(a.animalId));
+    const occupants = occupantsOf(zone).map((a) => animalName(a.animalId));
 
     const confirmed = await confirmDelete({
       // Typed tier: a zone is an aggregate root (§4.5 clause 3).
@@ -206,11 +238,35 @@ export function ZonesScreen({
   }
 
   const columns: readonly Column<Zone>[] = [
-    { key: "name", header: "Zone", render: (zone) => zone.name },
+    {
+      key: "name",
+      header: "Zone",
+      render: (zone) => (
+        <span className="flex flex-wrap items-center gap-2">
+          {zone.name}
+          {zone.resting ? <Pill tone="action">resting</Pill> : null}
+        </span>
+      ),
+    },
     {
       key: "type",
       header: "Type",
       render: (zone) => <Badge tone="neutral">{zone.type.replace(/_/g, " ")}</Badge>,
+    },
+    {
+      key: "occupancy",
+      header: "In it",
+      render: (zone) => {
+        const count = occupantsOf(zone).length;
+        const over = isOverCapacity(zone, count);
+        return (
+          <span className={over ? "text-danger" : undefined}>
+            {count}
+            {zone.capacity === undefined ? "" : ` / ${zone.capacity}`}
+            {over ? " — over" : ""}
+          </span>
+        );
+      },
     },
     {
       key: "water",
@@ -234,6 +290,9 @@ export function ZonesScreen({
       header: "",
       render: (zone) => (
         <span className="flex gap-2">
+          <Button variant="ghost" onClick={() => void toggleResting(zone)}>
+            {zone.resting ? "Graze" : "Rest"}
+          </Button>
           <Button variant="ghost" onClick={() => startEdit(zone)}>
             Edit
           </Button>
@@ -249,12 +308,11 @@ export function ZonesScreen({
 
   return (
     <div className="flex flex-col gap-density">
-      <header className="flex items-center justify-between gap-density">
-        <h1 className="font-heading text-2xl font-semibold text-ink">Zones</h1>
+      <div className="flex items-center justify-end">
         <Button variant="primary" onClick={startCreate}>
           Add a zone
         </Button>
-      </header>
+      </div>
 
       {draft !== undefined ? (
         <Modal
@@ -279,6 +337,16 @@ export function ZonesScreen({
               hint="A working facility holds cattle under handling but nothing lives there."
               onChange={(event) => setDraft({ ...draft, type: event.target.value as ZoneType })}
             />
+            <TextInput
+              label="Capacity"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              hint="Head this place holds. Leave blank if it is not a number worth guessing."
+              value={draft.capacity}
+              error={errors["capacity"]}
+              onChange={(event) => setDraft({ ...draft, capacity: event.target.value })}
+            />
             <Select
               label="Baseline care level"
               options={SAFETY_OPTIONS}
@@ -298,7 +366,9 @@ export function ZonesScreen({
                 Tanks are shared. Tick every source this zone drinks from.
               </p>
               {water.length === 0 ? (
-                <p className="text-sm text-muted">No water sources yet.</p>
+                <p className="text-sm text-muted">
+                  No tanks yet — add them on the Water tab, then tick them here.
+                </p>
               ) : (
                 water.map((source) => (
                   <Checkbox

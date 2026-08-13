@@ -369,3 +369,44 @@ export function planAncestorMerge(
 
   return { patch: patch as Partial<ExternalAnimal>, repoint, warnings };
 }
+
+/**
+ * The outside animals this farm actually uses (spec §5.2).
+ *
+ * The ancestors screen is for the pedigree behind *this herd*. Once every
+ * animal in the associations is queryable, listing them all here would bury
+ * the thirty that matter under a hundred thousand that do not.
+ *
+ * "In use" is **reachable from the farm's own cattle**, not "named by
+ * something". The difference is the whole point: importing a bull's page
+ * brings in thirty ancestors who all name each other, so a "named by
+ * anything" rule would keep the entire imported tree alive on its own merits
+ * even when nothing here descends from any of it. Reachability starts at the
+ * animals this farm owns and walks up.
+ *
+ * A repeated ancestor is ordinary in line breeding; a repeat on the way up is
+ * a mistyped registration making an animal its own grandsire, and the visited
+ * set is what stops that walking forever.
+ */
+export function ancestorsInUse(
+  profiles: readonly { sire?: ParentRef | undefined; dam?: ParentRef | undefined }[],
+  outsiders: readonly ExternalAnimal[],
+): Set<Ulid> {
+  const byId = new Map(outsiders.map((entry) => [entry.id, entry]));
+  const used = new Set<Ulid>();
+
+  const walk = (ref: ParentRef | undefined): void => {
+    if (ref === undefined || ref.kind !== "external" || used.has(ref.id)) return;
+    used.add(ref.id);
+    const entry = byId.get(ref.id);
+    if (entry === undefined) return;
+    walk(entry.sire);
+    walk(entry.dam);
+  };
+
+  for (const profile of profiles) {
+    walk(profile.sire);
+    walk(profile.dam);
+  }
+  return used;
+}

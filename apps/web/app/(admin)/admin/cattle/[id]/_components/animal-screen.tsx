@@ -482,7 +482,7 @@ function Registrations({
   const { show } = useToast();
   const confirmDelete = useConfirmDelete();
 
-  const [association, setAssociation] = useState<Association>("AMAA");
+  const [association, setAssociation] = useState<Association>("Maine-Anjou");
   const [regNumber, setRegNumber] = useState("");
   const [registeredName, setRegisteredName] = useState("");
   const [tattoo, setTattoo] = useState("");
@@ -496,7 +496,7 @@ function Registrations({
 
   function reset() {
     setEditingKey(undefined);
-    setAssociation("AMAA");
+    setAssociation("Maine-Anjou");
     setRegNumber("");
     setRegisteredName("");
     setTattoo("");

@@ -28,7 +28,7 @@ import type { DigitalBeefBreed } from "./digital-beef-breed.js";
  */
 
 export const MAINE_ANJOU: DigitalBeefBreed = {
-  association: "AMAA",
+  association: "Maine-Anjou",
   breed: "Maine-Anjou",
   host: "maine-anjou.digitalbeef.com",
   /** `reg  [ tattoo ]  name`. */

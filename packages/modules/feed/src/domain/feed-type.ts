@@ -9,6 +9,8 @@ import {
   type Unit,
 } from "@galaxy-farm/core";
 
+import { measureToPounds } from "./grain-measures.js";
+
 /**
  * What gets fed, as a catalogue entry (spec §5.3).
  *
@@ -27,7 +29,16 @@ export type FeedCategory = (typeof FEED_CATEGORIES)[number];
  * writes `bulk_lb` and `bulk_ton` where the kernel says `lb` and `ton`, and
  * two names for one unit is how a conversion ends up applied twice.
  */
-export const FEED_UNITS = ["round_bale", "square_bale", "bag", "block", "lb", "ton"] as const;
+export const FEED_UNITS = [
+  "round_bale",
+  "square_bale",
+  "bag",
+  "bucket",
+  "scoop",
+  "block",
+  "lb",
+  "ton",
+] as const;
 export type FeedUnit = (typeof FEED_UNITS)[number];
 
 export interface FeedType extends BaseRecord {
@@ -66,13 +77,22 @@ export const feedTypeSchema = baseRecordSchema.extend({
   notes: z.string().max(2000).optional(),
 }) as unknown as z.ZodType<FeedType>;
 
-/** Pounds in a quantity of this feed, where that can be worked out. */
+/**
+ * Pounds in a quantity of this feed, where that can be worked out.
+ *
+ * The feed's own figure wins wherever it has one — a round bale is anywhere
+ * from 800 to 1,400 lb and only the person who bought it knows which. Failing
+ * that, the barn's own vessels have known weights: a bag is 50 lb, a bucket
+ * half that, a scoop an eighteenth. Anything else comes back undefined rather
+ * than guessed, because a made-up weight per unit propagates into a run-out
+ * date somebody drives to town on.
+ */
 export function poundsOf(
   feedType: Pick<FeedType, "unit" | "estWeightLbPerUnit">,
   amount: number,
 ): number | undefined {
   if (feedType.unit === "lb") return amount;
   if (feedType.unit === "ton") return amount * 2000;
-  if (feedType.estWeightLbPerUnit === undefined) return undefined;
-  return amount * feedType.estWeightLbPerUnit;
+  if (feedType.estWeightLbPerUnit !== undefined) return amount * feedType.estWeightLbPerUnit;
+  return measureToPounds(amount, feedType.unit);
 }

@@ -58,6 +58,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/admin/cattle/roadmap", label: "Roadmap" },
       { href: "/admin/cattle/candidates", label: "Candidates" },
       { href: "/admin/cattle/ancestors", label: "Ancestors" },
+      { href: "/admin/cattle/catalogue", label: "Catalogue" },
       { href: "/admin/cattle/risks", label: "Worth a look" },
     ],
   },
@@ -65,7 +66,7 @@ export const NAV: readonly NavGroup[] = [
     label: "Land",
     collapsedByDefault: true,
     items: [
-      { href: "/admin/pastures", label: "Pastures" },
+      { href: "/admin/pastures", label: "Pastures and water" },
       { href: "/admin/garden/layout", label: "Garden layout" },
       { href: "/admin/garden/plantings", label: "Plantings" },
       { href: "/admin/garden/seeds", label: "Seeds" },

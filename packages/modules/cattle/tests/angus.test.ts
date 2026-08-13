@@ -103,7 +103,7 @@ describe("the registration number", () => {
     const parsed = parseAngusUrl("https://www.angus.org/find-an-animal?aid=13054003");
 
     expect(parsed.ok && parsed.ref.registration).toBe("13054003");
-    expect(parsed.ok && parsed.ref.association).toBe("AAA");
+    expect(parsed.ok && parsed.ref.association).toBe("Angus");
     expect(angusUrl("13054003")).toBe("https://www.angus.org/find-an-animal?aid=13054003");
   });
 

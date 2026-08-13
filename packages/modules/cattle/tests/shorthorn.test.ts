@@ -15,7 +15,7 @@ import { SHORTHORN_CARRIER_PAGE, SHORTHORN_PAGE } from "./fixtures/shorthorn-pag
  */
 
 const read = (page: string, registration: string) =>
-  parseDigitalBeefPage(page, { association: "ASA", registration });
+  parseDigitalBeefPage(page, { association: "Shorthorn", registration });
 
 const at = (animal: ReturnType<typeof read>, position: string) =>
   animal.ancestors.find((ancestor) => ancestor.position === position);

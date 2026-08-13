@@ -370,4 +370,54 @@ describe("what colour the calf can be", () => {
     expect(calf.missing.join(" ")).toContain("the sire's");
     expect(calf.missing.join(" ")).not.toContain("neither parent");
   });
+
+  it("gives four outcomes for the owner's own roan cow and carrier bull", () => {
+    // Straight off the records that were on screen. The cow is roan out of two
+    // parents who both came out solid — which is why this was wrong: her coat
+    // was being discarded in favour of her parents, so she was forced to R/R
+    // and every calf out of her came back solid.
+    const cow = inferCoat({
+      observed: readPhenotype("Roan"),
+      // Her sire reads e/e on his own record, so his colour names red — he is
+      // the red roan she got her roan from.
+      sire: inferCoat({ observed: readPhenotype("Red Roan") }),
+      dam: inferCoat({ observed: readPhenotype("Red") }),
+    });
+    const bull = inferCoat({
+      observed: readPhenotype("Black"),
+      sire: inferCoat({ observed: readPhenotype("Black") }),
+      dam: inferCoat({ observed: readPhenotype("Red") }),
+    });
+
+    expect(roan(cow)).toBe("R/r");
+    expect(roan(bull)).toBe("R/R");
+    expect(extension(bull)).toBe("ED/e or E/e");
+
+    const calf = predictCalfColour(bull, cow);
+
+    expect(
+      Object.fromEntries(calf.outcomes.map((outcome) => [outcome.name, outcome.chance])),
+    ).toEqual({
+      "red roan": 0.25,
+      red: 0.25,
+      "blue roan": 0.25,
+      black: 0.25,
+    });
+  });
+
+  it("keeps the coat and flags the pedigree when the two cannot both be true", () => {
+    // A roan out of two solid parents. The coat is a fact about the animal in
+    // front of you; the cross is a deduction resting on colours nobody
+    // recorded and parent links that may be wrong. The deduction is the
+    // unsafe half, and something in that pedigree needs looking at.
+    const solid = seen("Black");
+    const impossible = inferCoat({
+      observed: readPhenotype("Roan"),
+      sire: solid,
+      dam: solid,
+    });
+
+    expect(roan(impossible)).toBe("R/r");
+    expect(impossible.roan.because.join(" ")).toContain("cannot account for that coat");
+  });
 });

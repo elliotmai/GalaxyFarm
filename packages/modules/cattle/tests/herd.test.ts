@@ -90,13 +90,37 @@ const profile = (over: Partial<CattleProfile> = {}): CattleProfile => ({
     { breed: "Chianina", percent: 25 },
     { breed: "Shorthorn", percent: 25 },
   ],
-  registrations: [{ association: "AMAA", regNumber: "M123456" }],
+  registrations: [{ association: "Maine-Anjou", regNumber: "M123456" }],
   ...over,
 });
 
 describe("cattleProfileSchema", () => {
   it("accepts the spec's own example composition", () => {
     expect(cattleProfileSchema.safeParse(profile()).success).toBe(true);
+  });
+
+  it("takes a registration written under the association's old initials", () => {
+    // A device offline since before registries were named by breed still holds
+    // `AMAA`, and it has to be able to save an edit when it comes back. A
+    // validator that rejected what the device already has would strand exactly
+    // the work being offline is supposed to protect.
+    const result = cattleProfileSchema.safeParse({
+      ...profile(),
+      registrations: [{ association: "AMAA", regNumber: "M123456" }],
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.registrations[0]?.association).toBe("Maine-Anjou");
+  });
+
+  it("still refuses a registry nobody has heard of", () => {
+    // Reading the old initials is a fixed list of four, not an open door.
+    expect(
+      cattleProfileSchema.safeParse({
+        ...profile(),
+        registrations: [{ association: "AHA", regNumber: "M123456" }],
+      }).success,
+    ).toBe(false);
   });
 
   it("refuses a composition that does not add up", () => {
@@ -131,8 +155,8 @@ describe("cattleProfileSchema", () => {
     const result = cattleProfileSchema.safeParse({
       ...profile(),
       registrations: [
-        { association: "AMAA", regNumber: "M123456" },
-        { association: "AMAA", regNumber: "M123456" },
+        { association: "Maine-Anjou", regNumber: "M123456" },
+        { association: "Maine-Anjou", regNumber: "M123456" },
       ],
     });
     expect(result.success).toBe(false);
@@ -143,8 +167,8 @@ describe("cattleProfileSchema", () => {
     const result = cattleProfileSchema.safeParse({
       ...profile(),
       registrations: [
-        { association: "AMAA", regNumber: "M123456" },
-        { association: "ACA", regNumber: "C77" },
+        { association: "Maine-Anjou", regNumber: "M123456" },
+        { association: "Chianina", regNumber: "C77" },
       ],
     });
     expect(result.success).toBe(true);
@@ -179,8 +203,8 @@ describe("profile helpers", () => {
   });
 
   it("finds a registration by association", () => {
-    expect(registrationIn(profile(), "AMAA")?.regNumber).toBe("M123456");
-    expect(registrationIn(profile(), "ASA")).toBeUndefined();
+    expect(registrationIn(profile(), "Maine-Anjou")?.regNumber).toBe("M123456");
+    expect(registrationIn(profile(), "Shorthorn")).toBeUndefined();
   });
 
   it("knows whether an animal is papered at all", () => {

@@ -33,15 +33,34 @@
  * any breed's page tagged with another breed's code belongs to that other
  * breed, and it is that registry's page that gets fetched — not the one it was
  * printed on, which has nothing filed under that number at all.
+ *
+ * ## Why a registry is named by its breed
+ *
+ * Registrations here used to be filed under the association's initials — AMAA,
+ * ACA, ASA, AAA. Those initials are not unique. `ASA` is the American Shorthorn
+ * Association on this farm's papers and the American Simmental Association
+ * three counties over, and both publish herdbooks with overlapping numbers. A
+ * field holding `ASA / 4219133` does not say which animal it means.
+ *
+ * The breed does. Every registry here is a single-breed registry, so its breed
+ * names it exactly and reads the way somebody would say it out loud —
+ * "Shorthorn 4219133" rather than "ASA 4219133". The association's own name is
+ * still kept, in `name`, because that is what is printed on the paper.
+ *
+ * `legacyCode` is how records written before this survive: nothing on file is
+ * rewritten by guesswork, but a stored `ASA` is understood as Shorthorn
+ * wherever one is read, and migration 0019 rewrites the stored rows to match.
  */
 
 import type { Association } from "./cattle-profile.js";
 
 export interface Registry {
-  /** The short code this app files registrations under. */
+  /** The breed this registry keeps the herdbook for. Registrations file under it. */
   readonly code: string;
-  /** What it is called, spelled out for a screen. */
+  /** The association itself, spelled out — what is printed on the paper. */
   readonly name: string;
+  /** The initials this app used before breeds named the registries. */
+  readonly legacyCode: string;
   /**
    * The prefix a *foreign* page puts in front of one of its numbers.
    *
@@ -73,29 +92,33 @@ const digitalBeef = (host: string, registration: string): string =>
  */
 export const REGISTRIES: readonly Registry[] = [
   {
-    code: "AMAA",
+    code: "Maine-Anjou",
     name: "American Maine-Anjou Association",
+    legacyCode: "AMAA",
     prefix: "MA",
     urlFor: (registration) => digitalBeef("maine-anjou.digitalbeef.com", registration),
     readable: true,
   },
   {
-    code: "ACA",
+    code: "Chianina",
     name: "American Chianina Association",
+    legacyCode: "ACA",
     prefix: "CA",
     urlFor: (registration) => digitalBeef("chianina.digitalbeef.com", registration),
     readable: true,
   },
   {
-    code: "ASA",
+    code: "Shorthorn",
     name: "American Shorthorn Association",
+    legacyCode: "ASA",
     prefix: "SH",
     urlFor: (registration) => digitalBeef("shorthorn.digitalbeef.com", registration),
     readable: true,
   },
   {
-    code: "AAA",
+    code: "Angus",
     name: "American Angus Association",
+    legacyCode: "AAA",
     prefix: "AN",
     urlFor: (registration) =>
       `https://www.angus.org/find-an-animal?aid=${encodeURIComponent(registration)}`,
@@ -105,10 +128,41 @@ export const REGISTRIES: readonly Registry[] = [
   },
 ];
 
-const BY_CODE = new Map(REGISTRIES.map((registry) => [registry.code, registry]));
+/**
+ * Everything a registry answers to, folded to lower case.
+ *
+ * Its breed, the initials it used to be filed under, and — for the two whose
+ * breed is one word — the plain word on its own. Lower case because `ASA`,
+ * `asa` and `Shorthorn` all have to land on the same registry, and because a
+ * code typed into a form is not going to match the table's capitalisation.
+ */
+const BY_ALIAS = new Map<string, Registry>(
+  REGISTRIES.flatMap((registry) => [
+    [registry.code.toLowerCase(), registry] as const,
+    [registry.legacyCode.toLowerCase(), registry] as const,
+  ]),
+);
 
 export function registryFor(code: string): Registry | undefined {
-  return BY_CODE.get(code.trim().toUpperCase());
+  return BY_ALIAS.get(code.trim().toLowerCase());
+}
+
+/**
+ * The name a registry is filed under here, whatever it was called on the way in.
+ *
+ * A record written before registries were named by breed holds `ASA`; the
+ * migration rewrites the stored rows, but a device that has not synced yet
+ * still holds the old spelling, and so does anything pasted from an old export.
+ * Reading through this means both spell the same registry everywhere, without a
+ * single screen having to know that the rename happened.
+ *
+ * Anything unrecognised comes back trimmed and otherwise untouched. A registry
+ * this app has never heard of is still a real registry, and blanking it would
+ * lose the only thing the record said about where the number came from.
+ */
+export function registryCode(code: string): string {
+  const trimmed = code.trim();
+  return registryFor(trimmed)?.code ?? trimmed;
 }
 
 export interface SplitRegistration {
@@ -131,6 +185,11 @@ export interface SplitRegistration {
  */
 export function splitRegistration(value: string, onPage: string): SplitRegistration {
   const trimmed = value.trim();
+  // Whatever the caller spelled the page's registry, it comes out named the
+  // way this app files registries — otherwise a record read off an old export
+  // would compare `ASA` against `Shorthorn` and decide the number is foreign
+  // to its own page.
+  const page = registryCode(onPage);
   // The leading flags Shorthorn writes — `*s4219133` — are not part of the
   // number and not a registry code either. Kept off the front so a prefix
   // behind one is still found.
@@ -141,13 +200,13 @@ export function splitRegistration(value: string, onPage: string): SplitRegistrat
     found === null ? undefined : REGISTRIES.find((entry) => entry.prefix === found[1]);
 
   if (found === null || registry === undefined) {
-    return { association: onPage, regNumber: trimmed };
+    return { association: page, regNumber: trimmed };
   }
 
   const regNumber = found[2] as string;
-  return registry.code === onPage
-    ? { association: onPage, regNumber }
-    : { association: registry.code, regNumber, foreignTo: onPage };
+  return registry.code === page
+    ? { association: page, regNumber }
+    : { association: registry.code, regNumber, foreignTo: page };
 }
 
 /**
@@ -205,6 +264,20 @@ export function canRefresh(code: string, registration?: string): boolean {
   return registryFor(issued)?.readable === true;
 }
 
-/** The Digital Beef associations, for a dropdown that has to offer a choice. */
-export const isAssociation = (code: string): code is Association =>
-  code === "AMAA" || code === "ACA" || code === "ASA" || code === "other";
+/**
+ * Whether a code is one of the registries an animal here can be papered with.
+ *
+ * Takes the old initials as well as the breed, so a value read off a record
+ * written before the rename is still recognised — but narrows to the breed, so
+ * whatever comes out is what gets stored.
+ */
+export const isAssociation = (code: string): code is Association => {
+  const named = registryCode(code);
+  return (
+    named === "Maine-Anjou" ||
+    named === "Chianina" ||
+    named === "Shorthorn" ||
+    named === "Angus" ||
+    named === "other"
+  );
+};

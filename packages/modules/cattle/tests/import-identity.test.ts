@@ -28,25 +28,49 @@ const external = (over: Partial<ExternalAnimal> & { name: string }): ExternalAni
   }) as ExternalAnimal;
 
 const chianina = () =>
-  parseDigitalBeefPage(CHIANINA_PAGE, { association: "ACA", registration: "359968" });
+  parseDigitalBeefPage(CHIANINA_PAGE, { association: "Chianina", registration: "359968" });
 const maine = () =>
-  parseDigitalBeefPage(MAINE_ANJOU_PAGE, { association: "AMAA", registration: "402303" });
+  parseDigitalBeefPage(MAINE_ANJOU_PAGE, { association: "Maine-Anjou", registration: "402303" });
 
 describe("every number an animal is known by", () => {
   it("reads a record written before there was more than one", () => {
     expect(
       allRegistrations(
+        external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "Maine-Anjou" }),
+      ),
+    ).toEqual([{ association: "Maine-Anjou", regNumber: "378987" }]);
+  });
+
+  it("names the registry the way this app files it, whatever the record spells", () => {
+    // Written before registries were named by breed. Migration 0019 rewrites
+    // the stored rows, but a device that has been offline since still holds
+    // this, and it has to read as the same registry either way.
+    expect(
+      allRegistrations(
         external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "AMAA" }),
       ),
-    ).toEqual([{ association: "AMAA", regNumber: "378987" }]);
+    ).toEqual([{ association: "Maine-Anjou", regNumber: "378987" }]);
+  });
+
+  it("collapses a paper recorded under both the old initials and the breed", () => {
+    // Otherwise a cow whose device synced halfway through shows two rows for
+    // one certificate, and the merge screen offers to merge her with herself.
+    const animal = external({
+      name: "ZNT JENNA 707T",
+      regNumber: "378987",
+      association: "AMAA",
+      registrations: [{ association: "Maine-Anjou", regNumber: "378987" }],
+    });
+
+    expect(allRegistrations(animal)).toEqual([{ association: "Maine-Anjou", regNumber: "378987" }]);
   });
 
   it("does not list the same number twice under one registry", () => {
     const animal = external({
       name: "ZNT JENNA 707T",
       regNumber: "*s4219133",
-      association: "ASA",
-      registrations: [{ association: "ASA", regNumber: "4219133" }],
+      association: "Shorthorn",
+      registrations: [{ association: "Shorthorn", regNumber: "4219133" }],
     });
 
     // `*s4219133` and `4219133` are one bull. Counting them as two makes him
@@ -56,14 +80,18 @@ describe("every number an animal is known by", () => {
 });
 
 describe("recognising an animal already on file", () => {
-  const jenna = external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "AMAA" });
+  const jenna = external({
+    name: "ZNT JENNA 707T",
+    regNumber: "378987",
+    association: "Maine-Anjou",
+  });
 
   it("is certain about the same registry and the same number", () => {
     const match = matchCandidate(
       { name: "ZNT JENNA 707T", regNumber: "378987" },
-      "AMAA",
+      "Maine-Anjou",
       [jenna],
-      new Map([["AMAA:378987", jenna]]),
+      new Map([["Maine-Anjou:378987", jenna]]),
     );
 
     expect(match?.confidence).toBe("certain");
@@ -75,7 +103,7 @@ describe("recognising an animal already on file", () => {
     // screen looks unusual afterwards; a duplicate is visible and fixable.
     const match = matchCandidate(
       { name: "ZNT JENNA 707T", regNumber: "337003" },
-      "ACA",
+      "Chianina",
       [jenna],
       new Map(),
     );
@@ -87,19 +115,19 @@ describe("recognising an animal already on file", () => {
     const dated = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
       dob: new Date("2009-06-19T00:00:00Z"),
     });
 
     const match = matchCandidate(
       { name: "ZNT MONTEGO BAY 901W", regNumber: "359968", dob: "06/19/2009" },
-      "ACA",
+      "Chianina",
       [dated],
       new Map(),
     );
 
     expect(match?.confidence).toBe("strong");
-    expect(match?.addsRegistration).toEqual({ association: "ACA", regNumber: "359968" });
+    expect(match?.addsRegistration).toEqual({ association: "Chianina", regNumber: "359968" });
   });
 
   it("proposes a merge on the same slot beneath a subject that already matched", () => {
@@ -108,14 +136,14 @@ describe("recognising an animal already on file", () => {
     // does: both pages put ZNT JENNA 707T in the dam slot of the same bull.
     const match = matchCandidate(
       { name: "ZNT JENNA 707T", regNumber: "337003", position: "dam" },
-      "ACA",
+      "Chianina",
       [jenna],
       new Map(),
       new Map([["dam", jenna]]),
     );
 
     expect(match?.confidence).toBe("positional");
-    expect(match?.addsRegistration).toEqual({ association: "ACA", regNumber: "337003" });
+    expect(match?.addsRegistration).toEqual({ association: "Chianina", regNumber: "337003" });
   });
 });
 
@@ -130,7 +158,7 @@ describe("planning an import", () => {
   it("recognises a re-import of the same page and proposes nothing new", () => {
     const animal = maine();
     const onFile = [
-      external({ name: animal.name as string, regNumber: "402303", association: "AMAA" }),
+      external({ name: animal.name as string, regNumber: "402303", association: "Maine-Anjou" }),
       // Filed the way the importer files them: under whichever registry issued
       // the number. This page cites three Chianina numbers — `CA240047` and
       // friends — and storing those under AMAA is the duplicate this is meant
@@ -139,11 +167,11 @@ describe("planning an import", () => {
         const issued =
           ancestor.regNumber === undefined
             ? undefined
-            : splitRegistration(ancestor.regNumber, "AMAA");
+            : splitRegistration(ancestor.regNumber, "Maine-Anjou");
         return external({
           name: ancestor.name as string,
           ...(issued === undefined ? {} : { regNumber: issued.regNumber }),
-          association: issued?.association ?? "AMAA",
+          association: issued?.association ?? "Maine-Anjou",
         });
       }),
     ];
@@ -161,8 +189,8 @@ describe("planning an import", () => {
     const plan = planImport(maine(), []);
     const cited = plan.rows.find((row) => row.regNumber === "240047");
 
-    expect(cited?.association).toBe("ACA");
-    expect(cited?.citedOn).toBe("AMAA");
+    expect(cited?.association).toBe("Chianina");
+    expect(cited?.citedOn).toBe("Maine-Anjou");
     expect(plan.rows.some((row) => row.regNumber === "CA240047")).toBe(false);
   });
 
@@ -174,7 +202,7 @@ describe("planning an import", () => {
     const bull = external({
       name: first.name as string,
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
       dob: new Date("2009-06-19T00:00:00Z"),
     });
     const byPosition = new Map<string, ExternalAnimal>();
@@ -184,7 +212,7 @@ describe("planning an import", () => {
       const record = external({
         name: ancestor.name as string,
         ...(ancestor.regNumber === undefined ? {} : { regNumber: ancestor.regNumber }),
-        association: "AMAA",
+        association: "Maine-Anjou",
       });
       onFile.push(record);
       byPosition.set(ancestor.position as string, record);
@@ -197,7 +225,7 @@ describe("planning an import", () => {
 
     const dam = plan.rows.find((row) => row.position === "dam");
     expect(dam?.match?.existingName).toBe("ZNT JENNA 707T");
-    expect(dam?.match?.addsRegistration).toEqual({ association: "ACA", regNumber: "337003" });
+    expect(dam?.match?.addsRegistration).toEqual({ association: "Chianina", regNumber: "337003" });
 
     // Nothing in the chart comes back as a new animal. Every slot is one
     // animal, so the Chianina chart is the same thirty animals under thirty
@@ -226,12 +254,16 @@ describe("planning an import", () => {
 
 describe("folding a number into a record", () => {
   it("adds the new registry and keeps the old one", () => {
-    const jenna = external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "AMAA" });
+    const jenna = external({
+      name: "ZNT JENNA 707T",
+      regNumber: "378987",
+      association: "Maine-Anjou",
+    });
 
-    expect(mergeRegistration(jenna, { association: "ACA", regNumber: "337003" })).toEqual({
+    expect(mergeRegistration(jenna, { association: "Chianina", regNumber: "337003" })).toEqual({
       registrations: [
-        { association: "AMAA", regNumber: "378987" },
-        { association: "ACA", regNumber: "337003" },
+        { association: "Maine-Anjou", regNumber: "378987" },
+        { association: "Chianina", regNumber: "337003" },
       ],
     });
   });
@@ -239,8 +271,14 @@ describe("folding a number into a record", () => {
   it("returns nothing to do when the number is already there", () => {
     // So a re-import does not bump `updatedAt` on thirty ancestors and send a
     // whole pedigree back over the wire for no change.
-    const jenna = external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "AMAA" });
+    const jenna = external({
+      name: "ZNT JENNA 707T",
+      regNumber: "378987",
+      association: "Maine-Anjou",
+    });
 
-    expect(mergeRegistration(jenna, { association: "AMAA", regNumber: "378987" })).toBeUndefined();
+    expect(
+      mergeRegistration(jenna, { association: "Maine-Anjou", regNumber: "378987" }),
+    ).toBeUndefined();
   });
 });

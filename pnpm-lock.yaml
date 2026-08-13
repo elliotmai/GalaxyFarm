@@ -77,6 +77,9 @@ importers:
       '@galaxy-farm/infra-local':
         specifier: workspace:*
         version: link:../../packages/infrastructure/local
+      '@galaxy-farm/infra-registry-graph':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure/registry-graph
       '@galaxy-farm/infra-sync':
         specifier: workspace:*
         version: link:../../packages/infrastructure/sync
@@ -246,6 +249,19 @@ importers:
       '@galaxy-farm/core':
         specifier: workspace:*
         version: link:../../core
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/infrastructure/registry-graph:
+    dependencies:
+      '@galaxy-farm/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@galaxy-farm/module-cattle':
+        specifier: workspace:*
+        version: link:../../modules/cattle
     devDependencies:
       typescript:
         specifier: ^5.7.2

@@ -110,7 +110,7 @@ export async function POST(request: Request) {
     //
     // Angus needs none of this: its pedigree is on the animal's own page.
     const subDocuments =
-      parsed.ref.association === "AAA"
+      parsed.ref.association === "Angus"
         ? []
         : pedigreeDocuments(html, parsed.ref.url).slice(0, MAX_SUB_DOCUMENTS);
     for (const extra of subDocuments) {

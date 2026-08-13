@@ -39,14 +39,14 @@ const external = (over: Partial<ExternalAnimal> & { name: string }): ExternalAni
   }) as ExternalAnimal;
 
 const page = () =>
-  parseDigitalBeefPage(MAINE_ANJOU_PAGE, { association: "AMAA", registration: "402303" });
+  parseDigitalBeefPage(MAINE_ANJOU_PAGE, { association: "Maine-Anjou", registration: "402303" });
 
 describe("what a fresh read would change", () => {
   it("proposes filling in what the record does not have", () => {
     const thin = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
     });
     const changes = refreshChanges(thin, page());
 
@@ -60,7 +60,7 @@ describe("what a fresh read would change", () => {
     const corrected = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
       colour: "Black with a white foot",
     });
 
@@ -77,7 +77,7 @@ describe("what a fresh read would change", () => {
     const current = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
       colour: "Black",
     });
 
@@ -90,7 +90,7 @@ describe("what a fresh read would change", () => {
     const known = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
       breedComposition: [{ breed: "MA", percent: 79.57 }],
     });
 
@@ -103,22 +103,22 @@ describe("what a fresh read would change", () => {
     const chianinaOnly = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "359968",
-      association: "ACA",
+      association: "Chianina",
     });
 
     const change = refreshChanges(chianinaOnly, page()).find(
       (entry) => entry.field === "registrations",
     );
 
-    expect(change?.after).toContain("ACA 359968");
-    expect(change?.after).toContain("AMAA 402303");
+    expect(change?.after).toContain("Chianina 359968");
+    expect(change?.after).toContain("Maine-Anjou 402303");
   });
 
   it("does not offer a registration it already holds", () => {
     const held = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
     });
 
     expect(refreshChanges(held, page()).some((entry) => entry.field === "registrations")).toBe(
@@ -130,7 +130,7 @@ describe("what a fresh read would change", () => {
     const stale = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
       status: "Active",
     });
 
@@ -178,7 +178,7 @@ describe("what gets ticked", () => {
 
 describe("what a page says about the other animals on it", () => {
   const chianina = () =>
-    parseDigitalBeefPage(CHIANINA_PAGE, { association: "ACA", registration: "359968" });
+    parseDigitalBeefPage(CHIANINA_PAGE, { association: "Chianina", registration: "359968" });
 
   it("finds the defect results, which are only ever on a descendant's chart", () => {
     // The bug this covers: Digital Beef never prints an animal's own genetic
@@ -186,7 +186,11 @@ describe("what a page says about the other animals on it", () => {
     // everything descended from it. A refresh that only read the detail panel
     // reported "nothing has changed" for a whole herd, every time, without
     // ever saying it had looked somewhere they could not be.
-    const tyson = external({ name: "CMAC TYSON ET", regNumber: "MA364424", association: "ACA" });
+    const tyson = external({
+      name: "CMAC TYSON ET",
+      regNumber: "MA364424",
+      association: "Chianina",
+    });
 
     const [finding] = pedigreeChanges(chianina(), [tyson]);
     const defects = finding?.changes.find((change) => change.field === "geneticTests");
@@ -202,7 +206,7 @@ describe("what a page says about the other animals on it", () => {
     const wrongRegistry = external({
       name: "ZNT JENNA 707T",
       regNumber: "337003",
-      association: "AMAA",
+      association: "Maine-Anjou",
     });
 
     expect(pedigreeChanges(chianina(), [wrongRegistry])).toEqual([]);
@@ -214,7 +218,7 @@ describe("what a page says about the other animals on it", () => {
     const tested = external({
       name: "CMAC TYSON ET",
       regNumber: "MA364424",
-      association: "ACA",
+      association: "Chianina",
       geneticTests: [{ defect: "TH", status: "carrier" }],
     });
 
@@ -229,7 +233,7 @@ describe("what a page says about the other animals on it", () => {
     const complete = external({
       name: "COWAN'S ALI 4M",
       regNumber: "MA307184",
-      association: "ACA",
+      association: "Chianina",
       tattoo: "COWN4M",
       geneticTests: [
         { defect: "PHA", status: "free" },
@@ -242,7 +246,11 @@ describe("what a page says about the other animals on it", () => {
   });
 
   it("takes the tattoo and the sex off the slot as well", () => {
-    const thin = external({ name: "COWAN'S ALI 4M", regNumber: "MA307184", association: "ACA" });
+    const thin = external({
+      name: "COWAN'S ALI 4M",
+      regNumber: "MA307184",
+      association: "Chianina",
+    });
     const [finding] = pedigreeChanges(chianina(), [thin]);
     const fields = (finding?.changes ?? []).map((change) => change.field);
 
@@ -255,13 +263,13 @@ describe("what a page says about the other animals on it", () => {
     // Shorthorn prints both under every entry, going back to a roan bull born
     // in 1955 — the only record of either that exists anywhere.
     const shorthorn = parseDigitalBeefPage(SHORTHORN_PAGE, {
-      association: "ASA",
+      association: "Shorthorn",
       registration: "4219133",
     });
     const leader = external({
       name: "CORONET MAX LEADER",
       regNumber: "x2887446",
-      association: "ASA",
+      association: "Shorthorn",
     });
 
     const [finding] = pedigreeChanges(shorthorn, [leader]);
@@ -274,11 +282,11 @@ describe("what a page says about the other animals on it", () => {
     const corrected = external({
       name: "CORONET MAX LEADER",
       regNumber: "x2887446",
-      association: "ASA",
+      association: "Shorthorn",
       colour: "Roan with a white face",
     });
     const shorthorn = parseDigitalBeefPage(SHORTHORN_PAGE, {
-      association: "ASA",
+      association: "Shorthorn",
       registration: "4219133",
     });
 
@@ -293,11 +301,11 @@ describe("the breed makeup a refresh can actually find", () => {
     const montego = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "359968",
-      association: "ACA",
+      association: "Chianina",
     });
     const changes = refreshChanges(
       montego,
-      parseDigitalBeefPage(CHIANINA_PAGE, { association: "ACA", registration: "359968" }),
+      parseDigitalBeefPage(CHIANINA_PAGE, { association: "Chianina", registration: "359968" }),
     );
 
     expect(changes.find((change) => change.field === "breedComposition")?.after).toContain(
@@ -312,7 +320,7 @@ describe("the breed makeup a refresh can actually find", () => {
     const montego = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
     });
 
     expect(
@@ -322,8 +330,16 @@ describe("the breed makeup a refresh can actually find", () => {
 });
 
 describe("wiring the parents a page names", () => {
-  const tyson = external({ name: "CMAC TYSON ET", regNumber: "364424", association: "AMAA" });
-  const jenna = external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "AMAA" });
+  const tyson = external({
+    name: "CMAC TYSON ET",
+    regNumber: "364424",
+    association: "Maine-Anjou",
+  });
+  const jenna = external({
+    name: "ZNT JENNA 707T",
+    regNumber: "378987",
+    association: "Maine-Anjou",
+  });
 
   it("links a sire and dam the record does not have yet", () => {
     // The detail panel names both outright. An ancestor entered by hand off a
@@ -332,7 +348,7 @@ describe("wiring the parents a page names", () => {
     const orphan = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
     });
 
     const changes = refreshChanges(orphan, page(), [tyson, jenna]);
@@ -354,7 +370,7 @@ describe("wiring the parents a page names", () => {
     const wired = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
       sire: { kind: "external", id: "01ARZ3NDEKTSV4RRFFQ69G5FZZ" as never },
     });
 
@@ -367,7 +383,7 @@ describe("wiring the parents a page names", () => {
     const orphan = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
     });
 
     expect(refreshChanges(orphan, page(), []).some((c) => c.field === "sire")).toBe(false);
@@ -381,7 +397,7 @@ describe("wiring the parents a page names", () => {
     const orphan = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
     });
 
     expect(refreshChanges(orphan, page(), [one, two]).some((c) => c.field === "sire")).toBe(false);
@@ -393,12 +409,12 @@ describe("wiring the parents a page names", () => {
     const wrongRegistry = external({
       name: "SOMEBODY ELSE",
       regNumber: "364424",
-      association: "ACA",
+      association: "Chianina",
     });
     const orphan = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
     });
 
     expect(refreshChanges(orphan, page(), [wrongRegistry]).some((c) => c.field === "sire")).toBe(
@@ -422,7 +438,7 @@ describe("the farm's own animals", () => {
     }) as CattleProfile;
 
   const chianina = () =>
-    parseDigitalBeefPage(CHIANINA_PAGE, { association: "ACA", registration: "359968" });
+    parseDigitalBeefPage(CHIANINA_PAGE, { association: "Chianina", registration: "359968" });
 
   it("takes the breed makeup off the papers", () => {
     // The gap this covers: the farm's own pages were being read only for what
@@ -508,7 +524,7 @@ describe("what a chart offers that is not on file", () => {
         external({
           name: entry.name as string,
           regNumber: entry.regNumber as string,
-          association: "AMAA",
+          association: "Maine-Anjou",
         }),
       );
 
@@ -531,7 +547,7 @@ describe("what the chart says about the ancestors on it", () => {
    * through" was true the whole time it was broken.
    */
   const imported = () =>
-    parseDigitalBeefPage(CHIANINA_PAGE, { association: "ACA", registration: "359968" });
+    parseDigitalBeefPage(CHIANINA_PAGE, { association: "Chianina", registration: "359968" });
 
   /** The herd exactly as the import screen would have written it. */
   const asImported = (page: ReturnType<typeof imported>) =>
@@ -564,7 +580,11 @@ describe("what the chart says about the ancestors on it", () => {
     // `MA364424` on this Chianina page is Maine-Anjou 364424, and that is
     // where the importer put him.
     const page = imported();
-    const tyson = external({ name: "CMAC TYSON ET", regNumber: "364424", association: "AMAA" });
+    const tyson = external({
+      name: "CMAC TYSON ET",
+      regNumber: "364424",
+      association: "Maine-Anjou",
+    });
 
     expect(pedigreeChanges(page, [tyson])).toHaveLength(1);
   });
@@ -573,7 +593,11 @@ describe("what the chart says about the ancestors on it", () => {
     // Records written before the prefix was understood are filed under the
     // printing registry with the tag still on the number. They keep working.
     const page = imported();
-    const tyson = external({ name: "CMAC TYSON ET", regNumber: "MA364424", association: "ACA" });
+    const tyson = external({
+      name: "CMAC TYSON ET",
+      regNumber: "MA364424",
+      association: "Chianina",
+    });
 
     expect(pedigreeChanges(page, [tyson])).toHaveLength(1);
   });

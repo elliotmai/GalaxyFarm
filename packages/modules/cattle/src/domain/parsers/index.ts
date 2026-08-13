@@ -50,7 +50,7 @@ export function parseAnimalUrl(
 
 /** Read a page with whichever parser its association calls for. */
 export function parseAnimalPage(html: string, ref: PageRef): ImportedAnimal {
-  return ref.association === "AAA"
+  return ref.association === "Angus"
     ? parseAngusPage(html, { registration: ref.registration, url: ref.url })
     : parseDigitalBeefPage(html, ref as never);
 }

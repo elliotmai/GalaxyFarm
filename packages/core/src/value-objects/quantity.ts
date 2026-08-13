@@ -6,12 +6,23 @@ import { z } from "zod";
  * its unit at the type level is what stops a bale being added to a bag.
  */
 
+/**
+ * `bucket` and `scoop` are the vessels in this barn, not standard measures.
+ *
+ * Nobody weighs out grain. The feed goes in by the scoop and comes out of the
+ * shed by the bucket, and a plan written in pounds is a plan somebody has to
+ * do arithmetic on twice a day in the dark. So the vessels are units in their
+ * own right, and what they weigh is a property of the feed — `module-feed`
+ * holds the conversions and the per-feed override.
+ */
 export const UNITS = [
   "lb",
   "ton",
   "round_bale",
   "square_bale",
   "bag",
+  "bucket",
+  "scoop",
   "block",
   "ml",
   "cc",

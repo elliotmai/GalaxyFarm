@@ -42,7 +42,7 @@ const ANGUS_HOST = "www.angus.org";
 
 export interface AngusRef {
   readonly url: string;
-  readonly association: "AAA";
+  readonly association: "Angus";
   readonly registration: string;
 }
 
@@ -77,7 +77,7 @@ export function parseAngusUrl(
 
   return {
     ok: true,
-    ref: { url: url.toString(), association: "AAA", registration: registration.trim() },
+    ref: { url: url.toString(), association: "Angus", registration: registration.trim() },
   };
 }
 

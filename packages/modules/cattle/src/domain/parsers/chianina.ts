@@ -34,7 +34,7 @@ import type { DigitalBeefBreed } from "./digital-beef-breed.js";
 const PEDIGREE_LAYOUT = "reg-name-tattoo";
 
 export const CHIANINA: DigitalBeefBreed = {
-  association: "ACA",
+  association: "Chianina",
   breed: "Chianina",
   host: "chianina.digitalbeef.com",
   pedigreeLayout: PEDIGREE_LAYOUT,

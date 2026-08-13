@@ -9,6 +9,7 @@ import {
   EmptyState,
   PageBody,
   PageHeader,
+  Modal,
   Pill,
   RecordCard,
   Section,
@@ -30,12 +31,16 @@ import {
   type FeedingPlanLine,
   type TimeOfDay,
   type Ulid,
+  type Unit,
   type Zone,
 } from "@galaxy-farm/core";
 import {
+  describeGrain,
   FEED_CATEGORIES,
   FEED_UNITS,
   feedTypeSchema,
+  isGrainMeasure,
+  measureToPounds,
   poundsOf,
   type FeedCategory,
   type FeedType,
@@ -43,6 +48,7 @@ import {
 } from "@galaxy-farm/module-feed";
 
 import { animalHref } from "@/lib/animal-slug";
+import { describeLine, mixedUnitFeed } from "@/lib/feed-lines";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -82,6 +88,19 @@ export function CattleFeedScreen({
   );
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
+
+  /**
+   * Held by id rather than as the record itself.
+   *
+   * The list is a live query — a sync pull mid-edit replaces every object in
+   * it — and a form holding the old object would go on showing values the
+   * store no longer has.
+   */
+  const [editing, setEditing] = useState<Ulid | undefined>();
+  const editingPlan = plans.find((plan) => plan.id === editing);
+
+  const [editingFeedId, setEditingFeed] = useState<Ulid | undefined>();
+  const editingFeed = feeds.find((feed) => feed.id === editingFeedId);
 
   const feedById = useMemo(() => new Map(feeds.map((feed) => [feed.id, feed])), [feeds]);
   const animalById = useMemo(() => new Map(animals.map((a) => [a.id, a])), [animals]);
@@ -191,9 +210,18 @@ export function CattleFeedScreen({
                 }
                 meta={
                   poundsOf(entry.feed, entry.amount) === undefined ? undefined : (
-                    <Pill>
-                      about {Math.round(poundsOf(entry.feed, entry.amount) as number)} lb/day
-                    </Pill>
+                    <>
+                      <Pill>
+                        about {Math.round(poundsOf(entry.feed, entry.amount) as number)} lb/day
+                      </Pill>
+                      {/* Said in vessels as well, because "213 lb" is not
+                          something anybody can carry to the feed shed. */}
+                      {isGrainMeasure(entry.feed.unit) ? (
+                        <Pill tone="identity">
+                          {describeGrain(poundsOf(entry.feed, entry.amount) as number)}/day
+                        </Pill>
+                      ) : null}
+                    </>
                   )
                 }
               />
@@ -206,7 +234,7 @@ export function CattleFeedScreen({
         title="The feed catalogue"
         description="What a plan's lines can name. Cross-species — the same bale feeds cattle and the same scratch feeds chickens."
       >
-        <AddFeedType propertyId={propertyId} actorId={actorId} />
+        <FeedTypeForm propertyId={propertyId} actorId={actorId} />
         {feeds.length === 0 ? (
           <EmptyState
             title="Nothing in the catalogue"
@@ -217,22 +245,29 @@ export function CattleFeedScreen({
             {feeds.map((feed) => (
               <RecordCard
                 key={feed.id}
-                tone={feed.active ? "neutral" : "neutral"}
+                tone="neutral"
                 title={feed.name}
                 subtitle={`${feed.category} · by the ${feed.unit.replace(/_/g, " ")}`}
                 meta={
-                  feed.estWeightLbPerUnit === undefined ? undefined : (
-                    <Pill>{feed.estWeightLbPerUnit} lb each</Pill>
-                  )
+                  <>
+                    {feed.estWeightLbPerUnit === undefined ? null : (
+                      <Pill>{feed.estWeightLbPerUnit} lb each</Pill>
+                    )}
+                    {feed.active ? null : <Pill>not stocked</Pill>}
+                  </>
                 }
-              />
+              >
+                <Button variant="ghost" onClick={() => setEditingFeed(feed.id)}>
+                  Edit
+                </Button>
+              </RecordCard>
             ))}
           </CardGrid>
         )}
       </Section>
 
       <Section title="Add a plan">
-        <AddPlan animals={animals} zones={zones} feeds={feeds} api={plansApi} />
+        <PlanForm animals={animals} zones={zones} feeds={feeds} api={plansApi} />
       </Section>
 
       <Section title="Every plan">
@@ -278,6 +313,9 @@ export function CattleFeedScreen({
                 })}
               >
                 <div className="flex flex-wrap gap-2">
+                  <Button variant="ghost" onClick={() => setEditing(plan.id)}>
+                    Edit
+                  </Button>
                   <Button variant="ghost" onClick={() => void toggle(plan)}>
                     {plan.active ? "Switch off" : "Switch on"}
                   </Button>
@@ -290,42 +328,107 @@ export function CattleFeedScreen({
           </CardGrid>
         )}
       </Section>
+
+      {editingFeed === undefined ? null : (
+        <Modal
+          title={`Edit ${editingFeed.name}`}
+          description="What it is called, what it is bought by, and what one of those weighs — which is what turns a ration into pounds."
+          onClose={() => setEditingFeed(undefined)}
+        >
+          <FeedTypeForm
+            key={editingFeed.id}
+            feed={editingFeed}
+            propertyId={propertyId}
+            actorId={actorId}
+            onSaved={() => setEditingFeed(undefined)}
+          />
+        </Modal>
+      )}
+
+      {editingPlan === undefined ? null : (
+        <Modal
+          title={`Edit ${editingPlan.name}`}
+          description="Change the ration, what it feeds, or what it is measured in. The plan keeps its history."
+          size="wide"
+          onClose={() => setEditing(undefined)}
+        >
+          {/* Keyed on the plan, so opening a different one starts from its own
+              values rather than from whichever was opened first. */}
+          <PlanForm
+            key={editingPlan.id}
+            plan={editingPlan}
+            animals={animals}
+            zones={zones}
+            feeds={feeds}
+            api={plansApi}
+            onSaved={() => setEditing(undefined)}
+          />
+        </Modal>
+      )}
     </PageBody>
   );
 }
 
-function AddFeedType({
+/**
+ * A feed in the catalogue, added or corrected.
+ *
+ * Correcting matters more than it looks. Every plan line points at one of
+ * these by id, so a feed that could only be created and deleted would leave
+ * somebody deleting one to fix a typo and taking every ration that named it
+ * with them. And `lb each` is the figure that turns "three scoops" into
+ * pounds — it is the number most likely to be wrong at first and most worth
+ * being able to put right.
+ */
+function FeedTypeForm({
+  feed,
   propertyId,
   actorId,
+  onSaved,
 }: {
+  readonly feed?: FeedType | undefined;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  readonly onSaved?: (() => void) | undefined;
 }) {
   const api = useMutations<FeedType>("feedTypes", "feedTypes", feedTypeSchema, propertyId, actorId);
   const { show } = useToast();
+  const editing = feed !== undefined;
 
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState<FeedCategory>("hay");
-  const [unit, setUnit] = useState<FeedUnit>("round_bale");
-  const [weight, setWeight] = useState("");
+  const [name, setName] = useState(feed?.name ?? "");
+  const [category, setCategory] = useState<FeedCategory>(feed?.category ?? "hay");
+  const [unit, setUnit] = useState<FeedUnit>(feed?.unit ?? "round_bale");
+  const [weight, setWeight] = useState(
+    feed?.estWeightLbPerUnit === undefined ? "" : String(feed.estWeightLbPerUnit),
+  );
   const [busy, setBusy] = useState(false);
+
+  /** What the vessel holds when nobody has said, so the hint is not a guess. */
+  const standard = measureToPounds(1, unit);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     try {
-      const result = await api.create({
+      const fields = {
         name: name.trim(),
         category,
         unit,
-        ...(weight === "" ? {} : { estWeightLbPerUnit: Number(weight) }),
-        reorderLeadDays: 7,
-        active: true,
-      } as never);
+        // Cleared rather than left behind when the box is emptied: a weight
+        // held over from a different unit is worse than none.
+        estWeightLbPerUnit: weight === "" ? undefined : Number(weight),
+      };
+
+      const result = editing
+        ? await api.update(feed.id, fields as Partial<FeedType>)
+        : await api.create({ ...fields, reorderLeadDays: 7, active: true } as never);
       if (!result.ok) return;
-      setName("");
-      setWeight("");
-      show({ message: "Added to the catalogue", tone: "success" });
+
+      if (!editing) {
+        setName("");
+        setWeight("");
+      }
+      show({ message: editing ? "Feed updated" : "Added to the catalogue", tone: "success" });
+      onSaved?.();
     } finally {
       setBusy(false);
     }
@@ -355,74 +458,161 @@ function AddFeedType({
       />
       <TextInput
         label="lb each"
-        hint="A round bale is 800 to 1,400."
+        hint={
+          standard === undefined
+            ? "A round bale is 800 to 1,400."
+            : `Leave it blank for ${standard === 1 ? "a pound" : `${Number(standard.toFixed(2))} lb`}, which is what a ${unit} holds here.`
+        }
         type="number"
         inputMode="decimal"
+        step="any"
         value={weight}
         onChange={(event) => setWeight(event.target.value)}
       />
       <Button type="submit" busy={busy}>
-        Add feed
+        {editing ? "Save changes" : "Add feed"}
       </Button>
     </form>
   );
 }
 
-function AddPlan({
+/**
+ * One line of a plan, as the form holds it.
+ *
+ * The unit is on the line rather than taken from the feed, because they are
+ * genuinely different questions. Cubes are *bought* by the bag and *fed* by
+ * the scoop, and a form that reads the unit off the catalogue makes somebody
+ * write "0.15 bags" twice a day.
+ */
+interface LineDraft {
+  readonly key: string;
+  readonly feedId: string;
+  readonly amount: string;
+  readonly unit: Unit;
+  readonly frequency: FeedingFrequency;
+  readonly timeOfDay: TimeOfDay;
+}
+
+let lineSequence = 0;
+const blankLine = (): LineDraft => ({
+  key: `line-${lineSequence++}`,
+  feedId: "",
+  amount: "",
+  unit: "lb",
+  frequency: "twice_daily",
+  timeOfDay: "morning",
+});
+
+const draftFrom = (plan: FeedingPlan): LineDraft[] =>
+  plan.lines.map((line) => ({
+    key: `line-${lineSequence++}`,
+    feedId: line.feedTypeId,
+    amount: String(line.amount.amount),
+    unit: line.amount.unit,
+    frequency: line.frequency,
+    timeOfDay: line.timeOfDay,
+  }));
+
+/**
+ * Write a plan, or change one that exists.
+ *
+ * One form for both, because a plan that can only be created is a plan that
+ * gets deleted and retyped the first time a ration changes — and the deletion
+ * takes the history of what was being fed with it. §4.5 clause 1 asks for the
+ * full four operations on everything, and this is the U.
+ */
+function PlanForm({
+  plan,
   animals,
   zones,
   feeds,
   api,
+  onSaved,
 }: {
+  readonly plan?: FeedingPlan | undefined;
   readonly animals: readonly Animal[];
   readonly zones: readonly Zone[];
   readonly feeds: readonly FeedType[];
   readonly api: ReturnType<typeof useMutations<FeedingPlan>>;
+  readonly onSaved?: (() => void) | undefined;
 }) {
   const { show } = useToast();
-  const [name, setName] = useState("");
-  const [target, setTarget] = useState<"animal" | "zone" | "group">("group");
-  const [targetId, setTargetId] = useState("");
-  const [feedId, setFeedId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [frequency, setFrequency] = useState<FeedingFrequency>("twice_daily");
-  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>("morning");
+  const editing = plan !== undefined;
+
+  const [name, setName] = useState(plan?.name ?? "");
+  const [target, setTarget] = useState<"animal" | "zone" | "group">(plan?.target ?? "group");
+  const [targetId, setTargetId] = useState<string>(
+    plan === undefined || plan.target === "group" ? "" : plan.targetId,
+  );
+  const [lines, setLines] = useState<LineDraft[]>(
+    plan === undefined ? [blankLine()] : draftFrom(plan),
+  );
+  const [notes, setNotes] = useState(plan?.specialNotes ?? "");
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
   const targets = target === "animal" ? animals : target === "zone" ? zones : [];
+  const feedById = new Map<string, FeedType>(feeds.map((feed) => [feed.id, feed]));
+
+  const editLine = (key: string, patch: Partial<LineDraft>): void =>
+    setLines(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+
+  const dropLine = (key: string): void =>
+    // crud-guard: allow-unconfirmed — taking a line out of a form that has not been saved
+    setLines(lines.filter((line) => line.key !== key));
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(undefined);
 
-    if (feedId === "") {
-      setError("Choose what this plan feeds");
+    if (lines.length === 0) {
+      setError("A plan needs at least one thing in it");
+      return;
+    }
+    if (lines.some((line) => line.feedId === "")) {
+      setError("Choose what each line feeds");
       return;
     }
     if (target !== "group" && targetId === "") {
       setError(target === "animal" ? "Choose the animal" : "Choose the zone");
       return;
     }
+    // `dailyDemandOf` throws on a plan that feeds one feed in two units, which
+    // is a plan with no meaningful total. Caught here so it is a sentence
+    // rather than a crash on the screen that reads the plan back.
+    const mixed = mixedUnitFeed(lines);
+    if (mixed !== undefined) {
+      setError(
+        `Two lines feed ${feedById.get(mixed)?.name ?? "the same feed"} in different units. Put both in the same one.`,
+      );
+      return;
+    }
 
     setBusy(true);
     try {
-      const feed = feeds.find((entry) => entry.id === feedId);
-      const line: FeedingPlanLine = {
-        feedTypeId: feedId as Ulid,
-        amount: { amount: Number(amount || "0"), unit: feed?.unit ?? "lb" },
-        frequency,
-        timeOfDay,
-      };
+      const written: FeedingPlanLine[] = lines.map((line) => ({
+        feedTypeId: line.feedId as Ulid,
+        amount: { amount: Number(line.amount || "0"), unit: line.unit },
+        frequency: line.frequency,
+        timeOfDay: line.timeOfDay,
+      }));
 
-      const result = await api.create({
+      const fields = {
         name: name.trim(),
         target,
         // A group plan still needs a target id; the herd is the property.
-        targetId: (target === "group" ? feeds[0]?.propertyId : targetId) as Ulid,
-        lines: [line],
-        active: true,
-      } as never);
+        targetId: (target === "group"
+          ? plan?.target === "group"
+            ? plan.targetId
+            : feeds[0]?.propertyId
+          : targetId) as Ulid,
+        lines: written,
+        ...(notes.trim() === "" ? {} : { specialNotes: notes.trim() }),
+      };
+
+      const result = editing
+        ? await api.update(plan.id, fields as Partial<FeedingPlan>)
+        : await api.create({ ...fields, active: true } as never);
 
       if (!result.ok) {
         setError(
@@ -432,9 +622,14 @@ function AddPlan({
         );
         return;
       }
-      setName("");
-      setAmount("");
-      show({ message: "Plan added", tone: "success" });
+
+      if (!editing) {
+        setName("");
+        setLines([blankLine()]);
+        setNotes("");
+      }
+      show({ message: editing ? "Plan updated" : "Plan added", tone: "success" });
+      onSaved?.();
     } finally {
       setBusy(false);
     }
@@ -481,38 +676,93 @@ function AddPlan({
             required
           />
         )}
-        <Select
-          label="Feed"
-          value={feedId}
-          onChange={(event) => setFeedId(event.target.value)}
-          placeholder="Choose a feed"
-          options={feeds.map((feed) => ({ value: feed.id, label: feed.name }))}
-          required
-        />
-        <TextInput
-          label="Amount"
-          type="number"
-          inputMode="decimal"
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-          required
-        />
-        <Select
-          label="How often"
-          value={frequency}
-          onChange={(event) => setFrequency(event.target.value as FeedingFrequency)}
-          options={FEEDING_FREQUENCIES.map((value) => ({
-            value,
-            label: value.replace(/_/g, " "),
-          }))}
-        />
-        <Select
-          label="When"
-          value={timeOfDay}
-          onChange={(event) => setTimeOfDay(event.target.value as TimeOfDay)}
-          options={TIMES_OF_DAY.map((value) => ({ value, label: value }))}
-        />
       </div>
+
+      <div className="flex flex-col gap-density">
+        {lines.map((line) => (
+          <div
+            key={line.key}
+            className="grid grid-cols-1 gap-density rounded-density border border-edge p-3 sm:grid-cols-2 lg:grid-cols-5"
+          >
+            <Select
+              label="Feed"
+              value={line.feedId}
+              onChange={(event) => {
+                const feed = feedById.get(event.target.value);
+                // The catalogue's unit is the sensible starting point, and
+                // nothing more than that — it stays changeable, because a bag
+                // of cubes is fed by the scoop.
+                editLine(line.key, {
+                  feedId: event.target.value,
+                  ...(feed === undefined ? {} : { unit: feed.unit }),
+                });
+              }}
+              placeholder="Choose a feed"
+              options={feeds.map((feed) => ({ value: feed.id, label: feed.name }))}
+              required
+            />
+            <TextInput
+              label="Amount"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              value={line.amount}
+              onChange={(event) => editLine(line.key, { amount: event.target.value })}
+              required
+            />
+            <Select
+              label="Measured in"
+              hint="Bought by the bag, fed by the scoop."
+              value={line.unit}
+              onChange={(event) => editLine(line.key, { unit: event.target.value as Unit })}
+              options={FEED_UNITS.map((value) => ({ value, label: value.replace(/_/g, " ") }))}
+            />
+            <Select
+              label="How often"
+              value={line.frequency}
+              onChange={(event) =>
+                editLine(line.key, { frequency: event.target.value as FeedingFrequency })
+              }
+              options={FEEDING_FREQUENCIES.map((value) => ({
+                value,
+                label: value.replace(/_/g, " "),
+              }))}
+            />
+            <div className="flex items-end gap-2">
+              <Select
+                label="When"
+                value={line.timeOfDay}
+                onChange={(event) =>
+                  editLine(line.key, { timeOfDay: event.target.value as TimeOfDay })
+                }
+                options={TIMES_OF_DAY.map((value) => ({ value, label: value }))}
+              />
+              {lines.length === 1 ? null : (
+                <Button variant="ghost" type="button" onClick={() => dropLine(line.key)}>
+                  Remove
+                </Button>
+              )}
+            </div>
+
+            <p className="text-sm text-muted lg:col-span-5">
+              {describeLine(line, feedById.get(line.feedId))}
+            </p>
+          </div>
+        ))}
+
+        <div>
+          <Button variant="ghost" type="button" onClick={() => setLines([...lines, blankLine()])}>
+            Add another feed
+          </Button>
+        </div>
+      </div>
+
+      <TextInput
+        label="Notes"
+        hint="Anything about this plan somebody feeding needs to know."
+        value={notes}
+        onChange={(event) => setNotes(event.target.value)}
+      />
 
       {error === undefined ? null : (
         <p role="alert" className="text-sm text-danger">
@@ -520,9 +770,11 @@ function AddPlan({
         </p>
       )}
 
-      <Button type="submit" busy={busy}>
-        Add plan
-      </Button>
+      <div>
+        <Button type="submit" busy={busy}>
+          {editing ? "Save changes" : "Add plan"}
+        </Button>
+      </div>
     </form>
   );
 }
