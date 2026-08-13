@@ -29,6 +29,7 @@ import {
   planCatalogueImport,
   READABLE_REGISTRIES,
   registrationUrl,
+  reviveRegistryAnimal,
   type CataloguePlan,
   type CatalogueRow,
   type ExternalAnimal,
@@ -134,7 +135,8 @@ export function CatalogueScreen({
     if (search.sex !== "") query.set("sex", search.sex);
 
     try {
-      setResult(await ask<Found>(`/api/registry/search?${query.toString()}`));
+      const answer = await ask<Found>(`/api/registry/search?${query.toString()}`);
+      setResult({ ...answer, found: answer.found.map(reviveRegistryAnimal) });
     } catch (caught) {
       setResult(undefined);
       setError(caught instanceof Error ? caught.message : "That search did not work.");
@@ -157,8 +159,13 @@ export function CatalogueScreen({
             `&regNumber=${encodeURIComponent(animal.regNumber)}&generations=${generations}`,
         );
 
-        const plan = planCatalogueImport(detail.animal, detail.pedigree, onFile);
-        setOpened({ animal: detail.animal, plan, generations });
+        // Dates back into dates before anything reads them. JSON has no date,
+        // so what arrives is a string wearing the type of one.
+        const subject = reviveRegistryAnimal(detail.animal);
+        const pedigree = detail.pedigree.map(reviveRegistryAnimal);
+
+        const plan = planCatalogueImport(subject, pedigree, onFile);
+        setOpened({ animal: subject, plan, generations });
         // Certain matches are not a decision — they are the same animal. Only
         // the proposals start unticked.
         setMerging(new Set());

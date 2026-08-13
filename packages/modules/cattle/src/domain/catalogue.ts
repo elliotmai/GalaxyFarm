@@ -63,8 +63,20 @@ export function catalogueKey(association: string, regNumber: string): string {
   return `${association}:${normaliseRegistration(regNumber)}`;
 }
 
-const asIsoDay = (value: Date | undefined): string | undefined =>
-  value === undefined ? undefined : value.toISOString().slice(0, 10);
+/**
+ * The day part, for comparing one animal's birthday against another's.
+ *
+ * Takes a string as well as a `Date`, because this shape arrives over JSON and
+ * a date that has been through it is a string wearing the type of a Date.
+ * `reviveRegistryAnimal` is what fixes that properly, at the boundary; this is
+ * the belt to its braces, because a caller that forgets should get a match
+ * that still works rather than a screen that will not open.
+ */
+const asIsoDay = (value: Date | string | undefined): string | undefined => {
+  if (value === undefined) return undefined;
+  const day = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(day.getTime()) ? undefined : day.toISOString().slice(0, 10);
+};
 
 /**
  * What bringing this animal across would do, with nothing decided.

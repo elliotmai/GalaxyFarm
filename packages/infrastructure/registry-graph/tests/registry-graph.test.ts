@@ -226,6 +226,37 @@ describe("reading an animal", () => {
 });
 
 describe("searching", () => {
+  it("shows a bull papered twice once, not once per paper", async () => {
+    // The match fans out over registrations, so an animal in two associations
+    // came back on two rows — while the count beside it said DISTINCT, and the
+    // header and the table disagreed about how many animals there were.
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(reply(["total"], [[8]]))
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, [montegoBay, montegoBay]));
+
+    const result = await graphFor(fetch as never).search({ text: "znt" });
+
+    expect(result.found).toHaveLength(1);
+    expect(result.total).toBe(8);
+  });
+
+  it("keeps two different animals that happen to share a name", async () => {
+    // The crawl holds genuine near-duplicates — the same cow under two
+    // associations, never merged onto one node. Those are two animals as far
+    // as this is concerned, and hiding one would hide a real record.
+    const other: unknown[] = [...montegoBay];
+    other[0] = { ...(montegoBay[0] as object), uid: "USAM20090619Z002" };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(reply(["total"], [[2]]))
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, [montegoBay, other]));
+
+    const result = await graphFor(fetch as never).search({ text: "znt" });
+
+    expect(result.found).toHaveLength(2);
+  });
+
   it("reports the whole count alongside the page", async () => {
     // A search that silently truncates is one that lies about what is out
     // there — "25 results" out of four thousand sends somebody away.

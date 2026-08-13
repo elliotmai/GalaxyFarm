@@ -142,6 +142,29 @@ const asDefectStatus = (value: unknown): "free" | "carrier" | "suspect" => {
   return found === "F" ? "free" : found === "C" ? "carrier" : "suspect";
 };
 
+/**
+ * One row per animal, keeping the first of any repeats.
+ *
+ * The query collapses this itself; this is the net under it. Any `MATCH` that
+ * fans out over a relationship — and every one here does — returns the same
+ * animal once per match unless something says otherwise, and the failure looks
+ * exactly like a crawl that holds a bull twice. Keyed on the crawler's own id,
+ * which is what makes one animal one animal across every registry it is
+ * papered in.
+ */
+function oncePerAnimal(rows: readonly Row[]): Row[] {
+  const seen = new Set<string>();
+
+  return rows.filter((row) => {
+    const uid = asString(asRow(row["animal"])?.["uid"]);
+    // Without an id there is nothing safe to compare, and dropping a row on a
+    // guess is worse than showing it.
+    if (uid === undefined || seen.has(uid)) return uid === undefined;
+    seen.add(uid);
+    return true;
+  });
+}
+
 function toAnimal(row: Row): RegistryAnimal | undefined {
   const animal = asRow(row["animal"]);
   const association = asString(row["association"]);
@@ -307,8 +330,19 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
           parameters,
         ),
         run(
+          // One row per animal, not per paper. The match fans out over
+          // registrations, so a bull papered in two associations came back
+          // twice — and the count above says `DISTINCT a`, so the header and
+          // the table disagreed about how many animals there were.
+          //
+          // Collapsed by keeping the first registration that satisfied the
+          // filter, ordered so the choice is the same on every run rather than
+          // whichever the planner reached first. `LIMIT` then bounds animals,
+          // which is what a page of results is measured in.
           `MATCH (a:Animal)-[:HAS_REGISTRATION]->(reg:Registration) ${WHERE}
-           WITH a, reg ORDER BY a.name, reg.regNumber
+           WITH a, reg ORDER BY reg.association, reg.regNumber
+           WITH a, head(collect(reg)) AS reg
+           ORDER BY a.name, reg.regNumber
            LIMIT $limit
            RETURN ${RETURN_ANIMAL}`,
           { ...parameters, limit },
@@ -316,7 +350,9 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
       ]);
 
       return {
-        found: page.map(toAnimal).filter((entry): entry is RegistryAnimal => entry !== undefined),
+        found: oncePerAnimal(page)
+          .map(toAnimal)
+          .filter((entry): entry is RegistryAnimal => entry !== undefined),
         total: asNumber(counted[0]?.["total"]) ?? 0,
       };
     },
