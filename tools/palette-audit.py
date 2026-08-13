@@ -10,16 +10,20 @@ eyeballed. The formulas below are a straight port of
 `packages/ui/src/tokens/contrast.ts`, so anything this prints can go into
 `packages/ui/tests/contrast.test.ts` as an assertion the moment a palette wins.
 
-Running it found one real problem. The safety ramp's amber, level 3 at
-`#C98A1E`, sits between 2.71 and 2.74 against every one of these grounds —
-under the 3.0 that WCAG §1.4.11 requires of a meaningful non-text mark. It has
-never been a problem because it has only ever sat on a near-black canvas.
-Going light-first breaks it. Darkening to `#BC811C` clears every ground at 3.07
-and keeps black ink on it at 5.66, so that is the corrected value below.
+Two things it found that were not visible by looking.
 
-The neutrals are deliberately not shared between palettes: each ground and
-muted carries a faint bias toward its own primary, because a pure grey beside a
-coloured accent is what makes a palette read as defaulted rather than chosen.
+**The light ground breaks the amber.** Safety level 3 at `#C98A1E` sits between
+2.71 and 2.74 against every one of these grounds, under the 3.0 that WCAG
+§1.4.11 requires of a meaningful non-text mark. It has never been a problem
+because it has only ever sat on a near-black canvas. `#BC811C` clears every
+ground at 3.07 and keeps black ink on it at 5.66.
+
+**The middle of green belongs to the safety scale.** §8 forbids the calm sage
+from reading as safety-scale green and measures it by saturation; a green
+*primary* is that problem one step louder, because it lands on every button on
+the screen rather than on a few resting pastures. A mid-tone pasture green sits
+14.4° of hue from safety level 1 at 1.02:1 — the same colour by every measure
+that matters. See REJECTED.
 """
 
 AA_TEXT, AA_LARGE, AA_NON_TEXT = 4.5, 3.0, 3.0
@@ -42,6 +46,7 @@ def ratio(fg, bg):
 
 
 def saturation(hex_colour):
+    """HSL saturation, 0–1. §8 measures the sage/safety-green distinction here."""
     h = hex_colour.lstrip("#")
     r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
     mx, mn = max(r, g, b), min(r, g, b)
@@ -51,132 +56,176 @@ def saturation(hex_colour):
     return (mx - mn) / (2 - mx - mn) if li > 0.5 else (mx - mn) / (mx + mn)
 
 
+def hue(hex_colour):
+    import colorsys
+    h = hex_colour.lstrip("#")
+    rgb = tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    return colorsys.rgb_to_hls(*rgb)[0] * 360
+
+
+def hue_gap(a, b):
+    g = abs(hue(a) - hue(b))
+    return min(g, 360 - g)
+
+
 # ── The six ──────────────────────────────────────────────────────────────
 PALETTES = [
     {
         "key": "registry",
         "name": "Registry Green",
-        "story": "The colour of the paperwork. Herd books, registration "
-                 "certificates and sale catalogues have been printed in a deep "
-                 "green for a century, which is exactly the association the "
-                 "desktop surface wants.",
+        "family": "Green",
+        "story": "The colour the paperwork is printed in. Herd books, "
+                 "registration certificates and sale catalogues have used a "
+                 "deep desaturated green for a century — which is the same "
+                 "argument the redesign itself rests on.",
         "ground": "#f6f7f2", "surface": "#ffffff", "ink": "#171a16",
         "muted": "#565c53", "rule": "#dbded3",
-        "primary": "#2a4b34", "on_primary": "#ffffff",
-        "alert": "#8c3a2b", "ok": "#2a4b34",
-        "note": "Confirm and primary are the same green on purpose — two "
-                "greens in one palette read as a bug, not a distinction.",
+        "primary": "#223f2e", "on_primary": "#ffffff",
+        "alert": "#8c3a2b", "ok": "#223f2e",
+        "note": "Confirm and primary are the same green on purpose — two greens "
+                "in one palette read as a bug rather than a distinction.",
+    },
+    {
+        "key": "olive",
+        "name": "Field Olive",
+        "family": "Green",
+        "story": "Yellow-leaning: cured hay, winter rye, a pasture in August "
+                 "rather than April. The most agricultural of the six and the "
+                 "least like software of any kind.",
+        "ground": "#f7f7f0", "surface": "#ffffff", "ink": "#1a1a12",
+        "muted": "#5a5c48", "rule": "#dfe0cf",
+        "primary": "#4f5a1e", "on_primary": "#ffffff",
+        "alert": "#8c3a2b", "ok": "#3f6b4a",
+        "note": "Sits far enough from the safety greens in hue to keep confirm "
+                "as a separate colour, which the other two greens cannot.",
+    },
+    {
+        "key": "teal",
+        "name": "Slate Teal",
+        "family": "Blue-green",
+        "story": "The bridge between the two families — the coolest of the "
+                 "greens and the warmest of the blues. Nobody else in "
+                 "agricultural software is using it.",
+        "ground": "#f3f6f6", "surface": "#ffffff", "ink": "#13191a",
+        "muted": "#4f585a", "rule": "#d4dbdb",
+        "primary": "#1f5158", "on_primary": "#ffffff",
+        "alert": "#a8321f", "ok": "#3f6b4a",
+        "note": "Furthest from the farm's existing printed material, so it wins "
+                "on differentiation and loses on continuity.",
     },
     {
         "key": "bluebonnet",
         "name": "Bluebonnet",
-        "story": "The colour §8 already specifies for every primary action, "
-                 "kept. The state flower, and the one choice here that costs "
+        "family": "Blue",
+        "story": "The value §8 already specifies for every primary action, "
+                 "kept. The state flower, and the only choice here that costs "
                  "no continuity with anything already built or printed.",
         "ground": "#f5f6f8", "surface": "#ffffff", "ink": "#16181c",
         "muted": "#535963", "rule": "#d8dbe1",
         "primary": "#35569e", "on_primary": "#ffffff",
         "alert": "#a8321f", "ok": "#3f6b4a",
-        "note": "The safest continuity play: the token value does not change, "
-                "only everything around it.",
-    },
-    {
-        "key": "oxblood",
-        "name": "Barn Oxblood",
-        "story": "Barn paint and the heat of a brand iron. The most "
-                 "agricultural of the six and the most confident — it does not "
-                 "look like software at all.",
-        "ground": "#f8f6f2", "surface": "#ffffff", "ink": "#1a1613",
-        "muted": "#5f5850", "rule": "#e0dad0",
-        "primary": "#7e2d22", "on_primary": "#ffffff",
-        "alert": "#b3261e", "ok": "#3f6b4a",
-        "note": "Watch the collision: primary and alert are both red. The deep "
-                "oxblood and the brighter alert are separable, but a warning "
-                "next to a button will always be the weakest moment here.",
+        "note": "The token value does not change; only everything around it "
+                "does. The cheapest palette to defend.",
     },
     {
         "key": "navy",
         "name": "Ink Navy",
-        "story": "Ledgers, fountain pens, and every serious document ever "
-                 "filed. The most conservative option, and the one least "
-                 "likely to be wrong in five years.",
-        "ground": "#f5f6f7", "surface": "#ffffff", "ink": "#14171b",
+        "family": "Blue",
+        "story": "Ledgers, fountain pens and filed documents. The deepest and "
+                 "most neutral of the three blues — no violet lean, no cyan "
+                 "lean, nothing to date it.",
+        "ground": "#f5f6f8", "surface": "#ffffff", "ink": "#14171b",
         "muted": "#525860", "rule": "#d7dade",
-        "primary": "#1e3a5f", "on_primary": "#ffffff",
+        "primary": "#1b3a5c", "on_primary": "#ffffff",
         "alert": "#a8321f", "ok": "#3f6b4a",
         "note": "Nothing here will surprise anyone, which is both the "
                 "recommendation and the warning.",
     },
     {
-        "key": "brass",
-        "name": "Brass",
-        "story": "The champion accent §8 holds in reserve and has never used. "
-                 "Buckles, trophies, ribbons — the show ring rather than the "
-                 "pasture, which is exactly where the boarding business lives.",
-        "ground": "#f9f7f0", "surface": "#ffffff", "ink": "#1b1813",
-        "muted": "#5e5749", "rule": "#e3ddcc",
-        "primary": "#75570f", "on_primary": "#ffffff",
-        "alert": "#9c3324", "ok": "#47654d",
-        "note": "The bright brass #C9A24B cannot carry text — it is 2.0:1 on "
-                "white. It stays a fill and a rule; this darker tobacco does "
-                "the reading.",
-    },
-    {
-        "key": "teal",
-        "name": "Slate Teal",
-        "story": "The one nobody else in agricultural software is using. Cool, "
-                 "quiet and modern without being a tech-company blue.",
-        "ground": "#f3f6f6", "surface": "#ffffff", "ink": "#13191a",
-        "muted": "#4f585a", "rule": "#d4dbdb",
-        "primary": "#1f5158", "on_primary": "#ffffff",
+        "key": "harbor",
+        "name": "Harbor",
+        "family": "Blue",
+        "story": "Cleaner and brighter than a navy, and with none of "
+                 "Bluebonnet's violet lean. The most straightforwardly "
+                 "legible primary of the six on a small screen.",
+        "ground": "#f4f6f8", "surface": "#ffffff", "ink": "#13181c",
+        "muted": "#4e5760", "rule": "#d5dbe0",
+        "primary": "#15597f", "on_primary": "#ffffff",
         "alert": "#a8321f", "ok": "#3f6b4a",
-        "note": "Furthest from the farm's existing printed material, so it "
-                "wins on differentiation and loses on continuity.",
+        "note": "Reads as a utility blue rather than a brand blue — which is an "
+                "advantage on the kiosk and a shrug on the customer portal.",
     },
 ]
 
-# The safety ramp is outside every palette (spec §8) and identical in all of
-# them. Restyling it per palette would break the one rule the colour system is
-# built on.
-SAFETY = {1: "#2f6b3d", 2: "#3f8f4f", 3: "#c98a1e", 4: "#c0392b", 5: "#8e1f14"}
+# Corrected for light grounds: level 3 darkened from #C98A1E, which fails the
+# 3.0 non-text minimum against every one of these grounds.
+SAFETY = {1: "#2f6b3d", 2: "#3f8f4f", 3: "#bc811c", 4: "#c0392b", 5: "#8e1f14"}
+SAFETY_GREENS = (1, 2)
+
+# Kept as evidence rather than deleted. A mid-tone pasture green is the obvious
+# choice for a farm and it is the one colour a farm cannot use: at #1F6B43 it is
+# 14.4° of hue from safety level 1 with near-identical luminance (1.02:1), so a
+# button and "this pen is safe to walk into" become the same green. Solving it
+# against the ramp only pushes it down onto Registry.
+REJECTED = {
+    "name": "Pasture",
+    "primary": "#1f6b43",
+    "why": "14.4° of hue from safety level 1 at 1.02:1 contrast — the same green "
+           "as the calmest rung on the safety scale.",
+}
 
 
 CHECKS = [
-    ("ink on ground",       "ink",       "ground",  AA_TEXT),
-    ("muted on ground",     "muted",     "ground",  AA_TEXT),
-    ("ink on surface",      "ink",       "surface", AA_TEXT),
-    ("muted on surface",    "muted",     "surface", AA_TEXT),
-    ("primary on ground",   "primary",   "ground",  AA_TEXT),
-    ("primary on surface",  "primary",   "surface", AA_TEXT),
+    ("ink on ground",       "ink",        "ground",  AA_TEXT),
+    ("muted on ground",     "muted",      "ground",  AA_TEXT),
+    ("ink on surface",      "ink",        "surface", AA_TEXT),
+    ("muted on surface",    "muted",      "surface", AA_TEXT),
+    ("primary on ground",   "primary",    "ground",  AA_TEXT),
+    ("primary on surface",  "primary",    "surface", AA_TEXT),
     ("label on primary",    "on_primary", "primary", AA_TEXT),
-    ("alert on ground",     "alert",     "ground",  AA_TEXT),
-    ("ok on ground",        "ok",        "ground",  AA_TEXT),
-    ("rule on surface",     "rule",      "surface", AA_NON_TEXT),
+    ("alert on ground",     "alert",      "ground",  AA_TEXT),
+    ("ok on ground",        "ok",         "ground",  AA_TEXT),
+    ("rule on surface",     "rule",       "surface", AA_NON_TEXT),
 ]
 
 
 def audit(p):
-    rows = []
-    for what, fg, bg, minimum in CHECKS:
-        r = ratio(p[fg], p[bg])
-        rows.append((what, r, minimum, r >= minimum))
-    return rows
+    return [(what, ratio(p[fg], p[bg]), m, ratio(p[fg], p[bg]) >= m)
+            for what, fg, bg, m in CHECKS]
 
 
-# ── Corrected safety ramp ────────────────────────────────────────────────
-#
-# Identical in every palette and deliberately outside all of them. §8 puts the
-# safety scale outside the palette so nothing competes with it; tinting it per
-# palette would break the one rule the colour system is built on.
-SAFETY_LIGHT = {1: "#2f6b3d", 2: "#3f8f4f", 3: "#bc811c", 4: "#c0392b", 5: "#8e1f14"}
+def safety_clash(p):
+    """
+    §8's rule, applied to the primary.
+
+    The spec forbids the calm sage from reading as safety-scale green, and
+    measures it by saturation rather than by hue, because the two are
+    near-identical in hue by design. A green *primary* is the same problem one
+    step louder: it appears on every button on the screen.
+
+    Returns the closest safety green and how it is separated.
+    """
+    worst = None
+    for level in SAFETY_GREENS:
+        col = SAFETY[level]
+        h = hue_gap(p["primary"], col)
+        s = abs(saturation(p["primary"]) - saturation(col))
+        l = ratio(p["primary"], col)
+        # Separated if the hue differs enough to be seen, or the saturation
+        # gap is what §8 relies on, or one is plainly darker than the other.
+        clear = h >= 20 or s >= 0.18 or l >= 1.8
+        if worst is None or (h, s, l) < worst[1:4]:
+            worst = (level, h, s, l, clear)
+    return worst
 
 
 def report() -> int:
-    """Print the audit. Returns the number of AA text failures found."""
+    """Print the audit. Returns the number of failures found."""
     failures = 0
 
     for p in PALETTES:
-        print(f"\n{p['name']}  primary {p['primary']}  saturation {saturation(p['primary']):.2f}")
+        print(f"\n{p['name']}  [{p['family']}]  primary {p['primary']}  "
+              f"hue {hue(p['primary']):.0f}deg  saturation {saturation(p['primary']):.2f}")
         for what, r, minimum, ok in audit(p):
             # The hairline rule is decoration, not a control boundary, so it is
             # reported for information rather than gated.
@@ -187,43 +236,44 @@ def report() -> int:
                 failures += 1
             print(f"  {'  ' if ok else '!!'} {what:<20} {r:5.2f}  (min {minimum})")
 
-    print("\n── safety ramp, weakest contrast against any of the grounds ──")
-    for level, colour in sorted(SAFETY_LIGHT.items()):
+    print("\n-- does the primary read as safety-scale green? (spec 8) --")
+    for p in PALETTES + [REJECTED]:
+        level, h, s, l, clear = safety_clash(p)
+        by = "hue" if h >= 20 else "saturation" if s >= 0.18 else "depth"
+        if not clear:
+            failures += 1
+        verdict = f"clear, by {by}" if clear else "TOO CLOSE"
+        tail = "  <- kept as evidence, not in the set" if p is REJECTED else ""
+        print(f"  {p['name']:<16} vs level {level}: hue {h:5.1f}deg  "
+              f"satD {s:.2f}  contrast {l:.2f}  -> {verdict}{tail}")
+
+    print("\n-- safety ramp, weakest contrast against any ground --")
+    for level, colour in sorted(SAFETY.items()):
         worst = min(ratio(colour, p["ground"]) for p in PALETTES)
         white, black = ratio("#ffffff", colour), ratio("#111111", colour)
         ink = "white" if white >= black else "black"
+        if worst < AA_NON_TEXT:
+            failures += 1
         state = "ok" if worst >= AA_NON_TEXT else "FAIL"
         print(f"  level {level} {colour}  on ground {worst:5.2f} {state:5s}"
               f"  ink {ink} ({max(white, black):.2f})")
 
-    print("\n── primary against alert, in degrees of hue ──")
+    print("\n-- primary against alert, in degrees of hue --")
     for p in PALETTES:
-        gap = _hue_gap(p["primary"], p["alert"])
-        verdict = "same family" if gap < 25 else "distinct"
-        print(f"  {p['name']:<16} {gap:4.0f}°  {verdict}")
+        gap = hue_gap(p["primary"], p["alert"])
+        print(f"  {p['name']:<16} {gap:5.0f}deg  "
+              f"{'same family' if gap < 25 else 'distinct'}")
 
     weakest = min(
         r for p in PALETTES for what, r, m, o in audit(p) if what != "rule on surface"
     )
     print(f"\nweakest text pair anywhere: {weakest:.2f}  (AA needs {AA_TEXT})")
-    print(f"AA text failures: {failures or 'none'}")
+    print(f"failures: {failures or 'none'}")
     return failures
-
-
-def _hue_gap(a: str, b: str) -> float:
-    """Degrees between two hues — contrast cannot tell red from red."""
-    import colorsys
-
-    def hue(hex_colour: str) -> float:
-        h = hex_colour.lstrip("#")
-        rgb = tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
-        return colorsys.rgb_to_hls(*rgb)[0] * 360
-
-    gap = abs(hue(a) - hue(b))
-    return min(gap, 360 - gap)
 
 
 if __name__ == "__main__":
     import sys
 
-    sys.exit(1 if report() else 0)
+    # REJECTED is expected to fail the spec-8 check — that is what it is for.
+    sys.exit(1 if report() > 1 else 0)

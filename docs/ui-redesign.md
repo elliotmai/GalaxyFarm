@@ -194,31 +194,69 @@ by [`tools/palette-audit.py`](../tools/palette-audit.py), which ports the
 formulas from `packages/ui/src/tokens/contrast.ts` so its output can go straight
 into `packages/ui/tests/contrast.test.ts` as assertions once one wins.
 
-| Palette        | Primary   | The argument                                                             |
-| -------------- | --------- | ------------------------------------------------------------------------ |
-| Registry Green | `#2A4B34` | The colour herd books and registration papers are printed in.            |
-| Bluebonnet     | `#35569E` | The value §8 already specifies. Costs no continuity with anything built. |
-| Barn Oxblood   | `#7E2D22` | Barn paint and brand-iron heat. The most agricultural of the six.        |
-| Ink Navy       | `#1E3A5F` | Ledgers and filed documents. The most conservative.                      |
-| Brass          | `#75570F` | Activates the champion accent §8 holds in reserve. The show ring.        |
-| Slate Teal     | `#1F5158` | The one nobody else in agricultural software is using.                   |
+Greens and blues only — no red primaries. **Alert stays red**, because §8 locks
+the safety ramp as a saturated green-to-red scale, so red cannot leave the
+product without breaking the one rule the colour system is built on, and a
+warning that was not red standing beside a red level-4 chip would be worse than
+the inconsistency it fixed.
+
+| Palette        | Family     | Primary   | The argument                                                              |
+| -------------- | ---------- | --------- | ------------------------------------------------------------------------- |
+| Registry Green | Green      | `#223F2E` | The colour herd books and registration papers are printed in.             |
+| Field Olive    | Green      | `#4F5A1E` | Cured hay and winter rye. Least like software of any kind.                |
+| Slate Teal     | Blue-green | `#1F5158` | The bridge. Nobody else in agricultural software is using it.             |
+| Bluebonnet     | Blue       | `#35569E` | The value §8 already specifies. Costs no continuity with anything built.  |
+| Ink Navy       | Blue       | `#1B3A5C` | Ledgers and filed documents. The most conservative.                       |
+| Harbor         | Blue       | `#15597F` | Cleaner than a navy, no violet lean. The most legible on a small screen.  |
 
 All six clear WCAG AA on every text pair; the weakest anywhere is 5.66 against a
 4.5 minimum. Neutrals are not shared between them — each ground and muted
 carries a faint bias toward its own primary, because a pure grey beside a
 coloured accent is what makes a palette read as defaulted rather than chosen.
 
-Two are worth ruling out rather than recommending. **Barn Oxblood** puts its
-primary 4° of hue from its alert — measurably the same colour family — so every
-screen carrying a warning has a button competing with it. **Ink Navy** will
-never be wrong, which is the whole problem with it.
-
 Leaning **Registry Green**: it is the only one that comes from the same argument
 as the redesign itself, and it has the cleanest semantics, since primary and
 confirm are one green and the palette carries three signals rather than four.
-**Brass** is the one to look at twice — it is the more commercial choice and
-points at the show ring rather than the pasture, which is where the boarding
-business lives.
+**Bluebonnet** is the free one — its primary is the value §8 already specifies,
+so it costs no continuity at all. **Field Olive** is the interesting one, and the
+only green far enough from the safety ramp to afford a separate confirm colour.
+
+**Ink Navy** and **Harbor** are the ones not to push. Navy will never be wrong,
+which is the whole problem with it; Harbor reads as a utility blue rather than a
+brand one, which helps on the kiosk and does nothing on the customer portal —
+the surface that actually has to sell something.
+
+## The middle of green belongs to the safety scale
+
+The second thing the audit found, and the reason both greens above sit at the
+edges of green rather than in the middle of it.
+
+§8 already contains this rule, written for a different colour: it forbids the
+calm sage from reading as safety-scale green, and measures the difference by
+_saturation_ rather than hue, because the two are near-identical in hue by
+design. A green **primary** is that same problem one step louder — sage appears
+on a few resting pastures, a primary appears on every button, link and active
+nav item on the screen.
+
+A mid-tone pasture green, the single most obvious colour for a farm, is the one
+green a farm cannot use. At `#1F6B43` it sits **14.4° of hue from safety level 1
+with 1.02:1 contrast** — the same colour by every measure that matters, so a
+button and "this pen is safe to walk into" become indistinguishable. It is kept
+in `tools/palette-audit.py` as `REJECTED` rather than deleted, because the next
+person to reach for a pasture green will reach for exactly that one.
+
+That leaves three ways for a green primary to survive, and each green in the set
+uses one:
+
+- **By depth.** Registry Green goes to `#223F2E`, clearing the ramp at 1.81:1.
+  The constraint helped: that depth is what makes it read as ink on a
+  certificate rather than as a lawn.
+- **By hue, warm.** Field Olive turns 61° toward yellow.
+- **By hue, cool.** Slate Teal turns 53° toward blue.
+
+No blue has this problem — every one clears the ramp by 67° or more without
+anyone having to think about it. If the constraint feels like it is doing too
+much work, that is itself an argument for a blue.
 
 ## The light ground breaks the amber safety chip
 
