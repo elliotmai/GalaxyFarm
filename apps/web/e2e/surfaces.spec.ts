@@ -22,6 +22,7 @@ import { storageStatePath } from "./session.js";
 const ADMIN_ROUTES = [
   "/admin",
   "/admin/map",
+  "/admin/pastures",
   "/admin/calendar",
   "/admin/cattle",
   "/admin/cattle/breeding",

@@ -65,7 +65,7 @@ export const NAV: readonly NavGroup[] = [
     label: "Land",
     collapsedByDefault: true,
     items: [
-      { href: "/admin/pastures", label: "Pastures" },
+      { href: "/admin/pastures", label: "Pastures and water" },
       { href: "/admin/garden/layout", label: "Garden layout" },
       { href: "/admin/garden/plantings", label: "Plantings" },
       { href: "/admin/garden/seeds", label: "Seeds" },
