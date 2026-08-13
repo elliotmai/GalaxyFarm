@@ -399,6 +399,104 @@
     color: #B4B2C8;
   }
 
+
+  /* ---------- shortlist picker ---------- */
+
+  .keep {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    flex: none;
+  }
+  .keep input {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 17px;
+    height: 17px;
+    margin: 0;
+    border: 2px solid var(--rule-firm);
+    border-radius: 3px;
+    background: var(--sheet);
+    display: grid;
+    place-content: center;
+    cursor: pointer;
+  }
+  .keep input::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    transform: scale(0);
+    background: var(--sheet);
+    clip-path: polygon(14% 44%, 0 65%, 40% 100%, 100% 16%, 82% 0%, 38% 68%);
+  }
+  .keep input:checked { background: var(--brass-text); border-color: var(--brass-text); }
+  .keep input:checked::before { transform: scale(1); }
+  .keep input:focus-visible { outline: 2px solid var(--brass-line); outline-offset: 2px; }
+  .keep span {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft);
+  }
+  .keep input:checked + span { color: var(--brass-text); font-weight: 600; }
+
+  .base-head { display: flex; align-items: center; gap: 9px; margin: 14px 0 6px; }
+  .base-head h3 { margin: 0; }
+
+  /* ---------- selection bar ---------- */
+
+  .tally {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 20;
+    background: var(--sheet);
+    border: 1px solid var(--rule-firm);
+    border-radius: 4px;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.18);
+    font-size: 13px;
+    max-width: min(380px, calc(100vw - 36px));
+  }
+  .tally-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+  .tally-count {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .tally button {
+    font: inherit;
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 3px;
+    border: 1px solid var(--rule-firm);
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .tally button:hover { border-color: var(--brass-line); }
+  .tally button:focus-visible { outline: 2px solid var(--brass-line); outline-offset: 2px; }
+  .tally-out { display: none; padding: 0 12px 12px; }
+  .tally-out.open { display: block; }
+  .tally textarea {
+    width: 100%;
+    height: 150px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 8px;
+    resize: vertical;
+  }
+  .tally-hint { margin: 8px 0 0; font-size: 12px; color: var(--ink-soft); }
+
+  @media print { .tally { display: none; } }
+
   /* ---------- recommendation ---------- */
 
   .picks {
@@ -704,6 +802,13 @@
       test near the end answers the harder one, which is whether it still reads as two letters down there.
     </p>
 
+    <p class="standfirst">
+      <strong>Every mark has a checkbox.</strong> Tick the ones worth keeping and the counter in the corner
+      will build the list; <em>Recommended</em> fills in a starting shortlist you can edit. Numbers 17, 18 and
+      24 appear twice &mdash; once as a sketched base and again close up &mdash; and are the same design, so
+      ticking either ticks both.
+    </p>
+
     <ul class="grammar">
       <li><b>Rocking</b> &mdash; set on a curve</li>
       <li><b>Bar</b> &mdash; over or under a line</li>
@@ -733,6 +838,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="1" data-name="Rocking Double M" aria-label="Keep Rocking Double M"><span>1</span></label>
           <h3>Rocking Double M</h3>
           <span class="chip chip--holds">Holds at 24px</span>
         </div>
@@ -766,6 +872,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="2" data-name="Connected Double M" aria-label="Keep Connected Double M"><span>2</span></label>
           <h3>Connected Double M</h3>
           <span class="chip chip--holds">Holds at 24px</span>
         </div>
@@ -797,6 +904,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="3" data-name="Dam & Calf Double M" aria-label="Keep Dam & Calf Double M"><span>3</span></label>
           <h3>Dam &amp; Calf Double M</h3>
           <span class="chip chip--tight">Tight at 24px</span>
         </div>
@@ -828,6 +936,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="4" data-name="Bar Double M" aria-label="Keep Bar Double M"><span>4</span></label>
           <h3>Bar Double M</h3>
           <span class="chip chip--holds">Holds at 24px</span>
         </div>
@@ -859,6 +968,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="5" data-name="Stacked Double M" aria-label="Keep Stacked Double M"><span>5</span></label>
           <h3>Stacked Double M</h3>
           <span class="chip chip--tight">Tight at 24px</span>
         </div>
@@ -892,6 +1002,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="6" data-name="Circle Double M" aria-label="Keep Circle Double M"><span>6</span></label>
           <h3>Circle Double M</h3>
           <span class="chip chip--tight">Tight at 24px</span>
         </div>
@@ -923,6 +1034,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="7" data-name="Constellation Double M" aria-label="Keep Constellation Double M"><span>7</span></label>
           <h3>Constellation Double M</h3>
           <span class="chip chip--fails">Fails at 24px</span>
         </div>
@@ -954,6 +1066,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="8" data-name="Longhorn Double M" aria-label="Keep Longhorn Double M"><span>8</span></label>
           <h3>Longhorn Double M</h3>
           <span class="chip chip--holds">Holds at 24px</span>
         </div>
@@ -985,6 +1098,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="9" data-name="Lazy Double M" aria-label="Keep Lazy Double M"><span>9</span></label>
           <h3>Lazy Double M</h3>
           <span class="chip chip--tight">Tight at 24px</span>
         </div>
@@ -1016,6 +1130,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="10" data-name="Double M Star" aria-label="Keep Double M Star"><span>10</span></label>
           <h3>Double M Star</h3>
           <span class="chip chip--tight">Tight at 24px</span>
         </div>
@@ -1059,6 +1174,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="11" data-name="Rocking Connected Double M" aria-label="Keep Rocking Connected Double M"><span>11</span></label>
           <h3>Rocking Connected Double M</h3>
           <span class="chip chip--holds">Holds at 24px</span>
         </div>
@@ -1089,6 +1205,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="12" data-name="Rocking Connected Double M, posted" aria-label="Keep Rocking Connected Double M, posted"><span>12</span></label>
           <h3>Rocking Connected Double M, posted</h3>
           <span class="chip chip--holds">Holds at 24px</span>
         </div>
@@ -1119,6 +1236,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="13" data-name="Rocking Connected Double M, half-stem" aria-label="Keep Rocking Connected Double M, half-stem"><span>13</span></label>
           <h3>Rocking Connected Double M, half-stem</h3>
           <span class="chip chip--tight">Tight at 24px</span>
         </div>
@@ -1181,6 +1299,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="14" data-name="Constellation Bar Double M" aria-label="Keep Constellation Bar Double M"><span>14</span></label>
           <h3>Constellation Bar Double M</h3>
           <span class="chip chip--tight">Tight at 24px</span>
         </div>
@@ -1213,6 +1332,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="15" data-name="Crossed Double M" aria-label="Keep Crossed Double M"><span>15</span></label>
           <h3>Crossed Double M</h3>
           <span class="chip chip--tight">Tight at 24px</span>
         </div>
@@ -1245,6 +1365,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="16" data-name="Crossed Double M, barred" aria-label="Keep Crossed Double M, barred"><span>16</span></label>
           <h3>Crossed Double M, barred</h3>
           <span class="chip chip--tight">Tight at 24px</span>
         </div>
@@ -1302,7 +1423,7 @@
           <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b1"/></svg>
         </div>
       </div>
-      <h3>Overlapped</h3>
+      <div class="base-head"><label class="keep"><input type="checkbox" data-pick="17" data-name="Overlapped" aria-label="Keep Overlapped"><span>17</span></label><h3>Overlapped</h3></div>
       <p>Two whole M&rsquo;s, half-overlapped, four legs down. The most literal &ldquo;double&rdquo; here &mdash; and the narrow channel between the two inner legs is the first thing to fill in as it shrinks.</p>
     </article>
     <article class="base">
@@ -1314,7 +1435,7 @@
           <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b2"/></svg>
         </div>
       </div>
-      <h3>Double-struck</h3>
+      <div class="base-head"><label class="keep"><input type="checkbox" data-pick="18" data-name="Double-struck" aria-label="Keep Double-struck"><span>18</span></label><h3>Double-struck</h3></div>
       <p>One M printed twice, a few units apart. It reads as weight and shadow rather than as two letters &mdash; it says &ldquo;double&rdquo; without ever saying &ldquo;M&nbsp;M&rdquo;.</p>
     </article>
     <article class="base">
@@ -1326,7 +1447,7 @@
           <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b3"/></svg>
         </div>
       </div>
-      <h3>Shallow middle</h3>
+      <div class="base-head"><label class="keep"><input type="checkbox" data-pick="19" data-name="Shallow middle" aria-label="Keep Shallow middle"><span>19</span></label><h3>Shallow middle</h3></div>
       <p>Two M&rsquo;s meeting at a raised joint instead of a shared apex. The shallow notch is the whole idea, and it is the first casualty: by 24&nbsp;px it has flattened into a plain zigzag.</p>
     </article>
     <article class="base">
@@ -1338,7 +1459,7 @@
           <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b4"/></svg>
         </div>
       </div>
-      <h3>Splayed crown</h3>
+      <div class="base-head"><label class="keep"><input type="checkbox" data-pick="20" data-name="Splayed crown" aria-label="Keep Splayed crown"><span>20</span></label><h3>Splayed crown</h3></div>
       <p>Three peaks with the middle one dropped, legs kicked out. Lowering the shared apex is what separates the two M&rsquo;s &mdash; the same job the vertical stem did, done with geometry instead of an added stroke.</p>
     </article>
     <article class="base">
@@ -1350,7 +1471,7 @@
           <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b5"/></svg>
         </div>
       </div>
-      <h3>Wide crown</h3>
+      <div class="base-head"><label class="keep"><input type="checkbox" data-pick="21" data-name="Wide crown" aria-label="Keep Wide crown"><span>21</span></label><h3>Wide crown</h3></div>
       <p>The same dropped-apex move on vertical legs. Squarer, steadier, and the cleanest of the eight when it gets small.</p>
     </article>
     <article class="base">
@@ -1362,7 +1483,7 @@
           <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b6"/></svg>
         </div>
       </div>
-      <h3>Nested V</h3>
+      <div class="base-head"><label class="keep"><input type="checkbox" data-pick="22" data-name="Nested V" aria-label="Keep Nested V"><span>22</span></label><h3>Nested V</h3></div>
       <p>One M with a second V hung inside it. The &ldquo;double&rdquo; lives in the repeated valley rather than in a repeated letter &mdash; the only base here that is not two M&rsquo;s.</p>
     </article>
     <article class="base">
@@ -1374,7 +1495,7 @@
           <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b7"/></svg>
         </div>
       </div>
-      <h3>Angular, wide</h3>
+      <div class="base-head"><label class="keep"><input type="checkbox" data-pick="23" data-name="Angular, wide" aria-label="Keep Angular, wide"><span>23</span></label><h3>Angular, wide</h3></div>
       <p>Two all-diagonal M&rsquo;s overlapped, not a vertical anywhere. Reads as range and horizon before it reads as letters.</p>
     </article>
     <article class="base">
@@ -1386,7 +1507,7 @@
           <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b8"/></svg>
         </div>
       </div>
-      <h3>Angular, tight</h3>
+      <div class="base-head"><label class="keep"><input type="checkbox" data-pick="24" data-name="Angular, tight" aria-label="Keep Angular, tight"><span>24</span></label><h3>Angular, tight</h3></div>
       <p>Same, with the second M smaller and dropped. The asymmetry does the dam-and-calf job the star mark does, without needing a second size of anything.</p>
     </article>
   </div>
@@ -1480,6 +1601,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="17" data-name="Overlapped" aria-label="Keep Overlapped"><span>17</span></label>
           <h3>Overlapped</h3>
           <span class="chip chip--tight">Tight at 24px</span>
         </div>
@@ -1512,6 +1634,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="18" data-name="Double-struck" aria-label="Keep Double-struck"><span>18</span></label>
           <h3>Double-struck</h3>
           <span class="chip chip--fails">Fails at 24px</span>
         </div>
@@ -1544,6 +1667,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="24" data-name="Angular, tight" aria-label="Keep Angular, tight"><span>24</span></label>
           <h3>Angular, tight</h3>
           <span class="chip chip--tight">Tight at 24px</span>
         </div>
@@ -1611,6 +1735,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="25" data-name="Overlapped, opened" aria-label="Keep Overlapped, opened"><span>25</span></label>
           <h3>Overlapped, opened</h3>
           <span class="chip chip--holds">Holds at 16px</span>
         </div>
@@ -1643,6 +1768,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="26" data-name="Double-struck, vertical" aria-label="Keep Double-struck, vertical"><span>26</span></label>
           <h3>Double-struck, vertical</h3>
           <span class="chip chip--holds">Holds at 16px</span>
         </div>
@@ -1677,6 +1803,7 @@
       </div>
       <div>
         <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="27" data-name="Angular, opened" aria-label="Keep Angular, opened"><span>27</span></label>
           <h3>Angular, opened</h3>
           <span class="chip chip--holds">Holds at 16px</span>
         </div>
@@ -1921,3 +2048,76 @@
   </div>
 
 </div>
+
+<div class="tally" role="region" aria-label="Shortlist">
+  <div class="tally-bar">
+    <span class="tally-count"><span id="tallyN">0</span> of 27 kept</span>
+    <button type="button" id="tallyRec">Recommended</button>
+    <button type="button" id="tallyClear">Clear</button>
+    <button type="button" id="tallyShow" aria-expanded="false">List</button>
+  </div>
+  <div class="tally-out" id="tallyOut">
+    <textarea id="tallyText" readonly aria-label="Your selection as text"></textarea>
+    <p class="tally-hint">Select all and paste this back to me, or just send the numbers.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.keep input'));
+  var RECOMMENDED = [1, 12, 5, 7, 25, 26, 27];
+  var nEl = document.getElementById('tallyN');
+  var outEl = document.getElementById('tallyOut');
+  var textEl = document.getElementById('tallyText');
+  var showBtn = document.getElementById('tallyShow');
+
+  function store(v) { try { localStorage.setItem('doubleM.keep', JSON.stringify(v)); } catch (e) {} }
+  function load() { try { return JSON.parse(localStorage.getItem('doubleM.keep')) || []; } catch (e) { return []; } }
+
+  function chosen() {
+    var seen = {}, out = [];
+    boxes.forEach(function (b) {
+      var n = +b.dataset.pick;
+      if (b.checked && !seen[n]) { seen[n] = 1; out.push({ n: n, name: b.dataset.name }); }
+    });
+    return out.sort(function (a, b) { return a.n - b.n; });
+  }
+
+  function refresh() {
+    var c = chosen();
+    nEl.textContent = c.length;
+    textEl.value = c.length
+      ? 'Keep: ' + c.map(function (x) { return x.n; }).join(', ') + '\n\n' +
+        c.map(function (x) { return x.n + '. ' + x.name; }).join('\n')
+      : 'Nothing selected yet.';
+    store(c.map(function (x) { return x.n; }));
+  }
+
+  // 17, 18 and 24 each appear twice (base card and close-up) — keep them in step.
+  function setAll(n, on) {
+    boxes.forEach(function (b) { if (+b.dataset.pick === n) b.checked = on; });
+  }
+
+  boxes.forEach(function (b) {
+    b.addEventListener('change', function () { setAll(+b.dataset.pick, b.checked); refresh(); });
+  });
+
+  document.getElementById('tallyRec').addEventListener('click', function () {
+    boxes.forEach(function (b) { b.checked = RECOMMENDED.indexOf(+b.dataset.pick) > -1; });
+    refresh();
+  });
+  document.getElementById('tallyClear').addEventListener('click', function () {
+    boxes.forEach(function (b) { b.checked = false; });
+    refresh();
+  });
+  showBtn.addEventListener('click', function () {
+    var open = outEl.classList.toggle('open');
+    showBtn.setAttribute('aria-expanded', String(open));
+    if (open) { textEl.focus(); textEl.select(); }
+  });
+
+  var saved = load();
+  if (saved.length) boxes.forEach(function (b) { b.checked = saved.indexOf(+b.dataset.pick) > -1; });
+  refresh();
+})();
+</script>

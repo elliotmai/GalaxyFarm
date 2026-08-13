@@ -14,6 +14,10 @@ both real grounds (Midnight Nebula and Bluebonnet Linen) at 96, 64, 40 and
 24&nbsp;px, plus four pixel tests of the leading candidates rasterised at true
 24 and 16&nbsp;px (`pixel-test.png` … `pixel-test-4.png`).
 
+Every mark in `concepts.html` carries a checkbox, numbered in document order, so
+the sheet can be used as a shortlist picker — the counter builds a list to paste
+back. The numbers are a convenience; the names are the real key.
+
 Sixteen are drawn in the sheet's rounded brand-iron language. Eight are
 vectorised from a hand-drawn sheet and keep that sketch's language instead —
 sharp mitred corners, flat stroke ends, a lighter line. The last three are those
