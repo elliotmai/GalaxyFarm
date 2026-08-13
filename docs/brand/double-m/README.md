@@ -1,8 +1,8 @@
 # Double M — logo concepts
 
-Ten candidate marks for a "Double M" identity, drawn in the same livestock-brand
-grammar as the approved **Rocking Double Star** and coloured from
-`packages/config/tailwind.preset.ts`.
+Thirteen candidate marks for a "Double M" identity, drawn in the same
+livestock-brand grammar as the approved **Rocking Double Star** and coloured
+from `packages/config/tailwind.preset.ts`.
 
 **Status: exploration.** Nothing here is approved and nothing here replaces the
 star mark in `packages/ui/src/brand/`. These are candidates for whenever issue
@@ -11,7 +11,8 @@ business names.
 
 Open **[`concepts.html`](./concepts.html)** to see them — every mark rendered on
 both real grounds (Midnight Nebula and Bluebonnet Linen) at 96, 64, 40 and
-24&nbsp;px.
+24&nbsp;px, plus a pixel test of the leading candidates rasterised at true 24 and
+16&nbsp;px (`pixel-test.png`).
 
 ## The brand grammar
 
@@ -29,17 +30,23 @@ vocabulary rather than decoration:
 
 The approved mark is already named this way, so the candidates are too.
 
-## The ten
+## The thirteen
 
 Verdicts are against the threshold the brand README already put on the
-record — the pair "drifts apart below about 24px".
+record — the pair "drifts apart below about 24px". The three **Rocking
+Connected** rows came out of asking what happens if the M's are joined but keep
+the vertical stem between them; they are grouped after **Connected** because
+that is the mark they fix.
 
 | Mark | What it says | At 24px |
 | --- | --- | --- |
-| **Rocking Double M** | Same rocker, same shared ground, letters where the stars were. Least disruptive. | Tight — three elements to resolve |
-| **Connected Double M** | One unbroken zigzag, two M's sharing a middle apex. The default reading. | Holds — but roughly 2:1, awkward in square slots |
+| **Rocking Double M** | Same rocker, same shared ground, letters where the stars were. Least disruptive. | Holds — gap survives to 16px |
+| **Connected Double M** | One unbroken zigzag, two M's sharing a middle apex. The default reading. | Holds as a shape, but reads as a crown, not letters |
+| **Rocking Connected Double M** | The zigzag with a stem dropped from the shared apex, so each M gets its inner leg back. Joined *and* legible. | Holds — reads "M M" |
+| **… posted** | Same, but the stem carries down into the rocker. One object on a centre axis. | Holds — the last one still reading as letters at 16px |
+| **… half-stem** | Stem stops level with the valleys. Lighter, open bottom edge. | Tight — the stem disappears; reverts to a crown |
 | **Dam & Calf Double M** | Big M and small M at side. "Double M" and "cow and calf" are the same picture. | Tight — the calf must stay near 52% |
-| **Bar Double M** | Zigzag over a straight bar; the bar does the rocker's job with one less curve. | Holds — best small-size survival here |
+| **Bar Double M** | Zigzag over a straight bar; the bar does the rocker's job with one less curve. | Holds as a shape, but reads as a crown over a line |
 | **Stacked Double M** | One M over another. The only square variant, and the only one where two tones say something true (farm name over business name). | Tight — merges at 24px; its slots are 180px+ |
 | **Circle Double M** | Enclosed, so it has its own edge. The seal for signed PDFs and invoices. | Tight — the ring eats the letters below ~40px |
 | **Constellation Double M** | The zigzag as a star chart. Makes the logo and the pedigree screens one idea. | Fails — needs a solid companion below ~48px |
@@ -53,12 +60,28 @@ Not one mark — a family of three, because the app has a 24&nbsp;px nav, a
 512&nbsp;px maskable icon and a PDF that gets signed, and no single drawing is
 good at all three.
 
-- **Primary — Bar Double M.** Survives the nav bar, stays one glyph, keeps a
-  horizontal ground element as an echo of the rocker.
+- **Primary — Rocking Connected Double M, posted.** One connected object, so it
+  cannot drift apart at any size, and the only candidate still reading as two
+  letters at 16&nbsp;px. Keeps the approved rocker. The full-stem version is the
+  same mark one decision quieter, if the stem landing in the rocker is too much.
 - **Square lockup — Stacked Double M.** For the PWA and Apple touch icons, where
   the primary's 2:1 proportion would be letterboxed into a square.
 - **Hero and documents — Constellation Double M.** Kiosk splash, login, the top
   of a PDF — anywhere it renders at 64&nbsp;px or more on midnight.
+
+## What the pixel test changed
+
+Everything on the sheet is SVG, which the browser draws crisply at any size and
+which therefore flatters every candidate. Rasterising the leading marks at true
+24 and 16&nbsp;px moved two conclusions:
+
+- **Rocking Double M was marked down wrongly.** This file first said its gap
+  closes below 32&nbsp;px. It does not — the gap survives 24 and 16&nbsp;px
+  intact, and it is the clearest "M M" on the sheet at both.
+- **Holding together and still reading as letters are two different tests.**
+  Connected, Bar and the half-stem all survive small sizes as marks while
+  quietly becoming a single crown. For a mark whose whole job is to say
+  "Double M", that is a real demerit, and it is why the primary changed from Bar.
 
 ## One thing to settle first
 
