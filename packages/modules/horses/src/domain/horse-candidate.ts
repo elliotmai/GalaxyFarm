@@ -40,10 +40,21 @@ export type Discipline = (typeof DISCIPLINES)[number];
 export const SOUNDNESS_STATUSES = ["sound", "serviceably_sound", "unsound", "unknown"] as const;
 export type SoundnessStatus = (typeof SOUNDNESS_STATUSES)[number];
 
+/**
+ * Sex, as a horse listing writes it.
+ *
+ * Not the kernel's `male | female | steer | unknown`: a listing says mare or
+ * gelding, and the difference between a gelding and a stallion is the first
+ * thing anyone asks. Exported as a list because the form needs to offer it and
+ * a second copy typed into the screen would be the copy that goes stale.
+ */
+export const HORSE_SEXES = ["mare", "gelding", "stallion", "filly", "colt"] as const;
+export type HorseSex = (typeof HORSE_SEXES)[number];
+
 export interface HorseCandidateDetail {
   readonly candidateId: Ulid;
   readonly breed?: string | undefined;
-  readonly sex: "mare" | "gelding" | "stallion" | "filly" | "colt";
+  readonly sex: HorseSex;
   readonly ageYears?: number | undefined;
   /** Hands, the unit horses are actually measured in. 15.2 is 15 hands 2 in. */
   readonly heightHands?: number | undefined;
@@ -57,22 +68,29 @@ export interface HorseCandidateDetail {
   readonly regNumber?: string | undefined;
 }
 
+/**
+ * A hand is four inches, so the decimal runs .0 to .3.
+ *
+ * 15.4 hands is not a height — it is somebody typing centimetres or guessing.
+ * Exported because the form checks it while the number is being typed and the
+ * schema checks it on the way in: one rule with two callers, so the message on
+ * the field and the reason the save was refused cannot drift apart.
+ */
+export function isHandsFraction(hands: number): boolean {
+  return Math.round((hands % 1) * 10) <= 3;
+}
+
 export const horseCandidateSchema = z
   .object({
     candidateId: ulidSchema,
     breed: z.string().max(80).optional(),
-    sex: z.enum(["mare", "gelding", "stallion", "filly", "colt"]),
+    sex: z.enum(HORSE_SEXES),
     ageYears: z.number().min(0).max(45).optional(),
     heightHands: z
       .number()
       .min(8)
       .max(20)
-      .refine(
-        (hands) => Math.round((hands % 1) * 10) <= 3,
-        // 15.4 hands is not a height. A hand is four inches, so the decimal
-        // runs 0 to 3 and anything above it is somebody typing centimetres.
-        "Height in hands runs .0 to .3",
-      )
+      .refine(isHandsFraction, "Height in hands runs .0 to .3")
       .optional(),
     trainingLevel: z.enum(TRAINING_LEVELS).optional(),
     disciplines: z.array(z.enum(DISCIPLINES)),
@@ -113,4 +131,37 @@ export function concerns(detail: HorseCandidateDetail): string[] {
   if (detail.trainingLevel === "unhandled") found.push("Unhandled");
 
   return found;
+}
+
+/**
+ * The horse in one line: "8 yo gelding · 15.2 hh · Quarter Horse · solid".
+ *
+ * What a listing is skimmed for, in the order it is skimmed. Absent facts are
+ * left out rather than rendered as "unknown" four times over — a row of
+ * unknowns says less than a short line, and most listings start sparse.
+ */
+export function describeHorse(detail: HorseCandidateDetail): string {
+  const parts = [
+    detail.ageYears === undefined ? detail.sex : `${detail.ageYears} yo ${detail.sex}`,
+    describeHeight(detail.heightHands),
+    detail.breed,
+    detail.trainingLevel?.replace(/_/g, " "),
+  ];
+
+  return parts.filter((part): part is string => part !== undefined && part !== "").join(" · ");
+}
+
+/**
+ * Whether a horse does the job you are shopping for.
+ *
+ * Three answers, not two. A listing that names no disciplines has not said no
+ * — it has said nothing, and a filter that treats the two alike quietly hides
+ * the horse you have not asked about yet. Same distinction `concerns` draws
+ * between "unsound" and "soundness not stated", for the same reason.
+ */
+export type DisciplineFit = "listed" | "not_listed" | "unstated";
+
+export function disciplineFit(detail: HorseCandidateDetail, wanted: Discipline): DisciplineFit {
+  if (detail.disciplines.length === 0) return "unstated";
+  return detail.disciplines.includes(wanted) ? "listed" : "not_listed";
 }

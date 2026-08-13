@@ -86,7 +86,7 @@ galaxy-farm/
 │   │   ├── supplies/
 │   │   ├── business/               scaffold — schema + rules now, UI in Phase 5
 │   │   ├── pets/
-│   │   ├── horses/                 placeholder module, roadmap active
+│   │   ├── horses/                 placeholder module; roadmap and shopping live
 │   │   └── housesitting/
 │   ├── infrastructure/
 │   │   ├── db/                     Drizzle schema, migrations, Postgres repositories
