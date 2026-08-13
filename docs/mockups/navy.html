@@ -1,0 +1,1076 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Galaxy Farm mockups - Ink Navy</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&family=Barlow+Condensed:wght@600&family=Inter:wght@400;500;600&display=swap">
+<style>
+
+
+:root {
+  --ground:#f2f2ee; --surface:#ffffff; --sunk:#e9e9e3; --ink:#191a17;
+  --muted:#63665e; --rule:#dcdcd4; --rule-firm:#b9b9ae;
+  --accent:#1b3a5c; --alert:#8c3a2b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:#121310; --surface:#1b1d19; --sunk:#24261f; --ink:#edeee7;
+    --muted:#989c92; --rule:#2a2d27; --rule-firm:#454940;
+    --accent:#8fb39a; --alert:#d4877a;
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#121310; --surface:#1b1d19; --sunk:#24261f; --ink:#edeee7;
+  --muted:#989c92; --rule:#2a2d27; --rule-firm:#454940;
+  --accent:#8fb39a; --alert:#d4877a;
+}
+
+* { box-sizing:border-box; }
+body {
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans", system-ui, sans-serif;
+  font-size:16.5px; line-height:1.62; -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+h1,h2,h3 { font-family:"Source Serif 4",Georgia,serif; font-weight:600;
+           line-height:1.14; margin:0; letter-spacing:-0.02em; text-wrap:balance; }
+p { margin:0; }
+code { font-family:"IBM Plex Mono",monospace; font-size:.85em; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+@media (prefers-reduced-motion: reduce) {
+  *,*::before,*::after { animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
+
+.wrap { max-width:1240px; margin:0 auto; padding:0 clamp(16px,4vw,52px) 110px; }
+.col { max-width:66ch; }
+.stack { display:flex; flex-direction:column; gap:17px; }
+.eyebrow { font-size:11.5px; font-weight:600; letter-spacing:.16em;
+           text-transform:uppercase; color:var(--muted); }
+.lede { font-size:20px; line-height:1.55; }
+.note { font-size:15px; color:var(--muted); line-height:1.6; }
+
+/* -- Masthead ----------------------------------------------- */
+.masthead { padding:clamp(50px,7.5vw,90px) 0 clamp(26px,4vw,42px); }
+.masthead h1 { font-size:clamp(42px,7.6vw,86px); letter-spacing:-0.03em; margin:16px 0 22px; }
+
+.hero-chip {
+  display:inline-flex; align-items:center; gap:13px; margin-bottom:4px;
+}
+.hero-chip span.blob {
+  width:44px; height:44px; border-radius:4px; background:#1b3a5c;
+  border:1px solid var(--rule-firm); flex:none;
+}
+.hero-chip span.hex {
+  font-family:"IBM Plex Mono",monospace; font-size:15px; color:var(--muted);
+}
+
+.swatches {
+  display:grid; grid-template-columns:repeat(2,1fr); gap:1px;
+  background:var(--rule); border:1px solid var(--rule); border-radius:4px;
+  overflow:hidden; margin-top:38px;
+}
+@media (min-width:620px) { .swatches { grid-template-columns:repeat(4,1fr); } }
+@media (min-width:1000px) { .swatches { grid-template-columns:repeat(8,1fr); } }
+.sw { background:var(--ground); padding:13px 14px 15px; display:flex;
+      flex-direction:column; gap:7px; min-width:0; }
+.sw-chip { height:38px; border-radius:3px; border:1px solid var(--rule-firm); display:block; }
+.sw-role { font-size:12px; color:var(--ink); font-weight:600; }
+.sw-hex { font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--muted); }
+
+.checks { display:grid; grid-template-columns:repeat(2,1fr); gap:1px;
+          background:var(--rule); border:1px solid var(--rule); border-radius:4px;
+          overflow:hidden; margin-top:16px; }
+@media (min-width:700px) { .checks { grid-template-columns:repeat(3,1fr); } }
+@media (min-width:1060px) { .checks { grid-template-columns:repeat(6,1fr); } }
+.ck { background:var(--ground); padding:13px 15px; display:flex;
+      flex-direction:column; gap:2px; }
+.ck-n { font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:600;
+        color:var(--accent); font-variant-numeric:tabular-nums; }
+.ck-l { font-size:11.5px; color:var(--muted); line-height:1.35; }
+
+/* -- Groups ------------------------------------------------- */
+.group { padding-top:clamp(56px,7vw,92px); }
+.group-head {
+  display:grid; grid-template-columns:1fr; gap:12px;
+  padding-bottom:20px; margin-bottom:24px; border-bottom:1px solid var(--rule-firm);
+}
+@media (min-width:940px) {
+  .group-head { grid-template-columns:minmax(0,1fr) minmax(0,500px);
+                column-gap:48px; align-items:end; }
+}
+.group-dir { font-family:"IBM Plex Mono",monospace; font-size:12.5px;
+             color:var(--muted); letter-spacing:.1em; }
+.group-head h2 { font-size:clamp(28px,4vw,40px); margin-top:5px; }
+.group-blurb { font-size:15.5px; line-height:1.55; color:var(--muted); }
+
+.views { display:flex; flex-direction:column; gap:30px; }
+.views.pair { flex-direction:row; flex-wrap:wrap; align-items:flex-start; gap:24px; }
+
+.fr { margin:0; display:flex; flex-direction:column; gap:8px; min-width:0; }
+.fr figcaption { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.fr-name { font-size:11.5px; font-weight:600; letter-spacing:.15em;
+           text-transform:uppercase; color:var(--ink); }
+.fr-surface { font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--muted); }
+.fr-size { font-family:"IBM Plex Mono",monospace; font-size:11.5px;
+           color:var(--muted); margin-left:auto; opacity:.7; }
+.fr-scroll { overflow-x:auto; overflow-y:hidden; max-width:100%; }
+.fr-wrap {
+  width:calc(var(--w) * var(--k)); height:calc(var(--h) * var(--k)); overflow:hidden;
+  border:1px solid var(--rule-firm); border-radius:4px;
+  box-shadow:0 1px 3px rgb(25 26 23/8%), 0 18px 40px -22px rgb(25 26 23/32%);
+}
+.fr-inner { width:var(--w); height:var(--h); transform:scale(var(--k)); transform-origin:top left; }
+
+.s1440 { --k:.46; }  .s1280 { --k:.50; }  .s1060 { --k:.60; }  .s390 { --k:.62; }
+@media (min-width:700px)  { .s1440 { --k:.58; } .s1280 { --k:.62; } .s1060 { --k:.74; } .s390 { --k:.66; } }
+@media (min-width:940px)  { .s1440 { --k:.66; } .s1280 { --k:.72; } .s1060 { --k:.86; } .s390 { --k:.72; } }
+@media (min-width:1180px) { .s1440 { --k:.78; } .s1280 { --k:.86; } .s1060 { --k:1;   } .s390 { --k:.85; } }
+
+.callout { border-left:3px solid var(--accent); padding:4px 0 4px 22px;
+           display:flex; flex-direction:column; gap:10px; max-width:66ch; }
+.foot { margin-top:70px; padding-top:26px; border-top:1px solid var(--rule);
+        font-size:14.5px; color:var(--muted); max-width:66ch; }
+</style></head><body>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Comprehensive mockups &#183; palette 2 of 3</p>
+  <div class="hero-chip"><span class="blob"></span>
+    <span class="hex">#1B3A5C</span></div>
+  <h1>Ink Navy</h1>
+  <div class="col stack">
+    <p class="lede">Ledgers, fountain pens and filed documents. The deepest and most neutral of the three blues &#8212; no violet lean, no cyan lean, nothing to date it.</p>
+    <p class="note"><b>Note.</b> Nothing here will surprise anyone, which is both the recommendation and the warning.</p>
+    <p class="note">
+      Eleven screens across all three surfaces, at true device size. Herd Book
+      typography on desktop and the customer portal, Operations on the phone,
+      Stockman on the barn screen &#8212; one palette holding all three together.
+    </p>
+  </div>
+
+  <div class="swatches"><div class="sw"><span class="sw-chip" style="background:#f5f6f8"></span><span class="sw-role">Ground</span><span class="sw-hex">#F5F6F8</span></div><div class="sw"><span class="sw-chip" style="background:#ffffff"></span><span class="sw-role">Surface</span><span class="sw-hex">#FFFFFF</span></div><div class="sw"><span class="sw-chip" style="background:#d7dade"></span><span class="sw-role">Rule</span><span class="sw-hex">#D7DADE</span></div><div class="sw"><span class="sw-chip" style="background:#525860"></span><span class="sw-role">Muted</span><span class="sw-hex">#525860</span></div><div class="sw"><span class="sw-chip" style="background:#14171b"></span><span class="sw-role">Ink</span><span class="sw-hex">#14171B</span></div><div class="sw"><span class="sw-chip" style="background:#1b3a5c"></span><span class="sw-role">Primary</span><span class="sw-hex">#1B3A5C</span></div><div class="sw"><span class="sw-chip" style="background:#3f6b4a"></span><span class="sw-role">Confirm</span><span class="sw-hex">#3F6B4A</span></div><div class="sw"><span class="sw-chip" style="background:#a8321f"></span><span class="sw-role">Alert</span><span class="sw-hex">#A8321F</span></div></div>
+  <div class="checks"><div class="ck"><span class="ck-n">16.63</span><span class="ck-l">ink / ground</span></div><div class="ck"><span class="ck-n">6.64</span><span class="ck-l">muted / ground</span></div><div class="ck"><span class="ck-n">10.75</span><span class="ck-l">primary / ground</span></div><div class="ck"><span class="ck-n">11.63</span><span class="ck-l">label / primary</span></div><div class="ck"><span class="ck-n">6.18</span><span class="ck-l">alert / ground</span></div><div class="ck"><span class="ck-n">5.69</span><span class="ck-l">ok / ground</span></div></div>
+  <p class="note" style="margin-top:14px;max-width:66ch">
+    Every pair clears WCAG AA for body text at 4.5:1. The primary separates from
+    the nearest safety-scale green &#8212; level 1 &#8212; by <b>hue</b>:
+    77.4&#176; of hue, 1.82:1 contrast. Computed by
+    <code>tools/palette-audit.py</code>.
+  </p>
+</header>
+
+  <section class="group">
+    <div class="group-head">
+      <div>
+        <p class="group-dir">Herd Book</p>
+        <h2>The desktop</h2>
+      </div>
+      <p class="group-blurb">Serif names and figures, hairline rules, a ledger table. The three screens that carry the most weight &#8212; and the animal detail page, which is the hardest screen in the product and the one a direction usually breaks on.</p>
+    </div>
+    <div class="views">
+      <figure class="fr s1440">
+        <figcaption>
+          <span class="fr-name">Dashboard</span>
+          <span class="fr-surface">Desktop &#183; Herd Book</span>
+          <span class="fr-size">1440 &#215; 900</span>
+        </figcaption>
+        <div class="fr-scroll">
+          <div class="fr-wrap" style="--w:1440px;--h:900px">
+            <div class="fr-inner" style="--w:1440px;--h:900px"><div style="width:1440px;height:900px;background:#f5f6f8;color:#14171b;
+    font-family:'IBM Plex Sans', system-ui, sans-serif;display:flex;overflow:hidden">
+  <aside style="width:236px;flex:none;background:#ffffff;
+    border-right:1px solid #d7dade;display:flex;flex-direction:column;padding:18px 12px">
+  <div style="display:flex;align-items:center;gap:11px;padding:0 12px 18px">
+    <svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true" style="flex:none;display:block"><path d="M12 78 Q50 98 88 78" fill="none" stroke="#1b3a5c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(40 42) scale(0.7059) translate(-50 -50)"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(72 62) scale(0.3676) translate(-50 -50)"/></svg>
+    <span style="font-family:'Source Serif 4', Georgia, serif;font-size:18px;font-weight:600">Galaxy Farm</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:2px"><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;background:#1b3a5c12;color:#14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:600"><span style="color:#1b3a5c;width:16px;text-align:center">&#9672;</span>Today</div><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:400"><span style="color:#1b3a5c;width:16px;text-align:center">&#10022;</span>Animals</div><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:400"><span style="color:#1b3a5c;width:16px;text-align:center">&#9634;</span>Land</div><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:400"><span style="color:#1b3a5c;width:16px;text-align:center">&#9881;</span>Kit</div><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:400"><span style="color:#1b3a5c;width:16px;text-align:center">&#9671;</span>Business</div></div>
+  <div style="height:1px;background:#d7dade;margin:12px"></div>
+  <div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;height:34px;padding:0 12px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Contacts</div><div style="display:flex;align-items:center;height:34px;padding:0 12px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Reports</div><div style="display:flex;align-items:center;height:34px;padding:0 12px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Settings</div></div>
+  <div style="margin-top:auto;padding:12px;display:flex;align-items:center;gap:8px">
+    <span style="width:7px;height:7px;border-radius:50%;background:#3f6b4a;flex:none"></span>
+    <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#525860">Up to date</span>
+  </div>
+</aside>
+  <main style="flex:1;min-width:0;padding:28px 34px;display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;
+                border-bottom:1px solid #52586055;padding-bottom:14px">
+      <div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Thursday &#183; 13 August</div>
+        <div style="font-family:'Source Serif 4', Georgia, serif;font-size:36px;font-weight:600;letter-spacing:-0.02em;
+                    margin-top:3px">Today</div></div>
+      <div style="display:flex;gap:10px"><span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#ffffff;color:#14171b;border:1px solid #d7dade;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Log weight</span><span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#1b3a5c;color:#ffffff;border:1px solid #1b3a5c;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Add animal</span></div>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid #d7dade;
+                border-left:4px solid #a8321f;border-radius:3px;padding:15px 18px;
+                display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:16px">
+        <span style="border:1px solid #a8321f;color:#a8321f;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Calving watch</span>
+        <div><div style="font-family:'Source Serif 4', Georgia, serif;font-size:21px;font-weight:600">Juniper</div>
+        <div style="font-family:'IBM Plex Mono', monospace;font-size:11px;color:#525860;margin-top:1px">
+        TAG 118 &#183; MAINE-ANJOU &#183; NORTH TRAP</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:26px">
+        <div style="width:220px">
+          <div style="display:flex;justify-content:space-between;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:11px;
+                      color:#525860;margin-bottom:5px"><span>Gestation</span>
+            <span style="font-family:'IBM Plex Mono', monospace;color:#14171b">279 / 283</span></div>
+          <div style="height:6px;border-radius:3px;background:#d7dade;overflow:hidden">
+            <div style="height:100%;width:98.6%;background:#a8321f"></div></div>
+        </div>
+        <span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#ffffff;color:#14171b;border:1px solid #d7dade;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Open</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px"><div style="flex:1;background:#ffffff;border:1px solid #d7dade;border-radius:3px;padding:12px 14px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Head</div><div style="font-family:'Source Serif 4', Georgia, serif;font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;color:#14171b;margin-top:2px">24</div></div><div style="flex:1;background:#ffffff;border:1px solid #d7dade;border-radius:3px;padding:12px 14px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Pens in use</div><div style="font-family:'Source Serif 4', Georgia, serif;font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;color:#14171b;margin-top:2px">4 <span style='font-size:14px;color:#525860'>of 9</span></div></div><div style="flex:1;background:#ffffff;border:1px solid #d7dade;border-radius:3px;padding:12px 14px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Tanks uncovered</div><div style="font-family:'Source Serif 4', Georgia, serif;font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;color:#a8321f;margin-top:2px">3</div></div><div style="flex:1;background:#ffffff;border:1px solid #d7dade;border-radius:3px;padding:12px 14px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Eggs this week</div><div style="font-family:'Source Serif 4', Georgia, serif;font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;color:#14171b;margin-top:2px">84</div></div></div>
+
+    <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;
+                  border-bottom:1px solid #52586055">
+        <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Pen board</div>
+        <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#525860">4 in use &#183; 1 empty</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse"><tr style="border-bottom:1px solid #d7dade"><td style="padding:10px 14px;font-family:'Source Serif 4', Georgia, serif;font-size:16px;font-weight:600;color:#14171b">North Trap</td><td style="padding:10px 14px;font-family:'IBM Plex Mono', monospace;font-size:12px;color:#525860">2 head</td><td style="padding:10px 14px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:2px;background:#c0392b;color:#ffffff;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;font-weight:700;flex:none">4</span></td><td style="padding:10px 14px"><span style="border:1px solid #a8321f;color:#a8321f;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Level 4</span></td><td style="padding:10px 14px;text-align:right;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#1b3a5c">Open</td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:10px 14px;font-family:'Source Serif 4', Georgia, serif;font-size:16px;font-weight:600;color:#14171b">Creek Pen</td><td style="padding:10px 14px;font-family:'IBM Plex Mono', monospace;font-size:12px;color:#525860">3 head</td><td style="padding:10px 14px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:2px;background:#3f8f4f;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;font-weight:700;flex:none">2</span></td><td style="padding:10px 14px"><span style="border:1px solid #3f6b4a;color:#3f6b4a;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Level 2</span></td><td style="padding:10px 14px;text-align:right;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#1b3a5c">Open</td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:10px 14px;font-family:'Source Serif 4', Georgia, serif;font-size:16px;font-weight:600;color:#14171b">South Trap</td><td style="padding:10px 14px;font-family:'IBM Plex Mono', monospace;font-size:12px;color:#525860">4 head</td><td style="padding:10px 14px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:2px;background:#3f8f4f;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;font-weight:700;flex:none">2</span></td><td style="padding:10px 14px"><span style="border:1px solid #3f6b4a;color:#3f6b4a;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Level 2</span></td><td style="padding:10px 14px;text-align:right;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#1b3a5c">Open</td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:10px 14px;font-family:'Source Serif 4', Georgia, serif;font-size:16px;font-weight:600;color:#14171b">Barn Stall</td><td style="padding:10px 14px;font-family:'IBM Plex Mono', monospace;font-size:12px;color:#525860">1 head</td><td style="padding:10px 14px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:2px;background:#bc811c;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;font-weight:700;flex:none">3</span></td><td style="padding:10px 14px"><span style="border:1px solid #1b3a5c;color:#1b3a5c;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Level 3</span></td><td style="padding:10px 14px;text-align:right;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#1b3a5c">Open</td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:10px 14px;font-family:'Source Serif 4', Georgia, serif;font-size:16px;font-weight:600;color:#525860">Corral</td><td style="padding:10px 14px;font-family:'IBM Plex Mono', monospace;font-size:12px;color:#525860">empty</td><td style="padding:10px 14px"></td><td style="padding:10px 14px"><span style="border:1px solid #525860;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Resting</span></td><td style="padding:10px 14px;text-align:right;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#1b3a5c">Open</td></tr></table>
+      <div style="margin-top:auto;padding:12px 14px;border-top:1px solid #d7dade;
+                  font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#525860">
+        Covers go on the evening before. <span style="color:#1b3a5c">Manage the tanks</span>
+      </div>
+    </div>
+  </main>
+</div></div>
+          </div>
+        </div>
+      </figure>
+      <figure class="fr s1440">
+        <figcaption>
+          <span class="fr-name">Herd list</span>
+          <span class="fr-surface">Desktop &#183; Herd Book</span>
+          <span class="fr-size">1440 &#215; 900</span>
+        </figcaption>
+        <div class="fr-scroll">
+          <div class="fr-wrap" style="--w:1440px;--h:900px">
+            <div class="fr-inner" style="--w:1440px;--h:900px"><div style="width:1440px;height:900px;background:#f5f6f8;color:#14171b;
+    font-family:'IBM Plex Sans', system-ui, sans-serif;display:flex;overflow:hidden">
+  <aside style="width:236px;flex:none;background:#ffffff;
+    border-right:1px solid #d7dade;display:flex;flex-direction:column;padding:18px 12px">
+  <div style="display:flex;align-items:center;gap:11px;padding:0 12px 18px">
+    <svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true" style="flex:none;display:block"><path d="M12 78 Q50 98 88 78" fill="none" stroke="#1b3a5c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(40 42) scale(0.7059) translate(-50 -50)"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(72 62) scale(0.3676) translate(-50 -50)"/></svg>
+    <span style="font-family:'Source Serif 4', Georgia, serif;font-size:18px;font-weight:600">Galaxy Farm</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:2px"><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:400"><span style="color:#1b3a5c;width:16px;text-align:center">&#9672;</span>Today</div><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;background:#1b3a5c12;color:#14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:600"><span style="color:#1b3a5c;width:16px;text-align:center">&#10022;</span>Animals</div><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:400"><span style="color:#1b3a5c;width:16px;text-align:center">&#9634;</span>Land</div><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:400"><span style="color:#1b3a5c;width:16px;text-align:center">&#9881;</span>Kit</div><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:400"><span style="color:#1b3a5c;width:16px;text-align:center">&#9671;</span>Business</div></div>
+  <div style="height:1px;background:#d7dade;margin:12px"></div>
+  <div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;height:34px;padding:0 12px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Contacts</div><div style="display:flex;align-items:center;height:34px;padding:0 12px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Reports</div><div style="display:flex;align-items:center;height:34px;padding:0 12px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Settings</div></div>
+  <div style="margin-top:auto;padding:12px;display:flex;align-items:center;gap:8px">
+    <span style="width:7px;height:7px;border-radius:50%;background:#3f6b4a;flex:none"></span>
+    <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#525860">Up to date</span>
+  </div>
+</aside>
+  <main style="flex:1;min-width:0;padding:28px 34px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;
+                border-bottom:1px solid #52586055;padding-bottom:14px">
+      <div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Cattle</div>
+        <div style="font-family:'Source Serif 4', Georgia, serif;font-size:36px;font-weight:600;letter-spacing:-0.02em;
+                    margin-top:3px">Herd</div>
+        <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860;margin-top:3px">
+          24 active &#183; 3 sold this year</div></div>
+      <div style="display:flex;gap:10px"><span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#ffffff;color:#14171b;border:1px solid #d7dade;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Export</span><span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#1b3a5c;color:#ffffff;border:1px solid #1b3a5c;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Add animal</span></div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div style="display:flex;align-items:center;gap:9px;height:36px;padding:0 12px;
+                  background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                  width:260px">
+        <span style="color:#525860;font-size:14px">&#8981;</span>
+        <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Name or tag&#8230;</span>
+      </div>
+      <span style="display:inline-flex;align-items:center;height:30px;padding:0 13px;border:1px solid #1b3a5c;border-radius:3px;background:#1b3a5c10;color:#1b3a5c;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;font-weight:600">All</span><span style="display:inline-flex;align-items:center;height:30px;padding:0 13px;border:1px solid #d7dade;border-radius:3px;background:transparent;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;font-weight:400">Cows</span><span style="display:inline-flex;align-items:center;height:30px;padding:0 13px;border:1px solid #d7dade;border-radius:3px;background:transparent;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;font-weight:400">Heifers</span><span style="display:inline-flex;align-items:center;height:30px;padding:0 13px;border:1px solid #d7dade;border-radius:3px;background:transparent;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;font-weight:400">Steers</span><span style="display:inline-flex;align-items:center;height:30px;padding:0 13px;border:1px solid #d7dade;border-radius:3px;background:transparent;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;font-weight:400">Bulls</span><span style="display:inline-flex;align-items:center;height:30px;padding:0 13px;border:1px solid #d7dade;border-radius:3px;background:transparent;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;font-weight:400">On program</span>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                flex:1;min-height:0;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse"><thead><tr><th scope="col" style="padding:9px 14px;text-align:left;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;border-bottom:1px solid #52586055">Name</th><th scope="col" style="padding:9px 14px;text-align:left;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;border-bottom:1px solid #52586055">Tag</th><th scope="col" style="padding:9px 14px;text-align:left;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;border-bottom:1px solid #52586055">Breed</th><th scope="col" style="padding:9px 14px;text-align:left;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;border-bottom:1px solid #52586055">Class</th><th scope="col" style="padding:9px 14px;text-align:right;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;border-bottom:1px solid #52586055">Weight</th><th scope="col" style="padding:9px 14px;text-align:left;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;border-bottom:1px solid #52586055">Pen</th><th scope="col" style="padding:9px 14px;text-align:left;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;border-bottom:1px solid #52586055">Safety</th><th scope="col" style="padding:9px 14px;text-align:left;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;border-bottom:1px solid #52586055">Status</th></tr></thead>
+      <tbody><tr style="border-bottom:1px solid #d7dade"><td style="padding:9px 14px"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:15.5px;font-weight:600">Juniper</div></td><td style="padding:9px 14px;font-family:'IBM Plex Mono', monospace;font-size:12.5px;color:#525860">118</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Maine-Anjou</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Cow</td><td style="padding:9px 14px;text-align:right;font-family:'Source Serif 4', Georgia, serif;font-size:15px;font-variant-numeric:tabular-nums;font-weight:600">1,184</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">North Trap</td><td style="padding:9px 14px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:2px;background:#c0392b;color:#ffffff;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;font-weight:700;flex:none">4</span></td><td style="padding:9px 14px"><span style="border:1px solid #3f6b4a;color:#3f6b4a;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Bred</span></td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:9px 14px"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:15.5px;font-weight:600">Marigold</div></td><td style="padding:9px 14px;font-family:'IBM Plex Mono', monospace;font-size:12.5px;color:#525860">204</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Chianina</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Cow</td><td style="padding:9px 14px;text-align:right;font-family:'Source Serif 4', Georgia, serif;font-size:15px;font-variant-numeric:tabular-nums;font-weight:600">1,326</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Creek Pen</td><td style="padding:9px 14px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:2px;background:#3f8f4f;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;font-weight:700;flex:none">2</span></td><td style="padding:9px 14px"><span style="border:1px solid #525860;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Open</span></td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:9px 14px"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:15.5px;font-weight:600">Willow</div></td><td style="padding:9px 14px;font-family:'IBM Plex Mono', monospace;font-size:12.5px;color:#525860">092</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Shorthorn</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Cow</td><td style="padding:9px 14px;text-align:right;font-family:'Source Serif 4', Georgia, serif;font-size:15px;font-variant-numeric:tabular-nums;font-weight:600">1,241</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Creek Pen</td><td style="padding:9px 14px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:2px;background:#3f8f4f;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;font-weight:700;flex:none">2</span></td><td style="padding:9px 14px"><span style="border:1px solid #3f6b4a;color:#3f6b4a;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Bred</span></td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:9px 14px"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:15.5px;font-weight:600">Comet</div></td><td style="padding:9px 14px;font-family:'IBM Plex Mono', monospace;font-size:12.5px;color:#525860">311</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Maine-Anjou</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Heifer</td><td style="padding:9px 14px;text-align:right;font-family:'Source Serif 4', Georgia, serif;font-size:15px;font-variant-numeric:tabular-nums;font-weight:600">842</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">South Trap</td><td style="padding:9px 14px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:2px;background:#3f8f4f;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;font-weight:700;flex:none">2</span></td><td style="padding:9px 14px"><span style="border:1px solid #1b3a5c;color:#1b3a5c;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Show</span></td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:9px 14px"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:15.5px;font-weight:600">Bandit</div></td><td style="padding:9px 14px;font-family:'IBM Plex Mono', monospace;font-size:12.5px;color:#525860">277</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Chianina</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Steer</td><td style="padding:9px 14px;text-align:right;font-family:'Source Serif 4', Georgia, serif;font-size:15px;font-variant-numeric:tabular-nums;font-weight:600">1,020</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">South Trap</td><td style="padding:9px 14px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:2px;background:#bc811c;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;font-weight:700;flex:none">3</span></td><td style="padding:9px 14px"><span style="border:1px solid #1b3a5c;color:#1b3a5c;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Show</span></td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:9px 14px"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:15.5px;font-weight:600">Nutmeg</div></td><td style="padding:9px 14px;font-family:'IBM Plex Mono', monospace;font-size:12.5px;color:#525860">153</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Shorthorn</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Cow</td><td style="padding:9px 14px;text-align:right;font-family:'Source Serif 4', Georgia, serif;font-size:15px;font-variant-numeric:tabular-nums;font-weight:600">1,178</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Creek Pen</td><td style="padding:9px 14px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:2px;background:#3f8f4f;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;font-weight:700;flex:none">2</span></td><td style="padding:9px 14px"><span style="border:1px solid #3f6b4a;color:#3f6b4a;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Bred</span></td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:9px 14px"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:15.5px;font-weight:600">Rook</div></td><td style="padding:9px 14px;font-family:'IBM Plex Mono', monospace;font-size:12.5px;color:#525860">298</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Maine-Anjou</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Bull</td><td style="padding:9px 14px;text-align:right;font-family:'Source Serif 4', Georgia, serif;font-size:15px;font-variant-numeric:tabular-nums;font-weight:600">1,904</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Barn Stall</td><td style="padding:9px 14px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:2px;background:#c0392b;color:#ffffff;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;font-weight:700;flex:none">4</span></td><td style="padding:9px 14px"><span style="border:1px solid #1b3a5c;color:#1b3a5c;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Herd sire</span></td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:9px 14px"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:15.5px;font-weight:600">Clover</div></td><td style="padding:9px 14px;font-family:'IBM Plex Mono', monospace;font-size:12.5px;color:#525860">331</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Shorthorn</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Heifer</td><td style="padding:9px 14px;text-align:right;font-family:'Source Serif 4', Georgia, serif;font-size:15px;font-variant-numeric:tabular-nums;font-weight:600">688</td><td style="padding:9px 14px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">South Trap</td><td style="padding:9px 14px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:2px;background:#3f8f4f;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;font-weight:700;flex:none">2</span></td><td style="padding:9px 14px"><span style="border:1px solid #525860;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Growing</span></td></tr></tbody></table>
+    </div>
+  </main>
+</div></div>
+          </div>
+        </div>
+      </figure>
+      <figure class="fr s1440">
+        <figcaption>
+          <span class="fr-name">Animal detail</span>
+          <span class="fr-surface">Desktop &#183; Herd Book</span>
+          <span class="fr-size">1440 &#215; 960</span>
+        </figcaption>
+        <div class="fr-scroll">
+          <div class="fr-wrap" style="--w:1440px;--h:960px">
+            <div class="fr-inner" style="--w:1440px;--h:960px"><div style="width:1440px;height:960px;background:#f5f6f8;color:#14171b;
+    font-family:'IBM Plex Sans', system-ui, sans-serif;display:flex;overflow:hidden">
+  <aside style="width:236px;flex:none;background:#ffffff;
+    border-right:1px solid #d7dade;display:flex;flex-direction:column;padding:18px 12px">
+  <div style="display:flex;align-items:center;gap:11px;padding:0 12px 18px">
+    <svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true" style="flex:none;display:block"><path d="M12 78 Q50 98 88 78" fill="none" stroke="#1b3a5c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(40 42) scale(0.7059) translate(-50 -50)"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(72 62) scale(0.3676) translate(-50 -50)"/></svg>
+    <span style="font-family:'Source Serif 4', Georgia, serif;font-size:18px;font-weight:600">Galaxy Farm</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:2px"><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:400"><span style="color:#1b3a5c;width:16px;text-align:center">&#9672;</span>Today</div><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;background:#1b3a5c12;color:#14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:600"><span style="color:#1b3a5c;width:16px;text-align:center">&#10022;</span>Animals</div><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:400"><span style="color:#1b3a5c;width:16px;text-align:center">&#9634;</span>Land</div><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:400"><span style="color:#1b3a5c;width:16px;text-align:center">&#9881;</span>Kit</div><div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:3px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;font-weight:400"><span style="color:#1b3a5c;width:16px;text-align:center">&#9671;</span>Business</div></div>
+  <div style="height:1px;background:#d7dade;margin:12px"></div>
+  <div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;height:34px;padding:0 12px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Contacts</div><div style="display:flex;align-items:center;height:34px;padding:0 12px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Reports</div><div style="display:flex;align-items:center;height:34px;padding:0 12px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Settings</div></div>
+  <div style="margin-top:auto;padding:12px;display:flex;align-items:center;gap:8px">
+    <span style="width:7px;height:7px;border-radius:50%;background:#3f6b4a;flex:none"></span>
+    <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#525860">Up to date</span>
+  </div>
+</aside>
+  <main style="flex:1;min-width:0;padding:26px 34px 30px;display:flex;flex-direction:column;gap:16px;
+               overflow:hidden">
+
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px">
+      <div style="min-width:0">
+        <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:11px;font-weight:600;letter-spacing:.14em;
+                    text-transform:uppercase;color:#525860">
+          Cattle &#183; Herd &#183; <span style="color:#1b3a5c">Juniper</span></div>
+        <div style="display:flex;align-items:baseline;gap:14px;margin-top:4px">
+          <span style="font-family:'Source Serif 4', Georgia, serif;font-size:40px;font-weight:600;
+                       letter-spacing:-0.025em">Juniper</span>
+          <span style="font-family:'IBM Plex Mono', monospace;font-size:15px;color:#525860">TAG 118</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:2px;background:#c0392b;color:#ffffff;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:700;flex:none">4</span>
+          <span style="border:1px solid #a8321f;color:#a8321f;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Calving window</span>
+          <span style="border:1px solid #525860;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Papered</span>
+          <span style="border:1px solid #525860;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Maine-Anjou</span>
+          <span style="border:1px solid #525860;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">North Trap</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:9px;flex:none">
+        <span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#ffffff;color:#14171b;border:1px solid #d7dade;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Log weight</span><span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#ffffff;color:#14171b;border:1px solid #d7dade;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Record health</span><span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#1b3a5c;color:#ffffff;border:1px solid #1b3a5c;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Edit</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:2px;border-bottom:1px solid #52586055;overflow:hidden"><span style="padding:9px 13px 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b;font-weight:600;border-bottom:2px solid #1b3a5c;margin-bottom:-1px;white-space:nowrap">Overview</span><span style="padding:9px 13px 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860;font-weight:400;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap">Breeding</span><span style="padding:9px 13px 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860;font-weight:400;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap">Calving</span><span style="padding:9px 13px 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860;font-weight:400;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap">Health</span><span style="padding:9px 13px 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860;font-weight:400;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap">Weights</span><span style="padding:9px 13px 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860;font-weight:400;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap">Feed</span><span style="padding:9px 13px 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860;font-weight:400;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap">Pedigree</span><span style="padding:9px 13px 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860;font-weight:400;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap">Sales</span><span style="padding:9px 13px 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860;font-weight:400;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap">Photos</span></div>
+
+    <div style="display:grid;grid-template-columns:1.45fr 1fr;gap:18px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+
+        <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                    padding:16px 18px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;
+                      margin-bottom:14px">
+            <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Weigh-ins</div>
+            <div style="display:flex;align-items:baseline;gap:16px">
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;color:#525860">Average daily gain</span>
+              <span style="font-family:'Source Serif 4', Georgia, serif;font-size:19px;font-weight:600;
+                           font-variant-numeric:tabular-nums">1.88 <span
+                style="font-size:12px;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-weight:400">lb/day</span></span>
+            </div>
+          </div>
+          <svg viewBox="0 0 600 196" width="100%" height="196" role="img"
+     aria-label="Weigh-ins from October to August, 612 lb rising to 1,184 lb">
+  <line x1="46" y1="160.8" x2="516" y2="160.8" stroke="#d7dade" stroke-width="1"/><text x="37" y="164.3" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">600</text><line x1="46" y1="114.9" x2="516" y2="114.9" stroke="#d7dade" stroke-width="1"/><text x="37" y="118.4" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">800</text><line x1="46" y1="69.1" x2="516" y2="69.1" stroke="#d7dade" stroke-width="1"/><text x="37" y="72.6" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">1000</text><line x1="46" y1="23.2" x2="516" y2="23.2" stroke="#d7dade" stroke-width="1"/><text x="37" y="26.7" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">1200</text>
+  <polygon points="46,170 46.0,158.1 104.8,141.6 163.5,130.8 222.2,115.4 281.0,102.1 339.8,87.2 398.5,68.1 457.2,48.0 516.0,26.8 516,170" fill="#1b3a5c" opacity="0.07"/>
+  <polyline points="46.0,158.1 104.8,141.6 163.5,130.8 222.2,115.4 281.0,102.1 339.8,87.2 398.5,68.1 457.2,48.0 516.0,26.8" fill="none" stroke="#1b3a5c" stroke-width="2"
+            stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="46.0" cy="158.1" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="104.8" cy="141.6" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="163.5" cy="130.8" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="222.2" cy="115.4" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="281.0" cy="102.1" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="339.8" cy="87.2" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="398.5" cy="68.1" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="457.2" cy="48.0" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="516.0" cy="26.8" r="4.5" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/>
+  <text x="526.0" y="20.8" font-family="'Source Serif 4', Georgia, serif" font-size="15"
+        font-weight="600" fill="#14171b">1,184 lb</text>
+  <text x="526.0" y="35.8" font-family="'IBM Plex Sans', system-ui, sans-serif" font-size="10"
+        fill="#525860">latest</text>
+  <text x="46.0" y="188" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">12 Oct</text><text x="281.0" y="188" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">15 Mar</text><text x="516.0" y="188" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">12 Aug</text>
+</svg>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                    padding:16px 18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Health record</div>
+            <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#1b3a5c">All 18 entries</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse"><tr style="border-bottom:1px solid #d7dade"><td style="padding:7px 0;font-family:'IBM Plex Mono', monospace;font-size:11.5px;color:#525860;white-space:nowrap">12 Aug</td><td style="padding:7px 12px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13.5px">Ivermectin pour-on</td><td style="padding:7px 0"><span style="border:1px solid #525860;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Routine</span></td><td style="padding:7px 0;text-align:right;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12.5px;color:#525860;white-space:nowrap">Eli</td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:7px 0;font-family:'IBM Plex Mono', monospace;font-size:11.5px;color:#525860;white-space:nowrap">2 Jul</td><td style="padding:7px 12px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13.5px">Vitamin A/D/E</td><td style="padding:7px 0"><span style="border:1px solid #525860;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Routine</span></td><td style="padding:7px 0;text-align:right;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12.5px;color:#525860;white-space:nowrap">Eli</td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:7px 0;font-family:'IBM Plex Mono', monospace;font-size:11.5px;color:#525860;white-space:nowrap">18 May</td><td style="padding:7px 12px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13.5px">Foot trim &#8212; left rear</td><td style="padding:7px 0"><span style="border:1px solid #525860;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Lameness</span></td><td style="padding:7px 0;text-align:right;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12.5px;color:#525860;white-space:nowrap">Dr. Reyes</td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:7px 0;font-family:'IBM Plex Mono', monospace;font-size:11.5px;color:#525860;white-space:nowrap">4 Apr</td><td style="padding:7px 12px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13.5px">Bangs vaccination</td><td style="padding:7px 0"><span style="border:1px solid #525860;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Required</span></td><td style="padding:7px 0;text-align:right;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12.5px;color:#525860;white-space:nowrap">Dr. Reyes</td></tr></table>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                    padding:16px 18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;
+                      margin-bottom:12px">
+            <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Feeding</div>
+            <span style="border:1px solid #1b3a5c;color:#1b3a5c;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Late gestation</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;
+                        padding-bottom:8px;border-bottom:1px solid #d7dade">
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Coastal hay, free choice</span>
+              <span style="font-family:'IBM Plex Mono', monospace;font-size:12px;color:#525860">AM + PM</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;
+                        padding-bottom:8px;border-bottom:1px solid #d7dade">
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Breeder cube, 4 lb</span>
+              <span style="font-family:'IBM Plex Mono', monospace;font-size:12px;color:#525860">AM</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Mineral tub</span>
+              <span style="font-family:'IBM Plex Mono', monospace;font-size:12px;color:#525860">Free choice</span></div>
+          </div>
+          <div style="margin-top:12px;padding-top:11px;border-top:1px solid #d7dade;
+                      font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12.5px;color:#525860">
+            Bag runs out in 9 days at this rate.
+            <span style="color:#1b3a5c">Feed plans</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+        <div style="background:#ffffff;border:1px solid #d7dade;
+                    border-left:4px solid #a8321f;border-radius:3px;padding:15px 17px">
+          <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Calving watch</div>
+          <div style="display:flex;align-items:baseline;gap:9px;margin:6px 0 10px">
+            <span style="font-family:'Source Serif 4', Georgia, serif;font-size:30px;font-weight:600;
+                         font-variant-numeric:tabular-nums;color:#a8321f">Day 279</span>
+            <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">of 283</span>
+          </div>
+          <div style="height:6px;border-radius:3px;background:#d7dade;overflow:hidden">
+            <div style="height:100%;width:98.6%;background:#a8321f"></div></div>
+          <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12.5px;color:#525860;margin-top:9px">
+            Bred 4 Nov to Ridgeline Monarch &#183; due 13&#8211;17 August</div>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                    padding:16px 18px">
+          <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Pedigree</div>
+          <div style="margin-top:12px"><div style="display:flex;flex-direction:column;gap:9px">
+  <div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+      <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Sire</div><span style="flex:1;height:1px;background:#d7dade"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:5px;align-items:stretch">
+      <div style="display:flex"><div style="border:1px solid #d7dade;background:#ffffff;padding:9px 11px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:14px;font-weight:600;color:#14171b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ridgeline Monarch</div><div style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">MA 4471882</div></div></div>
+      <div style="display:grid;grid-template-rows:auto auto;gap:5px">
+        <div style="border:1px solid #d7dade;background:#ffffff;padding:7px 11px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:12.5px;font-weight:600;color:#14171b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Monarch's Legacy</div><div style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">MA 4102336</div></div><div style="border:1px solid #d7dade;background:#ffffff;padding:7px 11px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:12.5px;font-weight:600;color:#14171b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Cedar Hill Ruby</div><div style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">MA 4188907</div></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+      <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Dam</div><span style="flex:1;height:1px;background:#d7dade"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:5px;align-items:stretch">
+      <div style="display:flex"><div style="border:1px solid #d7dade;background:#ffffff;padding:9px 11px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:14px;font-weight:600;color:#14171b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Galaxy Farm Willow</div><div style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">MA 4520114</div></div></div>
+      <div style="display:grid;grid-template-rows:auto auto;gap:5px">
+        <div style="border:1px solid #d7dade;background:#ffffff;padding:7px 11px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:12.5px;font-weight:600;color:#14171b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bar-K Foundation</div><div style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">MA 4009551</div></div><div style="border:1px solid #d7dade;background:#ffffff;padding:7px 11px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:12.5px;font-weight:600;color:#14171b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Willow Creek Belle</div><div style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">MA 4233780</div></div>
+      </div>
+    </div>
+  </div>
+</div></div>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                    padding:16px 18px">
+          <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Facts</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 18px;margin-top:12px">
+            <div style="display:flex;flex-direction:column;gap:2px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Date of birth</div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14.5px;font-variant-numeric:tabular-nums">14 March 2022</div></div><div style="display:flex;flex-direction:column;gap:2px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Registration</div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14.5px;font-variant-numeric:tabular-nums">MA 4612093</div></div><div style="display:flex;flex-direction:column;gap:2px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Breed</div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14.5px;font-variant-numeric:tabular-nums">Maine-Anjou</div></div><div style="display:flex;flex-direction:column;gap:2px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Colour</div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14.5px;font-variant-numeric:tabular-nums">Black, white face</div></div><div style="display:flex;flex-direction:column;gap:2px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Sire</div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14.5px;font-variant-numeric:tabular-nums">Ridgeline Monarch</div></div><div style="display:flex;flex-direction:column;gap:2px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Dam</div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14.5px;font-variant-numeric:tabular-nums">Galaxy Farm Willow</div></div><div style="display:flex;flex-direction:column;gap:2px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Halter</div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14.5px;font-variant-numeric:tabular-nums">Red</div></div><div style="display:flex;flex-direction:column;gap:2px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Acquired</div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14.5px;font-variant-numeric:tabular-nums">Born on farm</div></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div></div>
+          </div>
+        </div>
+      </figure></div>
+  </section>
+  <section class="group">
+    <div class="group-head">
+      <div>
+        <p class="group-dir">Herd Book</p>
+        <h2>Forms and parts</h2>
+      </div>
+      <p class="group-blurb">Where a palette actually fails: focus rings, error states, disabled controls, and a destructive action that has to look destructive without shouting. Every state in one place.</p>
+    </div>
+    <div class="views">
+      <figure class="fr s1060">
+        <figcaption>
+          <span class="fr-name">Edit form</span>
+          <span class="fr-surface">Desktop &#183; Herd Book</span>
+          <span class="fr-size">1060 &#215; 660</span>
+        </figcaption>
+        <div class="fr-scroll">
+          <div class="fr-wrap" style="--w:1060px;--h:660px">
+            <div class="fr-inner" style="--w:1060px;--h:660px"><div style="width:1060px;height:660px;background:#f5f6f8;color:#14171b;
+    font-family:'IBM Plex Sans', system-ui, sans-serif;padding:26px 30px;display:flex;flex-direction:column;gap:18px;overflow:hidden">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;
+              border-bottom:1px solid #52586055;padding-bottom:13px">
+    <div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Cattle &#183; Herd</div>
+      <div style="font-family:'Source Serif 4', Georgia, serif;font-size:29px;font-weight:600;letter-spacing:-0.02em;
+                  margin-top:3px">Edit Juniper</div></div>
+    <div style="display:flex;gap:9px"><span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#ffffff;color:#14171b;border:1px solid #d7dade;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Cancel</span><span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#1b3a5c;color:#ffffff;border:1px solid #1b3a5c;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Save changes</span></div>
+  </div>
+
+  <div style="background:#a8321f0f;border:1px solid #a8321f44;border-radius:3px;
+              padding:11px 14px;display:flex;align-items:center;gap:11px">
+    <span style="color:#a8321f;font-size:15px">!</span>
+    <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13.5px;color:#a8321f">
+      Two fields need attention before this can be saved.</span>
+  </div>
+
+  <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+              padding:20px 22px;display:flex;flex-direction:column;gap:20px;flex:1">
+    <div>
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px">
+        <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Identity</div>
+        <span style="flex:1;height:1px;background:#d7dade"></span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+        <div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Name</div><div style="height:36px;border:1px solid #d7dade;border-radius:3px;background:#ffffff;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b">Juniper</div></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Tag number</div><div style="height:36px;border:1px solid #1b3a5c;border-radius:3px;background:#ffffff;box-shadow:0 0 0 3px #1b3a5c26;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b">118</div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;color:#525860;margin-top:4px">Being edited</div></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Registration</div><div style="height:36px;border:1px solid #d7dade;border-radius:3px;background:#ffffff;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b">MA 4612093</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px">
+        <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Breeding</div>
+        <span style="flex:1;height:1px;background:#d7dade"></span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+        <div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Bred on</div><div style="height:36px;border:1px solid #d7dade;border-radius:3px;background:#ffffff;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b">4 November 2024</div></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Calved on</div><div style="height:36px;border:1px solid #a8321f;border-radius:3px;background:#ffffff;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b">2 October 2024</div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;color:#a8321f;margin-top:4px">A calving date cannot precede its breeding date.</div></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Sire</div><div style="height:36px;border:1px solid #d7dade;border-radius:3px;background:#ffffff;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b">Ridgeline Monarch</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px">
+        <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Placement</div>
+        <span style="flex:1;height:1px;background:#d7dade"></span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+        <div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Pen</div><div style="height:36px;border:1px solid #d7dade;border-radius:3px;background:#ffffff;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b">North Trap</div></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Safety level</div><div style="height:36px;border:1px solid #a8321f;border-radius:3px;background:#ffffff;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b">4 &#8212; handle with a second person</div><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12px;color:#a8321f;margin-top:4px">Required when the animal is in a shared pen.</div></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Registry sync</div><div style="height:36px;border:1px solid #d7dade;border-radius:3px;background:#ffffff;background:#f5f6f8;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#52586099">Locked while an import is running</div></div>
+      </div>
+    </div>
+
+    <div style="margin-top:auto;padding-top:16px;border-top:1px solid #d7dade;
+                display:flex;align-items:center;justify-content:space-between">
+      <span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#ffffff;color:#a8321f;border:1px solid #a8321f;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Delete animal</span>
+      <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12.5px;color:#525860">
+        Deleting asks you to type the name. It stays in Trash for 30 days.</span>
+    </div>
+  </div>
+</div></div>
+          </div>
+        </div>
+      </figure>
+      <figure class="fr s1060">
+        <figcaption>
+          <span class="fr-name">Components</span>
+          <span class="fr-surface">Desktop &#183; Herd Book</span>
+          <span class="fr-size">1060 &#215; 720</span>
+        </figcaption>
+        <div class="fr-scroll">
+          <div class="fr-wrap" style="--w:1060px;--h:720px">
+            <div class="fr-inner" style="--w:1060px;--h:720px"><div style="width:1060px;height:720px;background:#f5f6f8;color:#14171b;
+    font-family:'IBM Plex Sans', system-ui, sans-serif;padding:26px 30px;overflow:hidden;display:flex;flex-direction:column;gap:16px">
+  <div>
+    <div style="font-family:'Source Serif 4', Georgia, serif;font-size:27px;font-weight:600;
+                letter-spacing:-0.02em">Component inventory</div>
+    <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13.5px;color:#525860;margin-top:3px">
+      Every state a palette has to survive, in one place.</div>
+  </div>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap"><div style="display:flex;flex-direction:column;gap:5px;min-width:78px"><span style="height:34px;border-radius:3px;background:#f5f6f8;border:1px solid #d7dade"></span><span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10.5px;color:#525860">Ground</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">#F5F6F8</span></div><div style="display:flex;flex-direction:column;gap:5px;min-width:78px"><span style="height:34px;border-radius:3px;background:#ffffff;border:1px solid #d7dade"></span><span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10.5px;color:#525860">Surface</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">#FFFFFF</span></div><div style="display:flex;flex-direction:column;gap:5px;min-width:78px"><span style="height:34px;border-radius:3px;background:#d7dade;border:1px solid #d7dade"></span><span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10.5px;color:#525860">Rule</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">#D7DADE</span></div><div style="display:flex;flex-direction:column;gap:5px;min-width:78px"><span style="height:34px;border-radius:3px;background:#525860;border:1px solid #d7dade"></span><span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10.5px;color:#525860">Muted</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">#525860</span></div><div style="display:flex;flex-direction:column;gap:5px;min-width:78px"><span style="height:34px;border-radius:3px;background:#14171b;border:1px solid #d7dade"></span><span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10.5px;color:#525860">Ink</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">#14171B</span></div><div style="display:flex;flex-direction:column;gap:5px;min-width:78px"><span style="height:34px;border-radius:3px;background:#1b3a5c;border:1px solid #d7dade"></span><span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10.5px;color:#525860">Primary</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">#1B3A5C</span></div><div style="display:flex;flex-direction:column;gap:5px;min-width:78px"><span style="height:34px;border-radius:3px;background:#3f6b4a;border:1px solid #d7dade"></span><span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10.5px;color:#525860">Confirm</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">#3F6B4A</span></div><div style="display:flex;flex-direction:column;gap:5px;min-width:78px"><span style="height:34px;border-radius:3px;background:#a8321f;border:1px solid #d7dade"></span><span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10.5px;color:#525860">Alert</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">#A8321F</span></div></div>
+
+  <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+              padding:4px 20px 8px;flex:1;overflow:hidden">
+    <div style="display:grid;grid-template-columns:132px 1fr;gap:18px;align-items:center;padding:13px 0;border-bottom:1px solid #d7dade"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Buttons</div><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#1b3a5c;color:#ffffff;border:1px solid #1b3a5c;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Primary</span><span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#ffffff;color:#14171b;border:1px solid #d7dade;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Secondary</span><span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#ffffff;color:#a8321f;border:1px solid #a8321f;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Destructive</span><span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;background:#ffffff;color:#52586088;border:1px solid #d7dade;border-radius:3px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;white-space:nowrap">Disabled</span></div></div>
+    <div style="display:grid;grid-template-columns:132px 1fr;gap:18px;align-items:center;padding:13px 0;border-bottom:1px solid #d7dade"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Stamps</div><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><span style="border:1px solid #525860;color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Papered</span><span style="border:1px solid #a8321f;color:#a8321f;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Calving window</span><span style="border:1px solid #3f6b4a;color:#3f6b4a;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Bred</span><span style="border:1px solid #1b3a5c;color:#1b3a5c;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">On program</span></div></div>
+    <div style="display:grid;grid-template-columns:132px 1fr;gap:18px;align-items:center;padding:13px 0;border-bottom:1px solid #d7dade"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Safety scale</div><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><div style="display:flex;gap:11px"><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:2px;background:#2f6b3d;color:#ffffff;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:17px;font-weight:700;flex:none">1</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">2F6B3D</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:2px;background:#3f8f4f;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:17px;font-weight:700;flex:none">2</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">3F8F4F</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:2px;background:#bc811c;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:17px;font-weight:700;flex:none">3</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">BC811C</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:2px;background:#c0392b;color:#ffffff;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:17px;font-weight:700;flex:none">4</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">C0392B</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:2px;background:#8e1f14;color:#ffffff;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:17px;font-weight:700;flex:none">5</span><span style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">8E1F14</span></div></div></div></div>
+    <div style="display:grid;grid-template-columns:132px 1fr;gap:18px;align-items:center;padding:13px 0;border-bottom:1px solid #d7dade"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Fields</div><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><div style="display:flex;gap:12px;width:100%"><div style="flex:1"><div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Default</div><div style="height:36px;border:1px solid #d7dade;border-radius:3px;background:#ffffff;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b">Juniper</div></div></div><div style="flex:1"><div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Focus</div><div style="height:36px;border:1px solid #1b3a5c;border-radius:3px;background:#ffffff;box-shadow:0 0 0 3px #1b3a5c26;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b">118</div></div></div><div style="flex:1"><div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Error</div><div style="height:36px;border:1px solid #a8321f;border-radius:3px;background:#ffffff;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b">2 Oct</div></div></div><div style="flex:1"><div style="display:flex;flex-direction:column;gap:5px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Disabled</div><div style="height:36px;border:1px solid #d7dade;border-radius:3px;background:#ffffff;background:#f5f6f8;display:flex;align-items:center;padding:0 11px;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#52586099">Locked</div></div></div></div></div></div>
+    <div style="display:grid;grid-template-columns:132px 1fr;gap:18px;align-items:center;padding:13px 0;border-bottom:1px solid #d7dade"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Link</div><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#1b3a5c;text-decoration:underline;text-underline-offset:3px">Manage the tanks</span><span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">&#183;</span><span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860;text-decoration:underline;text-underline-offset:3px">Visited</span></div></div>
+    <div style="display:grid;grid-template-columns:132px 1fr;gap:18px;align-items:center;padding:13px 0;border-bottom:1px solid #d7dade"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Meter</div><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><div style="width:280px"><div style="height:6px;border-radius:3px;background:#d7dade;overflow:hidden"><div style="height:100%;width:66%;background:#1b3a5c"></div></div></div><div style="width:280px"><div style="height:6px;border-radius:3px;background:#d7dade;overflow:hidden"><div style="height:100%;width:98.6%;background:#a8321f"></div></div></div></div></div>
+  </div>
+</div></div>
+          </div>
+        </div>
+      </figure></div>
+  </section>
+  <section class="group">
+    <div class="group-head">
+      <div>
+        <p class="group-dir">Operations</p>
+        <h2>The phone</h2>
+      </div>
+      <p class="group-blurb">One grotesque, soft cards, tinted chips, a bottom bar. Including the Sheet primitive proposed in the review &#8212; a log flow over a dimmed list, so the page behind never reflows.</p>
+    </div>
+    <div class="views pair">
+      <figure class="fr s390">
+        <figcaption>
+          <span class="fr-name">Today</span>
+          <span class="fr-surface">Mobile &#183; Operations</span>
+          <span class="fr-size">390 &#215; 844</span>
+        </figcaption>
+        <div class="fr-scroll">
+          <div class="fr-wrap" style="--w:390px;--h:844px">
+            <div class="fr-inner" style="--w:390px;--h:844px"><div style="width:390px;height:844px;background:#f5f6f8;color:#14171b;
+    font-family:Inter, sans-serif;display:flex;flex-direction:column;overflow:hidden">
+  <div style="height:52px;flex:none;background:#ffffff;border-bottom:1px solid #d7dade;display:flex;align-items:center;justify-content:space-between;padding:0 14px"><div style="display:flex;align-items:center;gap:9px"><svg viewBox="0 0 100 100" width="24" height="24" aria-hidden="true" style="flex:none;display:block"><path d="M12 78 Q50 98 88 78" fill="none" stroke="#1b3a5c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(40 42) scale(0.7059) translate(-50 -50)"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(72 62) scale(0.3676) translate(-50 -50)"/></svg><span style="font-family:Inter, sans-serif;font-size:16px;font-weight:600;letter-spacing:-0.02em">Galaxy Farm</span></div><span style="width:8px;height:8px;border-radius:50%;background:#3f6b4a"></span></div><div style="flex:1;padding:14px;display:flex;flex-direction:column;gap:14px;
+                overflow:hidden">
+    <div><div style="font-size:11.5px;color:#525860">Thursday, 13 August</div>
+      <div style="font-size:27px;font-weight:600;letter-spacing:-0.025em;margin-top:1px">Today</div></div>
+
+    <div style="background:#ffffff;border:1px solid #d7dade;
+                border-left:3px solid #a8321f;border-radius:10px;padding:14px;
+                box-shadow:0 1px 2px rgb(0 0 0/4%)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+        <span style="background:#a8321f14;color:#a8321f;font-family:Inter, sans-serif;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;white-space:nowrap;display:inline-block">Calving watch</span>
+        <span style="font-variant-numeric:tabular-nums;font-size:20px;font-weight:600;
+                     color:#a8321f">279</span></div>
+      <div style="font-size:18px;font-weight:600;letter-spacing:-0.02em">Juniper</div>
+      <div style="font-size:11.5px;color:#525860;margin-top:2px">
+        Tag 118 &#183; North Trap &#183; day 279 of 283</div>
+      <div style="height:4px;border-radius:2px;background:#d7dade;margin-top:11px;overflow:hidden">
+        <div style="height:100%;width:98.6%;background:#a8321f"></div></div>
+    </div>
+
+    <div style="display:flex;gap:8px"><div style="flex:1;background:#ffffff;border:1px solid #d7dade;border-radius:10px;padding:11px 12px;box-shadow:0 1px 2px rgb(0 0 0/4%)"><div style="font-family:Inter, sans-serif;font-size:11px;color:#525860">Head</div><div style="font-variant-numeric:tabular-nums;font-size:24px;font-weight:600;letter-spacing:-0.02em;color:#14171b;margin-top:1px">24</div></div><div style="flex:1;background:#ffffff;border:1px solid #d7dade;border-radius:10px;padding:11px 12px;box-shadow:0 1px 2px rgb(0 0 0/4%)"><div style="font-family:Inter, sans-serif;font-size:11px;color:#525860">Pens</div><div style="font-variant-numeric:tabular-nums;font-size:24px;font-weight:600;letter-spacing:-0.02em;color:#14171b;margin-top:1px">4/9</div></div><div style="flex:1;background:#ffffff;border:1px solid #d7dade;border-radius:10px;padding:11px 12px;box-shadow:0 1px 2px rgb(0 0 0/4%)"><div style="font-family:Inter, sans-serif;font-size:11px;color:#525860">Uncovered</div><div style="font-variant-numeric:tabular-nums;font-size:24px;font-weight:600;letter-spacing:-0.02em;color:#a8321f;margin-top:1px">3</div></div></div>
+
+    <div style="flex:1;min-height:0">
+      <div style="font-size:11.5px;color:#525860;padding-bottom:6px;
+                  border-bottom:1px solid #d7dade">Pen board</div><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:10px 0;border-bottom:1px solid #d7dade"><div style="display:flex;align-items:center;gap:11px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:2px;background:#c0392b;color:#ffffff;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:700;flex:none">4</span><div><div style="font-size:15px;font-weight:500">North Trap</div><div style="font-size:11.5px;color:#525860">2 head</div></div></div><span style="background:#a8321f14;color:#a8321f;font-family:Inter, sans-serif;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;white-space:nowrap;display:inline-block">Level 4</span></div><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:10px 0;border-bottom:1px solid #d7dade"><div style="display:flex;align-items:center;gap:11px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:2px;background:#3f8f4f;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:700;flex:none">2</span><div><div style="font-size:15px;font-weight:500">Creek Pen</div><div style="font-size:11.5px;color:#525860">3 head</div></div></div><span style="background:#3f6b4a14;color:#3f6b4a;font-family:Inter, sans-serif;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;white-space:nowrap;display:inline-block">Level 2</span></div><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:10px 0;border-bottom:1px solid #d7dade"><div style="display:flex;align-items:center;gap:11px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:2px;background:#3f8f4f;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:700;flex:none">2</span><div><div style="font-size:15px;font-weight:500">South Trap</div><div style="font-size:11.5px;color:#525860">4 head</div></div></div><span style="background:#3f6b4a14;color:#3f6b4a;font-family:Inter, sans-serif;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;white-space:nowrap;display:inline-block">Level 2</span></div><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:10px 0;border-bottom:1px solid #d7dade"><div style="display:flex;align-items:center;gap:11px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:2px;background:#bc811c;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:700;flex:none">3</span><div><div style="font-size:15px;font-weight:500">Barn Stall</div><div style="font-size:11.5px;color:#525860">1 head</div></div></div><span style="background:#1b3a5c14;color:#1b3a5c;font-family:Inter, sans-serif;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;white-space:nowrap;display:inline-block">Level 3</span></div></div>
+
+    <div style="height:44px;background:#1b3a5c;color:#ffffff;border-radius:10px;
+                display:flex;align-items:center;justify-content:center;font-size:16px;
+                font-weight:600">&#65291; Log something</div>
+  </div>
+  <nav style="flex:none;background:#ffffff;border-top:1px solid #d7dade;
+              display:flex;padding-bottom:8px"><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#1b3a5c"><span style="font-size:17px;line-height:1">&#9672;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:600">Today</span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#525860"><span style="font-size:17px;line-height:1">&#10022;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:400">Animals</span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#525860"><span style="font-size:17px;line-height:1">&#9634;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:400">Land</span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#525860"><span style="font-size:17px;line-height:1">&#9881;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:400">Kit</span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#525860"><span style="font-size:17px;line-height:1">&#9671;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:400">Business</span></div></nav>
+</div></div>
+          </div>
+        </div>
+      </figure>
+      <figure class="fr s390">
+        <figcaption>
+          <span class="fr-name">Animal detail</span>
+          <span class="fr-surface">Mobile &#183; Operations</span>
+          <span class="fr-size">390 &#215; 844</span>
+        </figcaption>
+        <div class="fr-scroll">
+          <div class="fr-wrap" style="--w:390px;--h:844px">
+            <div class="fr-inner" style="--w:390px;--h:844px"><div style="width:390px;height:844px;background:#f5f6f8;color:#14171b;
+    font-family:Inter, sans-serif;display:flex;flex-direction:column;overflow:hidden">
+  <div style="height:52px;flex:none;background:#ffffff;border-bottom:1px solid #d7dade;display:flex;align-items:center;justify-content:space-between;padding:0 14px"><div style="display:flex;align-items:center;gap:9px"><svg viewBox="0 0 100 100" width="24" height="24" aria-hidden="true" style="flex:none;display:block"><path d="M12 78 Q50 98 88 78" fill="none" stroke="#1b3a5c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(40 42) scale(0.7059) translate(-50 -50)"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(72 62) scale(0.3676) translate(-50 -50)"/></svg><span style="font-family:Inter, sans-serif;font-size:16px;font-weight:600;letter-spacing:-0.02em">Galaxy Farm</span></div><span style="width:8px;height:8px;border-radius:50%;background:#3f6b4a"></span></div><div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+    <div style="padding:14px 14px 0">
+      <div style="font-size:11px;color:#525860">Animals &#183; Herd</div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-top:3px">
+        <span style="font-size:28px;font-weight:600;letter-spacing:-0.025em">Juniper</span>
+        <span style="font-size:13px;color:#525860;font-variant-numeric:tabular-nums">118</span>
+      </div>
+      <div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap;align-items:center">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:2px;background:#c0392b;color:#ffffff;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;font-weight:700;flex:none">4</span><span style="background:#a8321f14;color:#a8321f;font-family:Inter, sans-serif;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;white-space:nowrap;display:inline-block">Calving window</span><span style="background:#52586014;color:#525860;font-family:Inter, sans-serif;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;white-space:nowrap;display:inline-block">Papered</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:2px;border-bottom:1px solid #d7dade;margin-top:12px;
+                padding:0 8px;overflow:hidden"><span style="padding:8px 8px 10px;font-family:Inter, sans-serif;font-size:13px;color:#14171b;font-weight:600;border-bottom:2px solid #1b3a5c;white-space:nowrap">Overview</span><span style="padding:8px 8px 10px;font-family:Inter, sans-serif;font-size:13px;color:#525860;font-weight:400;border-bottom:2px solid transparent;white-space:nowrap">Weights</span><span style="padding:8px 8px 10px;font-family:Inter, sans-serif;font-size:13px;color:#525860;font-weight:400;border-bottom:2px solid transparent;white-space:nowrap">Health</span><span style="padding:8px 8px 10px;font-family:Inter, sans-serif;font-size:13px;color:#525860;font-weight:400;border-bottom:2px solid transparent;white-space:nowrap">Breeding</span><span style="padding:8px 8px 10px;font-family:Inter, sans-serif;font-size:13px;color:#525860;font-weight:400;border-bottom:2px solid transparent;white-space:nowrap">Pedigree</span></div>
+
+    <div style="flex:1;padding:14px;display:flex;flex-direction:column;gap:13px;overflow:hidden">
+      <div style="background:#ffffff;border:1px solid #d7dade;
+                  border-left:3px solid #a8321f;border-radius:10px;padding:13px">
+        <div style="font-size:11px;color:#525860">Calving watch</div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin:3px 0 9px">
+          <span style="font-size:26px;font-weight:600;color:#a8321f;
+                       font-variant-numeric:tabular-nums">Day 279</span>
+          <span style="font-size:13px;color:#525860">of 283</span></div>
+        <div style="height:4px;border-radius:2px;background:#d7dade;overflow:hidden">
+          <div style="height:100%;width:98.6%;background:#a8321f"></div></div>
+      </div>
+
+      <div style="background:#ffffff;border:1px solid #d7dade;border-radius:10px;
+                  padding:13px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;
+                    margin-bottom:6px">
+          <span style="font-size:11px;color:#525860">Weigh-ins</span>
+          <span style="font-size:13px;font-weight:600;
+                       font-variant-numeric:tabular-nums">1.88 lb/day</span></div>
+        <svg viewBox="0 0 330 128" width="100%" height="128" role="img"
+     aria-label="Weigh-ins from October to August, 612 lb rising to 1,184 lb">
+  <line x1="46" y1="96.8" x2="246" y2="96.8" stroke="#d7dade" stroke-width="1"/><text x="37" y="100.3" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">600</text><line x1="46" y1="70.9" x2="246" y2="70.9" stroke="#d7dade" stroke-width="1"/><text x="37" y="74.4" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">800</text><line x1="46" y1="45.1" x2="246" y2="45.1" stroke="#d7dade" stroke-width="1"/><text x="37" y="48.6" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">1000</text><line x1="46" y1="19.2" x2="246" y2="19.2" stroke="#d7dade" stroke-width="1"/><text x="37" y="22.7" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">1200</text>
+  <polygon points="46,102 46.0,95.3 71.0,86.0 96.0,79.9 121.0,71.2 146.0,63.7 171.0,55.3 196.0,44.5 221.0,33.2 246.0,21.2 246,102" fill="#1b3a5c" opacity="0.07"/>
+  <polyline points="46.0,95.3 71.0,86.0 96.0,79.9 121.0,71.2 146.0,63.7 171.0,55.3 196.0,44.5 221.0,33.2 246.0,21.2" fill="none" stroke="#1b3a5c" stroke-width="2"
+            stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="46.0" cy="95.3" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="71.0" cy="86.0" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="96.0" cy="79.9" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="121.0" cy="71.2" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="146.0" cy="63.7" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="171.0" cy="55.3" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="196.0" cy="44.5" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="221.0" cy="33.2" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="246.0" cy="21.2" r="4.5" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/>
+  <text x="256.0" y="15.2" font-family="'Source Serif 4', Georgia, serif" font-size="15"
+        font-weight="600" fill="#14171b">1,184 lb</text>
+  <text x="256.0" y="30.2" font-family="'IBM Plex Sans', system-ui, sans-serif" font-size="10"
+        fill="#525860">latest</text>
+  <text x="46.0" y="120" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">12 Oct</text><text x="146.0" y="120" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">15 Mar</text><text x="246.0" y="120" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">12 Aug</text>
+</svg>
+      </div>
+
+      <div style="background:#ffffff;border:1px solid #d7dade;border-radius:10px;
+                  padding:4px 13px 6px;flex:1;min-height:0;overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #d7dade"><span style="font-size:13px;color:#525860">Born</span><span style="font-size:14px;font-variant-numeric:tabular-nums">14 Mar 2022</span></div><div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #d7dade"><span style="font-size:13px;color:#525860">Breed</span><span style="font-size:14px;font-variant-numeric:tabular-nums">Maine-Anjou</span></div><div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #d7dade"><span style="font-size:13px;color:#525860">Sire</span><span style="font-size:14px;font-variant-numeric:tabular-nums">Ridgeline Monarch</span></div><div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #d7dade"><span style="font-size:13px;color:#525860">Dam</span><span style="font-size:14px;font-variant-numeric:tabular-nums">GF Willow</span></div><div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #d7dade"><span style="font-size:13px;color:#525860">Halter</span><span style="font-size:14px;font-variant-numeric:tabular-nums">Red</span></div><div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #d7dade"><span style="font-size:13px;color:#525860">Pen</span><span style="font-size:14px;font-variant-numeric:tabular-nums">North Trap</span></div></div>
+    </div>
+  </div>
+  <nav style="flex:none;background:#ffffff;border-top:1px solid #d7dade;
+              display:flex;padding-bottom:8px"><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#525860"><span style="font-size:17px;line-height:1">&#9672;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:400">Today</span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#1b3a5c"><span style="font-size:17px;line-height:1">&#10022;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:600">Animals</span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#525860"><span style="font-size:17px;line-height:1">&#9634;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:400">Land</span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#525860"><span style="font-size:17px;line-height:1">&#9881;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:400">Kit</span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#525860"><span style="font-size:17px;line-height:1">&#9671;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:400">Business</span></div></nav>
+</div></div>
+          </div>
+        </div>
+      </figure>
+      <figure class="fr s390">
+        <figcaption>
+          <span class="fr-name">Log sheet</span>
+          <span class="fr-surface">Mobile &#183; Operations</span>
+          <span class="fr-size">390 &#215; 844</span>
+        </figcaption>
+        <div class="fr-scroll">
+          <div class="fr-wrap" style="--w:390px;--h:844px">
+            <div class="fr-inner" style="--w:390px;--h:844px"><div style="width:390px;height:844px;background:#f5f6f8;color:#14171b;
+    font-family:Inter, sans-serif;display:flex;flex-direction:column;overflow:hidden">
+  <div style="height:52px;flex:none;background:#ffffff;border-bottom:1px solid #d7dade;display:flex;align-items:center;justify-content:space-between;padding:0 14px"><div style="display:flex;align-items:center;gap:9px"><svg viewBox="0 0 100 100" width="24" height="24" aria-hidden="true" style="flex:none;display:block"><path d="M12 78 Q50 98 88 78" fill="none" stroke="#1b3a5c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(40 42) scale(0.7059) translate(-50 -50)"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(72 62) scale(0.3676) translate(-50 -50)"/></svg><span style="font-family:Inter, sans-serif;font-size:16px;font-weight:600;letter-spacing:-0.02em">Galaxy Farm</span></div><span style="width:8px;height:8px;border-radius:50%;background:#3f6b4a"></span></div><div style="flex:1;position:relative;overflow:hidden">
+    <div style="position:absolute;inset:0;padding:14px;display:flex;flex-direction:column;gap:12px;
+                filter:blur(1.5px);opacity:.45">
+      <div style="font-size:27px;font-weight:600;letter-spacing:-0.025em">Herd</div>
+      <div style="height:44px;background:#ffffff;border:1px solid #d7dade;
+                  border-radius:10px"></div>
+      <div style="height:60px;background:#ffffff;border:1px solid #d7dade;
+                  border-radius:10px"></div>
+      <div style="height:60px;background:#ffffff;border:1px solid #d7dade;
+                  border-radius:10px"></div>
+    </div>
+    <div style="position:absolute;inset:0;background:#14171b44"></div>
+
+    <div style="position:absolute;left:0;right:0;bottom:0;background:#ffffff;
+                border-top:1px solid #d7dade;border-radius:16px 16px 0 0;padding:10px 16px 18px;
+                box-shadow:0 -12px 34px -14px rgb(0 0 0/32%);display:flex;flex-direction:column;
+                gap:14px">
+      <div style="width:38px;height:4px;border-radius:2px;background:#d7dade;
+                  margin:0 auto 2px"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:19px;font-weight:600;letter-spacing:-0.02em">Log a weight</span>
+        <span style="font-size:13px;color:#1b3a5c;font-weight:500">Cancel</span></div>
+
+      <div style="display:flex;align-items:center;gap:11px;padding:11px 12px;
+                  background:#f5f6f8;border:1px solid #d7dade;border-radius:10px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:2px;background:#c0392b;color:#ffffff;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;font-weight:700;flex:none">4</span>
+        <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:600">Juniper</div>
+        <div style="font-size:11.5px;color:#525860">Tag 118 &#183; last 1,092 lb on 10 Jul</div></div>
+        <span style="font-size:13px;color:#1b3a5c;font-weight:500">Change</span></div>
+
+      <div style="text-align:center;padding:4px 0 2px">
+        <div style="font-size:11px;color:#525860;margin-bottom:2px">Weight</div>
+        <div style="font-size:44px;font-weight:600;letter-spacing:-0.03em;
+                    font-variant-numeric:tabular-nums">1,184<span
+          style="font-size:19px;color:#525860;font-weight:400"> lb</span></div>
+        <div style="font-size:12px;color:#3f6b4a;margin-top:3px">+92 lb since July &#183; 1.88 lb/day</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="height:52px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #d7dade;border-radius:10px;font-family:Inter, sans-serif;font-size:21px;font-weight:500;font-variant-numeric:tabular-nums">1</div><div style="height:52px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #d7dade;border-radius:10px;font-family:Inter, sans-serif;font-size:21px;font-weight:500;font-variant-numeric:tabular-nums">2</div><div style="height:52px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #d7dade;border-radius:10px;font-family:Inter, sans-serif;font-size:21px;font-weight:500;font-variant-numeric:tabular-nums">3</div><div style="height:52px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #d7dade;border-radius:10px;font-family:Inter, sans-serif;font-size:21px;font-weight:500;font-variant-numeric:tabular-nums">4</div><div style="height:52px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #d7dade;border-radius:10px;font-family:Inter, sans-serif;font-size:21px;font-weight:500;font-variant-numeric:tabular-nums">5</div><div style="height:52px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #d7dade;border-radius:10px;font-family:Inter, sans-serif;font-size:21px;font-weight:500;font-variant-numeric:tabular-nums">6</div><div style="height:52px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #d7dade;border-radius:10px;font-family:Inter, sans-serif;font-size:21px;font-weight:500;font-variant-numeric:tabular-nums">7</div><div style="height:52px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #d7dade;border-radius:10px;font-family:Inter, sans-serif;font-size:21px;font-weight:500;font-variant-numeric:tabular-nums">8</div><div style="height:52px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #d7dade;border-radius:10px;font-family:Inter, sans-serif;font-size:21px;font-weight:500;font-variant-numeric:tabular-nums">9</div><div style="height:52px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #d7dade;border-radius:10px;font-family:Inter, sans-serif;font-size:21px;font-weight:500;font-variant-numeric:tabular-nums">.</div><div style="height:52px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #d7dade;border-radius:10px;font-family:Inter, sans-serif;font-size:21px;font-weight:500;font-variant-numeric:tabular-nums">0</div><div style="height:52px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #d7dade;border-radius:10px;font-family:Inter, sans-serif;font-size:21px;font-weight:500;font-variant-numeric:tabular-nums">&#9003;</div></div>
+
+      <div style="height:44px;background:#1b3a5c;color:#ffffff;border-radius:10px;
+                  display:flex;align-items:center;justify-content:center;font-size:16px;
+                  font-weight:600">Save weigh-in</div>
+    </div>
+  </div>
+  <nav style="flex:none;background:#ffffff;border-top:1px solid #d7dade;
+              display:flex;padding-bottom:8px"><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#525860"><span style="font-size:17px;line-height:1">&#9672;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:400">Today</span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#1b3a5c"><span style="font-size:17px;line-height:1">&#10022;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:600">Animals</span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#525860"><span style="font-size:17px;line-height:1">&#9634;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:400">Land</span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#525860"><span style="font-size:17px;line-height:1">&#9881;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:400">Kit</span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:58px;color:#525860"><span style="font-size:17px;line-height:1">&#9671;</span><span style="font-family:Inter, sans-serif;font-size:10px;font-weight:400">Business</span></div></nav>
+</div></div>
+          </div>
+        </div>
+      </figure></div>
+  </section>
+  <section class="group">
+    <div class="group-head">
+      <div>
+        <p class="group-dir">Stockman</p>
+        <h2>The barn screen</h2>
+      </div>
+      <p class="group-blurb">Condensed caps, hard rules, 64 px targets, a solid alert band. No navigation: the pen board is the screen, and four things you might do standing in front of it.</p>
+    </div>
+    <div class="views">
+      <figure class="fr s1280">
+        <figcaption>
+          <span class="fr-name">Pen board</span>
+          <span class="fr-surface">Kiosk &#183; Stockman</span>
+          <span class="fr-size">1280 &#215; 800</span>
+        </figcaption>
+        <div class="fr-scroll">
+          <div class="fr-wrap" style="--w:1280px;--h:800px">
+            <div class="fr-inner" style="--w:1280px;--h:800px"><div style="width:1280px;height:800px;background:#f5f6f8;color:#14171b;
+    font-family:'IBM Plex Sans', system-ui, sans-serif;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:none;background:#ffffff;border-bottom:4px solid #14171b;
+              padding:18px 24px;display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:18px">
+      <svg viewBox="0 0 100 100" width="52" height="52" aria-hidden="true" style="flex:none;display:block"><path d="M12 78 Q50 98 88 78" fill="none" stroke="#1b3a5c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(40 42) scale(0.7059) translate(-50 -50)"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(72 62) scale(0.3676) translate(-50 -50)"/></svg>
+      <div><div style="font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:46px;font-weight:600;text-transform:uppercase;
+                       letter-spacing:.015em;line-height:1">Pen board</div>
+      <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:17px;color:#525860;margin-top:4px">
+        Thursday 13 August &#183; 6:42 am</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:11px">
+      <span style="width:14px;height:14px;border-radius:50%;background:#3f6b4a"></span>
+      <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:19px;color:#525860">Up to date</span></div>
+  </div>
+
+  <div style="flex:none;background:#a8321f;color:#fff;padding:15px 24px;display:flex;
+              align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:20px">
+      <span style="font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:36px;font-weight:700;text-transform:uppercase;
+                   letter-spacing:.04em">Calving watch</span>
+      <span style="font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:36px;font-weight:600;
+                   text-transform:uppercase">Juniper &#183; 118</span></div>
+    <span style="font-variant-numeric:tabular-nums;font-size:31px;font-weight:700">Day 279 / 283</span>
+  </div>
+
+  <div style="flex:1;padding:24px;display:flex;gap:20px;min-height:0"><div style="flex:1;background:#ffffff;border:2px solid #14171b;border-left:10px solid #a8321f;padding:18px 20px;display:flex;flex-direction:column;gap:11px;min-width:0"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:38px;font-weight:600;text-transform:uppercase;letter-spacing:.015em;line-height:1">North Trap</span><span style="display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:2px;background:#c0392b;color:#ffffff;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:26px;font-weight:700;flex:none">4</span></div><div style="font-family:'IBM Plex Mono', monospace;font-size:17px;color:#525860">2 HEAD</div><div style="margin-top:auto;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;color:#525860">Juniper &#183; Calf 214</div></div><div style="flex:1;background:#ffffff;border:2px solid #14171b;border-left:10px solid #3f6b4a;padding:18px 20px;display:flex;flex-direction:column;gap:11px;min-width:0"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:38px;font-weight:600;text-transform:uppercase;letter-spacing:.015em;line-height:1">Creek Pen</span><span style="display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:2px;background:#3f8f4f;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:26px;font-weight:700;flex:none">2</span></div><div style="font-family:'IBM Plex Mono', monospace;font-size:17px;color:#525860">3 HEAD</div><div style="margin-top:auto;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;color:#525860">Juniper &#183; Calf 214</div></div><div style="flex:1;background:#ffffff;border:2px solid #14171b;border-left:10px solid #3f6b4a;padding:18px 20px;display:flex;flex-direction:column;gap:11px;min-width:0"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:38px;font-weight:600;text-transform:uppercase;letter-spacing:.015em;line-height:1">South Trap</span><span style="display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:2px;background:#3f8f4f;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:26px;font-weight:700;flex:none">2</span></div><div style="font-family:'IBM Plex Mono', monospace;font-size:17px;color:#525860">4 HEAD</div><div style="margin-top:auto;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;color:#525860">Juniper &#183; Calf 214</div></div><div style="flex:1;background:#ffffff;border:2px solid #14171b;border-left:10px solid #bc811c;padding:18px 20px;display:flex;flex-direction:column;gap:11px;min-width:0"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:38px;font-weight:600;text-transform:uppercase;letter-spacing:.015em;line-height:1">Barn Stall</span><span style="display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:2px;background:#bc811c;color:#111111;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:26px;font-weight:700;flex:none">3</span></div><div style="font-family:'IBM Plex Mono', monospace;font-size:17px;color:#525860">1 HEAD</div><div style="margin-top:auto;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;color:#525860">Juniper &#183; Calf 214</div></div></div>
+  <div style="flex:none;padding:0 24px 24px;display:flex;gap:20px"><div style="flex:1;height:80px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #1b3a5c;color:#1b3a5c;font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:29px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Log weight</div><div style="flex:1;height:80px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #1b3a5c;color:#1b3a5c;font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:29px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Treatment</div><div style="flex:1;height:80px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #1b3a5c;color:#1b3a5c;font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:29px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Move animal</div><div style="flex:1;height:80px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #1b3a5c;color:#1b3a5c;font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:29px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Eggs</div></div>
+</div></div>
+          </div>
+        </div>
+      </figure>
+      <figure class="fr s1280">
+        <figcaption>
+          <span class="fr-name">Weight entry</span>
+          <span class="fr-surface">Kiosk &#183; Stockman</span>
+          <span class="fr-size">1280 &#215; 800</span>
+        </figcaption>
+        <div class="fr-scroll">
+          <div class="fr-wrap" style="--w:1280px;--h:800px">
+            <div class="fr-inner" style="--w:1280px;--h:800px"><div style="width:1280px;height:800px;background:#f5f6f8;color:#14171b;
+    font-family:'IBM Plex Sans', system-ui, sans-serif;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:none;background:#ffffff;border-bottom:4px solid #14171b;
+              padding:16px 24px;display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:18px">
+      <span style="border:2px solid #d7dade;color:#525860;font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:20px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 10px;white-space:nowrap;display:inline-block">&#8592; Back</span>
+      <span style="font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:44px;font-weight:600;text-transform:uppercase;
+                   letter-spacing:.015em;line-height:1">Log weight</span></div>
+    <span style="background:#a8321f;color:#fff;font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:20px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 10px;white-space:nowrap;display:inline-block">Level 4</span>
+  </div>
+
+  <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:24px;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+      <div style="background:#ffffff;border:3px solid #14171b;padding:20px 22px;
+                  display:flex;align-items:center;gap:18px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:2px;background:#c0392b;color:#ffffff;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:32px;font-weight:700;flex:none">4</span>
+        <div style="min-width:0">
+          <div style="font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:42px;font-weight:600;text-transform:uppercase;
+                      line-height:1">Juniper</div>
+          <div style="font-family:'IBM Plex Mono', monospace;font-size:17px;color:#525860;margin-top:5px">
+            TAG 118 &#183; NORTH TRAP</div></div>
+      </div>
+
+      <div style="background:#ffffff;border:3px solid #1b3a5c;padding:24px;
+                  flex:1;display:flex;flex-direction:column;justify-content:center;
+                  align-items:center;gap:8px">
+        <div style="font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:22px;font-weight:600;letter-spacing:.09em;
+                    text-transform:uppercase;color:#525860">Weight</div>
+        <div style="font-size:92px;font-weight:600;letter-spacing:-0.03em;line-height:1;
+                    font-variant-numeric:tabular-nums">1,184</div>
+        <div style="font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:26px;font-weight:600;text-transform:uppercase;
+                    color:#525860">pounds</div>
+        <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:19px;color:#3f6b4a;margin-top:6px">
+          +92 lb since 10 July &#183; 1.88 lb/day</div>
+      </div>
+
+      <div style="display:flex;gap:20px">
+        <div style="flex:1;height:80px;display:flex;align-items:center;justify-content:center;
+                    background:#ffffff;border:3px solid #d7dade;color:#525860;
+                    font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;font-size:29px;font-weight:600;text-transform:uppercase;
+                    letter-spacing:.05em">Cancel</div>
+        <div style="flex:2;height:80px;display:flex;align-items:center;justify-content:center;
+                    background:#1b3a5c;color:#ffffff;font-family:'Barlow Condensed', 'Arial Narrow', 'Liberation Sans Narrow', sans-serif;
+                    font-size:29px;font-weight:600;text-transform:uppercase;
+                    letter-spacing:.05em">Save weigh-in</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-content:start">
+      <div style="height:88px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:40px;font-weight:600;font-variant-numeric:tabular-nums">7</div><div style="height:88px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:40px;font-weight:600;font-variant-numeric:tabular-nums">8</div><div style="height:88px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:40px;font-weight:600;font-variant-numeric:tabular-nums">9</div><div style="height:88px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:40px;font-weight:600;font-variant-numeric:tabular-nums">4</div><div style="height:88px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:40px;font-weight:600;font-variant-numeric:tabular-nums">5</div><div style="height:88px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:40px;font-weight:600;font-variant-numeric:tabular-nums">6</div><div style="height:88px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:40px;font-weight:600;font-variant-numeric:tabular-nums">1</div><div style="height:88px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:40px;font-weight:600;font-variant-numeric:tabular-nums">2</div><div style="height:88px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:40px;font-weight:600;font-variant-numeric:tabular-nums">3</div><div style="height:88px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:40px;font-weight:600;font-variant-numeric:tabular-nums">0</div><div style="height:88px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:40px;font-weight:600;font-variant-numeric:tabular-nums">00</div><div style="height:88px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:3px solid #14171b;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:40px;font-weight:600;font-variant-numeric:tabular-nums">&#9003;</div></div>
+  </div>
+</div></div>
+          </div>
+        </div>
+      </figure></div>
+  </section>
+  <section class="group">
+    <div class="group-head">
+      <div>
+        <p class="group-dir">Herd Book</p>
+        <h2>The customer portal</h2>
+      </div>
+      <p class="group-blurb">The surface that has to sell something. A boarding client checking their calf's growth, their invoices and their paperwork &#8212; the screen where &#8220;professional&#8221; turns into money.</p>
+    </div>
+    <div class="views">
+      <figure class="fr s1280">
+        <figcaption>
+          <span class="fr-name">Customer portal</span>
+          <span class="fr-surface">Desktop &#183; Herd Book</span>
+          <span class="fr-size">1280 &#215; 900</span>
+        </figcaption>
+        <div class="fr-scroll">
+          <div class="fr-wrap" style="--w:1280px;--h:900px">
+            <div class="fr-inner" style="--w:1280px;--h:900px"><div style="width:1280px;height:900px;background:#f5f6f8;color:#14171b;
+    font-family:'IBM Plex Sans', system-ui, sans-serif;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:none;background:#ffffff;border-bottom:1px solid #d7dade;
+              padding:16px 40px;display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:12px"><svg viewBox="0 0 100 100" width="32" height="32" aria-hidden="true" style="flex:none;display:block"><path d="M12 78 Q50 98 88 78" fill="none" stroke="#1b3a5c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(40 42) scale(0.7059) translate(-50 -50)"/><polygon points="50,16 57.94,39.08 82.34,39.49 62.84,54.17 69.99,77.51 50,63.5 30.01,77.51 37.16,54.17 17.66,39.49 42.06,39.08" fill="#14171b" stroke="#14171b" stroke-width="5" stroke-linejoin="round" transform="translate(72 62) scale(0.3676) translate(-50 -50)"/></svg>
+      <span style="font-family:'Source Serif 4', Georgia, serif;font-size:20px;font-weight:600">Galaxy Farm</span>
+      <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#525860;
+                   border-left:1px solid #d7dade;padding-left:12px;margin-left:4px">
+        Show Calf Program</span></div>
+    <div style="display:flex;align-items:center;gap:22px">
+      <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">My calves</span>
+      <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Invoices</span>
+      <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Forms</span>
+      <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#14171b;font-weight:600">
+        Sarah Whitfield</span></div>
+  </div>
+
+  <div style="flex:1;padding:34px 40px;display:flex;flex-direction:column;gap:24px;
+              max-width:1080px;width:100%;margin:0 auto;min-height:0">
+    <div>
+      <div style="font-family:'Source Serif 4', Georgia, serif;font-size:34px;font-weight:600;letter-spacing:-0.02em">
+        Your calf, Ember</div>
+      <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:15px;color:#525860;margin-top:5px">
+        Boarding since 3 March &#183; Fort Worth Stock Show program</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:24px;flex:1;min-height:0">
+      <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+        <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                    padding:20px 22px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;
+                      margin-bottom:14px">
+            <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Growth</div>
+            <div style="display:flex;align-items:baseline;gap:14px">
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:12.5px;color:#525860">
+                Average daily gain</span>
+              <span style="font-family:'Source Serif 4', Georgia, serif;font-size:20px;font-weight:600;
+                           font-variant-numeric:tabular-nums">1.88 <span style="font-size:12px;
+                color:#525860;font-family:'IBM Plex Sans', system-ui, sans-serif;font-weight:400">lb/day</span></span></div>
+          </div>
+          <svg viewBox="0 0 600 200" width="100%" height="200" role="img"
+     aria-label="Weigh-ins from October to August, 612 lb rising to 1,184 lb">
+  <line x1="46" y1="164.6" x2="516" y2="164.6" stroke="#d7dade" stroke-width="1"/><text x="37" y="168.1" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">600</text><line x1="46" y1="117.5" x2="516" y2="117.5" stroke="#d7dade" stroke-width="1"/><text x="37" y="121.0" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">800</text><line x1="46" y1="70.5" x2="516" y2="70.5" stroke="#d7dade" stroke-width="1"/><text x="37" y="74.0" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">1000</text><line x1="46" y1="23.4" x2="516" y2="23.4" stroke="#d7dade" stroke-width="1"/><text x="37" y="26.9" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">1200</text>
+  <polygon points="46,174 46.0,161.8 104.8,144.8 163.5,133.8 222.2,118.0 281.0,104.4 339.8,89.1 398.5,69.5 457.2,48.8 516.0,27.2 516,174" fill="#1b3a5c" opacity="0.07"/>
+  <polyline points="46.0,161.8 104.8,144.8 163.5,133.8 222.2,118.0 281.0,104.4 339.8,89.1 398.5,69.5 457.2,48.8 516.0,27.2" fill="none" stroke="#1b3a5c" stroke-width="2"
+            stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="46.0" cy="161.8" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="104.8" cy="144.8" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="163.5" cy="133.8" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="222.2" cy="118.0" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="281.0" cy="104.4" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="339.8" cy="89.1" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="398.5" cy="69.5" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="457.2" cy="48.8" r="3" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/><circle cx="516.0" cy="27.2" r="4.5" fill="#1b3a5c" stroke="#ffffff" stroke-width="2"/>
+  <text x="526.0" y="21.2" font-family="'Source Serif 4', Georgia, serif" font-size="15"
+        font-weight="600" fill="#14171b">1,184 lb</text>
+  <text x="526.0" y="36.2" font-family="'IBM Plex Sans', system-ui, sans-serif" font-size="10"
+        fill="#525860">latest</text>
+  <text x="46.0" y="192" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">12 Oct</text><text x="281.0" y="192" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">15 Mar</text><text x="516.0" y="192" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#525860">12 Aug</text>
+</svg>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                    padding:20px 22px;flex:1">
+          <div style="display:flex;align-items:center;justify-content:space-between;
+                      margin-bottom:12px"><div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Invoices</div>
+            <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:13px;color:#1b3a5c">All invoices</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse"><tr style="border-bottom:1px solid #d7dade"><td style="padding:9px 0;font-family:'IBM Plex Mono', monospace;font-size:12px;color:#525860">1 Aug</td><td style="padding:9px 12px;font-family:'IBM Plex Mono', monospace;font-size:12.5px">INV-0142</td><td style="padding:9px 12px;text-align:right;font-family:'Source Serif 4', Georgia, serif;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums">$1,850.00</td><td style="padding:9px 0;text-align:right"><span style="border:1px solid #3f6b4a;color:#3f6b4a;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Paid</span></td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:9px 0;font-family:'IBM Plex Mono', monospace;font-size:12px;color:#525860">1 Jul</td><td style="padding:9px 12px;font-family:'IBM Plex Mono', monospace;font-size:12.5px">INV-0131</td><td style="padding:9px 12px;text-align:right;font-family:'Source Serif 4', Georgia, serif;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums">$1,850.00</td><td style="padding:9px 0;text-align:right"><span style="border:1px solid #3f6b4a;color:#3f6b4a;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Paid</span></td></tr><tr style="border-bottom:1px solid #d7dade"><td style="padding:9px 0;font-family:'IBM Plex Mono', monospace;font-size:12px;color:#525860">1 Jun</td><td style="padding:9px 12px;font-family:'IBM Plex Mono', monospace;font-size:12.5px">INV-0119</td><td style="padding:9px 12px;text-align:right;font-family:'Source Serif 4', Georgia, serif;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums">$1,850.00</td><td style="padding:9px 0;text-align:right"><span style="border:1px solid #3f6b4a;color:#3f6b4a;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Paid</span></td></tr></table>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+        <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                    padding:20px 22px">
+          <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">This week</div>
+          <div style="display:flex;flex-direction:column;gap:11px;margin-top:12px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Current weight</span>
+              <span style="font-family:'Source Serif 4', Georgia, serif;font-size:19px;font-weight:600;
+                           font-variant-numeric:tabular-nums">1,184 lb</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Rinsed and worked</span>
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">6 of 7 days</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px;color:#525860">Next show</span>
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Fort Worth &#183; 19 Jan</span></div>
+          </div>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                    padding:20px 22px">
+          <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Paperwork</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Liability waiver</span>
+              <span style="border:1px solid #3f6b4a;color:#3f6b4a;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Signed</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Boarding agreement</span>
+              <span style="border:1px solid #3f6b4a;color:#3f6b4a;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Signed</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:14px">Health certificate</span>
+              <span style="border:1px solid #a8321f;color:#a8321f;font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;display:inline-block">Due 4 Sep</span></div>
+          </div>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #d7dade;border-radius:3px;
+                    padding:20px 22px;flex:1">
+          <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Pedigree</div>
+          <div style="margin-top:12px"><div style="display:flex;flex-direction:column;gap:9px">
+  <div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+      <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Sire</div><span style="flex:1;height:1px;background:#d7dade"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:5px;align-items:stretch">
+      <div style="display:flex"><div style="border:1px solid #d7dade;background:#ffffff;padding:9px 11px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:14px;font-weight:600;color:#14171b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ridgeline Monarch</div><div style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">MA 4471882</div></div></div>
+      <div style="display:grid;grid-template-rows:auto auto;gap:5px">
+        <div style="border:1px solid #d7dade;background:#ffffff;padding:7px 11px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:12.5px;font-weight:600;color:#14171b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Monarch's Legacy</div><div style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">MA 4102336</div></div><div style="border:1px solid #d7dade;background:#ffffff;padding:7px 11px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:12.5px;font-weight:600;color:#14171b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Cedar Hill Ruby</div><div style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">MA 4188907</div></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+      <div style="font-family:'IBM Plex Sans', system-ui, sans-serif;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#525860;line-height:1.2">Dam</div><span style="flex:1;height:1px;background:#d7dade"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:5px;align-items:stretch">
+      <div style="display:flex"><div style="border:1px solid #d7dade;background:#ffffff;padding:9px 11px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:14px;font-weight:600;color:#14171b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Galaxy Farm Willow</div><div style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">MA 4520114</div></div></div>
+      <div style="display:grid;grid-template-rows:auto auto;gap:5px">
+        <div style="border:1px solid #d7dade;background:#ffffff;padding:7px 11px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:12.5px;font-weight:600;color:#14171b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bar-K Foundation</div><div style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">MA 4009551</div></div><div style="border:1px solid #d7dade;background:#ffffff;padding:7px 11px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0"><div style="font-family:'Source Serif 4', Georgia, serif;font-size:12.5px;font-weight:600;color:#14171b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Willow Creek Belle</div><div style="font-family:'IBM Plex Mono', monospace;font-size:9.5px;color:#525860">MA 4233780</div></div>
+      </div>
+    </div>
+  </div>
+</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></div>
+          </div>
+        </div>
+      </figure></div>
+  </section>
+
+<section class="group">
+  <div class="group-head">
+    <div><p class="group-dir">What to look for</p><h2>Judging it</h2></div>
+    <p class="group-blurb">Four places a palette usually gives itself away, and
+    where to find each on this page.</p>
+  </div>
+  <div class="col stack">
+    <ul style="margin:0;padding-left:21px;display:flex;flex-direction:column;gap:10px">
+      <li style="font-size:16px;line-height:1.55"><b>The safety chips against the
+      primary.</b> On the herd list and the animal detail header they sit inches
+      apart. If the primary ever reads as a safety level, it shows there first.</li>
+      <li style="font-size:16px;line-height:1.55"><b>The error state on the edit
+      form.</b> Alert red has to beat the primary for attention without the two
+      fighting. Two fields are deliberately in error.</li>
+      <li style="font-size:16px;line-height:1.55"><b>The kiosk alert band.</b> The
+      only large saturated fill in the product. It is the loudest the palette
+      ever gets.</li>
+      <li style="font-size:16px;line-height:1.55"><b>The customer portal.</b> The
+      one surface a stranger judges. If the palette reads as a hobby anywhere, it
+      reads that way here.</li>
+    </ul>
+    <div class="callout">
+      <p>The safety ramp is identical on all three of these pages and outside
+      every palette, exactly as &#167;8 requires &#8212; including the amber corrected to
+      <code>#BC811C</code> so it clears 3.0 against a light ground.</p>
+    </div>
+  </div>
+
+  <p class="foot">
+    These are compositions, not a running app. They settle how the palette
+    behaves across surfaces, states and densities, which is what the choice
+    turns on &#8212; but the weight chart's crosshair, the sheet's drag, and the tab
+    strip's keyboard behaviour are all real work that these pages only imply.
+  </p>
+</section>
+
+</div>
+</body></html>
