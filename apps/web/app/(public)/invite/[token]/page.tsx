@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Card, Logomark } from "@galaxy-farm/ui";
 
 import { InviteForm } from "@/app/(public)/invite/[token]/invite-form";
+import { classifyDatabaseFailure } from "@/lib/database-failure";
 import { withDeadline } from "@/lib/deadline";
 import { findPendingInvitation, type PendingInvitation } from "@/lib/user-store";
 
@@ -29,7 +30,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   const { token } = await params;
 
   let invitation: PendingInvitation | undefined;
-  let unreachable = false;
+  let unreachable: string | undefined;
 
   try {
     invitation = await withDeadline(
@@ -38,7 +39,10 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     );
   } catch (error) {
     console.error("[invite:lookup]", error);
-    unreachable = true;
+    // Said in whichever of the four ways it actually failed. None of it is a
+    // leak: it describes us, not the token, and somebody holding a URL learns
+    // nothing about whether it was ever real.
+    unreachable = classifyDatabaseFailure(error).message;
   }
 
   const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? "Galaxy Farm";
@@ -50,12 +54,13 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         <h1 className="font-heading text-2xl font-semibold text-ink">{farmName}</h1>
       </div>
 
-      {unreachable ? (
+      {unreachable !== undefined ? (
         <Card title="Cannot check that link right now" className="w-full max-w-sm">
           <p className="text-density text-ink">
-            Something at our end is not answering. Your link is probably fine — try again in a few
-            minutes before asking for another.
+            Your link is probably fine — this is something at our end. Try again in a few minutes
+            before asking for another.
           </p>
+          <p className="mt-density text-sm text-muted">{unreachable}</p>
         </Card>
       ) : invitation === undefined ? (
         <Card title="This link does not work" className="w-full max-w-sm">

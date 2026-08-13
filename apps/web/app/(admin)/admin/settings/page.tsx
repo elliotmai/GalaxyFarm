@@ -5,6 +5,7 @@ import { can } from "@galaxy-farm/core";
 import { SettingsScreen } from "@/app/(admin)/admin/settings/_components/settings-screen";
 import type { PersonRow } from "@/app/(admin)/admin/settings/_components/people-screen";
 import { currentActor } from "@/lib/auth";
+import { classifyDatabaseFailure } from "@/lib/database-failure";
 import { withDeadline } from "@/lib/deadline";
 import { listDeletedUsers, listUsers } from "@/lib/user-store";
 
@@ -42,7 +43,7 @@ export default async function AdminSettingsPage() {
 
   let people: readonly PersonRow[] = [];
   let deleted: readonly PersonRow[] = [];
-  let unavailable: string | undefined;
+  let unavailable: { message: string; retryable: boolean } | undefined;
 
   if (mayManagePeople) {
     try {
@@ -54,8 +55,12 @@ export default async function AdminSettingsPage() {
       // Logged, because a page that renders an apology and records nothing can
       // only be diagnosed by reproducing it.
       console.error("[settings:people]", error);
-      unavailable =
-        "Could not reach the database, so the list of people is not here. Everything else on this page is read from this device and is unaffected.";
+
+      // Which way it failed decides what to tell somebody to do about it. One
+      // sentence for all four was what this used to have, and "could not reach
+      // the database" is a wrong answer to three of them.
+      const failure = classifyDatabaseFailure(error);
+      unavailable = { message: failure.message, retryable: failure.retryable };
     }
   }
 

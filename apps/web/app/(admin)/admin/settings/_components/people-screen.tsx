@@ -114,8 +114,8 @@ export function PeopleScreen({
   readonly people: readonly PersonRow[];
   readonly deleted: readonly PersonRow[];
   readonly actorId: Ulid;
-  /** Set when the database could not be reached, so the list is not the truth. */
-  readonly unavailable?: string | undefined;
+  /** Set when the list could not be read, so what is shown is not the truth. */
+  readonly unavailable?: { readonly message: string; readonly retryable: boolean } | undefined;
 }) {
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
@@ -357,13 +357,27 @@ export function PeopleScreen({
         }
       >
         {unavailable === undefined ? null : (
-          <Callout tone="danger" title="The list of people is not here">
+          <Callout
+            tone="danger"
+            title="The list of people is not here"
+            actions={
+              unavailable.retryable ? (
+                <Button onClick={() => window.location.reload()}>Try again</Button>
+              ) : undefined
+            }
+          >
             {/*
               Empty and "could not be read" look identical, and one of them
-              would have somebody adding an account that already exists. Said
-              plainly, and every button that would act on the list is off.
+              would have somebody adding an account that already exists. So it
+              is said plainly, every button that would act on the list is off,
+              and the message names which of the four ways it failed — waking,
+              schema behind, not configured, unreachable — because they want
+              different things done about them.
             */}
-            <p>{unavailable}</p>
+            <p>{unavailable.message}</p>
+            <p className="mt-2">
+              Everything else on this page is read from this device and is unaffected.
+            </p>
           </Callout>
         )}
         {link === undefined ? null : (

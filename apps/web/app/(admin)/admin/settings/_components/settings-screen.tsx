@@ -35,8 +35,8 @@ export function SettingsScreen({
   readonly people: readonly PersonRow[];
   readonly deleted: readonly PersonRow[];
   readonly mayManagePeople: boolean;
-  /** Why the people list is missing, when it is. */
-  readonly unavailable?: string | undefined;
+  /** Why the people list is missing, when it is, and whether to offer a retry. */
+  readonly unavailable?: { readonly message: string; readonly retryable: boolean } | undefined;
 }) {
   const tabs = [
     ...(mayManagePeople

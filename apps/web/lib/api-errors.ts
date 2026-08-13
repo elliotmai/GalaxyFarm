@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { describeDrift, schemaDrift } from "@galaxy-farm/infra-db";
 
 import { database } from "@/lib/credential-store";
+import { SCHEMA_CODES, sqlState } from "@/lib/database-failure";
 
 /**
  * What to say when a sync request fails (spec §4.2).
@@ -17,15 +18,6 @@ import { database } from "@/lib/credential-store";
  * answers the first question somebody will ask, which is always "what do I do
  * about it".
  */
-
-/** Postgres errors carry a five-character SQLSTATE; ours do not. */
-function sqlState(error: unknown): string | undefined {
-  const code = (error as { code?: unknown } | null)?.code;
-  return typeof code === "string" && /^[0-9A-Z]{5}$/.test(code) ? code : undefined;
-}
-
-/** `42P01` undefined_table, `42703` undefined_column. */
-const SCHEMA_CODES = new Set(["42P01", "42703"]);
 
 export async function syncErrorResponse(error: unknown, operation: string): Promise<NextResponse> {
   const message = error instanceof Error ? error.message : String(error);
