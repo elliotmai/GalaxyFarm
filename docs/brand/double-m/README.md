@@ -1,105 +1,128 @@
 # Double M — logo concepts
 
-Eight candidate marks for a "Double M" identity, drawn as things you could
-actually have made. Coloured from `packages/config/tailwind.preset.ts`, read in
-the same livestock-brand grammar as the approved **Rocking Double Star**.
+Nine candidate marks for a "Double M" identity, drawn as registrable livestock
+brands rather than as logos that gesture at one. Rules from
+[TSCRA brand design](https://tscra.org/what-we-do/theft-and-law/brand-design/)
+and ordinary iron-making practice; colours from
+`packages/config/tailwind.preset.ts`.
 
-**Status: exploration.** Nothing here is approved and nothing here replaces the
-star mark in `packages/ui/src/brand/`. These are candidates for whenever issue
-[#26](https://github.com/elliotmai/GalaxyFarm/issues/26) settles the farm and
-business names.
+**Status: exploration.** Nothing here is approved and nothing replaces the star
+mark in `packages/ui/src/brand/`. Candidates for whenever issue
+[#26](https://github.com/elliotmai/GalaxyFarm/issues/26) settles the names.
 
-Open **[`concepts.html`](./concepts.html)**. Numbering carries over from the
-earlier sheets, so the gaps are the cuts; the full history — twenty-seven marks,
-then six, then nine — is in git if any of it is wanted back.
+Open **[`concepts.html`](./concepts.html)**. Marks are named in brand grammar —
+modifier first, letter last — rather than by the numbering earlier sheets used.
+The full history is in git.
 
-## An iron is bent bar
+## The correction
 
-This is the fact the earlier sheets got backwards. A branding iron is flat steel
-stock bent into shape, so **every corner is an arc** — flat bar bends, it does not
-fold. A mitred corner isn't a drawing decision, it's a cut and two welds: weaker,
-more expensive, and it burns hotter than the rest of the iron.
+Earlier versions of this sheet got the corners backwards, twice.
 
-Those sheets were organised around a fork between "rounded brand-iron language"
-and the sketches' "sharp mitred language," and treated choosing between them as
-the real decision. Once corners have to be bends, the fork closes. There is one
-language and it is the rounded one. The sharp set were drawings of an iron nobody
-would make.
+**First they drew mitred corners** and called that the buildable language. Flat
+bar bends; it doesn't fold. A mitre is a cut and two welds.
+
+**Then they over-corrected.** Told that sharp corners trap heat, they treated it
+as a *shape* problem and reshaped the letters to avoid sharp corners at all —
+splaying the legs until the M's were 1.6× wider than tall and barely read as
+letters. That produced a derivation, presented confidently, that "a brandable M
+has no vertical strokes." It was an artefact of a 60°-minimum-angle rule that was
+invented rather than looked up.
+
+**The trade solves it with a file.** A sharp corner gets a **¼ inch notch cut
+into the face** so heat vents; the letter keeps its normal shape. M is named
+explicitly in the guidance as a letter that needs this, alongside A, K, V, N, X,
+Y and Z. Closed counters — B, O, R, 8, 6, 9 — get a gap cut for the same reason.
+The notch is cut into the face only; the bar behind stays continuous, so a
+notched corner doesn't make it a second piece of iron.
+
+So these have upright legs and ordinary proportions, with visible breaks at every
+sharp corner and joint — which is what real brands look like up close.
 
 ## The rules
 
-Five constraints, all physical. Every mark is checked against them by
-measurement; the numbers are quoted per mark on the sheet.
+Per 100 units of letter height, so a 4″ character puts 1″ at 25 and ¼″ at 6.25.
 
 | Rule | Value | Because |
 | --- | --- | --- |
-| Bar face | 6.5% of letter height | ¼ inch bar on a 4 inch brand |
-| Bend radius | 1.5 × bar width | flat bar cracks below this |
-| Minimum angle | 60° | an acute crotch pools heat from both arms and blots |
-| Clear space | 2.5 × bar width | the scar spreads to ~1.7× the bar face |
-| Pieces | fewer is better | separate elements need a backing plate and heat unevenly |
+| Reading order | left to right, top to bottom, outside in | joined characters read "connected" |
+| Units | 2 or more, rarely over 3 | simple brands read better and hurt the animal less |
+| Notch | ¼ inch | at every sharp corner and every joint, so heat escapes |
+| Bar face | ¼ to ½ inch | edges slightly rounded; this sheet uses 10% of letter height |
+| Character | 4×3 inch | calves under a year; 6×3½ for grown cattle |
+| Clear space | 1 inch | between characters and between any two parallel lines |
 
-**Bar face was the number the earlier sheets had wrong.** They drew at 16% of
-letter height. At that weight the minimum bend radius swallows the letterform —
-the marks come out as rounded humps rather than M's. At 6.5% they read as letters.
+## The nine
 
-## What the rules do to the letter M
+| Mark | Units | Notches | Ratio |
+| --- | --- | --- | --- |
+| **Rocking Double M** | 3 | 6 | 1.31:1 |
+| **Double M** | 2 | 6 | 1.61:1 |
+| **Bar Double M** | 3 | 6 | 1.46:1 |
+| **Rocking Connected Double M** | 2 | 5 | 1.16:1 |
+| **Connected Double M** | 1 | 5 | 1.39:1 |
+| **Bar Connected Double M** | 2 | 5 | 1.28:1 |
+| **Dropped Double M** | 2 | 6 | 1.32:1 |
+| **Dam and Calf Double M** | 2 | 6 | 1.41:1 |
+| **Lazy Double M** | 2 | 6 | 0.62:1 |
 
-An M's apex is where a leg meets a diagonal, and its angle is
-`leg splay + half the valley angle`. Both the apex and the valley must clear 60°:
+- **Connected Double M** is the cheapest iron and the only single-unit mark — one
+  zigzag of bar plus a welded spur for the shared leg.
+- **Lazy Double M** is the only one taller than wide, so it's the one to look at
+  if a squarish lockup matters.
+- **Bar Double M** buys the tying-together that the rocker gives, for a modifier
+  with no bends in it.
+- **Rocking Double M** stays closest to the approved star mark and costs the most
+  iron.
 
-- Upright legs give a **32° apex**. So **a brandable M has no vertical strokes** —
-  the legs have to splay.
-- Splaying makes it wide: **1.3 to 1.7 times as wide as tall**, depending how the
-  angle budget is spent. A 90° valley with legs splayed only 15° is the cheapest
-  arrangement, and is what everything here uses.
-- **Two of those side by side cannot fit a square box.** Aspect ratios on this
-  sheet run 1.30:1 to 2.68:1.
+## What the rules changed
 
-**The stem in the old number 11 cannot be made.** A bar dropped from the shared
-apex splits it into two 30° crotches, and no size or weight fixes that. Dropping
-the apex instead separates the two M's with no extra stroke and no crotch — which
-is what the original sketch sheet was already reaching for.
+**Fixed the letterforms.** Aspect ratios went from 1.30–2.68:1 to 0.62–1.61:1 —
+which is just what letters look like.
 
-## The eight
+**Killed Overlapped Double M and Double-struck Double M.** Both are *defined* by
+putting strokes close together, and the 1″ minimum between parallel lines rules
+out both. No redrawing saves them.
 
-| # | Mark | Irons | Ratio | Note |
-| --- | --- | --- | --- | --- |
-| 1 | **Rocking Double M** | 3 | 2.08:1 | closest to the approved star mark; most expensive iron |
-| 1a | **Double M** | 2 | 2.68:1 | widest mark here |
-| 11 | **Rocking Connected Double M** | 2 | 1.60:1 | dropped apex in place of the stem |
-| 11a | **Connected Double M** | 1 | 2.02:1 | one bent length, no welds, no backing |
-| 25 | **Overlapped Double M** | 1 | 2.17:1 | tightest overlap the rules permit |
-| 26 | **Double-struck Double M** | 1 | 1.30:1 | squarest mark here |
-| 24 | **Angular, tight** | 1 | 1.85:1 | dam and calf |
-| 27 | **Angular, opened** | 1 | 1.77:1 | two equal M's, second dropped |
+**Killed the "angular" pair.** Those existed only to dodge sharp corners by making
+every stroke a diagonal. With notching, that problem doesn't exist.
 
-**11a is the cheapest iron by a distance** — one length of bar, bent, no welds and
-no backing plate. **26 is the squarest** at 1.30:1, and only because it stacks the
-second strike instead of standing it alongside.
+**Brought back the joined middle leg.** An earlier sheet concluded a stem was
+impossible because it made two 30° crotches. It does — and a notch at that joint
+is the standard answer.
 
-## What the rules took away
-
-**The dam-and-calf contrast.** The calf in 24 can only be 86% of the dam. The bar
-doesn't shrink with the letter, so a smaller M runs out of clear space before it
-looks meaningfully smaller. The dramatic size difference in the original sketch
-isn't available at any scale.
-
-**The square.** Nothing is near 1:1 except 26. If a square icon is a hard
-requirement, that is a requirement to not put two letters side by side.
-
-**Two marks merged.** 1b and 25 resolve to identical geometry once spaced at the
-tightest overlap the clear-space rule allows. Nine went in, eight came out.
+**The dam-and-calf contrast is still capped**, but by clear space rather than by
+angle: the calf is 70% of the dam, as small as it goes before its own valley falls
+under the 1″ minimum.
 
 ## Screen
 
-Held over deliberately. Worth flagging: these are wide, so a 16px square slot
-letterboxes them to about 8px of letter. **None of these is a favicon.**
+Still deliberately secondary. These are much closer to square than the last set,
+so it's less bleak — but the notches are the new question. A ¼″ break is 6% of
+letter height, which at 16px is a fraction of a pixel and will vanish.
 
-A brand that burns and a mark that survives a browser tab are close to opposite
-problems, and this sheet is now solved hard for the first. If both are needed the
-answer is probably two marks — the iron for physical use and signage, a squarer
-derivative for the interface — rather than one mark asked to do both.
+That isn't a fault; a screen mark has no heat to vent. But it means the burned
+brand and the drawn logo are not the same artwork, and a screen version should
+probably close the notches up.
+
+## Checking the geometry
+
+`iron-check.py` builds every mark from its parameters, verifies it against the
+rules, and writes `paths.json` — the path data the sheet uses. Run it to reproduce
+any number quoted in `concepts.html`:
+
+```
+python3 iron-check.py
+```
+
+It reports units, notch count, and the closest approach between any two lines.
+All nine pass.
+
+## Sources
+
+- [TSCRA — How to Design a Brand](https://tscra.org/what-we-do/theft-and-law/brand-design/)
+- [Ownership Identification — Branding Irons](https://www.ownershipid.ca/branding-information/branding-irons)
+- [Livestock Identification Services — Applying Brands](https://lis-ab.com/brands/applying-brands/)
+- [Oklahoma State — Livestock Branding in Oklahoma](https://pods.okstate.edu/fact-sheets/AFS-3255pod2019.pdf)
 
 ## Still to settle
 
@@ -110,26 +133,11 @@ The two shipped files disagree about colour roles:
 - `logomark.tsx` and `rocking-double-star-admin.svg` — stars in `--gf-text`,
   rocker in `--gf-identity`.
 
-So the component and the customer SVG render different marks on a light ground,
-and the brand README's own description matches neither exactly. These concepts
-follow the component: letters take the text colour on midnight and identity
-purple on linen; the rocker takes the second colour.
+These concepts follow the component: letters take the text colour on midnight and
+identity purple on linen; the modifier takes the second colour.
 
 ## If one of these is picked
 
 `concepts.html` is a review sheet, not production art. The chosen mark still needs
 the treatment the star mark got: a `Logomark`-style component reading theme
-tokens, plus the two flat SVGs, living in `packages/ui/src/brand/`.
-
-## Checking the geometry
-
-`iron-check.py` builds every mark from its angle parameters and verifies it against
-the five rules, then writes `paths.json` — the path data the sheet uses. Run it to
-reproduce any number quoted in `concepts.html`:
-
-```
-python3 iron-check.py
-```
-
-It reports the closest approach between any two strokes per mark, or `welded`
-where strokes are meant to touch. All eight pass.
+tokens, plus the two flat SVGs, in `packages/ui/src/brand/`.
