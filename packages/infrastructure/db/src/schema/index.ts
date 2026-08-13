@@ -614,6 +614,14 @@ export const feedingPlans = pgTable(
     name: text("name").notNull(),
     target: text("target").notNull(),
     targetId: text("target_id").notNull(),
+    /** Others eating out of the same bowl — animal-targeted plans only (§5.1). */
+    alsoFeeds: text("also_feeds").array().notNull().default([]),
+    /**
+     * `per_head | shared`. Defaulted, and the default is load-bearing: every
+     * plan written before this column meant per-head, and a NULL read as
+     * "shared" would divide a pen's hay by its headcount.
+     */
+    portion: text("portion").notNull().default("per_head"),
     lines: jsonb("lines")
       .$type<
         {

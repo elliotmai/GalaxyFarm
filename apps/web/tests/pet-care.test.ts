@@ -9,6 +9,8 @@ import {
   currentMedicinesFor,
   describePlanLine,
   feedingLinesFor,
+  nameList,
+  plansFeeding,
 } from "../lib/pet-care.js";
 
 /**
@@ -60,10 +62,17 @@ const plan = (overrides: Partial<FeedingPlan>): FeedingPlan =>
     name: "Rusty's ration",
     target: "animal",
     targetId: RUSTY,
+    alsoFeeds: [],
+    portion: "per_head",
     lines: [line({})],
     active: true,
     ...overrides,
   }) as FeedingPlan;
+
+const pets = [
+  { id: RUSTY, name: "Rusty" },
+  { id: BISCUIT, name: "Biscuit" },
+] as { id: Ulid; name: string }[];
 
 describe("careRecordsFor", () => {
   it("labels care by product, so two shots do not satisfy each other's boosters", () => {
@@ -210,5 +219,63 @@ describe("currentMedicinesFor", () => {
         NOW,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("a bowl two pets share", () => {
+  const bowl = plan({
+    id: id(32),
+    name: "The barn cats",
+    targetId: RUSTY,
+    alsoFeeds: [BISCUIT],
+    portion: "shared",
+  });
+
+  it("shows on both their cards, not just the one it is filed under", () => {
+    expect(plansFeeding(RUSTY, [bowl])).toHaveLength(1);
+    expect(plansFeeding(BISCUIT, [bowl])).toHaveLength(1);
+    expect(plansFeeding(id(9), [bowl])).toEqual([]);
+  });
+
+  it("says whose the amount is, so nobody puts it out twice", () => {
+    // The same line appears on two cards. Without the names, "1 scoop twice a
+    // day" on each is two scoops going into one bowl.
+    expect(feedingLinesFor(RUSTY, [bowl], feeds, pets)).toEqual([
+      "1 scoop of Purina Pro Plan between Rusty and Biscuit, twice a day, morning",
+    ]);
+    expect(feedingLinesFor(BISCUIT, [bowl], feeds, pets)).toEqual([
+      "1 scoop of Purina Pro Plan between Rusty and Biscuit, twice a day, morning",
+    ]);
+  });
+
+  it("says nothing about sharing when the amount is each", () => {
+    const each = plan({ id: id(33), alsoFeeds: [BISCUIT], portion: "per_head" });
+
+    expect(feedingLinesFor(RUSTY, [each], feeds, pets)[0]).not.toContain("between");
+  });
+
+  it("still reads correctly without the names to hand", () => {
+    // A screen that has not got the herd should degrade, not refuse.
+    expect(feedingLinesFor(RUSTY, [bowl], feeds)[0]).toBe(
+      "1 scoop of Purina Pro Plan, twice a day, morning",
+    );
+  });
+
+  it("reads a plan written before the fields existed", () => {
+    const old = { ...plan({}) };
+    delete (old as { alsoFeeds?: unknown }).alsoFeeds;
+    delete (old as { portion?: unknown }).portion;
+
+    expect(plansFeeding(RUSTY, [old])).toHaveLength(1);
+    expect(feedingLinesFor(RUSTY, [old], feeds, pets)[0]).not.toContain("between");
+  });
+});
+
+describe("nameList", () => {
+  it("reads the way somebody would say it", () => {
+    expect(nameList([])).toBe("");
+    expect(nameList(["Rusty"])).toBe("Rusty");
+    expect(nameList(["Rusty", "Biscuit"])).toBe("Rusty and Biscuit");
+    expect(nameList(["Rusty", "Biscuit", "Tig"])).toBe("Rusty, Biscuit and Tig");
   });
 });

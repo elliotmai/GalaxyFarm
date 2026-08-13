@@ -91,7 +91,7 @@ export function GuidePreview({
     ? petBriefings(
         petsOnFarm(animals).map((pet) => ({
           pet,
-          feeding: feedingLinesFor(pet.id, plans, feeds).map((text) => ({ text })),
+          feeding: feedingLinesFor(pet.id, plans, feeds, animals).map((text) => ({ text })),
           medicines: currentMedicinesFor(pet.id, health, now),
         })),
       )

@@ -75,7 +75,11 @@ export function creepPlanSuggestion(
       name: `${feed.name} — creep`,
       target: "animal",
       targetId: birth.animalId,
+      // A creep ration belongs to the calf it is suggested for. Nothing else
+      // is eating out of that creep feeder as far as this record knows.
+      alsoFeeds: [],
       lines: [line],
+      portion: "per_head",
       // Off until the start date arrives, so §5.3 does not count feed against
       // a calf that is still entirely on its dam.
       active: false,

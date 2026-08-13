@@ -22,7 +22,9 @@ import {
 } from "@galaxy-farm/ui";
 import {
   displayName,
+  isShared,
   openAssignments,
+  portionOf,
   FEEDING_FREQUENCIES,
   feedingPlanSchema,
   TIMES_OF_DAY,
@@ -30,6 +32,7 @@ import {
   type FeedingFrequency,
   type FeedingPlan,
   type FeedingPlanLine,
+  type Portion,
   type TimeOfDay,
   type Ulid,
   type Unit,
@@ -342,7 +345,7 @@ export function CattleFeedScreen({
                     plan.name
                   )
                 }
-                subtitle={`${plan.target} · ${describeTarget(plan)}`}
+                subtitle={`${plan.target} · ${describeTarget(plan)}${isShared(plan) ? " · shared, not per head" : ""}`}
                 actions={
                   <Pill tone={plan.active ? "calm" : "neutral"} dot={plan.active}>
                     {plan.active ? "feeding" : "off"}
@@ -597,6 +600,9 @@ function PlanForm({
   const [lines, setLines] = useState<LineDraft[]>(
     plan === undefined ? [blankLine()] : draftFrom(plan),
   );
+  const [portion, setPortion] = useState<Portion>(
+    plan === undefined ? "per_head" : portionOf(plan),
+  );
   const [notes, setNotes] = useState(plan?.specialNotes ?? "");
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -654,6 +660,13 @@ function PlanForm({
         // A group plan targets the property: it is the group every animal on
         // the place belongs to, and `herdDemand` resolves it that way.
         targetId: (target === "group" ? propertyId : targetId) as Ulid,
+        // `alsoFeeds` is for a bowl shared by named animals, which is a pets
+        // shape. Here a shared amount is a *zone* or *group* plan that says
+        // `shared` — one mineral tub in a pen, not one tub per cow.
+        alsoFeeds: [],
+        // An animal plan feeds one animal, so there is nothing to share it
+        // with whatever the control last said.
+        portion: target === "animal" ? ("per_head" as const) : portion,
         lines: written,
         ...(notes.trim() === "" ? {} : { specialNotes: notes.trim() }),
       };
@@ -725,6 +738,26 @@ function PlanForm({
           />
         )}
       </div>
+
+      {target === "animal" ? null : (
+        <Select
+          label="The amounts below are"
+          hint={
+            target === "zone"
+              ? "Per head is the usual reading: 40 lb of hay on a pen of four is 160 lb a day. A mineral tub is the other case — one tub in the pen, however many are in it."
+              : "Per head is the usual reading. Pick shared for the one thing the whole place works through at a fixed rate rather than per animal."
+          }
+          value={portion}
+          onChange={(event) => setPortion(event.target.value as Portion)}
+          options={[
+            { value: "per_head", label: "What each animal gets" },
+            {
+              value: "shared",
+              label: target === "zone" ? "Shared by the zone" : "Shared by the whole group",
+            },
+          ]}
+        />
+      )}
 
       <div className="flex flex-col gap-density">
         {lines.map((line) => (

@@ -1,5 +1,6 @@
 import {
   dailyDemandOf,
+  isShared,
   plansForAnimal,
   type FeedingPlan,
   type Money,
@@ -78,18 +79,60 @@ export function resolvedDemandFor(
   zoneIds: readonly Ulid[],
   groupIds: readonly Ulid[] = [],
 ): Map<Ulid, Quantity> {
-  const resolved = new Map<Ulid, Quantity>();
+  return new Map(
+    [...resolvedRationFor(plans, animalId, zoneIds, groupIds)].map(([feedTypeId, ration]) => [
+      feedTypeId,
+      ration.quantity,
+    ]),
+  );
+}
+
+export interface ResolvedRation {
+  readonly quantity: Quantity;
+  /** The plan that won this feed type for this animal. */
+  readonly planId: Ulid;
+  /**
+   * True when the quantity is the total across everybody the plan covers
+   * rather than what this animal gets.
+   *
+   * Carried out of the resolution rather than looked up again later, because
+   * by the time a caller has a bare quantity the plan it came from is gone —
+   * and that is precisely the fact that decides whether it multiplies by
+   * headcount or divides by it.
+   */
+  readonly shared: boolean;
+}
+
+/**
+ * The same resolution, with the plan each ration came from still attached.
+ *
+ * `resolvedDemandFor` throws that away, which was fine while every plan meant
+ * "each animal gets this". A shared bowl is the case it cannot express: two
+ * cats on one plan resolve to the same quantity, and summing them counts the
+ * bowl twice.
+ */
+export function resolvedRationFor(
+  plans: readonly FeedingPlan[],
+  animalId: Ulid,
+  zoneIds: readonly Ulid[],
+  groupIds: readonly Ulid[] = [],
+): Map<Ulid, ResolvedRation> {
+  const resolved = new Map<Ulid, ResolvedRation>();
 
   // `plansForAnimal` returns group, then zone, then animal — least specific
   // first — so a later plan overwriting an earlier one is precedence working.
   for (const plan of plansForAnimal(plans, animalId, zoneIds, groupIds)) {
+    const shared = isShared(plan);
     for (const [feedTypeId, quantity] of dailyDemandOf(plan)) {
-      resolved.set(feedTypeId, quantity);
+      resolved.set(feedTypeId, { quantity, planId: plan.id, shared });
     }
   }
 
   return resolved;
 }
+
+/** One bowl, one feed. The key a shared ration is counted and split under. */
+const sharedKey = (planId: Ulid, feedTypeId: Ulid) => `${planId}:${feedTypeId}`;
 
 /** An animal, and everything a plan could be targeting it through. */
 export interface DemandScope {
@@ -143,6 +186,14 @@ export function herdDemand(input: {
   const feedById = new Map(input.feeds.map((feed) => [feed.id, feed]));
   const perDay = new Map<Ulid, number>();
   const unconvertible = new Set<Ulid>();
+  /**
+   * Shared bowls already counted.
+   *
+   * The counterweight to "it counts heads": a shared ration is one amount for
+   * everybody on it, so the second cat must not put another cup a day on the
+   * barn. Counted once, on whichever animal reaches it first.
+   */
+  const countedShared = new Set<string>();
 
   for (const animal of input.animals) {
     const groups =
@@ -150,12 +201,19 @@ export function herdDemand(input: {
         ? (animal.groupIds ?? [])
         : [input.propertyId, ...(animal.groupIds ?? [])];
 
-    for (const [feedTypeId, quantity] of resolvedDemandFor(
+    for (const [feedTypeId, ration] of resolvedRationFor(
       input.plans,
       animal.id,
       animal.zoneIds,
       groups,
     )) {
+      const { quantity } = ration;
+      if (ration.shared) {
+        const key = sharedKey(ration.planId, feedTypeId);
+        if (countedShared.has(key)) continue;
+        countedShared.add(key);
+      }
+
       const feed = feedById.get(feedTypeId);
       // A ration for a feed no longer in the catalogue is taken at face value:
       // there is nothing to convert to, and dropping it would understate a
@@ -177,9 +235,15 @@ export function herdDemand(input: {
 /**
  * Split the feed bill across the animals it fed.
  *
- * Each animal's own resolved demand is what it is charged for, so a headcount
- * split falls out naturally: four head on one zone plan each resolve to the
- * same per-head quantity, and nothing has to divide anything.
+ * A per-head ration needs no division: four head on one zone plan each resolve
+ * to the same per-head quantity, and each is charged for what it ate.
+ *
+ * A shared ration is the case that does. One bowl between two cats is one
+ * amount, and each cat carries half of it — so the shares add back up to the
+ * bowl rather than to twice the bowl. The divisor is how many of the animals
+ * *in scope* actually resolve that plan, not how many the plan names: sell one
+ * cat and the survivor picks up the whole bowl, which is what is really
+ * happening in the barn.
  */
 export function allocateFeedCost(input: AllocationInput): AnimalAllocation[] {
   const costCache = new Map<Ulid, Money | undefined>();
@@ -192,22 +256,44 @@ export function allocateFeedCost(input: AllocationInput): AnimalAllocation[] {
 
   const feedById = new Map((input.feeds ?? []).map((feed) => [feed.id, feed]));
 
-  return input.animals.map((animal) => {
-    const groups =
-      input.propertyId === undefined
-        ? (animal.groupIds ?? [])
-        : [input.propertyId, ...(animal.groupIds ?? [])];
-    const perDay = resolvedDemandFor(input.plans, animal.id, animal.zoneIds, groups);
+  const groupsOf = (animal: DemandScope) =>
+    input.propertyId === undefined
+      ? (animal.groupIds ?? [])
+      : [input.propertyId, ...(animal.groupIds ?? [])];
+
+  // Resolved once, up front, because the divisor for a shared bowl is a fact
+  // about the whole set: how many of these animals are eating out of it.
+  const resolved = input.animals.map((animal) => ({
+    animal,
+    rations: resolvedRationFor(input.plans, animal.id, animal.zoneIds, groupsOf(animal)),
+  }));
+
+  const heads = new Map<string, number>();
+  for (const { rations } of resolved) {
+    for (const [feedTypeId, ration] of rations) {
+      if (!ration.shared) continue;
+      const key = sharedKey(ration.planId, feedTypeId);
+      heads.set(key, (heads.get(key) ?? 0) + 1);
+    }
+  }
+
+  return resolved.map(({ animal, rations }) => {
     const quantityByFeedType = new Map<Ulid, number>();
     let cents = 0;
     let complete = true;
 
-    for (const [feedTypeId, ration] of perDay) {
+    for (const [feedTypeId, resolvedRation] of rations) {
+      const { quantity: ration } = resolvedRation;
       const feed = feedById.get(feedTypeId);
       // Priced per purchase unit, so the ration has to be in purchase units
       // before it is multiplied by anything.
-      const daily =
+      const whole =
         feed === undefined ? ration.amount : inFeedUnit(feed, ration.amount, ration.unit);
+      // Never zero — this animal is one of the heads that was counted.
+      const share = resolvedRation.shared
+        ? (heads.get(sharedKey(resolvedRation.planId, feedTypeId)) ?? 1)
+        : 1;
+      const daily = whole === undefined ? undefined : whole / share;
       if (daily === undefined) {
         // No honest quantity means no honest cost, and a bill that quietly
         // leaves an animal's grain out is one somebody gets invoiced under.

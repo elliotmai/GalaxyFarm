@@ -269,6 +269,8 @@ const plan = (over: Partial<FeedingPlan> = {}): FeedingPlan => ({
   name: "Pasture cows",
   target: "zone",
   targetId: id(40),
+  alsoFeeds: [],
+  portion: "per_head",
   active: true,
   lines: [
     {
@@ -661,5 +663,161 @@ describe("costPerHead", () => {
 
   it("does not divide by zero on an empty herd", () => {
     expect(costPerHead([])).toEqual(fromDollars(0));
+  });
+});
+
+// ------------------------------------------------- one bowl, several animals
+
+describe("a ration shared between animals", () => {
+  const KIBBLE = id(4);
+  const kibble: FeedType = {
+    id: KIBBLE,
+    ...base,
+    name: "Cat food",
+    category: "pet",
+    unit: "lb",
+    reorderLeadDays: 3,
+    active: true,
+  };
+
+  const SMOKEY = id(60);
+  const BOOTS = id(61);
+
+  /** One cup each, twice a day — the same numbers, read the other way. */
+  const bowl = (over: Partial<FeedingPlan> = {}): FeedingPlan =>
+    plan({
+      id: id(70),
+      name: "The barn cats",
+      target: "animal",
+      targetId: SMOKEY,
+      alsoFeeds: [BOOTS],
+      portion: "shared",
+      lines: [
+        {
+          feedTypeId: KIBBLE,
+          amount: quantity(0.5, "lb"),
+          frequency: "twice_daily",
+          timeOfDay: "morning",
+        },
+      ],
+      ...over,
+    });
+
+  const cats = [
+    { id: SMOKEY, zoneIds: [] as Ulid[] },
+    { id: BOOTS, zoneIds: [] as Ulid[] },
+  ];
+
+  it("empties the bag once a day, not twice", () => {
+    // The whole point. Two cats eating a pound a day between them is a pound a
+    // day; counted per head it is two, and the reorder alert fires a week
+    // early every week forever.
+    const demand = herdDemand({ plans: [bowl()], feeds: [kibble], animals: cats });
+
+    expect(demand.perDay.get(KIBBLE)).toBeCloseTo(1, 6);
+  });
+
+  it("still counts per head when the plan says each", () => {
+    // The guard on the change: nothing that was written before this existed
+    // may quietly start meaning half as much.
+    const demand = herdDemand({
+      plans: [bowl({ portion: "per_head" })],
+      feeds: [kibble],
+      animals: cats,
+    });
+
+    expect(demand.perDay.get(KIBBLE)).toBeCloseTo(2, 6);
+  });
+
+  it("splits the bill down the middle", () => {
+    const allocations = allocateFeedCost({
+      plans: [bowl()],
+      feeds: [kibble],
+      purchases: [purchase({ feedTypeId: KIBBLE, quantity: 100, unitCost: { cents: 200 } })],
+      animals: cats,
+      days: 10,
+    });
+
+    // Ten pounds between them over ten days, five each at $2 a pound.
+    expect(allocations.map((a) => a.quantityByFeedType.get(KIBBLE))).toEqual([5, 5]);
+    expect(allocations.map((a) => a.cost.cents)).toEqual([1_000, 1_000]);
+  });
+
+  it("adds back up to the bowl rather than to twice the bowl", () => {
+    const allocations = allocateFeedCost({
+      plans: [bowl()],
+      feeds: [kibble],
+      purchases: [purchase({ feedTypeId: KIBBLE, quantity: 100, unitCost: { cents: 200 } })],
+      animals: cats,
+      days: 10,
+    });
+
+    const total = allocations.reduce((sum, a) => sum + (a.quantityByFeedType.get(KIBBLE) ?? 0), 0);
+    expect(total).toBeCloseTo(10, 6);
+  });
+
+  it("gives the survivor the whole bowl when the other cat has gone", () => {
+    // The divisor is who is actually eating, not who the plan names. A cat
+    // that left last month must not still be carrying half the bill.
+    const allocations = allocateFeedCost({
+      plans: [bowl()],
+      feeds: [kibble],
+      purchases: [purchase({ feedTypeId: KIBBLE, quantity: 100, unitCost: { cents: 200 } })],
+      animals: [{ id: SMOKEY, zoneIds: [] }],
+      days: 10,
+    });
+
+    expect(allocations[0]?.quantityByFeedType.get(KIBBLE)).toBeCloseTo(10, 6);
+  });
+
+  it("lets one cat's own plan override the shared bowl, and leaves the other on it", () => {
+    // §5.1's precedence, which does not stop applying because a plan is
+    // shared: a cat on a prescription diet comes off the communal bowl.
+    const prescription = plan({
+      id: id(71),
+      name: "Boots — renal",
+      target: "animal",
+      targetId: BOOTS,
+      alsoFeeds: [],
+      portion: "per_head",
+      lines: [
+        {
+          feedTypeId: KIBBLE,
+          amount: quantity(0.25, "lb"),
+          frequency: "twice_daily",
+          timeOfDay: "morning",
+        },
+      ],
+    });
+
+    const allocations = allocateFeedCost({
+      plans: [bowl(), prescription],
+      feeds: [kibble],
+      purchases: [purchase({ feedTypeId: KIBBLE, quantity: 100, unitCost: { cents: 200 } })],
+      animals: cats,
+      days: 10,
+    });
+
+    // Smokey is the only one left on the bowl, so he carries all of it.
+    expect(allocations[0]?.quantityByFeedType.get(KIBBLE)).toBeCloseTo(10, 6);
+    expect(allocations[1]?.quantityByFeedType.get(KIBBLE)).toBeCloseTo(5, 6);
+  });
+
+  it("does not let one shared plan swallow another's count", () => {
+    const other = bowl({
+      id: id(72),
+      name: "The porch cat",
+      targetId: id(62),
+      alsoFeeds: [],
+    });
+
+    const demand = herdDemand({
+      plans: [bowl(), other],
+      feeds: [kibble],
+      animals: [...cats, { id: id(62), zoneIds: [] }],
+    });
+
+    // A pound for the barn cats, a pound for the porch cat.
+    expect(demand.perDay.get(KIBBLE)).toBeCloseTo(2, 6);
   });
 });

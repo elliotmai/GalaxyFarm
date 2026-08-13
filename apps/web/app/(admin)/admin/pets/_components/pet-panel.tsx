@@ -37,7 +37,7 @@ import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 import { PET_SPECIES, petBriefings, type PetSpecies } from "@galaxy-farm/module-pets";
 
-import { currentMedicinesFor, feedingLinesFor } from "@/lib/pet-care";
+import { currentMedicinesFor, feedingLinesFor, plansFeeding } from "@/lib/pet-care";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -130,7 +130,7 @@ export function PetPanel({
   const briefings = petBriefings(
     pets.map((pet) => ({
       pet,
-      feeding: feedingLinesFor(pet.id, plans, feeds).map((text) => ({ text })),
+      feeding: feedingLinesFor(pet.id, plans, feeds, pets).map((text) => ({ text })),
       medicines: currentMedicinesFor(pet.id, health, now),
       ...(vet === undefined
         ? {}
@@ -235,7 +235,7 @@ export function PetPanel({
 
   async function remove(pet: Animal) {
     const records = health.filter((record) => record.animalId === pet.id).length;
-    const rations = plans.filter((plan) => plan.targetId === pet.id).length;
+    const rations = plansFeeding(pet.id, plans).length;
 
     const confirmed = await confirmDelete({
       // An animal is an aggregate root: everything about it hangs off this

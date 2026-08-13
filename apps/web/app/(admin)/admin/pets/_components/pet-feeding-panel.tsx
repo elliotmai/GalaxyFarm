@@ -20,20 +20,24 @@ import {
 import {
   FEEDING_FREQUENCIES,
   TIMES_OF_DAY,
+  animalsFedBy,
   displayName,
   feedingPlanSchema,
+  isShared,
+  portionOf,
   type Animal,
   type CrudError,
   type FeedingFrequency,
   type FeedingPlan,
   type FeedingPlanLine,
+  type Portion,
   type TimeOfDay,
   type Ulid,
   type Unit,
 } from "@galaxy-farm/core";
 import { FEED_UNITS, type FeedType } from "@galaxy-farm/module-feed";
 
-import { describePlanLine } from "@/lib/pet-care";
+import { describePlanLine, nameList, plansFeeding } from "@/lib/pet-care";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -65,8 +69,10 @@ interface LineDraft {
 }
 
 interface Draft {
-  readonly targetId: string;
+  /** Everybody eating out of this, the one it is filed under first. */
+  readonly fedIds: readonly string[];
   readonly name: string;
+  readonly portion: Portion;
   readonly active: boolean;
   readonly specialNotes: string;
   readonly lines: readonly LineDraft[];
@@ -148,8 +154,9 @@ export function PetFeedingPanel({
   function startAdd(petId: string) {
     setEditing(undefined);
     setDraft({
-      targetId: petId,
+      fedIds: [petId],
       name: `${petName(petId as Ulid)}'s ration`,
+      portion: "per_head",
       active: true,
       specialNotes: "",
       lines: [{ ...BLANK_LINE, feedTypeId: catalogue[0]?.id ?? "" }],
@@ -160,8 +167,9 @@ export function PetFeedingPanel({
   function startEdit(plan: FeedingPlan) {
     setEditing(plan);
     setDraft({
-      targetId: plan.targetId,
+      fedIds: animalsFedBy(plan),
       name: plan.name,
+      portion: portionOf(plan),
       active: plan.active,
       specialNotes: plan.specialNotes ?? "",
       lines: plan.lines.map((line) => ({
@@ -183,10 +191,19 @@ export function PetFeedingPanel({
   }
 
   function fields(source: Draft) {
+    const [first, ...rest] = source.fedIds;
+
     return {
       name: source.name.trim(),
       target: "animal" as const,
-      targetId: source.targetId as Ulid,
+      // The first is arbitrary and the record says so: `animalsFedBy` puts it
+      // back at the head of the list, and every read goes through that rather
+      // than through `targetId`.
+      targetId: (first ?? "") as Ulid,
+      alsoFeeds: rest as Ulid[],
+      // One pet cannot share a bowl with itself, so a single-pet ration is
+      // always per-head whatever the toggle last said.
+      portion: rest.length === 0 ? ("per_head" as const) : source.portion,
       active: source.active,
       specialNotes: source.specialNotes.trim() === "" ? undefined : source.specialNotes.trim(),
       lines: source.lines
@@ -226,6 +243,11 @@ export function PetFeedingPanel({
     if (draft === undefined) return;
     setErrors({});
 
+    if (draft.fedIds.length === 0) {
+      setErrors({ targetId: "Tick at least one pet — a ration nobody eats is not a ration" });
+      return;
+    }
+
     const clash = mixedUnits(draft.lines);
     if (clash !== undefined) {
       setErrors({ lines: clash });
@@ -259,7 +281,7 @@ export function PetFeedingPanel({
       recordName: plan.name,
       entity: "feeding plan",
       dependents: [],
-      consequence: `${petName(plan.targetId)} would have nothing written down, and the housesitter guide would say so.`,
+      consequence: `${nameList(animalsFedBy(plan).map((held) => petName(held)))} would have nothing written down, and the housesitter guide would say so.`,
       action: "Delete",
     });
     if (!confirmed) return;
@@ -300,14 +322,14 @@ export function PetFeedingPanel({
 
       <Section
         title="Rations"
-        description="One plan per pet. Written in the units it is fed in, because that is what somebody follows at six in the morning."
+        description="Written in the units it is fed in, because that is what somebody follows at six in the morning. A bowl two pets share is one ration, and it shows on both their cards."
       >
         {pets.length === 0 ? (
           <EmptyState title="No pets yet" detail="Add a pet before writing what it eats." />
         ) : (
           <CardGrid columns={2}>
             {pets.map((pet) => {
-              const mine = plans.filter((plan) => plan.targetId === pet.id);
+              const mine = plansFeeding(pet.id, plans);
 
               return (
                 <Card
@@ -331,11 +353,18 @@ export function PetFeedingPanel({
                           <span className="flex flex-wrap items-center gap-2">
                             <span className="text-density text-ink">{plan.name}</span>
                             {plan.active ? null : <Pill tone="neutral">paused</Pill>}
+                            {isShared(plan) ? <Pill tone="action">shared bowl</Pill> : null}
                           </span>
                           <ul className="flex flex-col gap-1 text-sm text-muted">
                             {plan.lines.map((line: FeedingPlanLine, index) => (
                               <li key={`${line.feedTypeId}-${index}`}>
-                                {describePlanLine(line, feeds)}
+                                {describePlanLine(
+                                  line,
+                                  feeds,
+                                  isShared(plan)
+                                    ? animalsFedBy(plan).map((held) => petName(held))
+                                    : [],
+                                )}
                               </li>
                             ))}
                           </ul>
@@ -369,7 +398,7 @@ export function PetFeedingPanel({
           size="wide"
           title={
             editing === undefined
-              ? `A ration for ${petName(draft.targetId as Ulid)}`
+              ? `A ration for ${nameList(draft.fedIds.map((held) => petName(held as Ulid)))}`
               : `Editing ${editing.name}`
           }
           description="One line per feed and per time of day. A morning and an evening feed of the same food are two lines."
@@ -392,14 +421,57 @@ export function PetFeedingPanel({
                 error={errors["name"]}
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
               />
-              <Select
-                label="Pet"
-                value={draft.targetId}
-                error={errors["targetId"]}
-                options={pets.map((pet) => ({ value: pet.id, label: displayName(pet) }))}
-                onChange={(event) => setDraft({ ...draft, targetId: event.target.value })}
-              />
             </div>
+
+            <fieldset className="flex flex-col gap-2">
+              <legend className="text-sm font-medium text-ink">Who eats this</legend>
+              <p className="text-sm text-muted">
+                More than one, when they share a bowl. One ration rather than two keeps the amount
+                in one place, so correcting it corrects it for both.
+              </p>
+              <div className="grid grid-cols-2 gap-x-density sm:grid-cols-3">
+                {pets.map((pet) => (
+                  <Checkbox
+                    key={pet.id}
+                    label={displayName(pet)}
+                    checked={draft.fedIds.includes(pet.id)}
+                    onChange={() =>
+                      setDraft({
+                        ...draft,
+                        // Order matters only in that the first is the one the
+                        // record is filed under; keeping the list in the pets'
+                        // own order stops the filing changing under a tick.
+                        fedIds: draft.fedIds.includes(pet.id)
+                          ? draft.fedIds.filter((held) => held !== pet.id)
+                          : pets
+                              .map((held) => held.id)
+                              .filter((id) => id === pet.id || draft.fedIds.includes(id)),
+                      })
+                    }
+                  />
+                ))}
+              </div>
+              {errors["targetId"] === undefined ? null : (
+                <p className="text-sm text-danger">{errors["targetId"]}</p>
+              )}
+              {errors["alsoFeeds"] === undefined ? null : (
+                <p className="text-sm text-danger">{errors["alsoFeeds"]}</p>
+              )}
+            </fieldset>
+
+            {draft.fedIds.length < 2 ? null : (
+              <Select
+                label="The amounts below are"
+                hint="Two cats on one bowl is a combined amount. Read per head it would put twice the food out and run the bag down twice as fast."
+                value={draft.portion}
+                error={errors["portion"]}
+                options={[
+                  { value: "shared", label: `Between all ${draft.fedIds.length} of them` },
+                  { value: "per_head", label: "What each of them gets" },
+                ]}
+                onChange={(event) => setDraft({ ...draft, portion: event.target.value as Portion })}
+              />
+            )}
 
             <fieldset className="flex flex-col gap-density">
               <legend className="text-sm font-medium text-ink">Lines</legend>

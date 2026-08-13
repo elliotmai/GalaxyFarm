@@ -96,7 +96,9 @@ export function SitterScreen({
     ? petBriefings(
         petsOnFarm(view.animals).map((pet) => ({
           pet,
-          feeding: feedingLinesFor(pet.id, view.plans, view.feeds).map((text) => ({ text })),
+          feeding: feedingLinesFor(pet.id, view.plans, view.feeds, view.animals).map((text) => ({
+            text,
+          })),
           medicines: currentMedicinesFor(pet.id, view.petHealth, now),
         })),
       )

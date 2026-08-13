@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  animalsFedBy,
   dailyDemandOf,
   feedingsPerDay,
   feedingPlanSchema,
+  isShared,
   plansForAnimal,
+  portionOf,
   type FeedingPlan,
 } from "../src/entities/feeding-plan.js";
 import { quantity } from "../src/value-objects/quantity.js";
@@ -30,6 +33,8 @@ const plan = (over: Partial<FeedingPlan> = {}): FeedingPlan => ({
   name: "Pasture cows",
   target: "zone",
   targetId: id(2),
+  alsoFeeds: [],
+  portion: "per_head",
   active: true,
   lines: [
     {
@@ -177,5 +182,85 @@ describe("feedingPlanSchema", () => {
 
   it("accepts a complete plan", () => {
     expect(feedingPlanSchema.safeParse(plan()).success).toBe(true);
+  });
+});
+
+describe("a ration shared between animals", () => {
+  const cats = plan({
+    id: id(30),
+    name: "The barn cats",
+    target: "animal",
+    targetId: id(31),
+    alsoFeeds: [id(32)],
+    portion: "shared",
+  });
+
+  it("is found by every animal eating out of it, not just the named one", () => {
+    // The whole point: one bowl, one record, and both cats have to find it or
+    // the second one reads as unfed.
+    expect(plansForAnimal([cats], id(31), [])).toHaveLength(1);
+    expect(plansForAnimal([cats], id(32), [])).toHaveLength(1);
+    expect(plansForAnimal([cats], id(33), [])).toEqual([]);
+  });
+
+  it("names everybody it feeds, the one it is filed under first", () => {
+    expect(animalsFedBy(cats)).toEqual([id(31), id(32)]);
+  });
+
+  it("says a zone plan feeds nobody by name — its population is the zone", () => {
+    expect(animalsFedBy(plan({ target: "zone", targetId: id(21) }))).toEqual([]);
+  });
+
+  it("reads a plan written before the field existed as per-head, and does not throw", () => {
+    // Records already on a device do not have these fields until the next
+    // pull. A spread over `undefined` would take the screen down over a plan
+    // somebody has been feeding for a year.
+    const old = { ...plan(), target: "animal" as const, targetId: id(31) };
+    delete (old as { alsoFeeds?: unknown }).alsoFeeds;
+    delete (old as { portion?: unknown }).portion;
+
+    expect(animalsFedBy(old)).toEqual([id(31)]);
+    expect(portionOf(old)).toBe("per_head");
+    expect(isShared(old)).toBe(false);
+  });
+
+  it("defaults both fields on the way in", () => {
+    const parsed = feedingPlanSchema.safeParse({
+      ...plan(),
+      alsoFeeds: undefined,
+      portion: undefined,
+    });
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.alsoFeeds).toEqual([]);
+    expect(parsed.success && parsed.data.portion).toBe("per_head");
+  });
+
+  it("refuses a zone plan that also lists animals", () => {
+    // Two answers to "who eats this", with nothing to break the tie.
+    const result = feedingPlanSchema.safeParse({
+      ...plan({ target: "zone", targetId: id(21) }),
+      alsoFeeds: [id(32)],
+      portion: "shared",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("refuses a plan that lists its own target again", () => {
+    const result = feedingPlanSchema.safeParse({ ...cats, alsoFeeds: [id(31)] });
+    expect(result.success).toBe(false);
+  });
+
+  it("refuses the same animal twice, which would count a head twice", () => {
+    const result = feedingPlanSchema.safeParse({ ...cats, alsoFeeds: [id(32), id(32)] });
+    expect(result.success).toBe(false);
+  });
+
+  it("leaves the amount alone — sharing is who it covers, not what it says", () => {
+    // `dailyDemandOf` answers "what does this plan put out in a day", which is
+    // the same number either way. Dividing it is the caller's job, because
+    // only the caller knows how many heads are still on the place.
+    expect(dailyDemandOf(cats).get(id(3))).toEqual(quantity(12, "lb"));
   });
 });

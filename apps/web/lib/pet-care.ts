@@ -1,4 +1,12 @@
-import type { FeedingPlan, FeedingPlanLine, Ulid } from "@galaxy-farm/core";
+import {
+  animalsFedBy,
+  displayName,
+  isShared,
+  type Animal,
+  type FeedingPlan,
+  type FeedingPlanLine,
+  type Ulid,
+} from "@galaxy-farm/core";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 import type { PetCareRecord } from "@galaxy-farm/module-pets";
@@ -38,32 +46,71 @@ const FREQUENCY_WORDS: Readonly<Record<FeedingPlanLine["frequency"], string>> = 
   weekly: "once a week",
 };
 
+/** "Smokey and Boots"; "Smokey, Boots and Tig". */
+export function nameList(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1] as string}`;
+}
+
 /**
  * One plan line, in the words somebody would say it.
  *
  * "1 scoop of Purina Pro Plan, twice a day, morning" rather than a row of
  * fields. The guide and the pet card both want a sentence, and building it
  * twice is how the two end up disagreeing about the amount.
+ *
+ * `sharedBetween` is what stops a helper doubling the food. Two barn cats on
+ * one bowl read the same line on both their cards, and "half a pound, twice a
+ * day" on each of two cards is a pound a day going into the bowl instead of
+ * half — so when the amount is a combined one the sentence says whose it is.
  */
-export function describePlanLine(line: FeedingPlanLine, feeds: readonly FeedType[]): string {
+export function describePlanLine(
+  line: FeedingPlanLine,
+  feeds: readonly FeedType[],
+  sharedBetween: readonly string[] = [],
+): string {
   const feed = feeds.find((held) => held.id === line.feedTypeId)?.name ?? "feed";
   const unit = line.amount.unit.replace(/_/g, " ");
   const plural = line.amount.amount === 1 ? unit : `${unit}s`;
+  const between = sharedBetween.length > 1 ? ` between ${nameList(sharedBetween)}` : "";
 
-  return `${line.amount.amount} ${plural} of ${feed}, ${FREQUENCY_WORDS[line.frequency]}, ${line.timeOfDay}${
+  return `${line.amount.amount} ${plural} of ${feed}${between}, ${FREQUENCY_WORDS[line.frequency]}, ${line.timeOfDay}${
     line.notes === undefined ? "" : ` — ${line.notes}`
   }`;
 }
 
-/** Every line of every live plan for one pet, worded. */
+/** The plans feeding one pet — including any bowl it shares with another. */
+export function plansFeeding(petId: Ulid, plans: readonly FeedingPlan[]): FeedingPlan[] {
+  return plans.filter((plan) => plan.target === "animal" && animalsFedBy(plan).includes(petId));
+}
+
+/**
+ * Every line of every live plan for one pet, worded.
+ *
+ * `animals` is passed so a shared bowl can name the cats on it. Without them
+ * the sentence still reads correctly, just without the names — a screen that
+ * has not got the herd to hand should degrade rather than refuse.
+ */
 export function feedingLinesFor(
   petId: Ulid,
   plans: readonly FeedingPlan[],
   feeds: readonly FeedType[],
+  animals: readonly Pick<Animal, "id" | "name" | "tagNumber">[] = [],
 ): string[] {
-  return plans
-    .filter((plan) => plan.active && plan.target === "animal" && plan.targetId === petId)
-    .flatMap((plan) => plan.lines.map((line) => describePlanLine(line, feeds)));
+  return plansFeeding(petId, plans)
+    .filter((plan) => plan.active)
+    .flatMap((plan) => {
+      const between = isShared(plan)
+        ? animalsFedBy(plan)
+            .map((id) => animals.find((animal) => animal.id === id))
+            .filter(
+              (animal): animal is Pick<Animal, "id" | "name" | "tagNumber"> => animal !== undefined,
+            )
+            .map(displayName)
+        : [];
+
+      return plan.lines.map((line) => describePlanLine(line, feeds, between));
+    });
 }
 
 /**

@@ -2,6 +2,7 @@
 
 import { Callout, PageBody, PageHeader, Tabs, Tile } from "@galaxy-farm/ui";
 import {
+  animalsFedBy,
   displayName,
   type Animal,
   type Contact,
@@ -56,12 +57,16 @@ export function PetsScreen({
   const pets = petsOnFarm(animals);
   const petIds = new Set(pets.map((pet) => pet.id));
   const petHealth = health.filter((record) => petIds.has(record.animalId));
-  const petPlans = plans.filter((plan) => plan.target === "animal" && petIds.has(plan.targetId));
+  // `animalsFedBy`, not `targetId`: a bowl two cats share is filed under one
+  // of them, and the other has to find it or it reads as unfed.
+  const petPlans = plans.filter(
+    (plan) => plan.target === "animal" && animalsFedBy(plan).some((id) => petIds.has(id)),
+  );
 
   const due = outstandingPetCare(careRecordsFor(petHealth), new Date());
   const overdue = due.filter((need) => need.status === "overdue");
   const unfed = pets.filter(
-    (pet) => !petPlans.some((plan) => plan.targetId === pet.id && plan.active),
+    (pet) => !petPlans.some((plan) => plan.active && animalsFedBy(plan).includes(pet.id)),
   );
 
   const nameOf = (id: Ulid) => {
