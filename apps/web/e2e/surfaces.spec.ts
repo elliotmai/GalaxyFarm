@@ -161,6 +161,25 @@ test.describe("the housesitter surface", () => {
       "bluebonnet-linen",
     );
   });
+
+  test("the guide renders rather than 500ing when the database cannot be reached", async ({
+    page,
+  }) => {
+    // §5.10: the sitter is a guest with no way to report a broken page and no
+    // second route to the information. A guide that cannot be loaded has to
+    // say so and point at the phone, not throw.
+    await page.goto("/sitter");
+
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  });
+
+  test("a sitter cannot reach the admin app", async ({ page }) => {
+    // §4.3's surface gate. The redirect rather than a 403 is deliberate:
+    // somebody following a stale link is not doing anything wrong.
+    await page.goto("/admin/contacts");
+
+    await expect(page).toHaveURL(/\/sitter$/);
+  });
 });
 
 test.describe("the gate itself", () => {
