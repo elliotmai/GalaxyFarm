@@ -1,0 +1,19 @@
+-- Tank covers, which are the mitigation this place actually uses.
+--
+-- Not one tank here has a heater and none is wanted, so `has_heater` was a
+-- column that answered "no" for every row and a freeze alert built on it could
+-- only ever say "all four are exposed". What is actually done before a hard
+-- freeze is that the covers go on, and until now there was nowhere to record
+-- either that a tank has one or that it is currently on.
+--
+-- One column with three states rather than two booleans. "There is no cover"
+-- and "the cover is off" lead to different work — the first can only be broken
+-- open in the morning, the second is something to carry out before dark — and
+-- a pair of booleans would admit a fourth state, no cover but cover on, that
+-- cannot happen.
+--
+-- Defaulted to 'none' rather than 'off': the tanks on file predate the column,
+-- and nobody has said which of them have covers. 'none' is the honest reading
+-- of silence and it is the state that raises no chore, so an unanswered
+-- question cannot send somebody out to fit a cover that does not exist.
+ALTER TABLE "water_sources" ADD COLUMN "cover" text NOT NULL DEFAULT 'none';

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { currentActor } from "@/lib/auth";
-import { registryGraph } from "@/lib/registry";
+import { registryGraph, registryNotConfigured } from "@/lib/registry";
 
 /**
  * /api/registry/search — find an animal anywhere in the associations (§5.2).
@@ -26,13 +26,7 @@ export async function GET(request: Request) {
 
   const graph = registryGraph();
   if (graph === undefined) {
-    return NextResponse.json(
-      {
-        error:
-          "The association catalogue is not set up on this server. Add the NEO4J_ settings and restart.",
-      },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: registryNotConfigured() }, { status: 503 });
   }
 
   const url = new URL(request.url);

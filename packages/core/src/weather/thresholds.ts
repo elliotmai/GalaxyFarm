@@ -1,5 +1,6 @@
 import type { DailyWeather, Forecast, HourlyWeather } from "../ports/weather.js";
 import {
+  coversToFit,
   freezeCheckTargets,
   type FreezeCheckTarget,
   type WaterSource,
@@ -108,6 +109,47 @@ export function freezeChores(
   return freezeDays(forecast, options).flatMap((day) =>
     targets.map((target) => ({ date: day.date, target, lowF: day.lowF })),
   );
+}
+
+export interface CoverChore {
+  /** The day to do it: the one before the cold arrives. */
+  readonly date: Date;
+  /** The freeze it is getting ahead of. */
+  readonly freezeDate: Date;
+  readonly target: FreezeCheckTarget;
+  readonly lowF: number;
+}
+
+/**
+ * Go and put the covers on, before it gets here (§6).
+ *
+ * The one piece of freeze work that has to happen *ahead* of the freeze rather
+ * than on the morning of it, which is why it is derived separately from
+ * `freezeChores` and dated a day earlier. §6 already sends the alert the
+ * evening before; this is the list that alert should be carrying.
+ *
+ * One chore per tank for the *first* freeze in the forecast, not one per tank
+ * per freeze day. A three-day cold spell does not need the same cover put on
+ * three times, and once somebody records it as on the tank drops off this list
+ * by itself.
+ */
+export function coverChores(
+  forecast: Pick<Forecast, "daily" | "hourly">,
+  waterSources: readonly WaterSource[],
+  zones: readonly ZoneWaterRef[],
+  options: { hardFreezeF?: number; sustainedF?: number; sustainedHours?: number } = {},
+): CoverChore[] {
+  const [first] = freezeDays(forecast, options).sort(
+    (left, right) => left.date.getTime() - right.date.getTime(),
+  );
+  if (first === undefined) return [];
+
+  return coversToFit(freezeCheckTargets(waterSources, zones)).map((target) => ({
+    date: new Date(first.date.getTime() - 86_400_000),
+    freezeDate: first.date,
+    target,
+    lowF: first.lowF,
+  }));
 }
 
 /**

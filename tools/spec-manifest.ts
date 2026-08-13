@@ -82,7 +82,7 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
   WaterSource: {
     section: "5.1",
     kind: "entity",
-    declares: ["waterSourceSchema", "freezeCheckTargets", "freezeChoreTitle"],
+    declares: ["waterSourceSchema", "freezeCheckTargets", "freezeChoreTitle", "coverChoreTitle"],
     phase: "Phase 0",
     status: "built",
   },

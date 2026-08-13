@@ -9,7 +9,7 @@ import {
   planCatalogueImport,
 } from "../src/domain/catalogue.js";
 import type { ExternalAnimal } from "../src/domain/pedigree.js";
-import type { RegistryAnimal } from "../src/ports/registry-graph.js";
+import { reviveRegistryAnimal, type RegistryAnimal } from "../src/ports/registry-graph.js";
 
 /**
  * Bringing an animal across from the catalogue (spec §5.2).
@@ -237,5 +237,66 @@ describe("joining the copies up", () => {
     const plan = planCatalogueImport(catalogued({ name: "PLAIN", regNumber: "1" }), [], []);
 
     expect(catalogueParentPatch(plan.rows[0] as never, new Map())).toBeUndefined();
+  });
+});
+
+/**
+ * The trip over the wire (spec §5.2).
+ *
+ * The catalogue is the one screen that reads from a server rather than from
+ * the copy on the device, so its records go through JSON — and JSON has no
+ * date. What comes out the far side is a string wearing the type of a `Date`:
+ * it type-checks everywhere, and the first thing to call a date method on it
+ * throws.
+ */
+describe("an animal that has been through JSON", () => {
+  /** Exactly what `fetch` hands back: `JSON.stringify` and straight back in. */
+  const overTheWire = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+  it("turns its dates back into dates", () => {
+    const sent = overTheWire(montego);
+    expect(typeof (sent as { dob: unknown }).dob).toBe("string");
+
+    const back = reviveRegistryAnimal(sent);
+
+    expect(back.dob).toBeInstanceOf(Date);
+    expect(back.dob?.toISOString()).toBe("2009-06-19T00:00:00.000Z");
+  });
+
+  it("leaves a real date alone", () => {
+    expect(reviveRegistryAnimal(montego).dob).toEqual(montego.dob);
+  });
+
+  it("drops a date it cannot read rather than keeping an invalid one", () => {
+    // An Invalid Date passes `instanceof Date` and fails later, somewhere with
+    // no clue about where it came from.
+    const back = reviveRegistryAnimal({ ...montego, dob: "not a date" as unknown as Date });
+
+    expect(back.dob).toBeUndefined();
+  });
+
+  it("plans an import from a record that came over the wire", () => {
+    // The bug this is here for: planning reads the birthday to tell one animal
+    // from another, and a string cannot answer that. The whole screen failed
+    // to open, on every animal with a date on it.
+    const plan = planCatalogueImport(overTheWire(montego), overTheWire(above), []);
+
+    expect(plan.rows).toHaveLength(1 + above.length);
+    expect(plan.rows[0]?.animal.name).toBe("ZNT MONTEGO BAY 901W");
+  });
+
+  it("still matches on birthday when nobody revived it", () => {
+    // Belt to the braces above. A caller that forgets should get a match that
+    // works, not a screen that will not open.
+    const onFile = external({
+      name: "ZNT MONTEGO BAY 901W",
+      regNumber: "999999",
+      association: "Shorthorn",
+      dob: new Date("2009-06-19T00:00:00Z"),
+    });
+
+    const plan = planCatalogueImport(overTheWire(montego), [], [onFile]);
+
+    expect(plan.rows[0]?.match?.existingId).toBe(onFile.id);
   });
 });

@@ -83,6 +83,8 @@ export const waterSources = pgTable(
     name: text("name").notNull(),
     type: text("type").notNull(),
     hasHeater: boolean("has_heater").notNull(),
+    /** `none | off | on` — the mitigation actually used here (§5.1, §6). */
+    cover: text("cover").notNull().default("none"),
     /** False while a seasonal tank is stowed — raises no freeze chore (§6). */
     active: boolean("active").notNull(),
     notes: text("notes"),
