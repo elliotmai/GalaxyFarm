@@ -7,15 +7,19 @@ import {
   flockSchema,
   headCountOn,
   lossesIn,
+  totalBirdsOn,
   type Flock,
   type FlockAdjustment,
 } from "../src/domain/flock.js";
 import {
   breakdownTotals,
+  dispositionTotals,
   eggDispositionSchema,
   eggLogSchema,
   eggTotalsByPeriod,
+  eggsOnHand,
   layRate,
+  type EggDisposition,
   type EggLog,
 } from "../src/domain/eggs.js";
 
@@ -64,6 +68,26 @@ describe("headCountOn", () => {
 
   it("ignores another flock's adjustments", () => {
     expect(headCountOn(flock, [adjustment({ flockId: id(9) })], AT)).toBe(18);
+  });
+});
+
+describe("totalBirdsOn", () => {
+  const quail: Flock = {
+    ...flock,
+    id: id(2),
+    name: "Quail hutch",
+    species: "quail",
+    openingCount: 30,
+  };
+
+  it("adds every live flock up", () => {
+    expect(totalBirdsOn([flock, quail], [adjustment()], AT)).toBe(44);
+  });
+
+  it("leaves a retired flock out", () => {
+    // Its birds are gone. Counting them would put them in the feed demand and
+    // in an eggs-per-bird figure nobody is collecting against.
+    expect(totalBirdsOn([flock, { ...quail, active: false }], [adjustment()], AT)).toBe(14);
   });
 });
 
@@ -210,6 +234,71 @@ describe("breakdownTotals", () => {
 
     expect(byColour.get("brown")).toBe(14);
     expect(bySize.get("medium")).toBe(10);
+  });
+});
+
+const disposition = (over: Partial<EggDisposition> = {}): EggDisposition => ({
+  id: id(40),
+  ...base,
+  disposedOn: new Date("2026-08-10T18:00:00Z"),
+  quantity: 12,
+  kind: "kept",
+  ...over,
+});
+
+describe("eggsOnHand", () => {
+  it("is what was collected, less what left the basket", () => {
+    const logs = [log({ id: id(41), total: 24 })];
+    expect(eggsOnHand(logs, [disposition()], AT)).toBe(12);
+  });
+
+  it("counts nothing that has not happened yet", () => {
+    // The basket on the first of the month does not hold eggs collected on the
+    // tenth, and a trend read against a past date would say it did.
+    const logs = [log({ id: id(42), collectedOn: new Date("2026-08-10T08:00:00Z"), total: 24 })];
+    expect(eggsOnHand(logs, [], new Date("2026-08-01"))).toBe(0);
+  });
+
+  it("goes negative rather than hiding a disagreement behind a zero", () => {
+    expect(eggsOnHand([], [disposition()], AT)).toBe(-12);
+  });
+});
+
+describe("dispositionTotals", () => {
+  it("splits by kind and adds up only what was sold", () => {
+    const entries = [
+      disposition(),
+      disposition({ id: id(43), kind: "given", quantity: 6 }),
+      disposition({ id: id(44), kind: "sold", quantity: 24, price: fromDollars(6) }),
+      disposition({ id: id(45), kind: "sold", quantity: 12, price: fromDollars(3) }),
+    ];
+
+    const { byKind, revenue } = dispositionTotals(entries);
+
+    expect(byKind.get("kept")).toBe(12);
+    expect(byKind.get("sold")).toBe(36);
+    expect(revenue).toEqual(fromDollars(9));
+  });
+
+  it("takes a window, so this month's takings are not last year's", () => {
+    const entries = [
+      disposition({ id: id(46), kind: "sold", quantity: 12, price: fromDollars(5) }),
+      disposition({
+        id: id(47),
+        kind: "sold",
+        quantity: 12,
+        price: fromDollars(5),
+        disposedOn: new Date("2025-08-10T18:00:00Z"),
+      }),
+    ];
+
+    const { byKind, revenue } = dispositionTotals(entries, {
+      from: new Date("2026-08-01"),
+      to: new Date("2026-08-31"),
+    });
+
+    expect(byKind.get("sold")).toBe(12);
+    expect(revenue).toEqual(fromDollars(5));
   });
 });
 

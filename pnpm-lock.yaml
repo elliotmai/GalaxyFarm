@@ -92,6 +92,9 @@ importers:
       '@galaxy-farm/module-feed':
         specifier: workspace:*
         version: link:../../packages/modules/feed
+      '@galaxy-farm/module-poultry':
+        specifier: workspace:*
+        version: link:../../packages/modules/poultry
       '@galaxy-farm/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -195,6 +198,9 @@ importers:
       '@galaxy-farm/module-feed':
         specifier: workspace:*
         version: link:../../modules/feed
+      '@galaxy-farm/module-poultry':
+        specifier: workspace:*
+        version: link:../../modules/poultry
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1

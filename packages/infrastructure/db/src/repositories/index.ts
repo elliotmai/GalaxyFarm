@@ -54,6 +54,12 @@ export const SEARCHABLE_FIELDS = {
   feedPurchases: ["notes"],
   feedConsumption: ["notes"],
   feedingPlans: ["name", "specialNotes"],
+  flocks: ["name", "breedMix", "notes"],
+  // An adjustment is found through its flock and its date. What is worth
+  // typing at is the note saying what got into the run.
+  flockAdjustments: ["notes"],
+  eggLogs: ["notes"],
+  eggDispositions: ["notes"],
   contacts: ["name", "company", "address", "notes"],
   attachments: ["filename", "caption"],
   choreTemplates: ["title", "detail"],

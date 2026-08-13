@@ -22,6 +22,7 @@
     "@galaxy-farm/infra-weather": "workspace:*",
     "@galaxy-farm/module-cattle": "workspace:*",
     "@galaxy-farm/module-feed": "workspace:*",
+    "@galaxy-farm/module-poultry": "workspace:*",
     "@galaxy-farm/ui": "workspace:*",
     "dexie": "^4.4.4",
     "drizzle-orm": "^0.38.4",

@@ -46,6 +46,13 @@ import {
   feedTypeSchema,
 } from "@galaxy-farm/module-feed";
 
+import {
+  eggDispositionSchema,
+  eggLogSchema,
+  flockAdjustmentSchema,
+  flockSchema,
+} from "@galaxy-farm/module-poultry";
+
 import { allTables } from "../src/schema/index.js";
 import { REPOSITORY_TABLES } from "../src/sync/entities.js";
 
@@ -95,6 +102,10 @@ const SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   feedPurchases: feedPurchaseSchema,
   feedConsumption: feedConsumptionSchema,
   feedingPlans: feedingPlanSchema,
+  flocks: flockSchema,
+  flockAdjustments: flockAdjustmentSchema,
+  eggLogs: eggLogSchema,
+  eggDispositions: eggDispositionSchema,
   contacts: contactSchema,
   attachments: attachmentSchema,
   choreTemplates: choreTemplateSchema,

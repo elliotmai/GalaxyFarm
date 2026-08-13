@@ -29,6 +29,8 @@ const ADMIN_ROUTES = [
   "/admin/cattle/breeding",
   "/admin/cattle/calving",
   "/admin/feed",
+  "/admin/chickens/flock",
+  "/admin/chickens/eggs",
   "/admin/supplies",
   "/admin/contacts",
   "/admin/settings",
