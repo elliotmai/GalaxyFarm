@@ -40,16 +40,22 @@ matters when an iron is actually ordered. None of it belongs in the drawing.
 
 ## Drawn, not plotted
 
-A brand is forged and struck. The samples on the page are brushed by hand and
-photographed off brand records: the stroke swells and thins, the lines are not
-quite true, and the two letters of a pair are not copies of each other. A path
-stroked at a constant width reads as machine output at a glance.
+The samples on the page are brushed by hand, but they are not scraggly — the
+edges are clean and straight and the strokes are confident. What marks them as
+drawn is that the **geometry** is off true: the two halves of an M are not mirror
+images, the legs splay by different amounts, one apex sits a little higher than
+the other, and the two letters of a pair are not copies.
 
-So each stroke is emitted as a **filled outline** — the centreline resampled,
-nudged off true by a slow wobble, and offset by a half-width that varies as it
-goes, with the outside of each corner filled out like upset metal. It runs off a
-fixed seed, so the drawing is irregular but the file is reproducible: rerunning
-`iron-check.py` gives byte-identical output.
+So each stroke is a **filled outline** built from the corner points with mitred
+joins — every edge dead straight — with the stroke weight easing gently across a
+letter and each letter taking its own small nudge off true.
+
+An earlier pass put the irregularity in the wrong place: it wobbled the
+centreline at every sample point and blobbed the corners, which produced exactly
+the mess that word describes. Irregular geometry, clean edges — not the reverse.
+
+It runs off a fixed seed, so the file is reproducible: rerunning `iron-check.py`
+gives byte-identical output.
 
 ## The grammar
 
