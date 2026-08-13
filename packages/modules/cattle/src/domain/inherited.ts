@@ -146,10 +146,8 @@ export interface CarriedColour {
   readonly carriesRoan: number;
 }
 
-const cross = <A extends string>(
-  sire: readonly [A, A],
-  dam: readonly [A, A],
-): [A, A][] => sire.flatMap((left) => dam.map((right) => [left, right] as [A, A]));
+const cross = <A extends string>(sire: readonly [A, A], dam: readonly [A, A]): [A, A][] =>
+  sire.flatMap((left) => dam.map((right) => [left, right] as [A, A]));
 
 /** `ED/e` and `e/ED` are one genotype. Sorted by dominance so they read alike. */
 const key = <A extends string>(pair: readonly [A, A], order: readonly A[]): string => {
@@ -208,7 +206,9 @@ export function carriedColour(
   const roan =
     roanPairs === undefined
       ? undefined
-      : roanPairs.filter((pair) => observed?.pattern === undefined || roanColour(pair) === observed.pattern);
+      : roanPairs.filter(
+          (pair) => observed?.pattern === undefined || roanColour(pair) === observed.pattern,
+        );
 
   const first = [...counted.values()][0]?.pair;
 

@@ -60,9 +60,9 @@ describe("a Shorthorn pedigree line", () => {
     // `*`, `x` and `s` are how Shorthorn records what kind of entry it is.
     // They stay, because the number as printed is what somebody checks
     // against the paper in the drawer.
-    expect(parsePedigreeEntry("*sxAR30383        [ 0016 ]        OCC LUSTRE 0016", "")).toMatchObject(
-      { regNumber: "*sxAR30383", name: "OCC LUSTRE 0016" },
-    );
+    expect(
+      parsePedigreeEntry("*sxAR30383        [ 0016 ]        OCC LUSTRE 0016", ""),
+    ).toMatchObject({ regNumber: "*sxAR30383", name: "OCC LUSTRE 0016" });
   });
 
   it("reads the second line as colour and birth date, not as an animal", () => {

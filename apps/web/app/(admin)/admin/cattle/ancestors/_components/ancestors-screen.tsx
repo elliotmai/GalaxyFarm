@@ -45,7 +45,10 @@ import {
 import { AncestorDetail } from "@/app/(admin)/admin/cattle/ancestors/_components/ancestor-detail";
 import { DigitalBeefImport } from "@/app/(admin)/admin/cattle/ancestors/_components/import-panel";
 import { MergeAncestors } from "@/app/(admin)/admin/cattle/ancestors/_components/merge-panel";
-import { checkable, RefreshAllAncestors } from "@/app/(admin)/admin/cattle/ancestors/_components/refresh-all-panel";
+import {
+  checkable,
+  RefreshAllAncestors,
+} from "@/app/(admin)/admin/cattle/ancestors/_components/refresh-all-panel";
 import { RefreshFromAssociation } from "@/app/(admin)/admin/cattle/ancestors/_components/refresh-panel";
 import { useMutations } from "@/lib/local/mutations";
 import { usePedigreeSource } from "@/lib/pedigree-source";
@@ -619,7 +622,9 @@ export function AncestorsScreen({
           size="wide"
           title={looking.name}
           {...(trail.length > 1
-            ? { description: `Followed from ${outsiders.find((entry) => entry.id === trail[0])?.name ?? "the list"}.` }
+            ? {
+                description: `Followed from ${outsiders.find((entry) => entry.id === trail[0])?.name ?? "the list"}.`,
+              }
             : {})}
           onClose={() => setTrail([])}
           footer={
@@ -708,13 +713,10 @@ export function AncestorsScreen({
       </div>
 
       {conflicted.length === 0 ? null : (
-        <Callout
-          tone="danger"
-          title={`${conflicted.length} used as both a sire and a dam`}
-        >
-          {conflicted.map((animal) => animal.name).join(", ")} — one record names each of these as
-          a sire and another as a dam. They cannot be both, so one of the pedigrees hanging off
-          them is wrong. Set the sex by hand to say which, then fix the record that disagrees.
+        <Callout tone="danger" title={`${conflicted.length} used as both a sire and a dam`}>
+          {conflicted.map((animal) => animal.name).join(", ")} — one record names each of these as a
+          sire and another as a dam. They cannot be both, so one of the pedigrees hanging off them
+          is wrong. Set the sex by hand to say which, then fix the record that disagrees.
         </Callout>
       )}
 

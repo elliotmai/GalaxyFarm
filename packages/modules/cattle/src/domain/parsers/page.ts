@@ -24,7 +24,6 @@ import type { DefectStatus, GeneticDefect, GeneticTest } from "../genetics.js";
  *    failure that matters.
  */
 
-
 export const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
@@ -58,25 +57,27 @@ export function textOf(source: string): string {
         .replace(/<[^>]+>/g, " ")
     : source;
 
-  return text
-    .replace(/&nbsp;?/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
-    .replace(/\u00a0/g, " ")
-    .replace(/\r\n?/g, "\n")
-    .split("\n")
-    // Runs of spaces are **not** collapsed. On a pasted page a run of spaces is
-    // where one table cell ended and the next began, and it is the only thing
-    // separating `MA185219` from `JF WAR CHIEF` on a Chianina pedigree line.
-    .map((line) => line.replace(/[ \t]+$/, "").replace(/^[ \t]+/, ""))
-    .join("\n")
-    // Runs of blank lines are **not** collapsed either, and this one cost a
-    // whole afternoon. Three blank rows in a pedigree block are three
-    // ancestors nobody recorded, and squeezing them to one moves everything
-    // below them two slots up. The Chianina page for ZNT TRIPLE X records one
-    // of his dam's dam's grandparents as three blanks, the animal, three
-    // blanks — collapse those and she lands in her own mother's place.
-    .trim();
+  return (
+    text
+      .replace(/&nbsp;?/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+      .replace(/\u00a0/g, " ")
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      // Runs of spaces are **not** collapsed. On a pasted page a run of spaces is
+      // where one table cell ended and the next began, and it is the only thing
+      // separating `MA185219` from `JF WAR CHIEF` on a Chianina pedigree line.
+      .map((line) => line.replace(/[ \t]+$/, "").replace(/^[ \t]+/, ""))
+      .join("\n")
+      // Runs of blank lines are **not** collapsed either, and this one cost a
+      // whole afternoon. Three blank rows in a pedigree block are three
+      // ancestors nobody recorded, and squeezing them to one moves everything
+      // below them two slots up. The Chianina page for ZNT TRIPLE X records one
+      // of his dam's dam's grandparents as three blanks, the animal, three
+      // blanks — collapse those and she lands in her own mother's place.
+      .trim()
+  );
 }
 /**
  * Look a field up by its label.

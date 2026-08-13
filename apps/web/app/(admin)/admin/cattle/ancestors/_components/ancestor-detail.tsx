@@ -220,13 +220,10 @@ export function AncestorDetail({
       </div>
 
       {house.carried.length === 0 ? null : (
-        <Callout
-          tone="danger"
-          title={`Carries ${house.carried.join(", ")}`}
-        >
-          The rule on this place is that no carrier comes onto it. Anything out of this animal is
-          at least a coin toss to carry it too, and any pairing that puts another carrier on the
-          other side is a quarter affected.
+        <Callout tone="danger" title={`Carries ${house.carried.join(", ")}`}>
+          The rule on this place is that no carrier comes onto it. Anything out of this animal is at
+          least a coin toss to carry it too, and any pairing that puts another carrier on the other
+          side is a quarter affected.
         </Callout>
       )}
 
@@ -352,9 +349,7 @@ export function AncestorDetail({
                     )}
                   </span>
                   <Pill
-                    tone={
-                      carries(status) ? "danger" : isKnownFree(status) ? "calm" : "neutral"
-                    }
+                    tone={carries(status) ? "danger" : isKnownFree(status) ? "calm" : "neutral"}
                     dot={carries(status)}
                   >
                     {STATUS_LABELS[status]}
@@ -403,10 +398,7 @@ export function AncestorDetail({
         )}
       </Section>
 
-      <Section
-        title="Progeny"
-        description="Everything on file that names this animal as a parent."
-      >
+      <Section title="Progeny" description="Everything on file that names this animal as a parent.">
         {descendants.length === 0 ? (
           <EmptyState
             title="Nothing points at it"

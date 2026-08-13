@@ -43,7 +43,11 @@ const page = () =>
 
 describe("what a fresh read would change", () => {
   it("proposes filling in what the record does not have", () => {
-    const thin = external({ name: "ZNT MONTEGO BAY 901W", regNumber: "402303", association: "AMAA" });
+    const thin = external({
+      name: "ZNT MONTEGO BAY 901W",
+      regNumber: "402303",
+      association: "AMAA",
+    });
     const changes = refreshChanges(thin, page());
 
     expect(changes.map((change) => change.field)).toEqual(
@@ -130,11 +134,13 @@ describe("what a fresh read would change", () => {
       status: "Active",
     });
 
-    expect(refreshChanges(stale, page()).find((change) => change.field === "status")).toMatchObject({
-      kind: "change",
-      before: "Active",
-      after: "Culled - Culled - age",
-    });
+    expect(refreshChanges(stale, page()).find((change) => change.field === "status")).toMatchObject(
+      {
+        kind: "change",
+        before: "Active",
+        after: "Culled - Culled - age",
+      },
+    );
   });
 });
 
@@ -358,7 +364,11 @@ describe("wiring the parents a page names", () => {
   });
 
   it("proposes nothing when the parent is not on file", () => {
-    const orphan = external({ name: "ZNT MONTEGO BAY 901W", regNumber: "402303", association: "AMAA" });
+    const orphan = external({
+      name: "ZNT MONTEGO BAY 901W",
+      regNumber: "402303",
+      association: "AMAA",
+    });
 
     expect(refreshChanges(orphan, page(), []).some((c) => c.field === "sire")).toBe(false);
   });
@@ -368,7 +378,11 @@ describe("wiring the parents a page names", () => {
     // pedigree pointed at the wrong one looks entirely normal afterwards.
     const one = external({ name: "CMAC TYSON ET" });
     const two = external({ name: "CMAC TYSON ET" });
-    const orphan = external({ name: "ZNT MONTEGO BAY 901W", regNumber: "402303", association: "AMAA" });
+    const orphan = external({
+      name: "ZNT MONTEGO BAY 901W",
+      regNumber: "402303",
+      association: "AMAA",
+    });
 
     expect(refreshChanges(orphan, page(), [one, two]).some((c) => c.field === "sire")).toBe(false);
   });
@@ -381,11 +395,15 @@ describe("wiring the parents a page names", () => {
       regNumber: "364424",
       association: "ACA",
     });
-    const orphan = external({ name: "ZNT MONTEGO BAY 901W", regNumber: "402303", association: "AMAA" });
+    const orphan = external({
+      name: "ZNT MONTEGO BAY 901W",
+      regNumber: "402303",
+      association: "AMAA",
+    });
 
-    expect(
-      refreshChanges(orphan, page(), [wrongRegistry]).some((c) => c.field === "sire"),
-    ).toBe(false);
+    expect(refreshChanges(orphan, page(), [wrongRegistry]).some((c) => c.field === "sire")).toBe(
+      false,
+    );
   });
 });
 
@@ -465,9 +483,9 @@ describe("the farm's own animals", () => {
     // A Maine-Anjou page prints none at all.
     const known = profile({ breedComposition: [{ breed: "MA", percent: 79.57 }] });
 
-    expect(
-      profileChanges(known, page()).some((entry) => entry.field === "breedComposition"),
-    ).toBe(false);
+    expect(profileChanges(known, page()).some((entry) => entry.field === "breedComposition")).toBe(
+      false,
+    );
   });
 });
 

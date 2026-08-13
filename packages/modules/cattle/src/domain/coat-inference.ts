@@ -231,7 +231,10 @@ function narrow<A extends string>(
   if (left.length === 0) {
     return {
       possible: [...current.possible],
-      because: [...current.because, `${reason} — but that disagrees with the rest, so it is ignored`],
+      because: [
+        ...current.because,
+        `${reason} — but that disagrees with the rest, so it is ignored`,
+      ],
     };
   }
   return {
@@ -322,7 +325,11 @@ function inferExtension(evidence: CoatEvidence): LocusInference<ExtensionAllele>
   let weighted = false;
 
   if (evidence.sire !== undefined && evidence.dam !== undefined) {
-    const crossed = crossPossible(evidence.sire.extension, evidence.dam.extension, EXTENSION_ALLELES);
+    const crossed = crossPossible(
+      evidence.sire.extension,
+      evidence.dam.extension,
+      EXTENSION_ALLELES,
+    );
     possible = crossed.possible;
     weighted = crossed.weighted;
     because = ["One allele from each parent."];
@@ -416,11 +423,7 @@ function inferRoan(evidence: CoatEvidence): LocusInference<RoanAllele> {
     ["solid", "R", "It has thrown a solid calf, so it handed over an R."],
   ] as const) {
     if (!(evidence.progeny ?? []).some((calf) => calf.pattern === pattern)) continue;
-    const state = narrow(
-      { possible, because },
-      (pair) => pair.includes(allele),
-      reason,
-    );
+    const state = narrow({ possible, because }, (pair) => pair.includes(allele), reason);
     possible = state.possible;
     because = state.because;
   }
@@ -487,7 +490,8 @@ function chanceOfCarryingRed(
     return { chance: carrying.reduce((sum, entry) => sum + (entry.chance ?? 0), 0) };
   }
 
-  const fromSire = evidence.sire === undefined ? undefined : transmits(evidence.sire.extension, "e");
+  const fromSire =
+    evidence.sire === undefined ? undefined : transmits(evidence.sire.extension, "e");
   const fromDam = evidence.dam === undefined ? undefined : transmits(evidence.dam.extension, "e");
   if (fromSire === undefined || fromDam === undefined) return undefined;
 
@@ -593,10 +597,7 @@ export function predictCalfColour(sire: CoatInference, dam: CoatInference): Calf
   const outcomes: { name: string; chance: number }[] = [];
   if (base !== undefined && pattern !== undefined) {
     // The loci are independent, so the coat is one multiplied by the other.
-    for (const [baseName, baseChance] of Object.entries(base) as [
-      "black" | "red",
-      number,
-    ][]) {
+    for (const [baseName, baseChance] of Object.entries(base) as ["black" | "red", number][]) {
       for (const [patternName, patternChance] of Object.entries(pattern) as [
         "solid" | "roan" | "white",
         number,

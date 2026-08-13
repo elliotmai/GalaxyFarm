@@ -113,7 +113,17 @@ function chianina(composition: readonly BreedShare[]): RegistrationClass[] {
 
   // Chiangus is a ceiling on everything that is not Chianina or Angus, not a
   // floor on Chianina.
-  const strangers = otherThan(composition, "CA", "CH", "CHIA", "CHIANINA", "AN", "ANGUS", "RA", "RED ANGUS");
+  const strangers = otherThan(
+    composition,
+    "CA",
+    "CH",
+    "CHIA",
+    "CHIANINA",
+    "AN",
+    "ANGUS",
+    "RA",
+    "RED ANGUS",
+  );
   if (chi > 0 && angus > 0 && strangers <= 6.249 + TOLERANCE) {
     both(
       "Chiangus or Red Chiangus",
@@ -165,8 +175,7 @@ function maine(
         association: "AMAA",
         name: `${paper ?? "Maine-Anjou"} — ${MAINE_CLASS_LABELS[recorded]}`,
         because: `The papers state ${stated as string}.`,
-        alsoRequires:
-          paper === "MaineTainer" ? [MAINE_ANGUS_NOTE] : ["Registered with the AMAA"],
+        alsoRequires: paper === "MaineTainer" ? [MAINE_ANGUS_NOTE] : ["Registered with the AMAA"],
       },
     ];
   }

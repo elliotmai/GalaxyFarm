@@ -144,9 +144,7 @@ export function matchCandidate(
   }
 
   const adds =
-    candidate.regNumber === undefined
-      ? undefined
-      : { association, regNumber: candidate.regNumber };
+    candidate.regNumber === undefined ? undefined : { association, regNumber: candidate.regNumber };
 
   // 2. Same name, and something else that agrees.
   const named = existing.filter((animal) => clean(animal.name) === clean(candidate.name));
@@ -157,7 +155,9 @@ export function matchCandidate(
         existingName: animal.name,
         confidence: "strong",
         reason: `Same name and the same date of birth as an animal already on file${
-          adds === undefined ? "" : `, under a different registry — this would add ${association} ${candidate.regNumber as string} to it`
+          adds === undefined
+            ? ""
+            : `, under a different registry — this would add ${association} ${candidate.regNumber as string} to it`
         }.`,
         addsRegistration: adds,
       };

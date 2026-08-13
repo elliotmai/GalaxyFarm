@@ -616,8 +616,8 @@ function AddHealth({
         )}
         {clears === undefined ? null : (
           <p className="text-sm text-muted">
-            {animal === undefined ? "This animal" : displayName(animal)} will not be clear for sale until{" "}
-            <span className="font-medium text-ink">{formatDate(clears)}</span>
+            {animal === undefined ? "This animal" : displayName(animal)} will not be clear for sale
+            until <span className="font-medium text-ink">{formatDate(clears)}</span>
           </p>
         )}
       </div>

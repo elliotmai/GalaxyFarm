@@ -73,9 +73,7 @@ export interface Pending {
   /** The ancestor this page is about, when it is one of them. */
   readonly animal?: ExternalAnimal | undefined;
   /** The farm's own animal, when the page is one of ours. */
-  readonly ours?:
-    | { readonly label: string; readonly profile: CattleProfile }
-    | undefined;
+  readonly ours?: { readonly label: string; readonly profile: CattleProfile } | undefined;
   readonly registration?: { association: string; regNumber: string } | undefined;
 }
 
@@ -116,9 +114,7 @@ export function recordInto(
 /** Only the ones there is actually a page to look up. */
 export function checkable(animals: readonly ExternalAnimal[]): ExternalAnimal[] {
   return animals.filter((animal) =>
-    allRegistrations(animal).some((entry) =>
-      canRefresh(entry.association, entry.regNumber),
-    ),
+    allRegistrations(animal).some((entry) => canRefresh(entry.association, entry.regNumber)),
   );
 }
 
@@ -220,7 +216,8 @@ export function RefreshAllAncestors({
     setAccepted(new Set());
 
     const found: Finding[] = [];
-    const ourResults: { label: string; profile: CattleProfile; changes: readonly FieldChange[] }[] = [];
+    const ourResults: { label: string; profile: CattleProfile; changes: readonly FieldChange[] }[] =
+      [];
     const stuck: Pending[] = [];
     const ticked = new Set<string>();
 
@@ -386,7 +383,11 @@ export function RefreshAllAncestors({
           }
 
           for (const entry of pedigreeChanges(page, animals)) {
-            record(entry.animal, { association: ours.association, regNumber: ours.regNumber }, entry.changes);
+            record(
+              entry.animal,
+              { association: ours.association, regNumber: ours.regNumber },
+              entry.changes,
+            );
           }
         }
       } catch {
@@ -449,7 +450,13 @@ export function RefreshAllAncestors({
     const ourResults = [...ourFindings];
 
     if (entry.animal !== undefined) {
-      recordInto(found, ticked, entry.animal, registration, refreshChanges(entry.animal, page, animals));
+      recordInto(
+        found,
+        ticked,
+        entry.animal,
+        registration,
+        refreshChanges(entry.animal, page, animals),
+      );
     }
 
     if (entry.ours !== undefined) {
@@ -490,9 +497,9 @@ export function RefreshAllAncestors({
       return;
     }
 
-    setPasteError(Object.fromEntries(
-      Object.entries(pasteError).filter(([key]) => key !== entry.key),
-    ));
+    setPasteError(
+      Object.fromEntries(Object.entries(pasteError).filter(([key]) => key !== entry.key)),
+    );
     setPending((current) => current.filter((row) => row.key !== entry.key));
     setOpenPaste(undefined);
     show({ message: `${entry.label} read from the paste`, tone: "success" });
@@ -563,19 +570,19 @@ export function RefreshAllAncestors({
       0,
     ) +
     findings.reduce(
-    (total, finding) =>
-      total +
-      finding.changes.filter((change) => accepted.has(`${finding.animal.id}:${change.field}`))
-        .length,
-    0,
-  );
+      (total, finding) =>
+        total +
+        finding.changes.filter((change) => accepted.has(`${finding.animal.id}:${change.field}`))
+          .length,
+      0,
+    );
 
   return (
     <div className="flex flex-col gap-density">
       {queue.length === 0 ? (
         <Callout tone="action" title="Nothing to check">
-          No ancestor on file has a registration number with one of the three associations, so
-          there is no page to look up.
+          No ancestor on file has a registration number with one of the three associations, so there
+          is no page to look up.
         </Callout>
       ) : (
         <>
@@ -586,10 +593,7 @@ export function RefreshAllAncestors({
           </p>
 
           {unreachable.length === 0 ? null : (
-            <Callout
-              tone="neutral"
-              title={`${unreachable.length} have no page this can check`}
-            >
+            <Callout tone="neutral" title={`${unreachable.length} have no page this can check`}>
               <p>
                 Not a failure — there is simply nowhere to look. Anything with a link is on a site
                 this app cannot read; open it and fill the record in by hand.
@@ -639,7 +643,10 @@ export function RefreshAllAncestors({
       )}
 
       {pending.map((entry) => (
-        <div key={entry.key} className="flex flex-col gap-2 rounded-density border border-edge p-density">
+        <div
+          key={entry.key}
+          className="flex flex-col gap-2 rounded-density border border-edge p-density"
+        >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="flex flex-wrap items-baseline gap-2">
               <span className="text-density font-medium text-ink">{entry.label}</span>
@@ -677,9 +684,7 @@ export function RefreshAllAncestors({
                 hint="Select all on the animal's page and paste it here. This works regardless of what the host thinks of our server, and behind a login."
                 rows={6}
                 value={drafts[entry.key] ?? ""}
-                onChange={(event) =>
-                  setDrafts({ ...drafts, [entry.key]: event.target.value })
-                }
+                onChange={(event) => setDrafts({ ...drafts, [entry.key]: event.target.value })}
               />
               {pasteError[entry.key] === undefined ? null : (
                 <p role="alert" className="text-sm text-danger">
@@ -701,8 +706,8 @@ export function RefreshAllAncestors({
           <p className="text-density font-medium text-ink">The farm&apos;s own animals</p>
           <p className="text-sm text-muted">
             Breed makeup, color and horn status off their own papers. This is the one place a
-            registered animal of ours picks up a composition from the association rather than
-            having it worked out from its parents.
+            registered animal of ours picks up a composition from the association rather than having
+            it worked out from its parents.
           </p>
           {ourFindings.map((finding) => (
             <div key={finding.profile.id} className="flex flex-col gap-1 border-t border-edge pt-3">
@@ -790,11 +795,7 @@ export function RefreshAllAncestors({
       )}
 
       <div className="flex flex-wrap gap-2 border-t border-edge pt-density">
-        <Button
-          onClick={() => void apply()}
-          busy={busy}
-          disabled={running || tickedCount === 0}
-        >
+        <Button onClick={() => void apply()} busy={busy} disabled={running || tickedCount === 0}>
           Apply {tickedCount === 0 ? "the ticked ones" : `${tickedCount} change(s)`}
         </Button>
         <Button variant="ghost" onClick={onDone}>
@@ -838,9 +839,7 @@ function PageLinks({
       {rows.map((entry) => (
         <li key={entry.label} className="flex flex-wrap items-baseline gap-2">
           <span className="text-density text-ink">{entry.label}</span>
-          {entry.why === undefined ? null : (
-            <span className="text-sm text-muted">{entry.why}</span>
-          )}
+          {entry.why === undefined ? null : <span className="text-sm text-muted">{entry.why}</span>}
           {entry.url === undefined ? (
             entry.why === undefined ? (
               <span className="text-sm text-muted">no page could be built for its registry</span>

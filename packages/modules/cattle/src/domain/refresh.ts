@@ -1,10 +1,6 @@
 import { HORN_STATUSES, type CattleProfile } from "./cattle-profile.js";
 import type { ImportedAnimal } from "./parsers/page.js";
-import {
-  allRegistrations,
-  normaliseRegistration,
-  type ExternalAnimal,
-} from "./pedigree.js";
+import { allRegistrations, normaliseRegistration, type ExternalAnimal } from "./pedigree.js";
 import { splitRegistration } from "./registries.js";
 
 /**
@@ -343,7 +339,14 @@ export function pedigreeChanges(
     add("colour", ancestor.colour);
     add("dob", asDate(ancestor.dob));
     if (ancestor.position !== undefined) {
-      add("sex", /(^|\s)sire$/.test(ancestor.position) ? "male" : /(^|\s)dam$/.test(ancestor.position) ? "female" : undefined);
+      add(
+        "sex",
+        /(^|\s)sire$/.test(ancestor.position)
+          ? "male"
+          : /(^|\s)dam$/.test(ancestor.position)
+            ? "female"
+            : undefined,
+      );
     }
 
     // Defect results merge rather than replace. A hair card typed in here for
@@ -384,15 +387,10 @@ export function pedigreeChanges(
  * overwrites. And the defect results merge, so a hair card typed against the
  * animal survives a page that only mentions something else.
  */
-export function profileChanges(
-  profile: CattleProfile,
-  imported: ImportedAnimal,
-): FieldChange[] {
+export function profileChanges(profile: CattleProfile, imported: ImportedAnimal): FieldChange[] {
   const changes: FieldChange[] = [];
 
-  const horn = HORN_STATUSES.find(
-    (status) => status === imported.hornStatus?.trim().toLowerCase(),
-  );
+  const horn = HORN_STATUSES.find((status) => status === imported.hornStatus?.trim().toLowerCase());
 
   const read: Record<string, unknown> = {
     ...(imported.breedComposition.length === 0
@@ -407,8 +405,7 @@ export function profileChanges(
     // An empty makeup is no makeup — `breedComposition` defaults to `[]`, and
     // treating that as "already answered" is why a papered animal with no
     // composition on file would never gain one.
-    const blank =
-      current === undefined || (Array.isArray(current) && current.length === 0);
+    const blank = current === undefined || (Array.isArray(current) && current.length === 0);
     if (!blank && same(current, value)) continue;
 
     changes.push({
@@ -459,9 +456,7 @@ export function unknownOnChart(
   const known = new Set<string>();
   for (const animal of existing) {
     for (const registration of allRegistrations(animal)) {
-      known.add(
-        `${registration.association}:${normaliseRegistration(registration.regNumber)}`,
-      );
+      known.add(`${registration.association}:${normaliseRegistration(registration.regNumber)}`);
     }
   }
 

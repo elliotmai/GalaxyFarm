@@ -46,7 +46,9 @@ describe("finding the pedigree tab", () => {
     // before anything is fetched. Following an arbitrary link out of a
     // document's markup would give that guarantee away and turn the route into
     // an open proxy for whatever anyone can get into a page.
-    expect(pedigreeDocuments(`<img src="https://evil.example.com/pedigree?x=1">`, PAGE)).toEqual([]);
+    expect(pedigreeDocuments(`<img src="https://evil.example.com/pedigree?x=1">`, PAGE)).toEqual(
+      [],
+    );
   });
 
   it("ignores a stylesheet or a script named for it", () => {
@@ -65,8 +67,9 @@ describe("finding the pedigree tab", () => {
   });
 
   it("lists each address once, however often the page names it", () => {
-    expect(pedigreeDocuments(`<a href="/p?pedigree=1">x</a><a href="/p?pedigree=1">y</a>`, PAGE))
-      .toHaveLength(1);
+    expect(
+      pedigreeDocuments(`<a href="/p?pedigree=1">x</a><a href="/p?pedigree=1">y</a>`, PAGE),
+    ).toHaveLength(1);
   });
 
   it("finds nothing in a page that names nothing", () => {

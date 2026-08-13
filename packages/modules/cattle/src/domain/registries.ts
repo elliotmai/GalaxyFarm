@@ -137,7 +137,8 @@ export function splitRegistration(value: string, onPage: string): SplitRegistrat
   const bare = trimmed.replace(/^[*\s]+/, "");
 
   const found = /^([A-Z]{2})(\d[\dA-Za-z-]*)$/.exec(bare);
-  const registry = found === null ? undefined : REGISTRIES.find((entry) => entry.prefix === found[1]);
+  const registry =
+    found === null ? undefined : REGISTRIES.find((entry) => entry.prefix === found[1]);
 
   if (found === null || registry === undefined) {
     return { association: onPage, regNumber: trimmed };

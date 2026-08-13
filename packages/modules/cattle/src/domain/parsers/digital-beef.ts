@@ -48,11 +48,7 @@ import { SHORTHORN } from "./shorthorn.js";
  */
 
 /** Every breed served by this template, in its own file. */
-export const DIGITAL_BEEF_BREEDS: readonly DigitalBeefBreed[] = [
-  MAINE_ANJOU,
-  CHIANINA,
-  SHORTHORN,
-];
+export const DIGITAL_BEEF_BREEDS: readonly DigitalBeefBreed[] = [MAINE_ANJOU, CHIANINA, SHORTHORN];
 
 const BY_HOST = new Map(DIGITAL_BEEF_BREEDS.map((breed) => [breed.host, breed]));
 const BY_ASSOCIATION = new Map(DIGITAL_BEEF_BREEDS.map((breed) => [breed.association, breed]));
@@ -217,7 +213,6 @@ export function fieldValue(text: string, labels: readonly string[]): string | un
   return undefined;
 }
 
-
 interface Token {
   readonly kind: "entry" | "gap" | "sire" | "dam";
   readonly entry?: ImportedAncestor;
@@ -276,7 +271,10 @@ export function parsePedigreeEntry(line: string, branch: string): ImportedAncest
   } else {
     // ACA: `reg  name  [ tattoo ]`. Registered numbers never contain a space,
     // so the first cell is the number and everything after it is the name.
-    const parts = before.split(/\t|\s{2,}/).map(cell).filter((part) => part !== "");
+    const parts = before
+      .split(/\t|\s{2,}/)
+      .map(cell)
+      .filter((part) => part !== "");
     registration = parts.shift();
     name = parts.join(" ");
     if (registration !== undefined && !looksLikeRegistration(registration)) {
@@ -297,7 +295,6 @@ export function parsePedigreeEntry(line: string, branch: string): ImportedAncest
     branch,
   };
 }
-
 
 /**
  * A seven-slot subtree, in the order the chart prints it.
@@ -500,9 +497,10 @@ const PEDIGREE_END = /(defect color code|digitalbeef,\s*llc|postnuke|a commercia
  * tab strip as an animal's ancestors. That is exactly what the first version
  * of this did, and it filed "tab left" as a grandsire.
  */
-export function parsePedigreeBlock(
-  text: string,
-): { placed: ImportedAncestor[]; unplaced: ImportedAncestor[] } {
+export function parsePedigreeBlock(text: string): {
+  placed: ImportedAncestor[];
+  unplaced: ImportedAncestor[];
+} {
   const start = PEDIGREE_START.exec(text);
   if (start === null) return { placed: [], unplaced: [] };
 

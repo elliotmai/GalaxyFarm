@@ -81,7 +81,9 @@ export function DigitalBeefImport({
   const [html, setHtml] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
-  const [preview, setPreview] = useState<{ animal: ImportedAnimal; plan: ImportPlan } | undefined>();
+  const [preview, setPreview] = useState<
+    { animal: ImportedAnimal; plan: ImportPlan } | undefined
+  >();
   /** Which proposed merges the person has agreed to. Certain ones are not asked. */
   const [merging, setMerging] = useState<ReadonlySet<string>>(new Set());
 
@@ -211,7 +213,8 @@ export function DigitalBeefImport({
 
       for (const row of plan.rows) {
         const match = row.match;
-        const agreed = match !== undefined && (match.confidence === "certain" || merging.has(row.key));
+        const agreed =
+          match !== undefined && (match.confidence === "certain" || merging.has(row.key));
 
         if (agreed) {
           resolved.set(row.key, match.existingId);
@@ -356,9 +359,10 @@ export function DigitalBeefImport({
             <div className="flex flex-col gap-density pt-density">
               <p className="text-sm text-muted">
                 Open the animal&apos;s page in a browser, select the whole page and copy it, then
-                paste it here. This works behind a login and regardless of what the association&apos;s
-                host thinks of our server. Paste it as it comes — the blank rows in the pedigree
-                chart are what say which ancestors are missing, so do not tidy it up.
+                paste it here. This works behind a login and regardless of what the
+                association&apos;s host thinks of our server. Paste it as it comes — the blank rows
+                in the pedigree chart are what say which ancestors are missing, so do not tidy it
+                up.
               </p>
               <TextArea
                 label="The page"
@@ -506,7 +510,10 @@ function Preview({
 
         {plan.unplaced.length === 0 ? null : (
           <div className="flex flex-col gap-2">
-            <Callout tone="action" title={`${plan.unplaced.length} could not be placed on the chart`}>
+            <Callout
+              tone="action"
+              title={`${plan.unplaced.length} could not be placed on the chart`}
+            >
               The chart had gaps that could not be accounted for, so where these sit is unknown.
               They are still worth saving — but their position has to be set by hand, because
               guessing puts a bull on the wrong side of a pedigree and every relatedness figure
@@ -571,9 +578,7 @@ function Row({
             // bare "13054003" would leave somebody looking for it in the wrong
             // herdbook.
             <Pill tone={row.citedOn === undefined ? "neutral" : "identity"}>
-              {row.citedOn === undefined
-                ? row.regNumber
-                : `${row.association} ${row.regNumber}`}
+              {row.citedOn === undefined ? row.regNumber : `${row.association} ${row.regNumber}`}
             </Pill>
           )}
           <Pill tone="identity">{row.position ?? row.ancestor?.branch ?? "this animal"}</Pill>
