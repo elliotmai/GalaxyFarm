@@ -92,6 +92,9 @@ importers:
       '@galaxy-farm/module-feed':
         specifier: workspace:*
         version: link:../../packages/modules/feed
+      '@galaxy-farm/module-horses':
+        specifier: workspace:*
+        version: link:../../packages/modules/horses
       '@galaxy-farm/ui':
         specifier: workspace:*
         version: link:../../packages/ui
