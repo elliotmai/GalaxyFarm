@@ -173,30 +173,92 @@ Reading across:
 | Operations | Very good, and the densest. Nothing wasted, nothing memorable.              | Best mobile of the nine. This is the language phones were designed in.         | Reads as a big web page. Rounded cards at 64 px look inflated.                  |
 | Stockman   | A dispatch board — fast, but shouty for a screen a client may see.          | Condensed labels buy real estate a phone badly needs.                          | Clearly the best kiosk; the only one that looks like equipment.                  |
 
-## Recommendation
+## Decided: one direction per surface
 
-**Direction 01, held to Direction 02's density — and Direction 03 on the kiosk.**
+**Herd Book on desktop, Operations on mobile, Stockman on the kiosk.**
 
-The density read-across sharpens the earlier recommendation rather than changing
-it. Herd Book wins desktop and mobile; Stockman wins the kiosk outright, and it
-is not close. That pairing is not a compromise between two directions —
-`theme.css` already has the mechanism, `[data-density="kiosk"]`, and the kiosk
-route group already sets it.
+Operations was the best mobile of the nine, so the split is well supported by
+the read-across above. The thing it puts at risk is coherence: three directions
+across three surfaces is either one brand or three, and what decides which is
+the palette. Locking a single set of colour tokens across all three is what
+makes them one product in three densities. Nothing but colour is shared — the
+typography and the container shapes stay per-direction.
 
-What has to be true for it to stay one design system: the two share one palette
-and one set of semantic roles, and only the type treatment and the container
-shape change at the kiosk breakpoint. Herd Book's registry green and oxide carry
-over unchanged; the condensed face and the hard rules come in. That is a
-variant, not a second system.
+That makes the palette the next decision, and the only one still open.
 
-The original argument for Herd Book stands on its own:
+## Palette candidates
 
-Herd Book is the only one of the three that could not belong to another company.
-It takes an identity that already exists and gives it the visual world it came
-from, which is how a design reads as mature rather than as decorated. The
-failure mode is prettiness, so borrow Operations' rigour for the data-dense
-screens — the same tight grid, the same restraint about colour, the same refusal
-to draw a box where a rule will do.
+Six, each with a different primary, each applied to all three surfaces at once:
+<https://claude.ai/code/artifact/d2dc6870-cc71-4714-8c23-6afe08f911f8>. Audited
+by [`tools/palette-audit.py`](../tools/palette-audit.py), which ports the
+formulas from `packages/ui/src/tokens/contrast.ts` so its output can go straight
+into `packages/ui/tests/contrast.test.ts` as assertions once one wins.
+
+| Palette        | Primary   | The argument                                                             |
+| -------------- | --------- | ------------------------------------------------------------------------ |
+| Registry Green | `#2A4B34` | The colour herd books and registration papers are printed in.            |
+| Bluebonnet     | `#35569E` | The value §8 already specifies. Costs no continuity with anything built. |
+| Barn Oxblood   | `#7E2D22` | Barn paint and brand-iron heat. The most agricultural of the six.        |
+| Ink Navy       | `#1E3A5F` | Ledgers and filed documents. The most conservative.                      |
+| Brass          | `#75570F` | Activates the champion accent §8 holds in reserve. The show ring.        |
+| Slate Teal     | `#1F5158` | The one nobody else in agricultural software is using.                   |
+
+All six clear WCAG AA on every text pair; the weakest anywhere is 5.66 against a
+4.5 minimum. Neutrals are not shared between them — each ground and muted
+carries a faint bias toward its own primary, because a pure grey beside a
+coloured accent is what makes a palette read as defaulted rather than chosen.
+
+Two are worth ruling out rather than recommending. **Barn Oxblood** puts its
+primary 4° of hue from its alert — measurably the same colour family — so every
+screen carrying a warning has a button competing with it. **Ink Navy** will
+never be wrong, which is the whole problem with it.
+
+Leaning **Registry Green**: it is the only one that comes from the same argument
+as the redesign itself, and it has the cleanest semantics, since primary and
+confirm are one green and the palette carries three signals rather than four.
+**Brass** is the one to look at twice — it is the more commercial choice and
+points at the show ring rather than the pasture, which is where the boarding
+business lives.
+
+## The light ground breaks the amber safety chip
+
+Not a tidy-up — a real consequence of the change, found by running the audit.
+
+Safety level 3 at `#C98A1E` lands between **2.71 and 2.74** against every
+candidate ground, under the **3.0** that WCAG §1.4.11 requires of a meaningful
+non-text mark. It has never been a problem because it has only ever sat on a
+near-black canvas. Darkening it to **`#BC811C`** clears every ground at 3.07 and
+keeps black ink on it at 5.66.
+
+The ramp stays identical across all six palettes and deliberately outside every
+one of them, exactly as §8 requires — this changes one value in it, for
+legibility, not for style.
+
+## What the decision leaves to settle
+
+The surface split is decided; what is left is making it hold together.
+
+`theme.css` is already the mechanism. `[data-density="kiosk"]` exists and the
+kiosk route group already sets it, so Stockman is a density variant rather than
+a second stylesheet. Mobile and desktop split on the same axis — the
+no-`data-density` media query at 48rem is exactly the Operations/Herd Book
+boundary.
+
+What has to stay true for it to remain one design system:
+
+- **One palette, one set of semantic roles, across all three.** Primary means
+  the same thing on every surface. This is the whole load-bearing constraint,
+  and it is why the palette is the next decision.
+- **One safety ramp**, outside the palette, untouched by any direction.
+- **Only type treatment and container shape vary.** Serif names and hairline
+  rules on desktop; one grotesque and soft cards on mobile; condensed caps and
+  hard rules on the kiosk. Nothing else.
+
+The argument for Herd Book carrying the desktop still stands on its own: it is
+the only one of the three that could not belong to another company, and it takes
+an identity that already exists and gives it the visual world it came from. Its
+failure mode is prettiness, so the desktop should keep Operations' rigour about
+density and colour even though it does not share its typography.
 
 ## Caveat
 
