@@ -114,6 +114,106 @@ SPEC = [
 
 
 # ---------------------------------------------------------------------------
+# Drawing by hand
+#
+# A brand is forged and struck, not plotted. The samples on the page are drawn
+# with a brush and photographed off brand records: the stroke swells and thins,
+# the lines are not quite straight, the two letters of a pair are not clones of
+# each other. Stroking a path at a constant width gives away a machine.
+#
+# So each stroke is emitted as a FILLED outline: the centreline is resampled,
+# nudged off true by a slow wobble, and offset by a half-width that varies as it
+# goes. Corners get a blob so the outside of the turn fills like upset metal.
+# Everything is driven by a seeded PRNG, so the drawing is irregular but the
+# file is reproducible -- rerunning gives byte-identical output.
+# ---------------------------------------------------------------------------
+
+import random
+
+WOBBLE   = 0.013   # how far the line strays, as a fraction of letter height
+WIDTH_V  = 0.22    # how much the stroke swells and thins
+STEP     = 5.0     # resampling interval along a stroke
+
+
+def _noise(rng, n, octaves=(1, 2, 5)):
+    """Slow, smooth deviation -- a drawn line wanders, it does not jitter."""
+    phases = [(rng.uniform(0, 6.283), rng.uniform(0.6, 1.4)) for _ in octaves]
+    out = []
+    for i in range(n):
+        u = i/max(1, n-1)
+        v = sum(a*math.sin(ph + 6.283*k*u*sc)/k
+                for (ph, sc), k, a in zip(phases, octaves, (1.0, 0.5, 0.28)))
+        out.append(v)
+    return out
+
+
+def _resample(piece, step=STEP):
+    if is_curve(piece):
+        (_, a, c, b) = piece
+        n = max(12, int(math.dist(a, b)/step))
+        return [((1-t)**2*a[0] + 2*(1-t)*t*c[0] + t*t*b[0],
+                 (1-t)**2*a[1] + 2*(1-t)*t*c[1] + t*t*b[1])
+                for t in (i/n for i in range(n+1))]
+    out = [piece[0]]
+    for i in range(len(piece)-1):
+        s, e = piece[i], piece[i+1]
+        n = max(1, int(math.dist(s, e)/step))
+        for j in range(1, n+1):
+            out.append((s[0] + (e[0]-s[0])*j/n, s[1] + (e[1]-s[1])*j/n))
+    return out
+
+
+def hand_outline(piece, w, seed, wobble=WOBBLE, width_v=WIDTH_V):
+    """Centreline -> a list of filled outlines: the stroke, then one per corner."""
+    rng = random.Random(seed)
+    pts = _resample(piece)
+    n = len(pts)
+    off = _noise(rng, n)
+    wid = _noise(rng, n)
+    amp = wobble*H
+
+    nrm = []
+    for i in range(n):
+        a, b = pts[max(0, i-1)], pts[min(n-1, i+1)]
+        dx, dy = b[0]-a[0], b[1]-a[1]
+        L = math.hypot(dx, dy) or 1.0
+        nrm.append((-dy/L, dx/L))
+
+    mid = [(pts[i][0] + nrm[i][0]*off[i]*amp,
+            pts[i][1] + nrm[i][1]*off[i]*amp) for i in range(n)]
+    half = [max(0.30*w, 0.5*w*(1 + width_v*wid[i])) for i in range(n)]
+    # the ends of a struck stroke are blunter than its middle
+    for i in range(min(3, n)):
+        k = 0.86 + 0.05*i
+        half[i] *= k
+        half[n-1-i] *= k
+
+    left  = [(mid[i][0] + nrm[i][0]*half[i], mid[i][1] + nrm[i][1]*half[i]) for i in range(n)]
+    right = [(mid[i][0] - nrm[i][0]*half[i], mid[i][1] - nrm[i][1]*half[i]) for i in range(n)]
+
+    d = ["M%.1f %.1f" % left[0]]
+    d += ["L%.1f %.1f" % q for q in left[1:]]
+    d += ["L%.1f %.1f" % q for q in reversed(right)]
+    d.append("Z")
+    out = [" ".join(d)]
+
+    # Corners: a struck turn upsets metal, so the outside of each one fills out.
+    # Emitted as separate paths -- inside one path they would wind against the
+    # outline and punch holes in it instead of joining on to it.
+    if not is_curve(piece):
+        for i in range(1, len(piece)-1):
+            cx, cy = piece[i]
+            r = 0.5*w*rng.uniform(0.80, 1.02)
+            k = 0.5523*r
+            out.append(f"M{cx-r:.1f} {cy:.1f} "
+                       f"C{cx-r:.1f} {cy-k:.1f} {cx-k:.1f} {cy-r:.1f} {cx:.1f} {cy-r:.1f} "
+                       f"C{cx+k:.1f} {cy-r:.1f} {cx+r:.1f} {cy-k:.1f} {cx+r:.1f} {cy:.1f} "
+                       f"C{cx+r:.1f} {cy+k:.1f} {cx+k:.1f} {cy+r:.1f} {cx:.1f} {cy+r:.1f} "
+                       f"C{cx-k:.1f} {cy+r:.1f} {cx-r:.1f} {cy+k:.1f} {cx-r:.1f} {cy:.1f} Z")
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Drawing and checking
 # ---------------------------------------------------------------------------
 
@@ -191,8 +291,12 @@ if __name__ == "__main__":
               f"ratio={int(w)/int(h):.2f} units={units}")
         for p in probs:
             print(f"        - {p}")
-        OUT[name] = (vb, [render(pc) for pc in pieces], units)
-    print(f"\nall pass: {allok}   (letter height {H:.0f}, stroke {STROKE:.0f})")
+        seed = abs(hash(name)) % 100000
+        OUT[name] = (vb,
+                     [hand_outline(pc, STROKE, seed + 17*i) for i, pc in enumerate(pieces)],
+                     [hand_outline(pc, STROKE*1.7, seed + 17*i) for i, pc in enumerate(pieces)],
+                     units)
+    print(f"\nall pass: {allok}   (letter height {H:.0f}, stroke {STROKE:.0f}, drawn by hand with a fixed seed)")
     if allok:
         here = os.path.dirname(os.path.abspath(__file__))
         json.dump(OUT, open(os.path.join(here, "paths.json"), "w"), indent=1)

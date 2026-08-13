@@ -38,6 +38,19 @@ on the page. It came from iron-making sources, about how a smith builds the tool
 and got quietly promoted into rules about how the artwork should look. Some of it
 matters when an iron is actually ordered. None of it belongs in the drawing.
 
+## Drawn, not plotted
+
+A brand is forged and struck. The samples on the page are brushed by hand and
+photographed off brand records: the stroke swells and thins, the lines are not
+quite true, and the two letters of a pair are not copies of each other. A path
+stroked at a constant width reads as machine output at a glance.
+
+So each stroke is emitted as a **filled outline** — the centreline resampled,
+nudged off true by a slow wobble, and offset by a half-width that varies as it
+goes, with the outside of each corner filled out like upset metal. It runs off a
+fixed seed, so the drawing is irregular but the file is reproducible: rerunning
+`iron-check.py` gives byte-identical output.
+
 ## The grammar
 
 | Rule | Value | Detail |
