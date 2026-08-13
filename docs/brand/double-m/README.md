@@ -11,7 +11,7 @@ business names.
 
 Open **[`concepts.html`](./concepts.html)** to see them — every mark rendered on
 both real grounds (Midnight Nebula and Bluebonnet Linen) at 96, 64, 40 and
-24&nbsp;px, plus three pixel tests of the leading candidates rasterised at true
+24&nbsp;px, plus four pixel tests of the leading candidates rasterised at true
 24 and 16&nbsp;px (`pixel-test.png` … `pixel-test-4.png`).
 
 Sixteen are drawn in the sheet's rounded brand-iron language. Eight are
