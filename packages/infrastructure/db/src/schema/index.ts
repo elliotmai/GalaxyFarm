@@ -858,7 +858,17 @@ export const users = pgTable(
     email: text("email").notNull().unique(),
     name: text("name").notNull(),
     role: text("role").notNull(),
-    passwordHash: text("password_hash").notNull(),
+    /**
+     * Null until they accept an invitation and choose one themselves.
+     *
+     * Nobody sets somebody else's password here: a password two people know
+     * arrives over whatever channel was to hand and is almost never changed
+     * afterwards.
+     */
+    passwordHash: text("password_hash"),
+    /** The hash of the invitation token, never the token. Cleared on use. */
+    inviteTokenHash: text("invite_token_hash"),
+    inviteExpiresAt: timestamp("invite_expires_at", { withTimezone: true, mode: "date" }),
     /** Set for `housesitter`: outside this window they have no access at all. */
     accessFrom: timestamp("access_from", { withTimezone: true, mode: "date" }),
     accessTo: timestamp("access_to", { withTimezone: true, mode: "date" }),

@@ -120,6 +120,8 @@ Roles from day one, cheap to add now and painful later:
 
 Permission checks live in the application layer (use cases declare required capability), not in UI conditionals.
 
+**Accounts are invited, never issued with a password.** There is no public sign-up: an owner adds somebody by name, email, and role from `/admin/settings`, and the account is created with *no* password and a single-use invitation link (256-bit token, stored only as a SHA-256 hash, good once, lapsing after a week). They set their own password at `/invite/[token]`. A password chosen on somebody's behalf is a password two people know, it travels over whatever channel is to hand, and it is almost never changed afterwards. The same action re-issues a link, which makes it the password-reset path as well — and re-issuing invalidates whatever came before it. Until acceptance the account exists, holds its role, appears in the list, and cannot sign in: "invited and never accepted" and "switched off" are different states with different answers, and one `active` flag would say the same thing about both. A `housesitter` cannot be saved without both ends of an access window, because access that never lapses is the one thing the role exists to prevent.
+
 ### 4.4 Kiosk mode
 
 Barn screens pair via a one-time code and hold a long-lived device token. Kiosk home offers preset boards: **Pen Board** (property map + who's where + care instructions), **Calendar**, **Today's Chores**, **Egg Quick-Entry** (big +1 buttons per coop/color/size), **Program Day Sheet** (today's show-program schedule as a calf × activity grid — tap to check off rinses, exercise, and training slots as they happen), and **Housesitter Mode**. Large touch targets, high contrast, auto-refresh on sync, screen-wake hints. Any screen can be locked to a single board from settings.
@@ -375,6 +377,8 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /                               landing (public, later)
 /book                           public booking request (Phase 5)
 /login
+/invite/[token]                 set a first password from a single-use invitation; public by
+                                necessity, since the account cannot be signed in to yet
 
 /admin                          dashboard: today's chores, alerts, calving countdowns, run-outs
 /admin/map                      property map — draw pens/pastures over aerial photo,

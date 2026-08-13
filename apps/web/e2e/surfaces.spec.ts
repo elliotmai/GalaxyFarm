@@ -105,6 +105,17 @@ test.describe("public surfaces", () => {
   // Signed out on purpose: these are the pages a stranger sees.
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test("an invitation link nobody can act on renders rather than 500ing", async ({ page }) => {
+    // This suite runs with `DATABASE_URL` pointing nowhere on purpose, so this
+    // exercises the unreachable-database path. Both outcomes are a rendered
+    // page with an explanation: a link that cannot be checked and a link that
+    // is not real need opposite advice, and neither needs a stack trace.
+    const response = await page.goto("/invite/not-a-real-token");
+
+    expect(response?.status()).toBe(200);
+    await expect(page.getByText(/does not work|cannot check that link/i)).toBeVisible();
+  });
+
   for (const route of ["/", "/book", "/login"] as const) {
     test(`${route} renders Bluebonnet Linen`, async ({ page }) => {
       const response = await page.goto(route);

@@ -30,9 +30,15 @@ export function database(): Database {
   return cached;
 }
 
-/** Row to entity. The password hash is handed back separately, never on the User. */
-function toCredential(row: typeof users.$inferSelect): StoredCredential {
-  const user: User = {
+/**
+ * Row to entity.
+ *
+ * Both secrets are dropped here rather than further up: `userFromRow` is what
+ * every screen and every action reads, and the one place that keeps a hash is
+ * this file's own `StoredCredential`, which never leaves the sign-in path.
+ */
+export function userFromRow(row: typeof users.$inferSelect): User {
+  return {
     id: row.id as User["id"],
     propertyId: row.propertyId as User["propertyId"],
     createdAt: row.createdAt,
@@ -46,9 +52,16 @@ function toCredential(row: typeof users.$inferSelect): StoredCredential {
     ...(row.accessTo === null ? {} : { accessTo: row.accessTo }),
     ...(row.contactId === null ? {} : { contactId: row.contactId as User["contactId"] }),
     ...(row.lastSignedInAt === null ? {} : { lastSignedInAt: row.lastSignedInAt }),
+    ...(row.inviteExpiresAt === null ? {} : { inviteExpiresAt: row.inviteExpiresAt }),
   };
+}
 
-  return { user, passwordHash: row.passwordHash };
+/** The password hash is handed back separately, never on the User. */
+function toCredential(row: typeof users.$inferSelect): StoredCredential {
+  return {
+    user: userFromRow(row),
+    ...(row.passwordHash === null ? {} : { passwordHash: row.passwordHash }),
+  };
 }
 
 export function credentialStore(db: Database = database()): CredentialStore {

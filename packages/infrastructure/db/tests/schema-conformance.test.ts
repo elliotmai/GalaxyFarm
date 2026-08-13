@@ -111,9 +111,12 @@ const SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
  * Short and justified on purpose — this is the one place the check is loosened.
  */
 const SERVER_ONLY: Readonly<Record<string, readonly string[]>> = {
-  // The hash never leaves the server and is not part of the domain type: §4.3
-  // keeps credentials out of anything that syncs to a device.
-  users: ["passwordHash"],
+  // Neither hash leaves the server, and neither is part of the domain type:
+  // §4.3 keeps credentials out of anything that reaches a screen. The
+  // invitation's *expiry* is on the entity — a screen has to say whether an
+  // invitation is still live — and only the token that would let somebody
+  // claim the account stays behind.
+  users: ["passwordHash", "inviteTokenHash"],
 };
 
 /**

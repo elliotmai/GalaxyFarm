@@ -21,7 +21,13 @@ import { hashPassword, needsRehash, verifyPassword } from "./password.js";
 
 export interface StoredCredential {
   readonly user: User;
-  readonly passwordHash: string;
+  /**
+   * Absent until they accept their invitation and choose one.
+   *
+   * A real state rather than a missing value: the account exists, holds its
+   * role, and appears in the list — it just cannot be signed in to yet.
+   */
+  readonly passwordHash?: string | undefined;
 }
 
 /**
@@ -72,6 +78,15 @@ export async function signIn(
   const found = await store.findByEmail(email);
 
   if (found === undefined) {
+    await verifyPassword(credentials.password, await decoy());
+    return { ok: false, failure: { kind: "invalid-credentials" } };
+  }
+
+  // Invited, never accepted. Refused like any other bad sign-in and for the
+  // same time, because "that account exists but has not set a password yet" is
+  // exactly the sentence an enumerator is fishing for. The person who owns the
+  // address still has their link, and it still says what to do.
+  if (found.passwordHash === undefined || found.passwordHash === "") {
     await verifyPassword(credentials.password, await decoy());
     return { ok: false, failure: { kind: "invalid-credentials" } };
   }

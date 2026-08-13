@@ -9,8 +9,6 @@ import {
   Card,
   Checkbox,
   DetailList,
-  PageBody,
-  PageHeader,
   Section,
   TextInput,
   useToast,
@@ -125,34 +123,36 @@ export function WatchSettingsScreen({
   if (loading) return <p className="text-muted">Loading…</p>;
 
   if (property === undefined) {
-    return (
-      <PageBody>
-        <PageHeader title="Settings" subtitle="No property on this device yet." />
-      </PageBody>
-    );
+    return <p className="text-muted">No property on this device yet.</p>;
   }
 
   const located = property.latitude !== undefined && property.longitude !== undefined;
 
   return (
-    <PageBody>
-      <PageHeader
-        eyebrow="Settings"
+    <div className="flex flex-col gap-density">
+      {/*
+        An `h2`, not an `h1`: this is one tab of `/admin/settings` now, and the
+        shell owns the page heading. Two `h1`s on a page is one too many for
+        anybody navigating it by headings.
+      */}
+      <Section
         title="Calving watch"
-        subtitle="What the forecast has to do before anybody hears about it."
-        meta={
-          located ? (
-            <Badge tone="calm">Located</Badge>
-          ) : (
-            <Badge tone="danger">No coordinates — no forecast</Badge>
-          )
-        }
+        description="What the forecast has to do before anybody hears about it."
         actions={
-          <Button onClick={() => void save()} busy={busy} disabled={!dirty}>
-            {dirty ? "Save" : "Saved"}
-          </Button>
+          <span className="flex items-center gap-2">
+            {located ? (
+              <Badge tone="calm">Located</Badge>
+            ) : (
+              <Badge tone="danger">No coordinates — no forecast</Badge>
+            )}
+            <Button onClick={() => void save()} busy={busy} disabled={!dirty}>
+              {dirty ? "Save" : "Saved"}
+            </Button>
+          </span>
         }
-      />
+      >
+        <span className="sr-only">Calving watch settings</span>
+      </Section>
 
       {located ? null : (
         <Card title="This property has no coordinates">
@@ -284,7 +284,7 @@ export function WatchSettingsScreen({
           ]}
         />
       </Section>
-    </PageBody>
+    </div>
   );
 }
 
