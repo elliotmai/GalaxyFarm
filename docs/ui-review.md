@@ -4,9 +4,16 @@ Written against `claude/ui-redesign-brainstorm-p0nl0p`, in response to three
 complaints about the admin surface: it takes a while to load, it feels flat and
 basic, and it feels cluttered.
 
-Each one has a specific cause in the repository. None of them is a problem with
-the design language — §8 is a good, well-argued system, and the largest single
-cause of "flat" is that a piece of it was never wired up.
+Each one has a specific cause in the repository, and the largest single cause of
+"flat" is that a piece of §8 was never wired up.
+
+> **Superseded in part.** This review concluded that the design language itself
+> was sound and needed only to be delivered properly. The owner's call is that
+> Midnight Nebula does not read as mature or professional enough, so §8 is being
+> replaced — see [`ui-redesign.md`](./ui-redesign.md). Everything below about
+> the missing typefaces, the load path and the information architecture still
+> holds and still has to be done; only the closing argument against a redesign
+> no longer applies.
 
 A rendered version of this review, with before-and-after mockups in Midnight
 Nebula, is at <https://claude.ai/code/artifact/f3d7d443-64fd-4746-9746-812f8a9369fa>.
