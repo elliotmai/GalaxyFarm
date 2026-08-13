@@ -602,7 +602,9 @@ function PlanForm({
         target,
         // A group plan still needs a target id; the herd is the property.
         targetId: (target === "group"
-          ? (plan?.target === "group" ? plan.targetId : feeds[0]?.propertyId)
+          ? plan?.target === "group"
+            ? plan.targetId
+            : feeds[0]?.propertyId
           : targetId) as Ulid,
         lines: written,
         ...(notes.trim() === "" ? {} : { specialNotes: notes.trim() }),
@@ -742,16 +744,14 @@ function PlanForm({
               )}
             </div>
 
-            <p className="text-sm text-muted lg:col-span-5">{describeLine(line, feedById.get(line.feedId))}</p>
+            <p className="text-sm text-muted lg:col-span-5">
+              {describeLine(line, feedById.get(line.feedId))}
+            </p>
           </div>
         ))}
 
         <div>
-          <Button
-            variant="ghost"
-            type="button"
-            onClick={() => setLines([...lines, blankLine()])}
-          >
+          <Button variant="ghost" type="button" onClick={() => setLines([...lines, blankLine()])}>
             Add another feed
           </Button>
         </div>
@@ -778,4 +778,3 @@ function PlanForm({
     </form>
   );
 }
-

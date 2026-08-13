@@ -273,5 +273,11 @@ export function canRefresh(code: string, registration?: string): boolean {
  */
 export const isAssociation = (code: string): code is Association => {
   const named = registryCode(code);
-  return named === "Maine-Anjou" || named === "Chianina" || named === "Shorthorn" || named === "Angus" || named === "other";
+  return (
+    named === "Maine-Anjou" ||
+    named === "Chianina" ||
+    named === "Shorthorn" ||
+    named === "Angus" ||
+    named === "other"
+  );
 };

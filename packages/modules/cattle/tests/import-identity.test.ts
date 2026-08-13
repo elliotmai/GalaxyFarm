@@ -27,26 +27,17 @@ const external = (over: Partial<ExternalAnimal> & { name: string }): ExternalAni
     ...over,
   }) as ExternalAnimal;
 
-<<<<<<< HEAD
 const chianina = () =>
-  parseDigitalBeefPage(CHIANINA_PAGE, { association: "ACA", registration: "359968" });
+  parseDigitalBeefPage(CHIANINA_PAGE, { association: "Chianina", registration: "359968" });
 const maine = () =>
-  parseDigitalBeefPage(MAINE_ANJOU_PAGE, { association: "AMAA", registration: "402303" });
-=======
-const chianina = () => parseDigitalBeefPage(CHIANINA_PAGE, { association: "Chianina", registration: "359968" });
-const maine = () => parseDigitalBeefPage(MAINE_ANJOU_PAGE, { association: "Maine-Anjou", registration: "402303" });
->>>>>>> 77ed80d (Name a registry by its breed, not the association's initials)
+  parseDigitalBeefPage(MAINE_ANJOU_PAGE, { association: "Maine-Anjou", registration: "402303" });
 
 describe("every number an animal is known by", () => {
   it("reads a record written before there was more than one", () => {
     expect(
-<<<<<<< HEAD
       allRegistrations(
-        external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "AMAA" }),
+        external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "Maine-Anjou" }),
       ),
-    ).toEqual([{ association: "AMAA", regNumber: "378987" }]);
-=======
-      allRegistrations(external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "Maine-Anjou" })),
     ).toEqual([{ association: "Maine-Anjou", regNumber: "378987" }]);
   });
 
@@ -55,7 +46,9 @@ describe("every number an animal is known by", () => {
     // the stored rows, but a device that has been offline since still holds
     // this, and it has to read as the same registry either way.
     expect(
-      allRegistrations(external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "AMAA" })),
+      allRegistrations(
+        external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "AMAA" }),
+      ),
     ).toEqual([{ association: "Maine-Anjou", regNumber: "378987" }]);
   });
 
@@ -69,10 +62,7 @@ describe("every number an animal is known by", () => {
       registrations: [{ association: "Maine-Anjou", regNumber: "378987" }],
     });
 
-    expect(allRegistrations(animal)).toEqual([
-      { association: "Maine-Anjou", regNumber: "378987" },
-    ]);
->>>>>>> 77ed80d (Name a registry by its breed, not the association's initials)
+    expect(allRegistrations(animal)).toEqual([{ association: "Maine-Anjou", regNumber: "378987" }]);
   });
 
   it("does not list the same number twice under one registry", () => {
@@ -90,7 +80,11 @@ describe("every number an animal is known by", () => {
 });
 
 describe("recognising an animal already on file", () => {
-  const jenna = external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "Maine-Anjou" });
+  const jenna = external({
+    name: "ZNT JENNA 707T",
+    regNumber: "378987",
+    association: "Maine-Anjou",
+  });
 
   it("is certain about the same registry and the same number", () => {
     const match = matchCandidate(
@@ -107,16 +101,12 @@ describe("recognising an animal already on file", () => {
     // Two cows called SWEET DANDY in one county is an ordinary Tuesday. A
     // wrong merge welds two animals' descendants together and nothing on any
     // screen looks unusual afterwards; a duplicate is visible and fixable.
-<<<<<<< HEAD
     const match = matchCandidate(
       { name: "ZNT JENNA 707T", regNumber: "337003" },
-      "ACA",
+      "Chianina",
       [jenna],
       new Map(),
     );
-=======
-    const match = matchCandidate({ name: "ZNT JENNA 707T", regNumber: "337003" }, "Chianina", [jenna], new Map());
->>>>>>> 77ed80d (Name a registry by its breed, not the association's initials)
 
     expect(match).toBeUndefined();
   });
@@ -264,7 +254,11 @@ describe("planning an import", () => {
 
 describe("folding a number into a record", () => {
   it("adds the new registry and keeps the old one", () => {
-    const jenna = external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "Maine-Anjou" });
+    const jenna = external({
+      name: "ZNT JENNA 707T",
+      regNumber: "378987",
+      association: "Maine-Anjou",
+    });
 
     expect(mergeRegistration(jenna, { association: "Chianina", regNumber: "337003" })).toEqual({
       registrations: [
@@ -277,8 +271,14 @@ describe("folding a number into a record", () => {
   it("returns nothing to do when the number is already there", () => {
     // So a re-import does not bump `updatedAt` on thirty ancestors and send a
     // whole pedigree back over the wire for no change.
-    const jenna = external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "Maine-Anjou" });
+    const jenna = external({
+      name: "ZNT JENNA 707T",
+      regNumber: "378987",
+      association: "Maine-Anjou",
+    });
 
-    expect(mergeRegistration(jenna, { association: "Maine-Anjou", regNumber: "378987" })).toBeUndefined();
+    expect(
+      mergeRegistration(jenna, { association: "Maine-Anjou", regNumber: "378987" }),
+    ).toBeUndefined();
   });
 });

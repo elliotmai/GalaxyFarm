@@ -62,8 +62,7 @@ const TO_GRAPH: Record<string, string> = Object.fromEntries(
  * Through `registryCode` first, so a filter carrying a registration's stored
  * spelling still translates when that record predates the rename.
  */
-export const graphAssociation = (code: string): string =>
-  TO_GRAPH[registryCode(code)] ?? code;
+export const graphAssociation = (code: string): string => TO_GRAPH[registryCode(code)] ?? code;
 export const ourAssociation = (code: string): string => TO_OURS[code] ?? code;
 
 export interface RegistryGraphOptions {

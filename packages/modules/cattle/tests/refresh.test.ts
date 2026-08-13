@@ -43,15 +43,11 @@ const page = () =>
 
 describe("what a fresh read would change", () => {
   it("proposes filling in what the record does not have", () => {
-<<<<<<< HEAD
     const thin = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
     });
-=======
-    const thin = external({ name: "ZNT MONTEGO BAY 901W", regNumber: "402303", association: "Maine-Anjou" });
->>>>>>> 77ed80d (Name a registry by its breed, not the association's initials)
     const changes = refreshChanges(thin, page());
 
     expect(changes.map((change) => change.field)).toEqual(
@@ -190,7 +186,11 @@ describe("what a page says about the other animals on it", () => {
     // everything descended from it. A refresh that only read the detail panel
     // reported "nothing has changed" for a whole herd, every time, without
     // ever saying it had looked somewhere they could not be.
-    const tyson = external({ name: "CMAC TYSON ET", regNumber: "MA364424", association: "Chianina" });
+    const tyson = external({
+      name: "CMAC TYSON ET",
+      regNumber: "MA364424",
+      association: "Chianina",
+    });
 
     const [finding] = pedigreeChanges(chianina(), [tyson]);
     const defects = finding?.changes.find((change) => change.field === "geneticTests");
@@ -246,7 +246,11 @@ describe("what a page says about the other animals on it", () => {
   });
 
   it("takes the tattoo and the sex off the slot as well", () => {
-    const thin = external({ name: "COWAN'S ALI 4M", regNumber: "MA307184", association: "Chianina" });
+    const thin = external({
+      name: "COWAN'S ALI 4M",
+      regNumber: "MA307184",
+      association: "Chianina",
+    });
     const [finding] = pedigreeChanges(chianina(), [thin]);
     const fields = (finding?.changes ?? []).map((change) => change.field);
 
@@ -326,8 +330,16 @@ describe("the breed makeup a refresh can actually find", () => {
 });
 
 describe("wiring the parents a page names", () => {
-  const tyson = external({ name: "CMAC TYSON ET", regNumber: "364424", association: "Maine-Anjou" });
-  const jenna = external({ name: "ZNT JENNA 707T", regNumber: "378987", association: "Maine-Anjou" });
+  const tyson = external({
+    name: "CMAC TYSON ET",
+    regNumber: "364424",
+    association: "Maine-Anjou",
+  });
+  const jenna = external({
+    name: "ZNT JENNA 707T",
+    regNumber: "378987",
+    association: "Maine-Anjou",
+  });
 
   it("links a sire and dam the record does not have yet", () => {
     // The detail panel names both outright. An ancestor entered by hand off a
@@ -368,15 +380,11 @@ describe("wiring the parents a page names", () => {
   });
 
   it("proposes nothing when the parent is not on file", () => {
-<<<<<<< HEAD
     const orphan = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
     });
-=======
-    const orphan = external({ name: "ZNT MONTEGO BAY 901W", regNumber: "402303", association: "Maine-Anjou" });
->>>>>>> 77ed80d (Name a registry by its breed, not the association's initials)
 
     expect(refreshChanges(orphan, page(), []).some((c) => c.field === "sire")).toBe(false);
   });
@@ -386,15 +394,11 @@ describe("wiring the parents a page names", () => {
     // pedigree pointed at the wrong one looks entirely normal afterwards.
     const one = external({ name: "CMAC TYSON ET" });
     const two = external({ name: "CMAC TYSON ET" });
-<<<<<<< HEAD
     const orphan = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
     });
-=======
-    const orphan = external({ name: "ZNT MONTEGO BAY 901W", regNumber: "402303", association: "Maine-Anjou" });
->>>>>>> 77ed80d (Name a registry by its breed, not the association's initials)
 
     expect(refreshChanges(orphan, page(), [one, two]).some((c) => c.field === "sire")).toBe(false);
   });
@@ -407,15 +411,11 @@ describe("wiring the parents a page names", () => {
       regNumber: "364424",
       association: "Chianina",
     });
-<<<<<<< HEAD
     const orphan = external({
       name: "ZNT MONTEGO BAY 901W",
       regNumber: "402303",
-      association: "AMAA",
+      association: "Maine-Anjou",
     });
-=======
-    const orphan = external({ name: "ZNT MONTEGO BAY 901W", regNumber: "402303", association: "Maine-Anjou" });
->>>>>>> 77ed80d (Name a registry by its breed, not the association's initials)
 
     expect(refreshChanges(orphan, page(), [wrongRegistry]).some((c) => c.field === "sire")).toBe(
       false,
@@ -580,7 +580,11 @@ describe("what the chart says about the ancestors on it", () => {
     // `MA364424` on this Chianina page is Maine-Anjou 364424, and that is
     // where the importer put him.
     const page = imported();
-    const tyson = external({ name: "CMAC TYSON ET", regNumber: "364424", association: "Maine-Anjou" });
+    const tyson = external({
+      name: "CMAC TYSON ET",
+      regNumber: "364424",
+      association: "Maine-Anjou",
+    });
 
     expect(pedigreeChanges(page, [tyson])).toHaveLength(1);
   });
@@ -589,7 +593,11 @@ describe("what the chart says about the ancestors on it", () => {
     // Records written before the prefix was understood are filed under the
     // printing registry with the tag still on the number. They keep working.
     const page = imported();
-    const tyson = external({ name: "CMAC TYSON ET", regNumber: "MA364424", association: "Chianina" });
+    const tyson = external({
+      name: "CMAC TYSON ET",
+      regNumber: "MA364424",
+      association: "Chianina",
+    });
 
     expect(pedigreeChanges(page, [tyson])).toHaveLength(1);
   });

@@ -28,8 +28,11 @@ import { SHORTHORN_PAGE } from "./fixtures/shorthorn-pages.js";
  * generations of ancestors. Fixtures that agree with the parser prove nothing.
  */
 
-const read = (page: string, association: "Maine-Anjou" | "Chianina" | "Shorthorn", registration: string) =>
-  parseDigitalBeefPage(page, { association, registration });
+const read = (
+  page: string,
+  association: "Maine-Anjou" | "Chianina" | "Shorthorn",
+  registration: string,
+) => parseDigitalBeefPage(page, { association, registration });
 
 const at = (animal: ImportedAnimal, position: string) =>
   animal.ancestors.find((ancestor) => ancestor.position === position);
@@ -46,14 +49,10 @@ describe("the address", () => {
       "https://shorthorn.digitalbeef.com/modules.php?op=modload&name=_animal&file=_animal&animal_registration=4219133",
     );
 
-<<<<<<< HEAD
     expect(parsed).toMatchObject({
       ok: true,
-      ref: { association: "ASA", registration: "4219133" },
+      ref: { association: "Shorthorn", registration: "4219133" },
     });
-=======
-    expect(parsed).toMatchObject({ ok: true, ref: { association: "Shorthorn", registration: "4219133" } });
->>>>>>> 77ed80d (Name a registry by its breed, not the association's initials)
   });
 
   it("refuses a host it does not know rather than guessing", () => {

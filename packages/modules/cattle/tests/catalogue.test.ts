@@ -133,9 +133,9 @@ describe("planning a copy", () => {
 
     const plan = planCatalogueImport(montego, above, [onFile]);
 
-    expect(
-      plan.rows.find((row) => row.animal.regNumber === "378987")?.match?.confidence,
-    ).toBe("certain");
+    expect(plan.rows.find((row) => row.animal.regNumber === "378987")?.match?.confidence).toBe(
+      "certain",
+    );
   });
 
   it("proposes rather than assumes a match on name and birthday", () => {

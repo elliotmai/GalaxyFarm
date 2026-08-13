@@ -42,7 +42,9 @@ describe("one feed, two units", () => {
 
   it("ignores a line where nothing has been chosen yet", () => {
     // Two half-filled rows are not a disagreement about anything.
-    expect(mixedUnitFeed([line({ feedId: "" }), line({ feedId: "", unit: "bag" })])).toBeUndefined();
+    expect(
+      mixedUnitFeed([line({ feedId: "" }), line({ feedId: "", unit: "bag" })]),
+    ).toBeUndefined();
   });
 });
 
@@ -71,7 +73,9 @@ describe("saying a line back while it is typed", () => {
   it("does not apply a bale's weight to a scoop of it", () => {
     // A 1,200 lb round bale says nothing about what a scoop of it weighs, and
     // borrowing the figure would report a scoop as most of a ton.
-    expect(describeLine(line({ amount: "1" }), { unit: "round_bale", estWeightLbPerUnit: 1200 })).toBe(
+    expect(
+      describeLine(line({ amount: "1" }), { unit: "round_bale", estWeightLbPerUnit: 1200 }),
+    ).toBe(
       `1 scoop each time — 2 scoops a day, about ${Number((POUNDS_PER_SCOOP * 2).toFixed(1))} lb.`,
     );
   });

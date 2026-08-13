@@ -152,7 +152,9 @@ export function catalogueRecord(row: CatalogueRow): Partial<ExternalAnimal> {
     ...(animal.colour === undefined ? {} : { colour: animal.colour }),
     ...(animal.hornStatus === undefined ? {} : { hornStatus: animal.hornStatus }),
     ...(animal.classification === undefined ? {} : { classification: animal.classification }),
-    ...(animal.breed === undefined || animal.breed.length === 0 ? {} : { breed: [...animal.breed] }),
+    ...(animal.breed === undefined || animal.breed.length === 0
+      ? {}
+      : { breed: [...animal.breed] }),
     ...(animal.breedComposition === undefined || animal.breedComposition.length === 0
       ? {}
       : { breedComposition: [...animal.breedComposition] }),

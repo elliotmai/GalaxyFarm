@@ -194,8 +194,7 @@ export function CatalogueScreen({
     try {
       for (const row of opened.plan.rows) {
         const agreed =
-          row.match !== undefined &&
-          (row.match.confidence === "certain" || merging.has(row.key));
+          row.match !== undefined && (row.match.confidence === "certain" || merging.has(row.key));
 
         if (agreed) {
           const existing = onFile.find((animal) => animal.id === row.match?.existingId);
@@ -218,7 +217,10 @@ export function CatalogueScreen({
         }
 
         const outcome = await api.create(
-          catalogueRecord(row) as Omit<ExternalAnimal, "id" | "propertyId" | "createdAt" | "updatedAt">,
+          catalogueRecord(row) as Omit<
+            ExternalAnimal,
+            "id" | "propertyId" | "createdAt" | "updatedAt"
+          >,
         );
         if (outcome.ok) {
           ids.set(row.key, outcome.value.id);
@@ -275,9 +277,11 @@ export function CatalogueScreen({
         header: "Papers",
         render: (animal) => (
           <span className="flex flex-wrap gap-1">
-            {(animal.registrations ?? [
-              { association: animal.association, regNumber: animal.regNumber },
-            ]).map((entry) => (
+            {(
+              animal.registrations ?? [
+                { association: animal.association, regNumber: animal.regNumber },
+              ]
+            ).map((entry) => (
               <Pill key={`${entry.association}-${entry.regNumber}`} tone="identity">
                 {entry.association} {entry.regNumber}
               </Pill>
@@ -400,7 +404,11 @@ export function CatalogueScreen({
         </Section>
       )}
 
-      {opening ? <Callout tone="neutral" title="Reading the pedigree…">Walking back {MAX_CATALOGUE_GENERATIONS} generations.</Callout> : null}
+      {opening ? (
+        <Callout tone="neutral" title="Reading the pedigree…">
+          Walking back {MAX_CATALOGUE_GENERATIONS} generations.
+        </Callout>
+      ) : null}
 
       {opened === undefined ? null : (
         <BringAcross
@@ -443,7 +451,8 @@ function BringAcross({
   const url = registrationUrl(animal.association, animal.regNumber);
 
   const newRecords = plan.rows.filter(
-    (row) => row.match === undefined || (row.match.confidence !== "certain" && !merging.has(row.key)),
+    (row) =>
+      row.match === undefined || (row.match.confidence !== "certain" && !merging.has(row.key)),
   ).length;
 
   const toggle = (key: string): void => {

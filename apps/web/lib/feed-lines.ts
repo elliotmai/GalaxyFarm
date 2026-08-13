@@ -1,5 +1,10 @@
 import { feedingsPerDay, type FeedingFrequency, type Unit } from "@galaxy-farm/core";
-import { describeGrain, isGrainMeasure, measureToPounds, type FeedType } from "@galaxy-farm/module-feed";
+import {
+  describeGrain,
+  isGrainMeasure,
+  measureToPounds,
+  type FeedType,
+} from "@galaxy-farm/module-feed";
 
 /**
  * The arithmetic behind a feeding plan's lines (spec §5.3).
@@ -29,9 +34,7 @@ export interface PlanLineDraft {
 export function mixedUnitFeed(lines: readonly PlanLineDraft[]): string | undefined {
   for (const line of lines) {
     if (line.feedId === "") continue;
-    const clash = lines.find(
-      (other) => other.feedId === line.feedId && other.unit !== line.unit,
-    );
+    const clash = lines.find((other) => other.feedId === line.feedId && other.unit !== line.unit);
     if (clash !== undefined) return line.feedId;
   }
   return undefined;
@@ -58,7 +61,8 @@ export function describeLine(
 
   // The feed's own weight applies only to the unit it is catalogued in. A
   // 1,200 lb round bale says nothing about what a scoop of it weighs.
-  const perUnit = feed !== undefined && feed.unit === line.unit ? feed.estWeightLbPerUnit : undefined;
+  const perUnit =
+    feed !== undefined && feed.unit === line.unit ? feed.estWeightLbPerUnit : undefined;
   const pounds = measureToPounds(amount, line.unit, perUnit);
   if (pounds === undefined) return "";
 
