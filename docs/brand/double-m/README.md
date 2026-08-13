@@ -1,135 +1,107 @@
 # Double M — logo concepts
 
-Nine candidate marks for a "Double M" identity: six shortlisted from twenty-seven,
-plus three sharpened, rocker-less versions of two of those six. All read in the
-same livestock-brand grammar as the approved **Rocking Double Star** and coloured
-from `packages/config/tailwind.preset.ts`.
+Eight candidate marks for a "Double M" identity, drawn as things you could
+actually have made. Coloured from `packages/config/tailwind.preset.ts`, read in
+the same livestock-brand grammar as the approved **Rocking Double Star**.
 
 **Status: exploration.** Nothing here is approved and nothing here replaces the
 star mark in `packages/ui/src/brand/`. These are candidates for whenever issue
 [#26](https://github.com/elliotmai/GalaxyFarm/issues/26) settles the farm and
 business names.
 
-Open **[`concepts.html`](./concepts.html)** to see them — each on both real
-grounds (Midnight Nebula and Bluebonnet Linen) at 96, 64, 40 and 24&nbsp;px, plus
-the two tests below.
+Open **[`concepts.html`](./concepts.html)**. Numbering carries over from the
+earlier sheets, so the gaps are the cuts; the full history — twenty-seven marks,
+then six, then nine — is in git if any of it is wanted back.
 
-Numbering is the original twenty-seven-mark sheet's, so the gaps are the cuts; a
-letter suffix (1a, 1b, 11a) means a mark derived from the number it carries. The
-full set is in git history if a dropped one is wanted back.
+## An iron is bent bar
 
-## The two tests
+This is the fact the earlier sheets got backwards. A branding iron is flat steel
+stock bent into shape, so **every corner is an arc** — flat bar bends, it does not
+fold. A mitred corner isn't a drawing decision, it's a cut and two welds: weaker,
+more expensive, and it burns hotter than the rest of the iron.
 
-Each mark carries two verdicts, and they are not the same threshold.
+Those sheets were organised around a fork between "rounded brand-iron language"
+and the sketches' "sharp mitred language," and treated choosing between them as
+the real decision. Once corners have to be bends, the fork closes. There is one
+language and it is the rounded one. The sharp set were drawings of an iron nobody
+would make.
 
-- **Screen** — rasterised at true 24 and 16&nbsp;px (`pixel-test.png`), because
-  SVG draws crisply at any size and flatters everything.
-- **Iron** — every stroke thickened 1.7×, standing in for heat spreading through
-  hide as the iron lands.
+## The rules
 
-Both destroy the same thing first: the narrow gap between two roughly-parallel
-strokes. But heat spreads further than a pixel grid rounds, so a mark can pass
-one and fail the other — and two of the six do.
+Five constraints, all physical. Every mark is checked against them by
+measurement; the numbers are quoted per mark on the sheet.
 
-## The six
+| Rule | Value | Because |
+| --- | --- | --- |
+| Bar face | 6.5% of letter height | ¼ inch bar on a 4 inch brand |
+| Bend radius | 1.5 × bar width | flat bar cracks below this |
+| Minimum angle | 60° | an acute crotch pools heat from both arms and blots |
+| Clear space | 2.5 × bar width | the scar spreads to ~1.7× the bar face |
+| Pieces | fewer is better | separate elements need a backing plate and heat unevenly |
 
-| # | Mark | Language | Screen | Iron |
+**Bar face was the number the earlier sheets had wrong.** They drew at 16% of
+letter height. At that weight the minimum bend radius swallows the letterform —
+the marks come out as rounded humps rather than M's. At 6.5% they read as letters.
+
+## What the rules do to the letter M
+
+An M's apex is where a leg meets a diagonal, and its angle is
+`leg splay + half the valley angle`. Both the apex and the valley must clear 60°:
+
+- Upright legs give a **32° apex**. So **a brandable M has no vertical strokes** —
+  the legs have to splay.
+- Splaying makes it wide: **1.3 to 1.7 times as wide as tall**, depending how the
+  angle budget is spent. A 90° valley with legs splayed only 15° is the cheapest
+  arrangement, and is what everything here uses.
+- **Two of those side by side cannot fit a square box.** Aspect ratios on this
+  sheet run 1.30:1 to 2.68:1.
+
+**The stem in the old number 11 cannot be made.** A bar dropped from the shared
+apex splits it into two 30° crotches, and no size or weight fixes that. Dropping
+the apex instead separates the two M's with no extra stroke and no crotch — which
+is what the original sketch sheet was already reaching for.
+
+## The eight
+
+| # | Mark | Irons | Ratio | Note |
 | --- | --- | --- | --- | --- |
-| 1 | **Rocking Double M** | rounded | Holds at 16px | **Fails** |
-| 11 | **Rocking Connected Double M** | rounded | Holds at 16px | **Fails** |
-| 24 | **Angular, tight** | sharp, 6-unit | Tight at 16px | Passes |
-| 25 | **Overlapped, opened** | sharp, 9-unit | Holds at 16px | Passes |
-| 26 | **Double-struck, vertical** | sharp, 9-unit | Holds at 16px | Passes |
-| 27 | **Angular, opened** | sharp, 9-unit | Holds at 16px | Passes |
+| 1 | **Rocking Double M** | 3 | 2.08:1 | closest to the approved star mark; most expensive iron |
+| 1a | **Double M** | 2 | 2.68:1 | widest mark here |
+| 11 | **Rocking Connected Double M** | 2 | 1.60:1 | dropped apex in place of the stem |
+| 11a | **Connected Double M** | 1 | 2.02:1 | one bent length, no welds, no backing |
+| 25 | **Overlapped Double M** | 1 | 2.17:1 | tightest overlap the rules permit |
+| 26 | **Double-struck Double M** | 1 | 1.30:1 | squarest mark here |
+| 24 | **Angular, tight** | 1 | 1.85:1 | dam and calf |
+| 27 | **Angular, opened** | 1 | 1.77:1 | two equal M's, second dropped |
 
-**1 — Rocking Double M.** Straight translation of the approved mark: same rocker,
-same shared ground, letters where the stars were. The clearest "M M" of the six.
+**11a is the cheapest iron by a distance** — one length of bar, bent, no welds and
+no backing plate. **26 is the squarest** at 1.30:1, and only because it stacks the
+second strike instead of standing it alongside.
 
-**11 — Rocking Connected Double M.** The zigzag with a stem dropped from the
-shared apex, so each M gets its inner leg back. One glyph, still two letters.
+## What the rules took away
 
-**24 — Angular, tight.** Two all-diagonal M's, the second smaller and dropped;
-the asymmetry does the dam-and-calf job. Same drawing as 27, at the sketch's
-lighter weight.
+**The dam-and-calf contrast.** The calf in 24 can only be 86% of the dam. The bar
+doesn't shrink with the letter, so a smaller M runs out of clear space before it
+looks meaningfully smaller. The dramatic size difference in the original sketch
+isn't available at any scale.
 
-**25 — Overlapped, opened.** Two whole M's, half-overlapped, four legs evenly
-spaced at 26 units. The most literally a *double* M.
+**The square.** Nothing is near 1:1 except 26. If a square icon is a hard
+requirement, that is a requirement to not put two letters side by side.
 
-**26 — Double-struck, vertical.** One M struck twice, second strike below the
-first. Says "double" by repeating the whole letter.
+**Two marks merged.** 1b and 25 resolve to identical geometry once spaced at the
+tightest overlap the clear-space rule allows. Nine went in, eight came out.
 
-**27 — Angular, opened.** 24 with the gaps opened — valleys to 72°, the small M
-widened, its outer stroke laid shallower so the crossing meets at 45° not 34°.
+## Screen
 
-## What the iron test exposed
+Held over deliberately. Worth flagging: these are wide, so a 16px square slot
+letterboxes them to about 8px of letter. **None of these is a favicon.**
 
-**The four sharp marks pass. The two rounded ones fail.** Not dramatically — they
-do not vanish. Each fails at a different place: in number 1 the 16-unit channel
-*between* the two letters comes down to 2.4 units under the spread, while the V
-inside each M stays open through its top half; in number 11 it is the 42° wedge
-where the stem meets the diagonals, open through only 29% of its length. The rule
-wants at least one stroke width of clearance the whole way, and neither holds it.
+A brand that burns and a mark that survives a browser tab are close to opposite
+problems, and this sheet is now solved hard for the first. If both are needed the
+answer is probably two marks — the iron for physical use and signage, a squarer
+derivative for the interface — rather than one mark asked to do both.
 
-The cause is proportion, not language. Numbers 1 and 11 pack two whole M's into
-the same box the sharp marks give to one-and-a-bit, so each letter is about half
-the width while the stroke stays the same — roughly 29% of each letterform is
-ink, against 17% for number 25. They were drawn to a 24px legibility standard,
-which they meet comfortably, and never to an iron standard, which nothing had
-asked of them until now.
-
-Fixable the same way 25–27 were fixed — widen the letters, or drop to one M and a
-rocker — but that is a redraw, not a tweak, and a wider mark sits differently
-next to the approved star mark. Worth deciding whether a physical brand is in
-scope before spending it.
-
-## Sharpened, rocker removed
-
-New versions of 1 and 11: mitred corners and flat stroke ends, rocker taken off.
-All three pass both tests, which neither parent did.
-
-| # | Mark | Box | Ink | Tightest feature at the iron |
-| --- | --- | --- | --- | --- |
-| 1a | **Double M, sharp** | square | 26% | channel between the M's, +6.7 |
-| 1b | **Double M, sharp, wide** | 1.32:1 | 19% | channel between the M's, +8.7 |
-| 11a | **Connected Double M, sharp** | square | 20% | stem-to-diagonal wedge, 35% open |
-
-**Removing the rocker is not what fixed the iron.** Both failures were horizontal
-— the channel between the letters in 1, the stem wedge in 11 — and neither has
-anything to do with what sits underneath. The fix came from widening the channel
-(16 → 22/24 units) and opening the valleys to 72°, and could have been done with
-the rocker left on.
-
-What removing it bought is **size**. The rocker occupied the bottom 40% of the
-box, so the letters had 34 units of height; without it they have 64. That is why
-the sharpened versions render *larger* at 24 and 16px than their parents
-(`sharpened-test.png`) — which was not the stated goal and is the clearest thing
-in the comparison.
-
-What it costs: the rocker was the visual tie to the approved **Rocking Double
-Star**. Without it these stop being the same family as the mark in
-`packages/ui/src/brand/` and become a separate identity sharing a palette.
-Whether that is a cost depends on whether issue #26 keeps the star mark alongside.
-
-Ranked by margin: **1b** has the most room by a distance and is the only one not
-square; **11a** is comfortable except at the stem wedge, improved from 29% to 35%
-open but still its tightest feature; **1a** passes with the least margin on the
-sheet, because two whole M's in a square box is close to a geometric floor.
-
-If the square matters, 1a and 11a are the replacements. If it does not, 1b is the
-better drawing and it is not close.
-
-## Where that leaves it
-
-- **If the mark has to be burnable:** pick from 25, 26, 27. All three hold at
-  16px too, so they cost nothing on the screen side. 27 survives smallest and
-  needed the least work; 25 is the most literally a double M.
-- **If it is a screen mark only:** 1 and 11 are the clearest pair of letters here
-  and the only survivors that keep the approved rocker.
-- **If the rocker is negotiable:** 1a, 1b and 11a pass both tests and read larger
-  small than anything else on the sheet.
-- **24 and 27 are one drawing at two weights** — decide them together.
-
-## One thing to settle whichever wins
+## Still to settle
 
 The two shipped files disagree about colour roles:
 
@@ -139,15 +111,25 @@ The two shipped files disagree about colour roles:
   rocker in `--gf-identity`.
 
 So the component and the customer SVG render different marks on a light ground,
-and the brand README's own description ("the stars carry the identity colour, the
-rocker carries the surface's action colour") matches neither exactly.
-
-These concepts follow the component: letters take the text colour on midnight and
-identity purple on linen; the supporting element takes the second colour. Worth
-deciding deliberately rather than inheriting.
+and the brand README's own description matches neither exactly. These concepts
+follow the component: letters take the text colour on midnight and identity
+purple on linen; the rocker takes the second colour.
 
 ## If one of these is picked
 
 `concepts.html` is a review sheet, not production art. The chosen mark still needs
 the treatment the star mark got: a `Logomark`-style component reading theme
 tokens, plus the two flat SVGs, living in `packages/ui/src/brand/`.
+
+## Checking the geometry
+
+`iron-check.py` builds every mark from its angle parameters and verifies it against
+the five rules, then writes `paths.json` — the path data the sheet uses. Run it to
+reproduce any number quoted in `concepts.html`:
+
+```
+python3 iron-check.py
+```
+
+It reports the closest approach between any two strokes per mark, or `welded`
+where strokes are meant to touch. All eight pass.

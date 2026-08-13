@@ -3,22 +3,11 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; }
 
-  /* Light: the Bluebonnet Linen ground, straight from tailwind.preset.ts */
   :root {
-    --paper:      #F8F5EC;
-    --sheet:      #FFFFFF;
-    --ink:        #24243A;
-    --ink-soft:   #565669;
-    --rule:       #DFD8C6;
-    --rule-firm:  #B6AD9A;
-    --brass-text: #8A6714;
-    --brass-line: #C9A24B;
-    --holds:      #4C6446;
-    --tight:      #8A5A10;
-    --fails:      #A2352C;
+    --paper: #F8F5EC; --sheet: #FFFFFF; --ink: #24243A; --ink-soft: #565669;
+    --rule: #DFD8C6; --rule-firm: #B6AD9A; --brass-text: #8A6714; --brass-line: #C9A24B;
+    --holds: #4C6446; --tight: #8A5A10; --fails: #A2352C;
   }
-
-  /* System-default dark (no stamp) — an explicit light choice still wins. */
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --paper: #0E1026; --sheet: #191C3C; --ink: #F2EFE6; --ink-soft: #B4B2C8;
@@ -31,7 +20,6 @@
     --rule: #2C3157; --rule-firm: #4A5083; --brass-text: #DDBB6A; --brass-line: #C9A24B;
     --holds: #A3BC9C; --tight: #E0B15C; --fails: #F08A84;
   }
-
   :root {
     --slab: "Zilla Slab", "Roboto Slab", Rockwell, "Bookman Old Style", Georgia, serif;
     --sans: Inter, "Helvetica Neue", Arial, system-ui, sans-serif;
@@ -39,38 +27,32 @@
   }
 
   body {
-    margin: 0;
-    background: var(--paper);
-    color: var(--ink);
-    font-family: var(--sans);
-    font-size: 16px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
+    margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans);
+    font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased;
   }
-
-  .sheet { max-width: 1080px; margin: 0 auto; padding: clamp(28px, 5vw, 72px) clamp(18px, 4vw, 48px) 120px; }
+  .sheet { max-width: 1080px; margin: 0 auto; padding: clamp(28px,5vw,72px) clamp(18px,4vw,48px) 120px; }
 
   .masthead { border-bottom: 2px solid var(--rule-firm); padding-bottom: 28px; }
   .eyebrow {
-    font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em;
+    font-family: var(--mono); font-size: 11px; letter-spacing: .16em;
     text-transform: uppercase; color: var(--brass-text); margin: 0 0 14px;
   }
   h1 {
-    font-family: var(--slab); font-weight: 600; font-size: clamp(34px, 6vw, 56px);
-    line-height: 1.05; letter-spacing: -0.015em; text-wrap: balance; margin: 0 0 18px;
+    font-family: var(--slab); font-weight: 600; font-size: clamp(34px,6vw,56px);
+    line-height: 1.05; letter-spacing: -.015em; text-wrap: balance; margin: 0 0 18px;
   }
-  .standfirst { max-width: 62ch; font-size: clamp(16px, 1.5vw, 18px); color: var(--ink-soft); margin: 0; }
+  .standfirst { max-width: 62ch; font-size: clamp(16px,1.5vw,18px); color: var(--ink-soft); margin: 0; }
   .standfirst + .standfirst { margin-top: 12px; }
-  .standfirst code, .standfirst strong { color: var(--ink); }
-  .standfirst code { font-family: var(--mono); font-size: 0.88em; }
+  .standfirst strong, .standfirst code { color: var(--ink); }
+  .standfirst code { font-family: var(--mono); font-size: .88em; }
 
   h2 {
-    font-family: var(--slab); font-weight: 600; font-size: clamp(22px, 3vw, 28px);
-    letter-spacing: -0.01em; margin: 72px 0 6px;
+    font-family: var(--slab); font-weight: 600; font-size: clamp(22px,3vw,28px);
+    letter-spacing: -.01em; margin: 72px 0 6px;
   }
   .evidence-head {
-    font-family: var(--slab); font-weight: 600; font-size: clamp(19px, 2.4vw, 23px);
-    letter-spacing: -0.01em; margin: 56px 0 6px;
+    font-family: var(--slab); font-weight: 600; font-size: clamp(19px,2.4vw,23px);
+    letter-spacing: -.01em; margin: 56px 0 6px;
   }
   .section-note { color: var(--ink-soft); font-size: 15px; max-width: 66ch; margin: 0 0 8px; }
   .section-note strong { color: var(--ink); }
@@ -80,91 +62,82 @@
     display: grid; grid-template-columns: 300px 1fr; gap: 34px;
     padding: 34px 0; border-bottom: 1px solid var(--rule); align-items: start;
   }
-  .grounds { display: flex; gap: 10px; }
+  .grounds { display: flex; flex-direction: column; gap: 10px; }
   .ground {
-    flex: 1;
-    margin: 0; /* <figure> ships 1em/40px from the UA sheet — it overflows the column */
-    border-radius: 3px; padding: 14px 10px 9px;
+    margin: 0; border-radius: 3px; padding: 16px 12px 10px;
     display: flex; flex-direction: column; align-items: center; gap: 9px;
-    transition: transform 140ms ease;
   }
-  .ground:hover { transform: translateY(-2px); }
-
-  /* Fixed, on purpose: these are the two real brand surfaces, not the page theme. */
   .ground--midnight { background: #0E1026; border: 1px solid #3D4478; --m1: #F2EFE6; --m2: #9D85E8; --caption: #B4B2C8; }
   .ground--linen    { background: #F8F5EC; border: 1px solid #DFD8C6; --m1: #5F45B0; --m2: #35569E; --caption: #565669; }
   .ground figcaption {
-    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.11em;
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .11em;
     text-transform: uppercase; color: var(--caption);
   }
 
-  /* Stroke weight lives here so the hot-iron row can thicken the same drawing. */
-  .mk { display: block; width: 96px; height: 96px; stroke-width: var(--sw, 9); }
-  .sw6 { --sw: 6; } .sw8 { --sw: 8; } .sw9 { --sw: 9; }
-  .hot .mk { stroke-width: calc(var(--sw, 9) * 1.7); }
-  .mk-64 { width: 64px; height: 64px; }
-  .mk-56 { width: 76px; height: 76px; }
-  .mk-40 { width: 40px; height: 40px; }
-  .mk-24 { width: 24px; height: 24px; }
-  /* a non-square mark keeps its aspect and matches on height, not width */
-  .mk--wide { width: auto; }
+  /* height-matched: these marks have different aspect ratios on purpose */
+  .mk { display: block; height: 84px; width: auto; max-width: 100%; stroke-width: 6.5; }
+  .mk-72 { height: 72px; } .mk-64 { height: 64px; } .mk-44 { height: 44px; } .mk-28 { height: 28px; }
+  .hot .mk { stroke-width: 11.05; }
 
   .read { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 12px; margin-bottom: 12px; }
-  .read h3 { font-family: var(--slab); font-weight: 600; font-size: 23px; letter-spacing: -0.01em; margin: 0; }
-
+  .read h3 { font-family: var(--slab); font-weight: 600; font-size: 23px; letter-spacing: -.01em; margin: 0; }
   .chip {
-    font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
     padding: 3px 8px; border-radius: 2px; border: 1px solid currentColor; white-space: nowrap;
   }
   .chip--holds { color: var(--holds); }
   .chip--tight { color: var(--tight); }
-  .chip--fails { color: var(--fails); }
+  .chip--plain { color: var(--ink-soft); }
 
-  /* Fixed, not auto: a long label in one entry must not re-indent that entry's
-     prose relative to every other entry on the sheet. */
-  dl { margin: 0; display: grid; grid-template-columns: 84px 1fr; gap: 7px 16px; }
+  dl { margin: 0; display: grid; grid-template-columns: 108px 1fr; gap: 7px 16px; }
   dt {
-    font-family: var(--mono); font-size: 10px; letter-spacing: 0.11em;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .11em;
     text-transform: uppercase; color: var(--brass-text); padding-top: 5px;
   }
   dd { margin: 0; max-width: 60ch; }
+  dd code, .section-note code, .aside code {
+    font-family: var(--mono); font-size: .86em;
+    background: color-mix(in srgb, var(--ink) 9%, transparent); padding: 1px 5px; border-radius: 2px;
+  }
 
   .scale {
-    display: flex; align-items: flex-end; gap: 16px; margin-top: 18px; padding: 12px 16px;
+    display: flex; align-items: flex-end; gap: 20px; margin-top: 18px; padding: 14px 18px;
     background: #0E1026; border: 1px solid #2C3157; border-radius: 3px;
-    --m1: #F2EFE6; --m2: #9D85E8;
+    --m1: #F2EFE6; --m2: #9D85E8; overflow-x: auto;
   }
   .scale span {
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px; flex: none;
     font-family: var(--mono); font-size: 9.5px; font-variant-numeric: tabular-nums;
-    letter-spacing: 0.08em; color: #B4B2C8;
+    letter-spacing: .08em; color: #B4B2C8;
   }
 
   .bench {
     margin-top: 22px; padding: 26px 22px; background: #0E1026; border: 1px solid #2C3157;
     border-radius: 3px; --m1: #F2EFE6; --m2: #9D85E8; overflow-x: auto;
   }
-  .bench-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 28px 12px; }
-  .bench figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 9px; }
+  .bench-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px 16px; }
+  .bench figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
   .bench figcaption {
-    font-family: var(--mono); font-size: 9px; letter-spacing: 0.07em; text-transform: uppercase;
-    color: #B4B2C8; text-align: center;
+    font-family: var(--mono); font-size: 9px; letter-spacing: .07em;
+    text-transform: uppercase; color: #B4B2C8; text-align: center;
   }
-  .ba-pair { display: flex; align-items: flex-end; gap: 14px; }
+  .ba-pair { display: flex; align-items: flex-end; gap: 18px; }
   .ba-pair span {
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    font-family: var(--mono); font-size: 9px; letter-spacing: 0.07em;
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: .07em;
     text-transform: uppercase; color: #B4B2C8;
   }
   .ba-pair .hot { color: #E0A08A; }
 
-  .evidence { margin: 22px 0 0; }
-  .evidence img {
-    display: block; width: 100%; max-width: 100%;
-    border: 1px solid var(--rule-firm); border-radius: 3px;
+  table { border-collapse: collapse; width: 100%; margin: 18px 0 0; font-size: 14.5px; }
+  th, td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--rule); }
+  th {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .11em;
+    text-transform: uppercase; color: var(--brass-text); font-weight: 400;
   }
-  .evidence figcaption { margin-top: 14px; font-size: 15px; color: var(--ink-soft); max-width: 70ch; }
-  .evidence figcaption strong { color: var(--ink); font-weight: 600; }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .tablewrap { overflow-x: auto; }
 
   .aside {
     margin-top: 34px; padding: 22px 24px; border-left: 3px solid var(--brass-line);
@@ -173,13 +146,6 @@
   .aside h3 { font-family: var(--slab); font-weight: 600; font-size: 17px; margin: 0 0 8px; }
   .aside p { margin: 0 0 10px; font-size: 15px; max-width: 66ch; }
   .aside p:last-child { margin-bottom: 0; }
-  .aside code, .section-note code, dd code {
-    font-family: var(--mono); font-size: 0.86em;
-    background: color-mix(in srgb, var(--ink) 9%, transparent);
-    padding: 1px 5px; border-radius: 2px;
-  }
-
-  /* ---------- shortlist picker ---------- */
 
   .keep { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; flex: none; }
   .keep input {
@@ -194,16 +160,13 @@
   .keep input:checked { background: var(--brass-text); border-color: var(--brass-text); }
   .keep input:checked::before { transform: scale(1); }
   .keep input:focus-visible { outline: 2px solid var(--brass-line); outline-offset: 2px; }
-  .keep span {
-    font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ink-soft);
-  }
+  .keep span { font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
   .keep input:checked + span { color: var(--brass-text); font-weight: 600; }
 
   .tally {
-    position: fixed; right: 18px; bottom: 18px; z-index: 20;
-    background: var(--sheet); border: 1px solid var(--rule-firm); border-radius: 4px;
-    box-shadow: 0 6px 22px rgba(0,0,0,0.18); font-size: 13px;
-    max-width: min(380px, calc(100vw - 36px));
+    position: fixed; right: 18px; bottom: 18px; z-index: 20; background: var(--sheet);
+    border: 1px solid var(--rule-firm); border-radius: 4px;
+    box-shadow: 0 6px 22px rgba(0,0,0,.18); font-size: 13px; max-width: min(380px, calc(100vw - 36px));
   }
   .tally-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
   .tally-count { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; }
@@ -212,7 +175,6 @@
     border: 1px solid var(--rule-firm); background: transparent; color: var(--ink); cursor: pointer;
   }
   .tally button:hover { border-color: var(--brass-line); }
-  .tally button:focus-visible { outline: 2px solid var(--brass-line); outline-offset: 2px; }
   .tally-out { display: none; padding: 0 12px 12px; }
   .tally-out.open { display: block; }
   .tally textarea {
@@ -222,86 +184,71 @@
   }
   .tally-hint { margin: 8px 0 0; font-size: 12px; color: var(--ink-soft); }
 
-  a { color: inherit; }
-  a:focus-visible { outline: 2px solid var(--brass-line); outline-offset: 3px; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .ground { transition: none; }
-    .ground:hover { transform: none; }
-  }
   @media print { .tally { display: none; } }
   @media (max-width: 760px) {
     .entry { grid-template-columns: 1fr; gap: 22px; }
-    .grounds { max-width: 300px; }
+    .grounds { flex-direction: row; }
+    dl { grid-template-columns: 1fr; gap: 2px 0; }
+    dt { padding-top: 10px; }
   }
 </style>
 
-<!-- Each mark drawn once; the grounds set --m1 / --m2 and the <use> inherits them.
-     No stroke-width here on purpose — it comes from CSS, so the hot-iron row can
-     thicken the same drawing instead of duplicating it. -->
+<!-- Every corner here is an arc, not a mitre: flat bar bends, it does not fold.
+     Stroke width lives in CSS so the hot-iron row thickens the same drawing. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-  <symbol id="m-rocking" viewBox="0 0 100 100">
-    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 78 Q50 98 88 78" stroke="var(--m2)"/>
-      <path d="M14 60 L14 26 L28 46 L42 26 L42 60" stroke="var(--m1)"/>
-      <path d="M58 60 L58 26 L72 46 L86 26 L86 60" stroke="var(--m1)"/>
+  <symbol id="m-1" viewBox="0 0 324 156">
+    <g fill="none" stroke-linecap="butt" stroke-linejoin="round">
+      <path d="M18.2 106.2 L40.7 22.6 A9.8 9.8 0 0 0 57.0 18.2 L78.2 39.4 A9.8 9.8 0 0 1 91.9 39.4 L113.1 18.2 A9.8 9.8 0 0 0 129.4 22.6 L151.8 106.2" stroke="var(--m1)"/>
+      <path d="M171.7 106.2 L194.1 22.6 A9.8 9.8 0 0 0 210.4 18.2 L231.6 39.4 A9.8 9.8 0 0 1 245.4 39.4 L266.5 18.2 A9.8 9.8 0 0 0 282.8 22.6 L305.3 106.2" stroke="var(--m1)"/>
+      <path d="M6.2 132.2 L32.0 137.7 A9.8 9.8 0 0 1 32.3 137.8 L57.9 142.2 A9.8 9.8 0 0 1 58.3 142.3 L83.8 145.7 A9.8 9.8 0 0 1 84.2 145.8 L109.7 148.2 A9.8 9.8 0 0 1 110.1 148.3 L135.6 149.7 A9.8 9.8 0 0 1 136.0 149.8 L161.6 150.2 A9.8 9.8 0 0 1 161.9 150.2 L187.5 149.8 A9.8 9.8 0 0 1 187.9 149.7 L213.4 148.3 A9.8 9.8 0 0 1 213.8 148.2 L239.3 145.8 A9.8 9.8 0 0 1 239.7 145.7 L265.2 142.3 A9.8 9.8 0 0 1 265.6 142.2 L291.2 137.8 A9.8 9.8 0 0 1 291.5 137.7 L317.3 132.2" stroke="var(--m2)"/>
     </g>
   </symbol>
 
-  <symbol id="m-rc-full" viewBox="0 0 100 100">
-    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 78 Q50 98 88 78" stroke="var(--m2)"/>
-      <path d="M14 62 L14 26 L32 46 L50 26 L68 46 L86 26 L86 62" stroke="var(--m1)"/>
-      <path d="M50 26 L50 62" stroke="var(--m1)"/>
+  <symbol id="m-1a" viewBox="0 0 300 112">
+    <g fill="none" stroke-linecap="butt" stroke-linejoin="round">
+      <path d="M6.2 106.2 L28.7 22.6 A9.8 9.8 0 0 0 45.0 18.2 L66.2 39.4 A9.8 9.8 0 0 1 79.9 39.4 L101.1 18.2 A9.8 9.8 0 0 0 117.4 22.6 L139.8 106.2" stroke="var(--m1)"/>
+      <path d="M159.7 106.2 L182.1 22.6 A9.8 9.8 0 0 0 198.4 18.2 L219.6 39.4 A9.8 9.8 0 0 1 233.4 39.4 L254.5 18.2 A9.8 9.8 0 0 0 270.8 22.6 L293.3 106.2" stroke="var(--m1)"/>
     </g>
   </symbol>
 
-  <symbol id="m-b8" viewBox="0 0 100 100">
-    <g fill="none" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4">
-      <path d="M8 74 L26 28 L40 56 L54 28 L70 74" stroke="var(--m1)"/>
-      <path d="M44 82 L58 44 L68 64 L78 44 L92 82" stroke="var(--m1)"/>
+  <symbol id="m-11" viewBox="0 0 250 156">
+    <g fill="none" stroke-linecap="butt" stroke-linejoin="round">
+      <path d="M18.2 106.2 L40.7 22.6 A9.8 9.8 0 0 0 57.0 18.2 L79.9 41.1 A9.8 9.8 0 0 1 91.5 42.7 L120.3 26.8 A9.8 9.8 0 0 0 129.7 26.8 L158.6 42.7 A9.8 9.8 0 0 1 170.2 41.1 L193.1 18.2 A9.8 9.8 0 0 0 209.4 22.6 L231.8 106.2" stroke="var(--m1)"/>
+      <path d="M6.2 132.2 L25.8 137.7 A9.8 9.8 0 0 1 26.3 137.8 L45.6 142.2 A9.8 9.8 0 0 1 46.1 142.3 L65.4 145.7 A9.8 9.8 0 0 1 65.9 145.8 L85.2 148.2 A9.8 9.8 0 0 1 85.7 148.3 L105.0 149.7 A9.8 9.8 0 0 1 105.5 149.8 L124.8 150.2 A9.8 9.8 0 0 1 125.3 150.2 L144.6 149.8 A9.8 9.8 0 0 1 145.1 149.7 L164.4 148.3 A9.8 9.8 0 0 1 164.9 148.2 L184.2 145.8 A9.8 9.8 0 0 1 184.7 145.7 L204.0 142.3 A9.8 9.8 0 0 1 204.5 142.2 L223.8 137.8 A9.8 9.8 0 0 1 224.3 137.7 L243.8 132.2" stroke="var(--m2)"/>
     </g>
   </symbol>
 
-  <symbol id="m-r1" viewBox="0 0 100 100">
-    <g fill="none" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4">
-      <path d="M12 84 L12 22 L38 54 L64 22 L64 84" stroke="var(--m1)"/>
-      <path d="M38 84 L38 22 L64 54 L90 22 L90 84" stroke="var(--m1)"/>
+  <symbol id="m-11a" viewBox="0 0 226 112">
+    <g fill="none" stroke-linecap="butt" stroke-linejoin="round">
+      <path d="M6.2 106.2 L28.7 22.6 A9.8 9.8 0 0 0 45.0 18.2 L67.9 41.1 A9.8 9.8 0 0 1 79.5 42.7 L108.3 26.8 A9.8 9.8 0 0 0 117.7 26.8 L146.6 42.7 A9.8 9.8 0 0 1 158.2 41.1 L181.1 18.2 A9.8 9.8 0 0 0 197.4 22.6 L219.8 106.2" stroke="var(--m1)"/>
     </g>
   </symbol>
 
-  <symbol id="m-r2" viewBox="0 0 100 100">
-    <g fill="none" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4">
-      <path d="M22 84 L22 18 L50 42 L78 18 L78 84" stroke="var(--m1)"/>
-      <path d="M22 46 L50 70 L78 46" stroke="var(--m1)"/>
+  <symbol id="m-25" viewBox="0 0 243 112">
+    <g fill="none" stroke-linecap="butt" stroke-linejoin="round">
+      <path d="M6.2 106.2 L28.7 22.6 A9.8 9.8 0 0 0 45.0 18.2 L66.2 39.4 A9.8 9.8 0 0 1 79.9 39.4 L101.1 18.2 A9.8 9.8 0 0 0 117.4 22.6 L139.8 106.2" stroke="var(--m1)"/>
+      <path d="M103.1 106.2 L125.5 22.6 A9.8 9.8 0 0 0 141.8 18.2 L163.0 39.4 A9.8 9.8 0 0 1 176.8 39.4 L198.0 18.2 A9.8 9.8 0 0 0 214.3 22.6 L236.7 106.2" stroke="var(--m1)"/>
     </g>
   </symbol>
 
-  <symbol id="m-r3" viewBox="0 0 100 100">
-    <g fill="none" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4">
-      <path d="M4 70 L16 24 L32 46 L48 24 L60 70" stroke="var(--m1)"/>
-      <path d="M44 82 L64 48 L75 63 L86 48 L96 82" stroke="var(--m1)"/>
+  <symbol id="m-26" viewBox="0 0 146 112">
+    <g fill="none" stroke-linecap="butt" stroke-linejoin="round">
+      <path d="M6.2 106.2 L28.7 22.6 A9.8 9.8 0 0 0 45.0 18.2 L66.2 39.4 A9.8 9.8 0 0 1 79.9 39.4 L101.1 18.2 A9.8 9.8 0 0 0 117.4 22.6 L139.8 106.2" stroke="var(--m1)"/>
+      <path d="M17.0 66.2 L68.2 95.5 A9.8 9.8 0 0 1 77.9 95.5 L129.1 66.2" stroke="var(--m1)"/>
     </g>
   </symbol>
 
-  <symbol id="m-1a" viewBox="0 0 100 100">
-    <g fill="none" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4">
-      <path d="M5 82 L5 18 L22 41.4 L39 18 L39 82" stroke="var(--m1)"/>
-      <path d="M61 82 L61 18 L78 41.4 L95 18 L95 82" stroke="var(--m1)"/>
+  <symbol id="m-24" viewBox="0 0 237 128">
+    <g fill="none" stroke-linecap="butt" stroke-linejoin="round">
+      <path d="M6.2 106.2 L28.7 22.6 A9.8 9.8 0 0 0 45.0 18.2 L66.2 39.4 A9.8 9.8 0 0 1 79.9 39.4 L101.1 18.2 A9.8 9.8 0 0 0 117.4 22.6 L139.8 106.2" stroke="var(--m1)"/>
+      <path d="M115.8 122.2 L134.5 52.6 A9.8 9.8 0 0 0 150.8 48.2 L166.3 63.8 A9.8 9.8 0 0 1 180.1 63.8 L195.7 48.2 A9.8 9.8 0 0 0 212.0 52.6 L230.7 122.2" stroke="var(--m1)"/>
     </g>
   </symbol>
 
-  <symbol id="m-1b" viewBox="0 0 132 100">
-    <g fill="none" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4">
-      <path d="M6 88 L6 16 L30 49 L54 16 L54 88" stroke="var(--m1)"/>
-      <path d="M78 88 L78 16 L102 49 L126 16 L126 88" stroke="var(--m1)"/>
-    </g>
-  </symbol>
-
-  <symbol id="m-11a" viewBox="0 0 100 100">
-    <g fill="none" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4">
-      <path d="M5 88 L5 16 L27.5 47 L50 16 L72.5 47 L95 16 L95 88" stroke="var(--m1)"/>
-      <path d="M50 16 L50 88" stroke="var(--m1)"/>
+  <symbol id="m-27" viewBox="0 0 251 142">
+    <g fill="none" stroke-linecap="butt" stroke-linejoin="round">
+      <path d="M6.2 106.2 L28.7 22.6 A9.8 9.8 0 0 0 45.0 18.2 L66.2 39.4 A9.8 9.8 0 0 1 79.9 39.4 L101.1 18.2 A9.8 9.8 0 0 0 117.4 22.6 L139.8 106.2" stroke="var(--m1)"/>
+      <path d="M111.1 136.2 L133.5 52.6 A9.8 9.8 0 0 0 149.9 48.2 L171.0 69.4 A9.8 9.8 0 0 1 184.8 69.4 L206.0 48.2 A9.8 9.8 0 0 0 222.3 52.6 L244.7 136.2" stroke="var(--m1)"/>
     </g>
   </symbol>
 </svg>
@@ -309,573 +256,436 @@
 <div class="sheet">
 
   <header class="masthead">
-    <p class="eyebrow">Brand concepts &middot; shortlist &middot; issue #26</p>
+    <p class="eyebrow">Brand concepts &middot; drawn as irons &middot; issue #26</p>
     <h1>Double&nbsp;M Brand Sheet</h1>
     <p class="standfirst">
-      Six marks, kept from twenty-seven. Numbering is the original sheet&rsquo;s, so the gaps are the cuts.
-      Every mark is drawn in livestock-brand grammar, coloured from the locked palette in
-      <code>packages/config/tailwind.preset.ts</code>, and shown on both real grounds &mdash; theme is fixed
-      per surface, so a mark proven on midnight is not thereby proven on linen.
+      Eight marks, every one of them a thing you could actually have made. A branding iron is
+      <strong>bent steel bar</strong> &mdash; so every corner on this sheet is an arc, because flat stock
+      bends and does not fold. A mitred corner is not a drawing decision, it is a cut and two welds.
     </p>
     <p class="standfirst">
-      Each carries two verdicts. <strong>Screen</strong> is the pixel test: rasterised at true 24 and
-      16&nbsp;px, because SVG draws crisply at any size and flatters everything. <strong>Iron</strong> is the
-      blotch test: every stroke thickened 1.7&times; to stand in for heat spreading through hide. They are the
-      same question asked twice &mdash; both destroy the narrow gap between two roughly-parallel strokes first
-      &mdash; but they are not the same threshold, and two of these six pass one and fail the other.
+      That inverts what the earlier sheets assumed. They treated the sharp, mitred language as the
+      buildable one and the rounded language as decorative. It is the other way round: <strong>the rounded
+      corners were the honest ones all along</strong>, and the sharp set could not have been made without
+      cutting every corner and welding it back.
+    </p>
+    <p class="standfirst">
+      Screen behaviour is deliberately secondary here and is noted only where it bites. These are drawn to
+      be burned first.
     </p>
   </header>
 
-  <h2>The six</h2>
+  <h2>What an iron can do</h2>
   <p class="section-note">
-    Two are drawn in the rounded brand-iron language of the original sheet; four keep the sharper language of
-    your sketches &mdash; mitred corners, flat stroke ends. That split is the real decision here, and the
-    hot-iron row below has something to say about it.
+    Five constraints, all of them physical. Everything on this sheet is checked against them by measurement
+    rather than eye, and the numbers are quoted per mark.
+  </p>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Rule</th><th>Value</th><th>Because</th></tr></thead>
+    <tbody>
+      <tr><td>Bar face</td><td class="num">6.5% of letter height</td>
+          <td>A &frac14;&nbsp;inch bar on a 4&nbsp;inch brand. This is the single number the earlier sheets had wrong &mdash; they drew at 16%, which is a bar so fat the minimum bend swallows the letter.</td></tr>
+      <tr><td>Bend radius</td><td class="num">1.5 &times; bar width</td>
+          <td>Flat bar will not take a tighter radius without cracking. Below this you are cutting and welding, not bending.</td></tr>
+      <tr><td>Minimum angle</td><td class="num">60&deg;</td>
+          <td>An acute crotch pools heat from both arms and burns through as a solid blot.</td></tr>
+      <tr><td>Clear space</td><td class="num">2.5 &times; bar width</td>
+          <td>The scar spreads to about 1.7&times; the bar face. Two strokes closer than this merge into one.</td></tr>
+      <tr><td>Pieces</td><td class="num">fewer is better</td>
+          <td>Disconnected elements need a backing plate, and each piece heats at its own rate. One bent length is the cheapest and most even iron you can have.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="aside">
+    <h3>What those rules do to the letter M</h3>
+    <p>
+      An M&rsquo;s apex is where a leg meets a diagonal, and its angle is <em>leg splay + half the valley
+      angle</em>. Both that apex and the valley have to clear 60&deg;, and the arithmetic is unforgiving:
+      <strong>a brandable M has no vertical strokes at all.</strong> Upright legs give a 32&deg; apex. The
+      legs have to splay.
+    </p>
+    <p>
+      Splaying them makes the letter wide &mdash; between 1.3 and 1.7 times as wide as it is tall, depending
+      on how the angle budget is spent. The cheapest arrangement is a 90&deg; valley with the legs splayed
+      only 15&deg;, which is what everything here uses. <strong>Two of those side by side cannot fit a square
+      box</strong>, which is why the aspect ratios on this sheet run from 1.30:1 to 2.68:1 and why none of
+      these is a favicon.
+    </p>
+    <p>
+      The stem in the old number 11 is simply not makeable. Dropping a bar from the shared apex splits that
+      apex into two 30&deg; crotches, and no size or weight fixes it. Dropping the apex instead separates the
+      two M&rsquo;s with no extra stroke and no crotch at all.
+    </p>
+  </div>
+
+  <h2>The eight</h2>
+  <p class="section-note">
+    Each shown on both real grounds, with its piece count and aspect ratio. Every one passes all five rules;
+    the differences that remain are cost, proportion, and what the mark says.
   </p>
 
   <div class="registry">
 
     <article class="entry">
       <div class="grounds">
-        <figure class="ground ground--midnight">
-          <svg class="mk sw8" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>
-          <figcaption>Admin</figcaption>
-        </figure>
-        <figure class="ground ground--linen">
-          <svg class="mk sw8" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>
-          <figcaption>Customer</figcaption>
-        </figure>
+        <figure class="ground ground--midnight"><svg class="mk" viewBox="0 0 324 156" aria-hidden="true"><use href="#m-1"/></svg><figcaption>Admin</figcaption></figure>
+        <figure class="ground ground--linen"><svg class="mk" viewBox="0 0 324 156" aria-hidden="true"><use href="#m-1"/></svg><figcaption>Customer</figcaption></figure>
       </div>
       <div>
         <div class="read">
           <label class="keep"><input type="checkbox" data-pick="1" data-name="Rocking Double M" aria-label="Keep Rocking Double M" checked><span>1</span></label>
           <h3>Rocking Double M</h3>
-          <span class="chip chip--holds">Holds at 16px</span>
-          <span class="chip chip--fails">Iron: fails</span>
+          <span class="chip chip--holds">Brandable</span>
+          <span class="chip chip--tight">3 irons</span>
+          <span class="chip chip--plain">2.08:1</span>
         </div>
         <dl>
           <dt>Says</dt>
-          <dd>Straight translation of the mark already approved: same rocker, same shared ground, letters where the stars were. The least disruptive thing you could put next to the star mark.</dd>
-          <dt>Screen</dt>
-          <dd>The clearest &ldquo;M&nbsp;M&rdquo; of the six. Two whole letters with a real gap between them, and the gap survives 24&nbsp;px and 16&nbsp;px intact.</dd>
+          <dd>The approved mark&rsquo;s rocker with two M&rsquo;s cradled in it. The closest thing here to the star mark already in <code>packages/ui/src/brand/</code>.</dd>
           <dt>Iron</dt>
-          <dd>Fails, and this is new &mdash; nobody had asked it of this mark before. The binding constraint is not the V inside each M, which stays open through the top half of its depth, but the 16-unit channel <em>between</em> the two letters: the spread takes it to 2.4 units. The rocker closes on the letters at the same time. See the hot-iron row.</dd>
+          <dd>Three separate pieces &mdash; two letters and the rocker &mdash; carried on a common backing plate. The most expensive iron on the sheet, and three pieces heat less evenly than one.</dd>
+          <dt>Clearance</dt>
+          <dd>Closest approach 19.8 against a 16.25 minimum. Comfortable.</dd>
         </dl>
         <div class="scale">
-          <span><svg class="mk sw8 mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>64</span>
-          <span><svg class="mk sw8 mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>40</span>
-          <span><svg class="mk sw8 mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>24</span>
+          <span><svg class="mk mk-72" viewBox="0 0 324 156" aria-hidden="true"><use href="#m-1"/></svg>72</span>
+          <span><svg class="mk mk-44" viewBox="0 0 324 156" aria-hidden="true"><use href="#m-1"/></svg>44</span>
+          <span><svg class="mk mk-28" viewBox="0 0 324 156" aria-hidden="true"><use href="#m-1"/></svg>28</span>
         </div>
       </div>
     </article>
 
     <article class="entry">
       <div class="grounds">
-        <figure class="ground ground--midnight">
-          <svg class="mk sw8" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rc-full"/></svg>
-          <figcaption>Admin</figcaption>
-        </figure>
-        <figure class="ground ground--linen">
-          <svg class="mk sw8" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rc-full"/></svg>
-          <figcaption>Customer</figcaption>
-        </figure>
+        <figure class="ground ground--midnight"><svg class="mk" viewBox="0 0 300 112" aria-hidden="true"><use href="#m-1a"/></svg><figcaption>Admin</figcaption></figure>
+        <figure class="ground ground--linen"><svg class="mk" viewBox="0 0 300 112" aria-hidden="true"><use href="#m-1a"/></svg><figcaption>Customer</figcaption></figure>
+      </div>
+      <div>
+        <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="1a" data-name="Double M" aria-label="Keep Double M" checked><span>1a</span></label>
+          <h3>Double M</h3>
+          <span class="chip chip--holds">Brandable</span>
+          <span class="chip chip--tight">2 irons</span>
+          <span class="chip chip--plain">2.68:1</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>The same pair with the rocker taken off. Nothing holds the two letters in relation to each other, which is why it is the widest mark here.</dd>
+          <dt>Iron</dt>
+          <dd>Two pieces, no contact. Cheaper than 1 by one element, but the pair still needs a backing to keep the spacing true.</dd>
+          <dt>Cost</dt>
+          <dd>At 2.68:1 this is a wordmark, not an icon. It will not survive being squeezed into a square slot.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-72" viewBox="0 0 300 112" aria-hidden="true"><use href="#m-1a"/></svg>72</span>
+          <span><svg class="mk mk-44" viewBox="0 0 300 112" aria-hidden="true"><use href="#m-1a"/></svg>44</span>
+          <span><svg class="mk mk-28" viewBox="0 0 300 112" aria-hidden="true"><use href="#m-1a"/></svg>28</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight"><svg class="mk" viewBox="0 0 250 156" aria-hidden="true"><use href="#m-11"/></svg><figcaption>Admin</figcaption></figure>
+        <figure class="ground ground--linen"><svg class="mk" viewBox="0 0 250 156" aria-hidden="true"><use href="#m-11"/></svg><figcaption>Customer</figcaption></figure>
       </div>
       <div>
         <div class="read">
           <label class="keep"><input type="checkbox" data-pick="11" data-name="Rocking Connected Double M" aria-label="Keep Rocking Connected Double M" checked><span>11</span></label>
           <h3>Rocking Connected Double M</h3>
-          <span class="chip chip--holds">Holds at 16px</span>
-          <span class="chip chip--fails">Iron: fails</span>
+          <span class="chip chip--holds">Brandable</span>
+          <span class="chip chip--tight">2 irons</span>
+          <span class="chip chip--plain">1.60:1</span>
         </div>
         <dl>
           <dt>Says</dt>
-          <dd>The zigzag with a stem dropped from the shared apex, so each M gets its inner leg back. Joined into one glyph and still reading as two letters &mdash; which the plain connected version does not manage.</dd>
-          <dt>Screen</dt>
-          <dd>Holds at 24&nbsp;px and 16&nbsp;px. The stem is what does it: without it the mark reads as a crown.</dd>
+          <dd>One continuous zigzag with the middle apex dropped, so the two M&rsquo;s read apart without a stroke between them. Cradled in a rocker.</dd>
+          <dt>The stem is gone</dt>
+          <dd>A bar dropped from the shared apex splits that apex into two crotches of 30&deg; each. Nothing under 60&deg; survives the heat, so the stem cannot be made &mdash; at any size, in any weight. Dropping the apex does the same job with no extra stroke, which is what the original sketches were already reaching for.</dd>
           <dt>Iron</dt>
-          <dd>Fails, and for its own reason: the stem meets the diagonals at 42&deg;, and that wedge stays open through only 29% of its length once the stroke has spread. Tighter as a proportion than anything in the mark above.</dd>
+          <dd>Two pieces: the zigzag and the rocker. The best shape-to-cost ratio here.</dd>
         </dl>
         <div class="scale">
-          <span><svg class="mk sw8 mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rc-full"/></svg>64</span>
-          <span><svg class="mk sw8 mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rc-full"/></svg>40</span>
-          <span><svg class="mk sw8 mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rc-full"/></svg>24</span>
+          <span><svg class="mk mk-72" viewBox="0 0 250 156" aria-hidden="true"><use href="#m-11"/></svg>72</span>
+          <span><svg class="mk mk-44" viewBox="0 0 250 156" aria-hidden="true"><use href="#m-11"/></svg>44</span>
+          <span><svg class="mk mk-28" viewBox="0 0 250 156" aria-hidden="true"><use href="#m-11"/></svg>28</span>
         </div>
       </div>
     </article>
 
     <article class="entry">
       <div class="grounds">
-        <figure class="ground ground--midnight">
-          <svg class="mk sw6" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b8"/></svg>
-          <figcaption>Admin</figcaption>
-        </figure>
-        <figure class="ground ground--linen">
-          <svg class="mk sw6" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b8"/></svg>
-          <figcaption>Customer</figcaption>
-        </figure>
+        <figure class="ground ground--midnight"><svg class="mk" viewBox="0 0 226 112" aria-hidden="true"><use href="#m-11a"/></svg><figcaption>Admin</figcaption></figure>
+        <figure class="ground ground--linen"><svg class="mk" viewBox="0 0 226 112" aria-hidden="true"><use href="#m-11a"/></svg><figcaption>Customer</figcaption></figure>
       </div>
       <div>
         <div class="read">
-          <label class="keep"><input type="checkbox" data-pick="24" data-name="Angular, tight" aria-label="Keep Angular, tight" checked><span>24</span></label>
-          <h3>Angular, tight</h3>
-          <span class="chip chip--tight">Tight at 16px</span>
-          <span class="chip chip--holds">Iron: passes</span>
+          <label class="keep"><input type="checkbox" data-pick="11a" data-name="Connected Double M" aria-label="Keep Connected Double M" checked><span>11a</span></label>
+          <h3>Connected Double M</h3>
+          <span class="chip chip--holds">Brandable</span>
+          <span class="chip chip--holds">1 iron</span>
+          <span class="chip chip--plain">2.02:1</span>
         </div>
         <dl>
           <dt>Says</dt>
-          <dd>Two all-diagonal M&rsquo;s, the second smaller and dropped. The asymmetry does the dam-and-calf job the star mark does, without needing a second size of anything drawn in.</dd>
-          <dt>Screen</dt>
-          <dd>Reads at 24&nbsp;px. At 16 the smaller M softens first &mdash; the 6-unit line is lighter than everything else here and it greys at exactly the size the nav bar uses.</dd>
+          <dd>The zigzag alone. One unbroken line, three peaks, the middle one dropped.</dd>
           <dt>Iron</dt>
-          <dd>Passes, despite being the busiest drawing of the six. Nothing in it runs parallel and close, so there is no channel for heat to close.</dd>
-          <dt>Pairs with</dt>
-          <dd>Number 27 below is this same drawing opened to iron tolerances. Keeping both is the comparison: this is the sketch as drawn, that is the sketch made buildable.</dd>
+          <dd><strong>One length of bar, bent, with no welds and no backing plate.</strong> The cheapest and most even-heating iron on the sheet by a distance, and the only one a farrier could make in an afternoon.</dd>
+          <dt>Clearance</dt>
+          <dd>45.7 at its closest &mdash; nearly three times the minimum. Nothing here is marginal.</dd>
         </dl>
         <div class="scale">
-          <span><svg class="mk sw6 mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b8"/></svg>64</span>
-          <span><svg class="mk sw6 mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b8"/></svg>40</span>
-          <span><svg class="mk sw6 mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b8"/></svg>24</span>
+          <span><svg class="mk mk-72" viewBox="0 0 226 112" aria-hidden="true"><use href="#m-11a"/></svg>72</span>
+          <span><svg class="mk mk-44" viewBox="0 0 226 112" aria-hidden="true"><use href="#m-11a"/></svg>44</span>
+          <span><svg class="mk mk-28" viewBox="0 0 226 112" aria-hidden="true"><use href="#m-11a"/></svg>28</span>
         </div>
       </div>
     </article>
 
     <article class="entry">
       <div class="grounds">
-        <figure class="ground ground--midnight">
-          <svg class="mk sw9" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r1"/></svg>
-          <figcaption>Admin</figcaption>
-        </figure>
-        <figure class="ground ground--linen">
-          <svg class="mk sw9" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r1"/></svg>
-          <figcaption>Customer</figcaption>
-        </figure>
+        <figure class="ground ground--midnight"><svg class="mk" viewBox="0 0 243 112" aria-hidden="true"><use href="#m-25"/></svg><figcaption>Admin</figcaption></figure>
+        <figure class="ground ground--linen"><svg class="mk" viewBox="0 0 243 112" aria-hidden="true"><use href="#m-25"/></svg><figcaption>Customer</figcaption></figure>
       </div>
       <div>
         <div class="read">
-          <label class="keep"><input type="checkbox" data-pick="25" data-name="Overlapped, opened" aria-label="Keep Overlapped, opened" checked><span>25</span></label>
-          <h3>Overlapped, opened</h3>
-          <span class="chip chip--holds">Holds at 16px</span>
-          <span class="chip chip--holds">Iron: passes</span>
+          <label class="keep"><input type="checkbox" data-pick="25" data-name="Overlapped Double M" aria-label="Keep Overlapped Double M" checked><span>25</span></label>
+          <h3>Overlapped Double M</h3>
+          <span class="chip chip--holds">Brandable</span>
+          <span class="chip chip--holds">1 iron</span>
+          <span class="chip chip--plain">2.17:1</span>
         </div>
         <dl>
           <dt>Says</dt>
-          <dd>Two whole M&rsquo;s, half-overlapped, four legs down. The most literally a <em>double</em> M of anything here &mdash; nothing shared, nothing abbreviated.</dd>
+          <dd>Two M&rsquo;s pushed together until they cross, welded where they meet. Still the most literally a <em>double</em> M.</dd>
           <dt>Built to</dt>
-          <dd>All four legs evenly spaced at 26 units, which is nearly three times the stroke. The two V&rsquo;s clear each other by 11 units where in the original sketch they ran nearly parallel.</dd>
+          <dd>0.725 of a letter width apart, which is the tightest overlap the rules permit &mdash; any closer and the converging strokes fall under the minimum clear space. This is a floor, not a preference.</dd>
+          <dt>Also</dt>
+          <dd><strong>Number 1b ended up here.</strong> Drawn to the same rules, &ldquo;close-set&rdquo; and &ldquo;overlapped&rdquo; resolve to identical geometry, so they are one mark now rather than two.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-72" viewBox="0 0 243 112" aria-hidden="true"><use href="#m-25"/></svg>72</span>
+          <span><svg class="mk mk-44" viewBox="0 0 243 112" aria-hidden="true"><use href="#m-25"/></svg>44</span>
+          <span><svg class="mk mk-28" viewBox="0 0 243 112" aria-hidden="true"><use href="#m-25"/></svg>28</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight"><svg class="mk" viewBox="0 0 146 112" aria-hidden="true"><use href="#m-26"/></svg><figcaption>Admin</figcaption></figure>
+        <figure class="ground ground--linen"><svg class="mk" viewBox="0 0 146 112" aria-hidden="true"><use href="#m-26"/></svg><figcaption>Customer</figcaption></figure>
+      </div>
+      <div>
+        <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="26" data-name="Double-struck Double M" aria-label="Keep Double-struck Double M" checked><span>26</span></label>
+          <h3>Double-struck Double M</h3>
+          <span class="chip chip--holds">Brandable</span>
+          <span class="chip chip--holds">1 iron</span>
+          <span class="chip chip--plain">1.30:1</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>One M struck again below, the lower strike&rsquo;s ends welded onto the upper one&rsquo;s legs. Says &ldquo;double&rdquo; by repeating the letter rather than standing two side by side.</dd>
+          <dt>Iron</dt>
+          <dd>One piece with two welds. <strong>The squarest mark on the sheet at 1.30:1</strong>, and the only survivor that could plausibly take a square slot.</dd>
           <dt>Note</dt>
-          <dd>Each M&rsquo;s valley lands exactly on its neighbour&rsquo;s leg. That is a weld rather than a collision &mdash; an iron makes a T-junction happily &mdash; and it is what turns the pair from two letters that overlap into one interlocked object.</dd>
+          <dd>Being the squarest is a direct consequence of not putting two letters side by side. That is the whole trade.</dd>
         </dl>
         <div class="scale">
-          <span><svg class="mk sw9 mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r1"/></svg>64</span>
-          <span><svg class="mk sw9 mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r1"/></svg>40</span>
-          <span><svg class="mk sw9 mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r1"/></svg>24</span>
+          <span><svg class="mk mk-72" viewBox="0 0 146 112" aria-hidden="true"><use href="#m-26"/></svg>72</span>
+          <span><svg class="mk mk-44" viewBox="0 0 146 112" aria-hidden="true"><use href="#m-26"/></svg>44</span>
+          <span><svg class="mk mk-28" viewBox="0 0 146 112" aria-hidden="true"><use href="#m-26"/></svg>28</span>
         </div>
       </div>
     </article>
 
     <article class="entry">
       <div class="grounds">
-        <figure class="ground ground--midnight">
-          <svg class="mk sw9" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r2"/></svg>
-          <figcaption>Admin</figcaption>
-        </figure>
-        <figure class="ground ground--linen">
-          <svg class="mk sw9" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r2"/></svg>
-          <figcaption>Customer</figcaption>
-        </figure>
+        <figure class="ground ground--midnight"><svg class="mk" viewBox="0 0 237 128" aria-hidden="true"><use href="#m-24"/></svg><figcaption>Admin</figcaption></figure>
+        <figure class="ground ground--linen"><svg class="mk" viewBox="0 0 237 128" aria-hidden="true"><use href="#m-24"/></svg><figcaption>Customer</figcaption></figure>
       </div>
       <div>
         <div class="read">
-          <label class="keep"><input type="checkbox" data-pick="26" data-name="Double-struck, vertical" aria-label="Keep Double-struck, vertical" checked><span>26</span></label>
-          <h3>Double-struck, vertical</h3>
-          <span class="chip chip--holds">Holds at 16px</span>
-          <span class="chip chip--holds">Iron: passes</span>
+          <label class="keep"><input type="checkbox" data-pick="24" data-name="Angular Double M, tight" aria-label="Keep Angular Double M, tight" checked><span>24</span></label>
+          <h3>Angular Double M, tight</h3>
+          <span class="chip chip--holds">Brandable</span>
+          <span class="chip chip--holds">1 iron</span>
+          <span class="chip chip--plain">1.85:1</span>
         </div>
         <dl>
           <dt>Says</dt>
-          <dd>One M struck twice, the second strike below the first. It says &ldquo;double&rdquo; by repeating the whole letter rather than by standing two letters side by side &mdash; the only one of the six that does.</dd>
-          <dt>Built to</dt>
-          <dd>The legs coincide and reinforce into single strokes; the two V&rsquo;s stack 28 units apart, a 12-unit clearance where the original sketch had none.</dd>
-          <dt>Why vertical</dt>
-          <dd>Arithmetic, not taste. A sideways offset has to reach 18 units to clear the legs, but short of exactly half the letter width the first M&rsquo;s valley lands within 4 units of the second M&rsquo;s leg &mdash; and at exactly half you have number 25 above. There is no horizontal double-strike that is neither blotchy nor already Overlapped.</dd>
-        </dl>
-        <div class="scale">
-          <span><svg class="mk sw9 mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r2"/></svg>64</span>
-          <span><svg class="mk sw9 mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r2"/></svg>40</span>
-          <span><svg class="mk sw9 mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r2"/></svg>24</span>
-        </div>
-      </div>
-    </article>
-
-    <article class="entry">
-      <div class="grounds">
-        <figure class="ground ground--midnight">
-          <svg class="mk sw9" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r3"/></svg>
-          <figcaption>Admin</figcaption>
-        </figure>
-        <figure class="ground ground--linen">
-          <svg class="mk sw9" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r3"/></svg>
-          <figcaption>Customer</figcaption>
-        </figure>
-      </div>
-      <div>
-        <div class="read">
-          <label class="keep"><input type="checkbox" data-pick="27" data-name="Angular, opened" aria-label="Keep Angular, opened" checked><span>27</span></label>
-          <h3>Angular, opened</h3>
-          <span class="chip chip--holds">Holds at 16px</span>
-          <span class="chip chip--holds">Iron: passes</span>
-        </div>
-        <dl>
-          <dt>Says</dt>
-          <dd>Number 24 with the gaps opened: valleys widened to 72&deg;, the small M widened to 22 units across its apexes, and its outer stroke laid down shallower.</dd>
-          <dt>Built to</dt>
-          <dd>The crossing now meets at 45&deg; instead of 34&deg;. At 45&deg; it burns as a crossing; at 34&deg; it burns as a blot.</dd>
-          <dt>Note</dt>
-          <dd>It needed the least work of the three refinements and it still survives smallest. If the sharp language wins, this is the one to build the family around.</dd>
-        </dl>
-        <div class="scale">
-          <span><svg class="mk sw9 mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r3"/></svg>64</span>
-          <span><svg class="mk sw9 mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r3"/></svg>40</span>
-          <span><svg class="mk sw9 mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r3"/></svg>24</span>
-        </div>
-      </div>
-    </article>
-
-  </div>
-
-
-  <h2>Sharpened, rocker removed</h2>
-  <p class="section-note">
-    New versions of 1 and 11: mitred corners and flat stroke ends in place of the rounded ones, and the
-    rocker taken off. Two things to say before the drawings &mdash; one about what the rocker was costing,
-    and one about what removing it does not fix.
-  </p>
-
-  <div class="aside">
-    <h3>Removing the rocker is not what fixed the iron</h3>
-    <p>
-      Worth being straight about, because it would be easy to read these as proof that the rocker was the
-      problem. It was not. Both failures were horizontal &mdash; in number&nbsp;1 the tightest thing is the
-      16-unit channel <em>between</em> the two M&rsquo;s, which leaves 2.4 units at the iron; in
-      number&nbsp;11 it is the 42&deg; wedge where the stem meets the diagonals. Neither has anything to do
-      with what sits underneath. <strong>The iron fix came from widening the channel and opening the
-      valleys</strong>, and could have been done with the rocker left on.
-    </p>
-    <p>
-      What removing it actually bought is size. The rocker occupied the bottom 40% of the box, so the letters
-      had 34 units of height; without it they have 64. That is why the sharpened versions read
-      <em>larger</em> at 24 and 16&nbsp;px than their parents, which is the clearest thing in the comparison
-      below and was not the stated goal.
-    </p>
-    <p>
-      And what it costs: the rocker was the visual tie to the approved <strong>Rocking Double Star</strong>.
-      Take it off and these stop being the same family as the mark already in
-      <code>packages/ui/src/brand/</code> &mdash; they become a separate identity that happens to share a
-      palette. Whether that is a cost or the point depends on whether issue&nbsp;#26 is expected to keep the
-      star mark alongside.
-    </p>
-  </div>
-
-  <div class="registry">
-
-    <article class="entry">
-      <div class="grounds">
-        <figure class="ground ground--midnight"><svg class="mk sw9" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-1a"/></svg><figcaption>Admin</figcaption></figure>
-        <figure class="ground ground--linen"><svg class="mk sw9" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-1a"/></svg><figcaption>Customer</figcaption></figure>
-      </div>
-      <div>
-        <div class="read">
-          <label class="keep"><input type="checkbox" data-pick="1a" data-name="Double M, sharp" aria-label="Keep Double M, sharp" checked><span>1a</span></label>
-          <h3>Double M, sharp</h3>
-          <span class="chip chip--holds">Holds at 16px</span>
-          <span class="chip chip--holds">Iron: passes</span>
-        </div>
-        <dl>
-          <dt>Says</dt>
-          <dd>Number&nbsp;1 with the rocker taken off and the corners mitred. With nothing sitting underneath, the letters take the whole box &mdash; 64 units tall against 34 &mdash; which is why they read <em>larger</em> at 24&nbsp;px than the mark they came from, not smaller.</dd>
-          <dt>Built to</dt>
-          <dd>Each M 34 units wide with a 22-unit channel between them, valleys opened to 72&deg;. At the iron the channel keeps 6.7 units clear and each inner V stays open through the top 55% of its depth.</dd>
-          <dt>Cost</dt>
-          <dd>Ink is 26% of each letterform, against 17% for number&nbsp;25. Two whole M&rsquo;s in a square box has a floor and this is close to it &mdash; it passes, but with the least margin of the three.</dd>
-        </dl>
-        <div class="scale">
-          <span><svg class="mk sw9 mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-1a"/></svg>64</span>
-          <span><svg class="mk sw9 mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-1a"/></svg>40</span>
-          <span><svg class="mk sw9 mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-1a"/></svg>24</span>
-        </div>
-      </div>
-    </article>
-
-    <article class="entry">
-      <div class="grounds">
-        <figure class="ground ground--midnight"><svg class="mk sw9 mk--wide" viewBox="0 0 132 100" aria-hidden="true"><use href="#m-1b"/></svg><figcaption>Admin</figcaption></figure>
-        <figure class="ground ground--linen"><svg class="mk sw9 mk--wide" viewBox="0 0 132 100" aria-hidden="true"><use href="#m-1b"/></svg><figcaption>Customer</figcaption></figure>
-      </div>
-      <div>
-        <div class="read">
-          <label class="keep"><input type="checkbox" data-pick="1b" data-name="Double M, sharp, wide" aria-label="Keep Double M, sharp, wide" checked><span>1b</span></label>
-          <h3>Double M, sharp, wide</h3>
-          <span class="chip chip--holds">Holds at 16px</span>
-          <span class="chip chip--holds">Iron: passes</span>
-        </div>
-        <dl>
-          <dt>Says</dt>
-          <dd>The same drawing given a 1.32:1 box instead of a square, so each M gets 48 units instead of 34. This is what number&nbsp;1a wants to be if the square is negotiable.</dd>
-          <dt>Built to</dt>
-          <dd>Ink drops to 19%, the channel to 8.7 clear, the inner V open through 68% of its depth. The most comfortable margins on the sheet after number&nbsp;25.</dd>
-          <dt>Cost</dt>
-          <dd>It is not square. Dropped into a square favicon slot it renders at 76% of the height the others get, and that is the whole of its disadvantage &mdash; but it is not a small one when 16&nbsp;px is the target.</dd>
-        </dl>
-        <div class="scale">
-          <span><svg class="mk sw9 mk--wide mk-64" viewBox="0 0 132 100" aria-hidden="true"><use href="#m-1b"/></svg>64</span>
-          <span><svg class="mk sw9 mk--wide mk-40" viewBox="0 0 132 100" aria-hidden="true"><use href="#m-1b"/></svg>40</span>
-          <span><svg class="mk sw9 mk--wide mk-24" viewBox="0 0 132 100" aria-hidden="true"><use href="#m-1b"/></svg>24</span>
-        </div>
-      </div>
-    </article>
-
-    <article class="entry">
-      <div class="grounds">
-        <figure class="ground ground--midnight"><svg class="mk sw9" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-11a"/></svg><figcaption>Admin</figcaption></figure>
-        <figure class="ground ground--linen"><svg class="mk sw9" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-11a"/></svg><figcaption>Customer</figcaption></figure>
-      </div>
-      <div>
-        <div class="read">
-          <label class="keep"><input type="checkbox" data-pick="11a" data-name="Connected Double M, sharp" aria-label="Keep Connected Double M, sharp" checked><span>11a</span></label>
-          <h3>Connected Double M, sharp</h3>
-          <span class="chip chip--holds">Holds at 16px</span>
-          <span class="chip chip--holds">Iron: passes</span>
-        </div>
-        <dl>
-          <dt>Says</dt>
-          <dd>Number&nbsp;11 with the rocker off, the corners mitred and everything widened &mdash; verticals at 5, 50 and 95 against 14, 50 and 86. Still one glyph, still reading as two letters.</dd>
-          <dt>Built to</dt>
-          <dd>The valleys open to 72&deg; and stay open through two-thirds of their depth at the iron.</dd>
+          <dd>A big M with a smaller one dropped alongside &mdash; the dam-and-calf reading, which no other mark here gives you.</dd>
           <dt>Watch</dt>
-          <dd>The stem still meets the diagonals at 36&deg;, and that wedge is the tightest thing in the drawing &mdash; open through 35% of its length at the iron, against 29% for the mark it replaces. Improved rather than solved. It is the price of keeping the stem, which is also the only reason this reads as two letters instead of a crown.</dd>
+          <dd><strong>The calf can only be 86% of the dam.</strong> Below that the smaller M&rsquo;s own valley falls under the minimum clear space, because the bar does not shrink with the letter. The dramatic size contrast in the original sketch is not available at any scale.</dd>
+          <dt>Iron</dt>
+          <dd>One piece, welded where the calf crosses the dam&rsquo;s leg.</dd>
         </dl>
         <div class="scale">
-          <span><svg class="mk sw9 mk-64" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-11a"/></svg>64</span>
-          <span><svg class="mk sw9 mk-40" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-11a"/></svg>40</span>
-          <span><svg class="mk sw9 mk-24" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-11a"/></svg>24</span>
+          <span><svg class="mk mk-72" viewBox="0 0 237 128" aria-hidden="true"><use href="#m-24"/></svg>72</span>
+          <span><svg class="mk mk-44" viewBox="0 0 237 128" aria-hidden="true"><use href="#m-24"/></svg>44</span>
+          <span><svg class="mk mk-28" viewBox="0 0 237 128" aria-hidden="true"><use href="#m-24"/></svg>28</span>
         </div>
       </div>
     </article>
+
+    <article class="entry">
+      <div class="grounds">
+        <figure class="ground ground--midnight"><svg class="mk" viewBox="0 0 251 142" aria-hidden="true"><use href="#m-27"/></svg><figcaption>Admin</figcaption></figure>
+        <figure class="ground ground--linen"><svg class="mk" viewBox="0 0 251 142" aria-hidden="true"><use href="#m-27"/></svg><figcaption>Customer</figcaption></figure>
+      </div>
+      <div>
+        <div class="read">
+          <label class="keep"><input type="checkbox" data-pick="27" data-name="Angular Double M, opened" aria-label="Keep Angular Double M, opened" checked><span>27</span></label>
+          <h3>Angular Double M, opened</h3>
+          <span class="chip chip--holds">Brandable</span>
+          <span class="chip chip--holds">1 iron</span>
+          <span class="chip chip--plain">1.77:1</span>
+        </div>
+        <dl>
+          <dt>Says</dt>
+          <dd>Two M&rsquo;s of equal size, the second dropped rather than shrunk. Reads as a pair rather than as a parent and offspring.</dd>
+          <dt>Iron</dt>
+          <dd>One piece, welded at the crossing. Every clearance well clear of the minimum.</dd>
+          <dt>Note</dt>
+          <dd>Where 24 buys asymmetry with size, this buys it with height. Height is the cheaper of the two, because it costs nothing in clearance.</dd>
+        </dl>
+        <div class="scale">
+          <span><svg class="mk mk-72" viewBox="0 0 251 142" aria-hidden="true"><use href="#m-27"/></svg>72</span>
+          <span><svg class="mk mk-44" viewBox="0 0 251 142" aria-hidden="true"><use href="#m-27"/></svg>44</span>
+          <span><svg class="mk mk-28" viewBox="0 0 251 142" aria-hidden="true"><use href="#m-27"/></svg>28</span>
+        </div>
+      </div>
+    </article>
+
   </div>
-
-  <h3 class="evidence-head">Against the marks they came from</h3>
-  <p class="section-note">
-    Each new version beside its parent, rasterised at true 24 and 16&nbsp;px.
-  </p>
-
-  <figure class="evidence">
-    <img src="data:image/png;base64,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" alt="Marks 1, 1a, 1b, 11 and 11a rasterised at 24 and 16 pixels and magnified. The sharpened versions render visibly larger than their rounded parents at both sizes, because the rocker no longer takes the lower part of the box.">
-    <figcaption>
-      The sharpened versions are <strong>visibly larger at both sizes</strong> &mdash; same slot, more letter.
-      At 16&nbsp;px the parents are spending roughly a third of their height on a rocker that has itself
-      become a smudge, while 1a and 11a spend all of it on letterforms.
-    </figcaption>
-  </figure>
-
-  <h3 class="evidence-head">And under the iron</h3>
-
-  <div class="bench">
-    <div class="bench-grid">
-      <figure>
-        <div class="ba-pair">
-          <span><svg class="mk sw8 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>drawn</span>
-          <span class="hot"><svg class="mk sw8 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>iron</span>
-        </div>
-        <figcaption>1</figcaption>
-      </figure>
-      <figure>
-        <div class="ba-pair">
-          <span><svg class="mk sw9 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-1a"/></svg>drawn</span>
-          <span class="hot"><svg class="mk sw9 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-1a"/></svg>iron</span>
-        </div>
-        <figcaption>1a</figcaption>
-      </figure>
-      <figure>
-        <div class="ba-pair">
-          <span><svg class="mk sw9 mk--wide mk-56" viewBox="0 0 132 100" aria-hidden="true"><use href="#m-1b"/></svg>drawn</span>
-          <span class="hot"><svg class="mk sw9 mk--wide mk-56" viewBox="0 0 132 100" aria-hidden="true"><use href="#m-1b"/></svg>iron</span>
-        </div>
-        <figcaption>1b</figcaption>
-      </figure>
-      <figure>
-        <div class="ba-pair">
-          <span><svg class="mk sw8 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rc-full"/></svg>drawn</span>
-          <span class="hot"><svg class="mk sw8 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rc-full"/></svg>iron</span>
-        </div>
-        <figcaption>11</figcaption>
-      </figure>
-      <figure>
-        <div class="ba-pair">
-          <span><svg class="mk sw9 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-11a"/></svg>drawn</span>
-          <span class="hot"><svg class="mk sw9 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-11a"/></svg>iron</span>
-        </div>
-        <figcaption>11a</figcaption>
-      </figure>
-    </div>
-  </div>
-
-  <div class="aside">
-    <h3>Where the three land</h3>
-    <p>
-      <strong>All three pass both tests</strong>, which neither parent did. Ranked by margin:
-      <strong>1b</strong> has the most room by a distance and is the only one that is not square;
-      <strong>11a</strong> is comfortable everywhere except the stem wedge, which is improved but still its
-      tightest feature; <strong>1a</strong> passes with the least margin of anything on the sheet, because
-      two whole M&rsquo;s in a square box is close to a geometric floor.
-    </p>
-    <p>
-      If the square matters, <strong>1a</strong> and <strong>11a</strong> are the replacements. If it does
-      not, <strong>1b</strong> is the better drawing and it is not close.
-    </p>
-  </div>
-
-  <h3 class="evidence-head">The pixel test</h3>
-  <p class="section-note">
-    All six rasterised at true 24&nbsp;px and 16&nbsp;px, then magnified &mdash; the actual pixels a nav bar
-    and a favicon would get.
-  </p>
-
-  <figure class="evidence">
-    <img src="data:image/png;base64,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" alt="The six marks rasterised at 24 and 16 pixels and magnified. All six keep their internal gaps open at both sizes; Angular tight is the softest at 16 pixels because of its lighter line.">
-    <figcaption>
-      All six survive, which is what a shortlist should look like. The only softening worth noting is
-      <strong>24 Angular, tight</strong> at 16&nbsp;px &mdash; its 6-unit line is lighter than everything else
-      here and greys before the others do. That is a weight decision, not a shape problem: the same drawing at
-      9 units is number 27.
-    </figcaption>
-  </figure>
 
   <h3 class="evidence-head">The hot-iron test</h3>
   <p class="section-note">
-    Each mark as drawn, then with every stroke thickened 1.7&times; &mdash; standing in for heat spreading
-    into the gaps as the iron meets hide. If a gap is still open on the right, heat will not close it.
+    Each mark as drawn, then with every stroke thickened 1.7&times; &mdash; heat spreading into the gaps as
+    the iron meets hide. Every gap that is open on the right is a gap that survives the burn.
   </p>
 
   <div class="bench">
     <div class="bench-grid">
       <figure>
         <div class="ba-pair">
-          <span><svg class="mk sw8 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>drawn</span>
-          <span class="hot"><svg class="mk sw8 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rocking"/></svg>iron</span>
+          <span><svg class="mk mk-64" viewBox="0 0 324 156" aria-hidden="true"><use href="#m-1"/></svg>drawn</span>
+          <span class="hot"><svg class="mk mk-64" viewBox="0 0 324 156" aria-hidden="true"><use href="#m-1"/></svg>iron</span>
         </div>
         <figcaption>1. Rocking Double M</figcaption>
       </figure>
       <figure>
         <div class="ba-pair">
-          <span><svg class="mk sw8 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rc-full"/></svg>drawn</span>
-          <span class="hot"><svg class="mk sw8 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-rc-full"/></svg>iron</span>
+          <span><svg class="mk mk-64" viewBox="0 0 300 112" aria-hidden="true"><use href="#m-1a"/></svg>drawn</span>
+          <span class="hot"><svg class="mk mk-64" viewBox="0 0 300 112" aria-hidden="true"><use href="#m-1a"/></svg>iron</span>
+        </div>
+        <figcaption>1a. Double M</figcaption>
+      </figure>
+      <figure>
+        <div class="ba-pair">
+          <span><svg class="mk mk-64" viewBox="0 0 250 156" aria-hidden="true"><use href="#m-11"/></svg>drawn</span>
+          <span class="hot"><svg class="mk mk-64" viewBox="0 0 250 156" aria-hidden="true"><use href="#m-11"/></svg>iron</span>
         </div>
         <figcaption>11. Rocking Connected Double M</figcaption>
       </figure>
       <figure>
         <div class="ba-pair">
-          <span><svg class="mk sw6 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b8"/></svg>drawn</span>
-          <span class="hot"><svg class="mk sw6 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-b8"/></svg>iron</span>
+          <span><svg class="mk mk-64" viewBox="0 0 226 112" aria-hidden="true"><use href="#m-11a"/></svg>drawn</span>
+          <span class="hot"><svg class="mk mk-64" viewBox="0 0 226 112" aria-hidden="true"><use href="#m-11a"/></svg>iron</span>
         </div>
-        <figcaption>24. Angular, tight</figcaption>
+        <figcaption>11a. Connected Double M</figcaption>
       </figure>
       <figure>
         <div class="ba-pair">
-          <span><svg class="mk sw9 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r1"/></svg>drawn</span>
-          <span class="hot"><svg class="mk sw9 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r1"/></svg>iron</span>
+          <span><svg class="mk mk-64" viewBox="0 0 243 112" aria-hidden="true"><use href="#m-25"/></svg>drawn</span>
+          <span class="hot"><svg class="mk mk-64" viewBox="0 0 243 112" aria-hidden="true"><use href="#m-25"/></svg>iron</span>
         </div>
-        <figcaption>25. Overlapped, opened</figcaption>
+        <figcaption>25. Overlapped Double M</figcaption>
       </figure>
       <figure>
         <div class="ba-pair">
-          <span><svg class="mk sw9 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r2"/></svg>drawn</span>
-          <span class="hot"><svg class="mk sw9 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r2"/></svg>iron</span>
+          <span><svg class="mk mk-64" viewBox="0 0 146 112" aria-hidden="true"><use href="#m-26"/></svg>drawn</span>
+          <span class="hot"><svg class="mk mk-64" viewBox="0 0 146 112" aria-hidden="true"><use href="#m-26"/></svg>iron</span>
         </div>
-        <figcaption>26. Double-struck, vertical</figcaption>
+        <figcaption>26. Double-struck Double M</figcaption>
       </figure>
       <figure>
         <div class="ba-pair">
-          <span><svg class="mk sw9 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r3"/></svg>drawn</span>
-          <span class="hot"><svg class="mk sw9 mk-56" viewBox="0 0 100 100" aria-hidden="true"><use href="#m-r3"/></svg>iron</span>
+          <span><svg class="mk mk-64" viewBox="0 0 237 128" aria-hidden="true"><use href="#m-24"/></svg>drawn</span>
+          <span class="hot"><svg class="mk mk-64" viewBox="0 0 237 128" aria-hidden="true"><use href="#m-24"/></svg>iron</span>
         </div>
-        <figcaption>27. Angular, opened</figcaption>
+        <figcaption>24. Angular Double M, tight</figcaption>
+      </figure>
+      <figure>
+        <div class="ba-pair">
+          <span><svg class="mk mk-64" viewBox="0 0 251 142" aria-hidden="true"><use href="#m-27"/></svg>drawn</span>
+          <span class="hot"><svg class="mk mk-64" viewBox="0 0 251 142" aria-hidden="true"><use href="#m-27"/></svg>iron</span>
+        </div>
+        <figcaption>27. Angular Double M, opened</figcaption>
       </figure>
     </div>
   </div>
 
-  <div class="aside">
-    <h3>The split this exposes</h3>
-    <p>
-      <strong>The four sharp marks pass the iron. The two rounded ones fail it.</strong> Not dramatically
-      &mdash; they do not vanish. Measured rather than eyeballed, and each fails at a different place: in
-      number&nbsp;1 the 16-unit channel between the two letters comes down to 2.4 units under the spread,
-      while the V inside each M stays open through its top half; in number&nbsp;11 it is the 42&deg; wedge
-      where the stem meets the diagonals, open through only 29% of its length. The rule wants at least one
-      stroke width of clearance the whole way, and neither mark holds it.
-    </p>
-    <p>
-      The cause is proportion, not language. Numbers 1 and 11 pack two whole M&rsquo;s into the same box the
-      sharp marks give to one-and-a-bit, so each letter is about half the width while the stroke stays the
-      same &mdash; roughly 29% of each letterform is ink, against 17% for number 25. They were drawn to a
-      24&nbsp;px legibility standard, which they meet comfortably, and never to an iron standard, which nobody
-      had asked of them until now.
-    </p>
-    <p>
-      That is fixable the same way 25&ndash;27 were fixed &mdash; widen the letters, or drop to one M and a
-      rocker &mdash; but it is a redraw, not a tweak, and a wider mark sits differently next to the approved
-      star mark than these do now. Worth deciding whether a physical brand is actually in scope before spending that. If it is
-      only ever a screen mark, 1 and 11 are the two clearest &ldquo;M&nbsp;M&rdquo;s on the sheet and the iron
-      column does not matter.
-    </p>
-  </div>
-
-  <h2>Where that leaves it</h2>
-  <p class="section-note">
-    Nothing here is approved; this is still exploration against issue&nbsp;#26. But the six now sort cleanly
-    by what they are for.
-  </p>
+  <h2>What this cost</h2>
 
   <div class="aside">
-    <h3>If the mark has to be burnable</h3>
+    <h3>The two languages turned out to be one</h3>
     <p>
-      Pick from 25, 26 and 27. All three were drawn to iron tolerances and all three hold at 16&nbsp;px, so
-      they carry no compromise on the screen side either. <strong>27</strong> survives smallest and needed the
-      least work, which makes it the natural centre of a family; <strong>25</strong> is the most literally a
-      double M if that reading matters more than economy.
+      The earlier sheets were organised around a fork &mdash; rounded brand-iron language against the
+      sketches&rsquo; sharp mitred language &mdash; and treated it as the real decision. Once corners have to
+      be bends, that fork closes. There is one language, and it is the rounded one. The sharp marks were not
+      a different school of drawing; they were drawings of an iron nobody would make.
     </p>
     <p>
-      <strong>If it is a screen mark only</strong>, <strong>1</strong> and <strong>11</strong> are the clearest
-      pair of letters here and keep the approved rocker, which no other survivor does.
-    </p>
-    <p>
-      <strong>24 and 27 are the same drawing at two weights</strong> and are worth deciding together rather
-      than separately &mdash; 24 is your sketch as drawn, 27 is it made buildable.
+      Two marks collapsed into each other on the way. <strong>Number 1b and number 25</strong> resolve to
+      identical geometry once you space them at the tightest overlap the clear-space rule allows, so they are
+      one mark now. Nine went in, eight came out.
     </p>
   </div>
 
   <div class="aside">
-    <h3>One thing to settle whichever wins</h3>
+    <h3>What the rules took away</h3>
     <p>
-      The two shipped files disagree about colour roles.
-      <code>rocking-double-star-customer.svg</code> draws the stars in identity purple with the rocker in
-      bluebonnet blue, while <code>logomark.tsx</code> and the admin file draw the stars in
-      <code>--gf-text</code> with the rocker in <code>--gf-identity</code> &mdash; so the component and the
-      customer SVG render different marks on a light ground, and the brand README&rsquo;s own description
-      matches neither exactly.
+      <strong>The dam-and-calf contrast.</strong> The calf in number 24 can only be 86% of the dam &mdash; the
+      bar does not shrink with the letter, so a smaller M runs out of clear space before it looks meaningfully
+      smaller. The dramatic size difference in the original sketch is not available at any scale.
     </p>
     <p>
-      These follow the component: letters take the text colour on midnight and identity purple on linen; the
-      supporting element takes the second colour. Worth deciding deliberately rather than inheriting.
+      <strong>The square.</strong> Nothing here is close to 1:1 except number 26 at 1.30:1, and that only
+      because it stacks the second strike instead of standing it alongside. If a square icon is a hard
+      requirement, it is a requirement to not put two letters side by side.
+    </p>
+    <p>
+      <strong>The stem</strong>, as above &mdash; and with it the cleanest &ldquo;two letters, not a
+      crown&rdquo; reading the old sheet had. The dropped apex does the same work, but more quietly.
     </p>
   </div>
 
   <div class="aside">
-    <h3>Next step, when a mark is picked</h3>
+    <h3>Screen, briefly</h3>
     <p>
-      This is a review sheet, not production art. The chosen mark needs the treatment the star mark got: a
-      <code>Logomark</code>-style component reading theme tokens, plus the two flat SVGs, living in
-      <code>packages/ui/src/brand/</code>. The full twenty-seven remain in git history if a cut one is wanted
-      back.
+      Held over deliberately, but worth flagging: these are wide, so a 16&nbsp;px square slot will letterbox
+      them to about 8&nbsp;px of letter. <strong>None of these is a favicon.</strong> A brand that burns and a
+      mark that survives a browser tab are close to opposite problems, and this sheet has now been solved
+      hard for the first. If both are needed the answer is probably two marks &mdash; the iron for physical
+      use and signage, a squarer derivative for the interface &mdash; rather than one mark asked to do both.
+    </p>
+  </div>
+
+  <div class="aside">
+    <h3>Still to settle</h3>
+    <p>
+      The colour-role disagreement between <code>rocking-double-star-customer.svg</code> and
+      <code>logomark.tsx</code> is unchanged and still wants a decision. These follow the component: letters
+      take the text colour on midnight and identity purple on linen, and the rocker takes the second colour.
+    </p>
+    <p>
+      Nothing here is approved. The full drawing history &mdash; twenty-seven marks, then six, then nine
+      &mdash; is in git if any of it is wanted back.
     </p>
   </div>
 
@@ -883,24 +693,21 @@
 
 <div class="tally" role="region" aria-label="Shortlist">
   <div class="tally-bar">
-    <span class="tally-count"><span id="tallyN">9</span> of 9 kept</span>
+    <span class="tally-count"><span id="tallyN">8</span> of 8 kept</span>
     <button type="button" id="tallyClear">Clear</button>
     <button type="button" id="tallyShow" aria-expanded="false">List</button>
   </div>
   <div class="tally-out" id="tallyOut">
     <textarea id="tallyText" readonly aria-label="Your selection as text"></textarea>
-    <p class="tally-hint">Untick to cut further, then paste this back to me.</p>
+    <p class="tally-hint">Untick to cut, then paste this back to me.</p>
   </div>
 </div>
 
 <script>
 (function () {
   var boxes = Array.prototype.slice.call(document.querySelectorAll('.keep input'));
-  var nEl = document.getElementById('tallyN');
-  var outEl = document.getElementById('tallyOut');
-  var textEl = document.getElementById('tallyText');
-  var showBtn = document.getElementById('tallyShow');
-
+  var nEl = document.getElementById('tallyN'), outEl = document.getElementById('tallyOut');
+  var textEl = document.getElementById('tallyText'), showBtn = document.getElementById('tallyShow');
   function refresh() {
     var c = boxes.filter(function (b) { return b.checked; });
     nEl.textContent = c.length;
@@ -909,11 +716,9 @@
         c.map(function (b) { return b.dataset.pick + '. ' + b.dataset.name; }).join('\n')
       : 'Nothing selected.';
   }
-
   boxes.forEach(function (b) { b.addEventListener('change', refresh); });
   document.getElementById('tallyClear').addEventListener('click', function () {
-    boxes.forEach(function (b) { b.checked = false; });
-    refresh();
+    boxes.forEach(function (b) { b.checked = false; }); refresh();
   });
   showBtn.addEventListener('click', function () {
     var open = outEl.classList.toggle('open');
