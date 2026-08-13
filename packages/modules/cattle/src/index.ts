@@ -17,6 +17,7 @@ export * from "./domain/breeds.js";
 export * from "./domain/calving-record.js";
 export * from "./domain/calving-watch.js";
 export * from "./domain/cattle-candidate.js";
+export * from "./domain/catalogue.js";
 export * from "./domain/cattle-profile.js";
 export * from "./domain/coat-colour.js";
 export * from "./domain/coat-inference.js";
