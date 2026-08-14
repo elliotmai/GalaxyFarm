@@ -22,6 +22,7 @@ import {
   useConfirmDelete,
   useToast,
   type Column,
+  Modal,
 } from "@galaxy-farm/ui";
 import {
   CANDIDATE_STATUSES,
@@ -213,6 +214,9 @@ export function EquipmentCandidatesScreen({
   const { show } = useToast();
 
   const [editing, setEditing] = useState<PurchaseCandidate | undefined>();
+  // The editor is a side dialog now, so it needs an open state of its own —
+  // `editing` alone cannot express \"adding a new one\".
+  const [editorOpen, setEditorOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => ({
     ...BLANK,
     roadmapItemId: params.get("item") ?? "",
@@ -250,13 +254,19 @@ export function EquipmentCandidatesScreen({
     return budget !== undefined && compareToBudget(entry, budget).overBudget;
   });
 
+  function openEditor(): void {
+    setEditorOpen(true);
+  }
+
   function reset() {
+    setEditorOpen(false);
     setEditing(undefined);
     setDraft({ ...BLANK, roadmapItemId: filter });
     setError(undefined);
   }
 
   function startEdit(candidate: PurchaseCandidate) {
+    setEditorOpen(true);
     const detail = detailOf(candidate);
     setEditing(candidate);
     setDraft({
@@ -647,276 +657,276 @@ export function EquipmentCandidatesScreen({
         </Callout>
       )}
 
-      <Section
-        title={editing === undefined ? "Add a candidate" : `Edit ${editing.title}`}
-        description="Every cost that only shows up after you say yes goes in as its own line, because that is what makes the all-in figure worth sorting on."
-      >
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-            <TextInput
-              label="What it is"
-              hint="&ldquo;2018 F-250, Weatherford&rdquo;"
-              value={draft.title}
-              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-              required
-            />
-            <Select
-              label="Against which want"
-              value={draft.roadmapItemId}
-              placeholder="Not on the roadmap"
-              onChange={(event) => setDraft({ ...draft, roadmapItemId: event.target.value })}
-              options={items.map((item) => ({
-                value: item.id,
-                label:
-                  item.budgetEstimate === undefined
-                    ? item.title
-                    : `${item.title} · ${formatMoney(item.budgetEstimate)}`,
-              }))}
-            />
-            <Select
-              label="Category"
-              value={draft.category}
-              onChange={(event) =>
-                setDraft({ ...draft, category: event.target.value as EquipmentCategory })
-              }
-              options={EQUIPMENT_CATEGORIES.map((value) => ({ value, label: value }))}
-            />
-            <TextInput
-              label="Asking ($)"
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              numeric
-              value={draft.asking}
-              onChange={(event) => setDraft({ ...draft, asking: event.target.value })}
-              required
-            />
-            <TextInput
-              label="Where"
-              value={draft.location}
-              onChange={(event) => setDraft({ ...draft, location: event.target.value })}
-            />
-            <TextInput
-              label="Miles away"
-              hint="One way. It is most of what hauling costs."
-              type="number"
-              inputMode="decimal"
-              numeric
-              value={draft.distanceMiles}
-              onChange={(event) => setDraft({ ...draft, distanceMiles: event.target.value })}
-            />
-            <TextInput
-              label="Make"
-              value={draft.make}
-              onChange={(event) => setDraft({ ...draft, make: event.target.value })}
-            />
-            <TextInput
-              label="Model"
-              value={draft.model}
-              onChange={(event) => setDraft({ ...draft, model: event.target.value })}
-            />
-            <TextInput
-              label="Year"
-              type="number"
-              inputMode="numeric"
-              numeric
-              value={draft.year}
-              onChange={(event) => setDraft({ ...draft, year: event.target.value })}
-            />
-            <TextInput
-              label="Mileage"
-              type="number"
-              inputMode="numeric"
-              numeric
-              value={draft.mileage}
-              onChange={(event) => setDraft({ ...draft, mileage: event.target.value })}
-            />
-            <TextInput
-              label="Engine hours"
-              type="number"
-              inputMode="decimal"
-              step="0.1"
-              numeric
-              value={draft.engineHours}
-              onChange={(event) => setDraft({ ...draft, engineHours: event.target.value })}
-            />
-            <TextInput
-              label="VIN or serial"
-              value={draft.vin}
-              onChange={(event) => setDraft({ ...draft, vin: event.target.value })}
-            />
-            <Select
-              label="Condition"
-              value={draft.condition}
-              placeholder="Not judged yet"
-              onChange={(event) => setDraft({ ...draft, condition: event.target.value })}
-              options={CONDITIONS.map((value: Condition) => ({ value, label: value }))}
-            />
-            <Select
-              label="Title"
-              value={draft.titleStatus}
-              placeholder="Not asked yet"
-              onChange={(event) => setDraft({ ...draft, titleStatus: event.target.value })}
-              options={TITLE_STATUSES.map((value: TitleStatus) => ({
-                value,
-                label: value.replace(/_/g, " "),
-              }))}
-            />
-            <Select
-              label="Seller"
-              value={draft.sellerId}
-              placeholder="Not recorded"
-              onChange={(event) => setDraft({ ...draft, sellerId: event.target.value })}
-              options={contacts.map((contact) => ({ value: contact.id, label: contact.name }))}
-            />
-            <TextInput
-              label="Listing link"
-              type="url"
-              value={draft.listingUrl}
-              onChange={(event) => setDraft({ ...draft, listingUrl: event.target.value })}
-            />
-            <TextInput
-              label="Listed on"
-              type="date"
-              value={draft.listedDate}
-              onChange={(event) => setDraft({ ...draft, listedDate: event.target.value })}
-            />
-            <TextInput
-              label="Sale or expiry date"
-              hint="A lot is a deadline. Leave blank for a private treaty."
-              type="date"
-              value={draft.expiresAt}
-              onChange={(event) => setDraft({ ...draft, expiresAt: event.target.value })}
-            />
-            <TextInput
-              label="Warranty left"
-              value={draft.warrantyRemaining}
-              onChange={(event) => setDraft({ ...draft, warrantyRemaining: event.target.value })}
-            />
-            <TextInput
-              label="Known faults"
-              value={draft.knownFaults}
-              onChange={(event) => setDraft({ ...draft, knownFaults: event.target.value })}
-            />
-            <TextInput
-              label="Tyres, tracks or wear"
-              value={draft.wearCondition}
-              onChange={(event) => setDraft({ ...draft, wearCondition: event.target.value })}
-            />
-            <Checkbox
-              label="Service history available"
-              checked={draft.serviceHistoryAvailable}
-              onChange={(event) =>
-                setDraft({ ...draft, serviceHistoryAvailable: event.target.checked })
-              }
-            />
-          </div>
-
-          <fieldset className="flex flex-col gap-3">
-            <legend className="text-xs font-semibold uppercase tracking-wide text-muted">
-              Costs on top
-            </legend>
+      {editorOpen || editing !== undefined ? (
+        <Modal placement="side" title={"Edit"} onClose={reset}>
+          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
             <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-              {draft.additionalCosts.map((cost, index) => (
-                <div key={index} className="flex items-end gap-2">
-                  <div className="min-w-0 flex-1">
-                    <TextInput
-                      label={`Cost ${index + 1}`}
-                      hideLabel
-                      placeholder="What for"
-                      value={cost.label}
-                      onChange={(event) =>
-                        setDraft({
-                          ...draft,
-                          additionalCosts: draft.additionalCosts.map((entry, at) =>
-                            at === index ? { ...entry, label: event.target.value } : entry,
-                          ),
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="w-32">
-                    <TextInput
-                      label={`Amount ${index + 1}`}
-                      hideLabel
-                      placeholder="$"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.01"
-                      numeric
-                      value={cost.amount}
-                      onChange={(event) =>
-                        setDraft({
-                          ...draft,
-                          additionalCosts: draft.additionalCosts.map((entry, at) =>
-                            at === index ? { ...entry, amount: event.target.value } : entry,
-                          ),
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div>
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  setDraft({
-                    ...draft,
-                    additionalCosts: [...draft.additionalCosts, { label: "", amount: "" }],
-                  })
+              <TextInput
+                label="What it is"
+                hint="&ldquo;2018 F-250, Weatherford&rdquo;"
+                value={draft.title}
+                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                required
+              />
+              <Select
+                label="Against which want"
+                value={draft.roadmapItemId}
+                placeholder="Not on the roadmap"
+                onChange={(event) => setDraft({ ...draft, roadmapItemId: event.target.value })}
+                options={items.map((item) => ({
+                  value: item.id,
+                  label:
+                    item.budgetEstimate === undefined
+                      ? item.title
+                      : `${item.title} · ${formatMoney(item.budgetEstimate)}`,
+                }))}
+              />
+              <Select
+                label="Category"
+                value={draft.category}
+                onChange={(event) =>
+                  setDraft({ ...draft, category: event.target.value as EquipmentCategory })
                 }
-              >
-                Another cost
-              </Button>
+                options={EQUIPMENT_CATEGORIES.map((value) => ({ value, label: value }))}
+              />
+              <TextInput
+                label="Asking ($)"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                numeric
+                value={draft.asking}
+                onChange={(event) => setDraft({ ...draft, asking: event.target.value })}
+                required
+              />
+              <TextInput
+                label="Where"
+                value={draft.location}
+                onChange={(event) => setDraft({ ...draft, location: event.target.value })}
+              />
+              <TextInput
+                label="Miles away"
+                hint="One way. It is most of what hauling costs."
+                type="number"
+                inputMode="decimal"
+                numeric
+                value={draft.distanceMiles}
+                onChange={(event) => setDraft({ ...draft, distanceMiles: event.target.value })}
+              />
+              <TextInput
+                label="Make"
+                value={draft.make}
+                onChange={(event) => setDraft({ ...draft, make: event.target.value })}
+              />
+              <TextInput
+                label="Model"
+                value={draft.model}
+                onChange={(event) => setDraft({ ...draft, model: event.target.value })}
+              />
+              <TextInput
+                label="Year"
+                type="number"
+                inputMode="numeric"
+                numeric
+                value={draft.year}
+                onChange={(event) => setDraft({ ...draft, year: event.target.value })}
+              />
+              <TextInput
+                label="Mileage"
+                type="number"
+                inputMode="numeric"
+                numeric
+                value={draft.mileage}
+                onChange={(event) => setDraft({ ...draft, mileage: event.target.value })}
+              />
+              <TextInput
+                label="Engine hours"
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                numeric
+                value={draft.engineHours}
+                onChange={(event) => setDraft({ ...draft, engineHours: event.target.value })}
+              />
+              <TextInput
+                label="VIN or serial"
+                value={draft.vin}
+                onChange={(event) => setDraft({ ...draft, vin: event.target.value })}
+              />
+              <Select
+                label="Condition"
+                value={draft.condition}
+                placeholder="Not judged yet"
+                onChange={(event) => setDraft({ ...draft, condition: event.target.value })}
+                options={CONDITIONS.map((value: Condition) => ({ value, label: value }))}
+              />
+              <Select
+                label="Title"
+                value={draft.titleStatus}
+                placeholder="Not asked yet"
+                onChange={(event) => setDraft({ ...draft, titleStatus: event.target.value })}
+                options={TITLE_STATUSES.map((value: TitleStatus) => ({
+                  value,
+                  label: value.replace(/_/g, " "),
+                }))}
+              />
+              <Select
+                label="Seller"
+                value={draft.sellerId}
+                placeholder="Not recorded"
+                onChange={(event) => setDraft({ ...draft, sellerId: event.target.value })}
+                options={contacts.map((contact) => ({ value: contact.id, label: contact.name }))}
+              />
+              <TextInput
+                label="Listing link"
+                type="url"
+                value={draft.listingUrl}
+                onChange={(event) => setDraft({ ...draft, listingUrl: event.target.value })}
+              />
+              <TextInput
+                label="Listed on"
+                type="date"
+                value={draft.listedDate}
+                onChange={(event) => setDraft({ ...draft, listedDate: event.target.value })}
+              />
+              <TextInput
+                label="Sale or expiry date"
+                hint="A lot is a deadline. Leave blank for a private treaty."
+                type="date"
+                value={draft.expiresAt}
+                onChange={(event) => setDraft({ ...draft, expiresAt: event.target.value })}
+              />
+              <TextInput
+                label="Warranty left"
+                value={draft.warrantyRemaining}
+                onChange={(event) => setDraft({ ...draft, warrantyRemaining: event.target.value })}
+              />
+              <TextInput
+                label="Known faults"
+                value={draft.knownFaults}
+                onChange={(event) => setDraft({ ...draft, knownFaults: event.target.value })}
+              />
+              <TextInput
+                label="Tyres, tracks or wear"
+                value={draft.wearCondition}
+                onChange={(event) => setDraft({ ...draft, wearCondition: event.target.value })}
+              />
+              <Checkbox
+                label="Service history available"
+                checked={draft.serviceHistoryAvailable}
+                onChange={(event) =>
+                  setDraft({ ...draft, serviceHistoryAvailable: event.target.checked })
+                }
+              />
             </div>
-          </fieldset>
 
-          <div className="grid grid-cols-1 gap-density md:grid-cols-2">
-            <TagInput
-              label="Pros"
-              hint="Your own words. This is what the conversation away from the screen is made of."
-              value={draft.pros}
-              onChange={(pros) => setDraft({ ...draft, pros })}
+            <fieldset className="flex flex-col gap-3">
+              <legend className="text-xs font-semibold uppercase tracking-wide text-muted">
+                Costs on top
+              </legend>
+              <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+                {draft.additionalCosts.map((cost, index) => (
+                  <div key={index} className="flex items-end gap-2">
+                    <div className="min-w-0 flex-1">
+                      <TextInput
+                        label={`Cost ${index + 1}`}
+                        hideLabel
+                        placeholder="What for"
+                        value={cost.label}
+                        onChange={(event) =>
+                          setDraft({
+                            ...draft,
+                            additionalCosts: draft.additionalCosts.map((entry, at) =>
+                              at === index ? { ...entry, label: event.target.value } : entry,
+                            ),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="w-32">
+                      <TextInput
+                        label={`Amount ${index + 1}`}
+                        hideLabel
+                        placeholder="$"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        numeric
+                        value={cost.amount}
+                        onChange={(event) =>
+                          setDraft({
+                            ...draft,
+                            additionalCosts: draft.additionalCosts.map((entry, at) =>
+                              at === index ? { ...entry, amount: event.target.value } : entry,
+                            ),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    setDraft({
+                      ...draft,
+                      additionalCosts: [...draft.additionalCosts, { label: "", amount: "" }],
+                    })
+                  }
+                >
+                  Another cost
+                </Button>
+              </div>
+            </fieldset>
+
+            <div className="grid grid-cols-1 gap-density md:grid-cols-2">
+              <TagInput
+                label="Pros"
+                hint="Your own words. This is what the conversation away from the screen is made of."
+                value={draft.pros}
+                onChange={(pros) => setDraft({ ...draft, pros })}
+              />
+              <TagInput
+                label="Cons"
+                value={draft.cons}
+                onChange={(cons) => setDraft({ ...draft, cons })}
+              />
+            </div>
+
+            <TextInput
+              label="Notes"
+              value={draft.notes}
+              onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
-            <TagInput
-              label="Cons"
-              value={draft.cons}
-              onChange={(cons) => setDraft({ ...draft, cons })}
-            />
-          </div>
 
-          <TextInput
-            label="Notes"
-            value={draft.notes}
-            onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-          />
-
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" busy={busy}>
-              {editing === undefined ? "Add candidate" : "Save candidate"}
-            </Button>
-            {editing === undefined ? null : (
-              <Button variant="ghost" onClick={reset}>
-                Cancel
-              </Button>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
             )}
-          </div>
-        </form>
-      </Section>
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" busy={busy}>
+                {editing === undefined ? "Add candidate" : "Save candidate"}
+              </Button>
+              {editing === undefined ? null : (
+                <Button variant="ghost" onClick={reset}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </Modal>
+      ) : null}
 
       <Section
         title="Comparison"
         description="Sorted on total acquisition cost. Price per mile and per hour divide that same figure, which is the only honest way to weigh a low-hour expensive unit against a high-hour cheap one."
         actions={
           <div className="flex flex-wrap items-end gap-3">
+            <Button onClick={openEditor}>Add a candidate</Button>
             <Select
               label="Want"
               value={filter}

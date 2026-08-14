@@ -18,6 +18,7 @@ import {
   Tile,
   useConfirmDelete,
   useToast,
+  Modal,
 } from "@galaxy-farm/ui";
 import {
   byPriority,
@@ -113,6 +114,9 @@ export function EquipmentRoadmapScreen({
   const { show } = useToast();
 
   const [editing, setEditing] = useState<RoadmapItem | undefined>();
+  // The editor is a side dialog now, so it needs an open state of its own —
+  // `editing` alone cannot express \"adding a new one\".
+  const [editorOpen, setEditorOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(BLANK);
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -130,13 +134,19 @@ export function EquipmentRoadmapScreen({
     cents: open.reduce((total, item) => total + (item.budgetEstimate?.cents ?? 0), 0),
   };
 
+  function openEditor(): void {
+    setEditorOpen(true);
+  }
+
   function reset() {
+    setEditorOpen(false);
     setEditing(undefined);
     setDraft(BLANK);
     setError(undefined);
   }
 
   function startEdit(item: RoadmapItem) {
+    setEditorOpen(true);
     setEditing(item);
     setDraft({
       type: item.type,
@@ -267,104 +277,108 @@ export function EquipmentRoadmapScreen({
         <Tile label="Budgeted" value={formatMoney(budgeted)} hint="Across everything still open" />
       </div>
 
-      <Section
-        title={editing === undefined ? "Add to the roadmap" : `Edit ${editing.title}`}
-        description="A wishlist line is a want — &ldquo;truck, need, ASAP&rdquo;. What you are actually looking at goes on the candidates screen."
-      >
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-            <TextInput
-              label="What"
-              hint="&ldquo;Three-quarter-ton truck&rdquo;, &ldquo;Compact tractor with a loader&rdquo;"
-              value={draft.title}
-              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-              required
-            />
-            <Select
-              label="Kind"
-              value={draft.type}
-              onChange={(event) =>
-                setDraft({ ...draft, type: event.target.value as RoadmapItemType })
-              }
-              options={ROADMAP_ITEM_TYPES.map((value) => ({
-                value,
-                label: value.replace(/_/g, " "),
-              }))}
-            />
-            <Select
-              label="Priority"
-              value={draft.priority}
-              onChange={(event) => setDraft({ ...draft, priority: event.target.value as Priority })}
-              options={PRIORITIES.map((value) => ({ value, label: value }))}
-            />
-            <TextInput
-              label="Budget ($)"
-              hint="What a candidate's all-in cost gets measured against."
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              numeric
-              value={draft.budgetEstimate}
-              onChange={(event) => setDraft({ ...draft, budgetEstimate: event.target.value })}
-            />
-            <TextInput
-              label="Target date"
-              type="date"
-              value={draft.targetDate}
-              onChange={(event) => setDraft({ ...draft, targetDate: event.target.value })}
-            />
-            <TextInput
-              label="…or season"
-              hint="&ldquo;Before hay season&rdquo; is how this is usually said."
-              value={draft.targetSeason}
-              onChange={(event) => setDraft({ ...draft, targetSeason: event.target.value })}
-            />
-            <TextInput
-              label="Why"
-              value={draft.detail}
-              onChange={(event) => setDraft({ ...draft, detail: event.target.value })}
-            />
-            <Select
-              label="Status"
-              value={draft.status}
-              onChange={(event) =>
-                setDraft({ ...draft, status: event.target.value as RoadmapStatus })
-              }
-              options={ROADMAP_STATUSES.map((value) => ({
-                value,
-                label: value.replace(/_/g, " "),
-              }))}
-            />
-          </div>
+      {editorOpen || editing !== undefined ? (
+        <Modal placement="side" title={"Edit"} onClose={reset}>
+          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
+            <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+              <TextInput
+                label="What"
+                hint="&ldquo;Three-quarter-ton truck&rdquo;, &ldquo;Compact tractor with a loader&rdquo;"
+                value={draft.title}
+                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                required
+              />
+              <Select
+                label="Kind"
+                value={draft.type}
+                onChange={(event) =>
+                  setDraft({ ...draft, type: event.target.value as RoadmapItemType })
+                }
+                options={ROADMAP_ITEM_TYPES.map((value) => ({
+                  value,
+                  label: value.replace(/_/g, " "),
+                }))}
+              />
+              <Select
+                label="Priority"
+                value={draft.priority}
+                onChange={(event) =>
+                  setDraft({ ...draft, priority: event.target.value as Priority })
+                }
+                options={PRIORITIES.map((value) => ({ value, label: value }))}
+              />
+              <TextInput
+                label="Budget ($)"
+                hint="What a candidate's all-in cost gets measured against."
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                numeric
+                value={draft.budgetEstimate}
+                onChange={(event) => setDraft({ ...draft, budgetEstimate: event.target.value })}
+              />
+              <TextInput
+                label="Target date"
+                type="date"
+                value={draft.targetDate}
+                onChange={(event) => setDraft({ ...draft, targetDate: event.target.value })}
+              />
+              <TextInput
+                label="…or season"
+                hint="&ldquo;Before hay season&rdquo; is how this is usually said."
+                value={draft.targetSeason}
+                onChange={(event) => setDraft({ ...draft, targetSeason: event.target.value })}
+              />
+              <TextInput
+                label="Why"
+                value={draft.detail}
+                onChange={(event) => setDraft({ ...draft, detail: event.target.value })}
+              />
+              <Select
+                label="Status"
+                value={draft.status}
+                onChange={(event) =>
+                  setDraft({ ...draft, status: event.target.value as RoadmapStatus })
+                }
+                options={ROADMAP_STATUSES.map((value) => ({
+                  value,
+                  label: value.replace(/_/g, " "),
+                }))}
+              />
+            </div>
 
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" busy={busy}>
-              {editing === undefined ? "Add to roadmap" : "Save item"}
-            </Button>
-            {editing === undefined ? null : (
-              <Button variant="ghost" onClick={reset}>
-                Cancel
-              </Button>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
             )}
-          </div>
-        </form>
-      </Section>
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" busy={busy}>
+                {editing === undefined ? "Add to roadmap" : "Save item"}
+              </Button>
+              {editing === undefined ? null : (
+                <Button variant="ghost" onClick={reset}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </Modal>
+      ) : null}
 
       <Section
         title="The list"
         description="Needs first, then wants, then somedays — the order you actually shop in."
         actions={
-          <Checkbox
-            label="Show achieved and dropped"
-            checked={showClosed}
-            onChange={(event) => setShowClosed(event.target.checked)}
-          />
+          <span className="flex flex-wrap items-center gap-3">
+            <Button onClick={openEditor}>Add to the roadmap</Button>
+            <Checkbox
+              label="Show achieved and dropped"
+              checked={showClosed}
+              onChange={(event) => setShowClosed(event.target.checked)}
+            />
+          </span>
         }
       >
         {loading ? (

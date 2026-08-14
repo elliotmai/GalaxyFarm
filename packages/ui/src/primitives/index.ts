@@ -13,7 +13,6 @@ export * from "./layout.js";
 export * from "./modal.js";
 export * from "./pull-to-refresh.js";
 export * from "./search-select.js";
-export * from "./sheet.js";
 export * from "./skeleton.js";
 export * from "./surfaces.js";
 export * from "./tabs.js";

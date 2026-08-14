@@ -177,83 +177,112 @@
 }
 
 /*
- * The sheet's geometry (see `primitives/sheet.tsx`).
+ * The dialog's geometry (see `primitives/modal.tsx`).
  *
- * Bottom on a phone, because that is where a thumb is; right on a laptop,
- * because that is where the space is and because a list reads left to right.
- * The direction is a media query rather than a prop — it is a property of the
- * surface, and a caller that had to pass it would eventually pass the wrong
- * one.
+ * A `<dialog>` in the top layer is positioned against the viewport, not against
+ * the surface, so the safe-area insets have to be paid here — the padding in
+ * globals.css is on an element the dialog is no longer inside.
  *
- * Here rather than in Tailwind classes because a `<dialog>` in the top layer
- * is positioned against the viewport, and the safe-area insets have to be paid
- * on the panel itself: the surface padding in globals.css is on an element the
- * dialog is no longer inside.
+ * Both placements are the same bottom sheet on a phone, because there is no
+ * room beside anything. They only differ once there is.
  */
-.gf-sheet {
+.gf-modal {
   position: fixed;
   inset: auto 0 0 0;
   width: 100%;
   max-height: 92dvh;
 }
 
-.gf-sheet .gf-sheet-panel {
+.gf-modal .gf-modal-panel {
   max-height: 92dvh;
-  border-top-width: 1px;
+  border-width: 1px 0 0 0;
   border-top-left-radius: calc(var(--gf-radius) + 6px);
   border-top-right-radius: calc(var(--gf-radius) + 6px);
   padding-bottom: calc(var(--gf-gap) + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 34px -14px rgb(20 23 27 / 28%);
 }
 
 @media (min-width: 40rem) {
-  .gf-sheet {
-    inset: 0 0 0 auto;
-    width: min(30rem, 92vw);
-    max-height: none;
+  /* Centred: an editor that is not about one visible row. */
+  .gf-modal--center {
+    inset: 0;
+    display: grid;
+    place-items: center;
+    width: 100%;
     height: 100dvh;
+    max-height: none;
+    padding: var(--gf-gap);
   }
 
-  .gf-sheet .gf-sheet-panel {
+  .gf-modal--center .gf-modal-panel {
+    width: 100%;
+    max-height: 88dvh;
+    border-width: 1px;
+    border-radius: var(--gf-radius);
+    padding-bottom: var(--gf-gap);
+    box-shadow: 0 18px 48px -20px rgb(20 23 27 / 34%);
+  }
+
+  /* Side: a form over the list it is about, which stays readable beside it. */
+  .gf-modal--side {
+    inset: 0 0 0 auto;
+    width: min(34rem, 92vw);
+    height: 100dvh;
     max-height: none;
+  }
+
+  .gf-modal--side .gf-modal-panel {
     min-height: 100dvh;
-    border-top-width: 0;
-    border-left-width: 1px;
+    max-height: none;
+    border-width: 0 0 0 1px;
     border-radius: 0;
     padding-right: calc(var(--gf-gap) + env(safe-area-inset-right));
     padding-bottom: var(--gf-gap);
+    box-shadow: -14px 0 40px -18px rgb(20 23 27 / 28%);
   }
 }
 
 /*
- * The slide, and the reason it is short.
+ * The arrival, and why it is short.
  *
  * Long enough to say which direction the panel came from — which is what tells
- * somebody the list is still behind it rather than replaced — and short enough
- * not to be a wait. The reduced-motion rule above turns it off entirely.
+ * somebody the page is still behind it rather than replaced — and short enough
+ * not to be a wait. The reduced-motion rule below turns it off entirely.
  */
 @media (prefers-reduced-motion: no-preference) {
-  .gf-sheet[open] {
-    animation: gf-sheet-up 180ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  .gf-modal[open] {
+    animation: gf-modal-up 180ms cubic-bezier(0.2, 0.7, 0.3, 1);
   }
 
   @media (min-width: 40rem) {
-    .gf-sheet[open] {
-      animation-name: gf-sheet-in;
+    .gf-modal--side[open] {
+      animation-name: gf-modal-in;
+    }
+
+    .gf-modal--center[open] {
+      animation-name: gf-modal-rise;
     }
   }
 }
 
-@keyframes gf-sheet-up {
+@keyframes gf-modal-up {
   from {
     transform: translateY(6%);
     opacity: 0.6;
   }
 }
 
-@keyframes gf-sheet-in {
+@keyframes gf-modal-in {
   from {
     transform: translateX(6%);
     opacity: 0.6;
+  }
+}
+
+@keyframes gf-modal-rise {
+  from {
+    transform: translateY(1.5%);
+    opacity: 0.7;
   }
 }
 

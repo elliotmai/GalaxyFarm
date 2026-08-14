@@ -23,6 +23,7 @@ import {
   useConfirmDelete,
   useToast,
   type Column,
+  Modal,
 } from "@galaxy-farm/ui";
 import {
   displayName,
@@ -398,6 +399,9 @@ function Purchases({
 
   const byId = useMemo(() => new Map(feeds.map((feed) => [feed.id, feed])), [feeds]);
   const [editing, setEditing] = useState<FeedPurchase | undefined>();
+  // The editor is a side dialog now, so it needs an open state of its own —
+  // `editing` alone cannot express \"adding a new one\".
+  const [editorOpen, setEditorOpen] = useState(false);
   const [feedTypeId, setFeedTypeId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [unitCost, setUnitCost] = useState("");
@@ -406,6 +410,7 @@ function Purchases({
   const [busy, setBusy] = useState(false);
 
   function startEdit(purchase: FeedPurchase) {
+    setEditorOpen(true);
     setEditing(purchase);
     setFeedTypeId(purchase.feedTypeId);
     setQuantity(String(purchase.quantity));
@@ -414,7 +419,12 @@ function Purchases({
     setError(undefined);
   }
 
+  function openEditor(): void {
+    setEditorOpen(true);
+  }
+
   function reset() {
+    setEditorOpen(false);
     setEditing(undefined);
     setQuantity("");
     setUnitCost("");
@@ -516,69 +526,78 @@ function Purchases({
 
   return (
     <div className="flex flex-col gap-density">
-      <Section title={editing === undefined ? "Record a purchase" : "Edit this purchase"}>
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
-            <Select
-              label="Feed"
-              value={feedTypeId}
-              placeholder="Choose a feed"
-              options={feeds.map((feed) => ({
-                value: feed.id,
-                label: `${feed.name} (${feed.unit.replace(/_/g, " ")})`,
-              }))}
-              onChange={(event) => setFeedTypeId(event.target.value)}
-              required
-            />
-            <TextInput
-              label="Quantity"
-              hint="In the feed's own unit — bales, bags, tons."
-              type="number"
-              inputMode="decimal"
-              numeric
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-              required
-            />
-            <TextInput
-              label="Cost each"
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              numeric
-              value={unitCost}
-              onChange={(event) => setUnitCost(event.target.value)}
-              required
-            />
-            <TextInput
-              label="Bought"
-              type="date"
-              value={purchasedOn}
-              onChange={(event) => setPurchasedOn(event.target.value)}
-              required
-            />
-          </div>
+      {editorOpen || editing !== undefined ? (
+        <Modal
+          placement="side"
+          title={editing === undefined ? "Record a purchase" : "Edit this purchase"}
+          onClose={reset}
+        >
+          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
+            <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
+              <Select
+                label="Feed"
+                value={feedTypeId}
+                placeholder="Choose a feed"
+                options={feeds.map((feed) => ({
+                  value: feed.id,
+                  label: `${feed.name} (${feed.unit.replace(/_/g, " ")})`,
+                }))}
+                onChange={(event) => setFeedTypeId(event.target.value)}
+                required
+              />
+              <TextInput
+                label="Quantity"
+                hint="In the feed's own unit — bales, bags, tons."
+                type="number"
+                inputMode="decimal"
+                numeric
+                value={quantity}
+                onChange={(event) => setQuantity(event.target.value)}
+                required
+              />
+              <TextInput
+                label="Cost each"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                numeric
+                value={unitCost}
+                onChange={(event) => setUnitCost(event.target.value)}
+                required
+              />
+              <TextInput
+                label="Bought"
+                type="date"
+                value={purchasedOn}
+                onChange={(event) => setPurchasedOn(event.target.value)}
+                required
+              />
+            </div>
 
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" busy={busy}>
-              {editing === undefined ? "Record purchase" : "Save purchase"}
-            </Button>
-            {editing === undefined ? null : (
-              <Button variant="ghost" onClick={reset}>
-                Cancel
-              </Button>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
             )}
-          </div>
-        </form>
-      </Section>
 
-      <Section title="Every purchase">
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" busy={busy}>
+                {editing === undefined ? "Record purchase" : "Save purchase"}
+              </Button>
+              {editing === undefined ? null : (
+                <Button variant="ghost" onClick={reset}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      <Section
+        title="Every purchase"
+        actions={<Button onClick={openEditor}>Record a purchase</Button>}
+      >
         <Card>
           <DataTable
             caption="Feed purchases"
@@ -627,6 +646,13 @@ function Used({
 
   const byId = useMemo(() => new Map(feeds.map((feed) => [feed.id, feed])), [feeds]);
   const [editing, setEditing] = useState<FeedConsumption | undefined>();
+  // The editor is a side dialog now, so it needs an open state of its own —
+  // `editing` alone cannot express \"adding a new one\".
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  function openEditor(): void {
+    setEditorOpen(true);
+  }
   const [feedTypeId, setFeedTypeId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [kind, setKind] = useState<ConsumptionKind>("extra");
@@ -637,6 +663,7 @@ function Used({
   const [busy, setBusy] = useState(false);
 
   function reset() {
+    setEditorOpen(false);
     setEditing(undefined);
     setQuantity("");
     setZoneId("");
@@ -645,6 +672,7 @@ function Used({
   }
 
   function startEdit(entry: FeedConsumption) {
+    setEditorOpen(true);
     setEditing(entry);
     setFeedTypeId(entry.feedTypeId);
     setQuantity(String(entry.quantity));
@@ -771,83 +799,82 @@ function Used({
 
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title={editing === undefined ? "Log feed the plans do not know about" : "Edit this entry"}
-        description="Ordinary feeding is never logged — the plans already say what goes out. This is the torn bag, the extra bale in a cold snap, and the morning somebody counts the barn."
-      >
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-            <Select
-              label="Feed"
-              value={feedTypeId}
-              placeholder="Choose a feed"
-              options={feeds.map((feed) => ({ value: feed.id, label: feed.name }))}
-              onChange={(event) => setFeedTypeId(event.target.value)}
-              required
-            />
-            <Select
-              label="Kind"
-              hint="A correction is you counting the barn — the projection restarts from it."
-              value={kind}
-              options={CONSUMPTION_KINDS.map((value) => ({ value, label: value }))}
-              onChange={(event) => setKind(event.target.value as ConsumptionKind)}
-            />
-            <TextInput
-              label="Quantity"
-              type="number"
-              inputMode="decimal"
-              numeric
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-              required
-            />
-            <TextInput
-              label="When"
-              type="date"
-              value={usedOn}
-              onChange={(event) => setUsedOn(event.target.value)}
-              required
-            />
-            <Select
-              label="Pen"
-              value={zoneId}
-              placeholder="Not against a pen"
-              options={zones
-                .filter((zone) => zone.active)
-                .map((zone) => ({ value: zone.id, label: zone.name }))}
-              onChange={(event) => setZoneId(event.target.value)}
-            />
-            <Select
-              label="Animal"
-              value={animalId}
-              placeholder="Not against an animal"
-              options={animals
-                .filter((animal) => animal.status === "active")
-                .map((animal) => ({ value: animal.id, label: displayName(animal) }))}
-              onChange={(event) => setAnimalId(event.target.value)}
-            />
-          </div>
+      {editorOpen || editing !== undefined ? (
+        <Modal placement="side" title={"Edit"} onClose={reset}>
+          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
+            <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+              <Select
+                label="Feed"
+                value={feedTypeId}
+                placeholder="Choose a feed"
+                options={feeds.map((feed) => ({ value: feed.id, label: feed.name }))}
+                onChange={(event) => setFeedTypeId(event.target.value)}
+                required
+              />
+              <Select
+                label="Kind"
+                hint="A correction is you counting the barn — the projection restarts from it."
+                value={kind}
+                options={CONSUMPTION_KINDS.map((value) => ({ value, label: value }))}
+                onChange={(event) => setKind(event.target.value as ConsumptionKind)}
+              />
+              <TextInput
+                label="Quantity"
+                type="number"
+                inputMode="decimal"
+                numeric
+                value={quantity}
+                onChange={(event) => setQuantity(event.target.value)}
+                required
+              />
+              <TextInput
+                label="When"
+                type="date"
+                value={usedOn}
+                onChange={(event) => setUsedOn(event.target.value)}
+                required
+              />
+              <Select
+                label="Pen"
+                value={zoneId}
+                placeholder="Not against a pen"
+                options={zones
+                  .filter((zone) => zone.active)
+                  .map((zone) => ({ value: zone.id, label: zone.name }))}
+                onChange={(event) => setZoneId(event.target.value)}
+              />
+              <Select
+                label="Animal"
+                value={animalId}
+                placeholder="Not against an animal"
+                options={animals
+                  .filter((animal) => animal.status === "active")
+                  .map((animal) => ({ value: animal.id, label: displayName(animal) }))}
+                onChange={(event) => setAnimalId(event.target.value)}
+              />
+            </div>
 
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" busy={busy}>
-              {editing === undefined ? "Log it" : "Save entry"}
-            </Button>
-            {editing === undefined ? null : (
-              <Button variant="ghost" onClick={reset}>
-                Cancel
-              </Button>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
             )}
-          </div>
-        </form>
-      </Section>
 
-      <Section title="Everything logged">
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" busy={busy}>
+                {editing === undefined ? "Log it" : "Save entry"}
+              </Button>
+              {editing === undefined ? null : (
+                <Button variant="ghost" onClick={reset}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      <Section title="Everything logged" actions={<Button onClick={openEditor}>Log feed</Button>}>
         <Card>
           <DataTable
             caption="Feed used and counted"
@@ -1077,6 +1104,13 @@ function Types({
   const { show } = useToast();
 
   const [editing, setEditing] = useState<FeedType | undefined>();
+  // The editor is a side dialog now, so it needs an open state of its own —
+  // `editing` alone cannot express \"adding a new one\".
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  function openEditor(): void {
+    setEditorOpen(true);
+  }
   const [draft, setDraft] = useState(BLANK_TYPE);
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -1096,12 +1130,14 @@ function Types({
   }, [purchases, consumption, plans]);
 
   function reset() {
+    setEditorOpen(false);
     setEditing(undefined);
     setDraft(BLANK_TYPE);
     setError(undefined);
   }
 
   function startEdit(feed: FeedType) {
+    setEditorOpen(true);
     setEditing(feed);
     setDraft({
       name: feed.name,
@@ -1241,92 +1277,91 @@ function Types({
 
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title={editing === undefined ? "Add a feed" : `Editing ${editing.name}`}
-        description="Pounds per unit is what makes “three bales” and “40 lb a head a day” comparable at all — a round bale is anywhere from 800 to 1,400 lb depending on who baled it."
-      >
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-            <TextInput
-              label="Name"
-              value={draft.name}
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-              required
-            />
-            <Select
-              label="Category"
-              value={draft.category}
-              options={FEED_CATEGORIES.map((value) => ({ value, label: value }))}
-              onChange={(event) =>
-                setDraft({ ...draft, category: event.target.value as FeedCategory })
-              }
-            />
-            <Select
-              label="Bought in"
-              value={draft.unit}
-              options={FEED_UNITS.map((value) => ({
-                value,
-                label: value.replace(/_/g, " "),
-              }))}
-              onChange={(event) => setDraft({ ...draft, unit: event.target.value as FeedUnit })}
-            />
-            <TextInput
-              label="Pounds per unit"
-              hint="Leave blank when the unit is already a weight."
-              type="number"
-              inputMode="decimal"
-              numeric
-              value={draft.estWeightLbPerUnit}
-              onChange={(event) => setDraft({ ...draft, estWeightLbPerUnit: event.target.value })}
-            />
-            <TextInput
-              label="Reorder lead (days)"
-              hint="How long the supplier takes. The alert leads the run-out date by this."
-              type="number"
-              inputMode="numeric"
-              numeric
-              value={draft.reorderLeadDays}
-              onChange={(event) => setDraft({ ...draft, reorderLeadDays: event.target.value })}
-              required
-            />
-            <TextInput
-              label="Reorder threshold"
-              hint="On hand at or below this raises a low-stock warning."
-              type="number"
-              inputMode="decimal"
-              numeric
-              value={draft.reorderThreshold}
-              onChange={(event) => setDraft({ ...draft, reorderThreshold: event.target.value })}
-            />
-          </div>
+      {editorOpen || editing !== undefined ? (
+        <Modal placement="side" title={"Edit"} onClose={reset}>
+          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
+            <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+              <TextInput
+                label="Name"
+                value={draft.name}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                required
+              />
+              <Select
+                label="Category"
+                value={draft.category}
+                options={FEED_CATEGORIES.map((value) => ({ value, label: value }))}
+                onChange={(event) =>
+                  setDraft({ ...draft, category: event.target.value as FeedCategory })
+                }
+              />
+              <Select
+                label="Bought in"
+                value={draft.unit}
+                options={FEED_UNITS.map((value) => ({
+                  value,
+                  label: value.replace(/_/g, " "),
+                }))}
+                onChange={(event) => setDraft({ ...draft, unit: event.target.value as FeedUnit })}
+              />
+              <TextInput
+                label="Pounds per unit"
+                hint="Leave blank when the unit is already a weight."
+                type="number"
+                inputMode="decimal"
+                numeric
+                value={draft.estWeightLbPerUnit}
+                onChange={(event) => setDraft({ ...draft, estWeightLbPerUnit: event.target.value })}
+              />
+              <TextInput
+                label="Reorder lead (days)"
+                hint="How long the supplier takes. The alert leads the run-out date by this."
+                type="number"
+                inputMode="numeric"
+                numeric
+                value={draft.reorderLeadDays}
+                onChange={(event) => setDraft({ ...draft, reorderLeadDays: event.target.value })}
+                required
+              />
+              <TextInput
+                label="Reorder threshold"
+                hint="On hand at or below this raises a low-stock warning."
+                type="number"
+                inputMode="decimal"
+                numeric
+                value={draft.reorderThreshold}
+                onChange={(event) => setDraft({ ...draft, reorderThreshold: event.target.value })}
+              />
+            </div>
 
-          <Checkbox
-            label="Still bought"
-            hint="Unticking hides it from the pickers and keeps every record that names it."
-            checked={draft.active}
-            onChange={(event) => setDraft({ ...draft, active: event.target.checked })}
-          />
+            <Checkbox
+              label="Still bought"
+              hint="Unticking hides it from the pickers and keeps every record that names it."
+              checked={draft.active}
+              onChange={(event) => setDraft({ ...draft, active: event.target.checked })}
+            />
 
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" busy={busy}>
-              {editing === undefined ? "Add feed" : "Save feed"}
-            </Button>
-            {editing === undefined ? null : (
-              <Button variant="ghost" onClick={reset}>
-                Cancel
-              </Button>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
             )}
-          </div>
-        </form>
-      </Section>
 
-      <Section title="Every feed">
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" busy={busy}>
+                {editing === undefined ? "Add feed" : "Save feed"}
+              </Button>
+              {editing === undefined ? null : (
+                <Button variant="ghost" onClick={reset}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      <Section title="Every feed" actions={<Button onClick={openEditor}>Add a feed</Button>}>
         <Card>
           <DataTable
             caption="Feed types"

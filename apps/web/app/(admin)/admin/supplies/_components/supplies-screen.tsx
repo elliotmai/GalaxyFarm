@@ -22,6 +22,7 @@ import {
   useConfirmDelete,
   useToast,
   type Column,
+  Modal,
 } from "@galaxy-farm/ui";
 import {
   displayName,
@@ -389,6 +390,9 @@ function Items({
   const [draft, setDraft] = useState<ItemDraft>(BLANK_ITEM);
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+  // The editor is a side dialog now, so it has an open state of its own —
+  // `editing` alone cannot express "adding a new one".
+  const [editorOpen, setEditorOpen] = useState(false);
 
   /** What names each item, so restrict can say what rather than count. */
   const held = useMemo(() => {
@@ -401,12 +405,18 @@ function Items({
   }, [purchases, usage, assignments]);
 
   function reset() {
+    setEditorOpen(false);
     setEditing(undefined);
     setDraft(BLANK_ITEM);
     setError(undefined);
   }
 
+  function openEditor(): void {
+    setEditorOpen(true);
+  }
+
   function startEdit(item: SupplyItem) {
+    setEditorOpen(true);
     setEditing(item);
     setDraft({
       name: item.name,
@@ -530,95 +540,99 @@ function Items({
 
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title={editing === undefined ? "Add an item" : `Edit ${editing.name}`}
-        description="The opening count is what is on the shelf the day you write it down. Everything after that is purchases and usage."
-      >
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
-            <TextInput
-              label="Name"
-              hint="&ldquo;Pine shavings&rdquo;, &ldquo;Show halter&rdquo;, &ldquo;Revive&rdquo;"
-              value={draft.name}
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-              required
-            />
-            <Select
-              label="Kind"
-              hint="Drawn down, or counted and assigned."
-              value={draft.kind}
-              onChange={(event) => setDraft({ ...draft, kind: event.target.value as SupplyKind })}
-              options={SUPPLY_KINDS.map((value) => ({ value, label: value }))}
-            />
-            <Select
-              label="Category"
-              value={draft.category}
-              onChange={(event) =>
-                setDraft({ ...draft, category: event.target.value as SupplyCategory })
-              }
-              options={SUPPLY_CATEGORIES.map((value) => ({
-                value,
-                label: value.replace(/_/g, " "),
-              }))}
-            />
-            <Select
-              label="Unit"
-              value={draft.unit}
-              onChange={(event) => setDraft({ ...draft, unit: event.target.value as Unit })}
-              options={UNITS.map((value) => ({ value, label: unitLabel(value) }))}
-            />
-            <TextInput
-              label="Opening count"
-              type="number"
-              inputMode="decimal"
-              numeric
-              value={draft.openingQty}
-              onChange={(event) => setDraft({ ...draft, openingQty: event.target.value })}
-              required
-            />
-            {draft.kind === "consumable" ? (
+      {editorOpen || editing !== undefined ? (
+        <Modal
+          placement="side"
+          title={editing === undefined ? "Add an item" : `Edit ${editing.name}`}
+          description="The opening count is what is on the shelf the day you write it down. Everything after that is purchases and usage."
+          onClose={reset}
+        >
+          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
+            <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
               <TextInput
-                label="Reorder at"
-                hint="Where there is still time to buy some."
+                label="Name"
+                hint="&ldquo;Pine shavings&rdquo;, &ldquo;Show halter&rdquo;, &ldquo;Revive&rdquo;"
+                value={draft.name}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                required
+              />
+              <Select
+                label="Kind"
+                hint="Drawn down, or counted and assigned."
+                value={draft.kind}
+                onChange={(event) => setDraft({ ...draft, kind: event.target.value as SupplyKind })}
+                options={SUPPLY_KINDS.map((value) => ({ value, label: value }))}
+              />
+              <Select
+                label="Category"
+                value={draft.category}
+                onChange={(event) =>
+                  setDraft({ ...draft, category: event.target.value as SupplyCategory })
+                }
+                options={SUPPLY_CATEGORIES.map((value) => ({
+                  value,
+                  label: value.replace(/_/g, " "),
+                }))}
+              />
+              <Select
+                label="Unit"
+                value={draft.unit}
+                onChange={(event) => setDraft({ ...draft, unit: event.target.value as Unit })}
+                options={UNITS.map((value) => ({ value, label: unitLabel(value) }))}
+              />
+              <TextInput
+                label="Opening count"
                 type="number"
                 inputMode="decimal"
                 numeric
-                value={draft.reorderThreshold}
-                onChange={(event) => setDraft({ ...draft, reorderThreshold: event.target.value })}
+                value={draft.openingQty}
+                onChange={(event) => setDraft({ ...draft, openingQty: event.target.value })}
+                required
               />
-            ) : null}
-            <TextInput
-              label="Where it lives"
-              value={draft.storageLocation}
-              onChange={(event) => setDraft({ ...draft, storageLocation: event.target.value })}
-            />
-            <TextInput
-              label="Notes"
-              value={draft.notes}
-              onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-            />
-          </div>
+              {draft.kind === "consumable" ? (
+                <TextInput
+                  label="Reorder at"
+                  hint="Where there is still time to buy some."
+                  type="number"
+                  inputMode="decimal"
+                  numeric
+                  value={draft.reorderThreshold}
+                  onChange={(event) => setDraft({ ...draft, reorderThreshold: event.target.value })}
+                />
+              ) : null}
+              <TextInput
+                label="Where it lives"
+                value={draft.storageLocation}
+                onChange={(event) => setDraft({ ...draft, storageLocation: event.target.value })}
+              />
+              <TextInput
+                label="Notes"
+                value={draft.notes}
+                onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
+              />
+            </div>
 
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" busy={busy}>
-              {editing === undefined ? "Add item" : "Save item"}
-            </Button>
-            {editing === undefined ? null : (
-              <Button variant="ghost" onClick={reset}>
-                Cancel
-              </Button>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
             )}
-          </div>
-        </form>
-      </Section>
 
-      <Section title="The catalogue">
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" busy={busy}>
+                {editing === undefined ? "Add item" : "Save item"}
+              </Button>
+              {editing === undefined ? null : (
+                <Button variant="ghost" onClick={reset}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      <Section title="The catalogue" actions={<Button onClick={openEditor}>Add an item</Button>}>
         <Card>
           <DataTable
             caption="Supply items"
@@ -673,8 +687,12 @@ function Purchases({
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+  // The editor is a side dialog now, so it has an open state of its own —
+  // `editing` alone cannot express "adding a new one".
+  const [editorOpen, setEditorOpen] = useState(false);
 
   function reset() {
+    setEditorOpen(false);
     setEditing(undefined);
     setQuantity("");
     setUnitCost("");
@@ -682,7 +700,12 @@ function Purchases({
     setError(undefined);
   }
 
+  function openEditor(): void {
+    setEditorOpen(true);
+  }
+
   function startEdit(purchase: SupplyPurchase) {
+    setEditorOpen(true);
     setEditing(purchase);
     setSupplyItemId(purchase.supplyItemId);
     setQuantity(String(purchase.quantity));
@@ -789,83 +812,90 @@ function Purchases({
 
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title={editing === undefined ? "Record a purchase" : "Edit this purchase"}
-        description="The same shape as feed on purpose: both land on the same boarding invoice, and a client would notice if the two were costed differently."
-      >
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-            <Select
-              label="Item"
-              value={supplyItemId}
-              placeholder="Choose an item"
-              onChange={(event) => setSupplyItemId(event.target.value)}
-              options={items.map((item) => ({
-                value: item.id,
-                label: `${item.name} (${unitLabel(item.unit)})`,
-              }))}
-              required
-            />
-            <TextInput
-              label="Quantity"
-              type="number"
-              inputMode="decimal"
-              numeric
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-              required
-            />
-            <TextInput
-              label="Cost each ($)"
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              numeric
-              value={unitCost}
-              onChange={(event) => setUnitCost(event.target.value)}
-              required
-            />
-            <Select
-              label="Vendor"
-              value={vendorContactId}
-              placeholder="Not recorded"
-              onChange={(event) => setVendorContactId(event.target.value)}
-              options={contacts.map((contact) => ({ value: contact.id, label: contact.name }))}
-            />
-            <TextInput
-              label="Bought"
-              type="date"
-              value={purchasedOn}
-              onChange={(event) => setPurchasedOn(event.target.value)}
-              required
-            />
-            <TextInput
-              label="Notes"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-            />
-          </div>
+      {editorOpen || editing !== undefined ? (
+        <Modal
+          placement="side"
+          title={editing === undefined ? "Record a purchase" : "Edit this purchase"}
+          description="The same shape as feed on purpose: both land on the same boarding invoice, and a client would notice if the two were costed differently."
+          onClose={reset}
+        >
+          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
+            <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+              <Select
+                label="Item"
+                value={supplyItemId}
+                placeholder="Choose an item"
+                onChange={(event) => setSupplyItemId(event.target.value)}
+                options={items.map((item) => ({
+                  value: item.id,
+                  label: `${item.name} (${unitLabel(item.unit)})`,
+                }))}
+                required
+              />
+              <TextInput
+                label="Quantity"
+                type="number"
+                inputMode="decimal"
+                numeric
+                value={quantity}
+                onChange={(event) => setQuantity(event.target.value)}
+                required
+              />
+              <TextInput
+                label="Cost each ($)"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                numeric
+                value={unitCost}
+                onChange={(event) => setUnitCost(event.target.value)}
+                required
+              />
+              <Select
+                label="Vendor"
+                value={vendorContactId}
+                placeholder="Not recorded"
+                onChange={(event) => setVendorContactId(event.target.value)}
+                options={contacts.map((contact) => ({ value: contact.id, label: contact.name }))}
+              />
+              <TextInput
+                label="Bought"
+                type="date"
+                value={purchasedOn}
+                onChange={(event) => setPurchasedOn(event.target.value)}
+                required
+              />
+              <TextInput
+                label="Notes"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+              />
+            </div>
 
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" busy={busy}>
-              {editing === undefined ? "Record purchase" : "Save purchase"}
-            </Button>
-            {editing === undefined ? null : (
-              <Button variant="ghost" onClick={reset}>
-                Cancel
-              </Button>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
             )}
-          </div>
-        </form>
-      </Section>
 
-      <Section title="Every purchase">
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" busy={busy}>
+                {editing === undefined ? "Record purchase" : "Save purchase"}
+              </Button>
+              {editing === undefined ? null : (
+                <Button variant="ghost" onClick={reset}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      <Section
+        title="Every purchase"
+        actions={<Button onClick={openEditor}>Record a purchase</Button>}
+      >
         <Card>
           <DataTable
             caption="Supply purchases"
@@ -922,8 +952,12 @@ function Used({
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+  // The editor is a side dialog now, so it has an open state of its own —
+  // `editing` alone cannot express "adding a new one".
+  const [editorOpen, setEditorOpen] = useState(false);
 
   function reset() {
+    setEditorOpen(false);
     setEditing(undefined);
     setQuantity("");
     setAnimalId("");
@@ -932,7 +966,12 @@ function Used({
     setError(undefined);
   }
 
+  function openEditor(): void {
+    setEditorOpen(true);
+  }
+
   function startEdit(entry: SupplyUsage) {
+    setEditorOpen(true);
     setEditing(entry);
     setSupplyItemId(entry.supplyItemId);
     setQuantity(String(entry.quantity));
@@ -1056,84 +1095,91 @@ function Used({
 
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title={editing === undefined ? "Record what was used" : "Edit this entry"}
-        description="Naming the calf is what puts shavings and fitting products on its costs — the mechanism behind the rule that owners pay for feed and supplies."
-      >
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-            <Select
-              label="Item"
-              value={supplyItemId}
-              placeholder="Choose an item"
-              onChange={(event) => setSupplyItemId(event.target.value)}
-              options={items
-                .filter((item) => item.kind === "consumable")
-                .map((item) => ({
-                  value: item.id,
-                  label: `${item.name} (${unitLabel(item.unit)})`,
-                }))}
-              required
-            />
-            <TextInput
-              label="Quantity"
-              type="number"
-              inputMode="decimal"
-              numeric
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-              required
-            />
-            <TextInput
-              label="Used"
-              type="date"
-              value={usedOn}
-              onChange={(event) => setUsedOn(event.target.value)}
-              required
-            />
-            <Select
-              label="On which animal"
-              value={animalId}
-              placeholder="Not one in particular"
-              onChange={(event) => setAnimalId(event.target.value)}
-              options={animals
-                .filter((animal) => animal.status === "active")
-                .map((animal) => ({ value: animal.id, label: displayName(animal) }))}
-            />
-            <Select
-              label="…or which pen"
-              value={zoneId}
-              placeholder="Not one in particular"
-              onChange={(event) => setZoneId(event.target.value)}
-              options={zones.map((zone) => ({ value: zone.id, label: zone.name }))}
-            />
-            <TextInput
-              label="Notes"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-            />
-          </div>
+      {editorOpen || editing !== undefined ? (
+        <Modal
+          placement="side"
+          title={editing === undefined ? "Record what was used" : "Edit this entry"}
+          description="Naming the calf is what puts shavings and fitting products on its costs — the mechanism behind the rule that owners pay for feed and supplies."
+          onClose={reset}
+        >
+          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
+            <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+              <Select
+                label="Item"
+                value={supplyItemId}
+                placeholder="Choose an item"
+                onChange={(event) => setSupplyItemId(event.target.value)}
+                options={items
+                  .filter((item) => item.kind === "consumable")
+                  .map((item) => ({
+                    value: item.id,
+                    label: `${item.name} (${unitLabel(item.unit)})`,
+                  }))}
+                required
+              />
+              <TextInput
+                label="Quantity"
+                type="number"
+                inputMode="decimal"
+                numeric
+                value={quantity}
+                onChange={(event) => setQuantity(event.target.value)}
+                required
+              />
+              <TextInput
+                label="Used"
+                type="date"
+                value={usedOn}
+                onChange={(event) => setUsedOn(event.target.value)}
+                required
+              />
+              <Select
+                label="On which animal"
+                value={animalId}
+                placeholder="Not one in particular"
+                onChange={(event) => setAnimalId(event.target.value)}
+                options={animals
+                  .filter((animal) => animal.status === "active")
+                  .map((animal) => ({ value: animal.id, label: displayName(animal) }))}
+              />
+              <Select
+                label="…or which pen"
+                value={zoneId}
+                placeholder="Not one in particular"
+                onChange={(event) => setZoneId(event.target.value)}
+                options={zones.map((zone) => ({ value: zone.id, label: zone.name }))}
+              />
+              <TextInput
+                label="Notes"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+              />
+            </div>
 
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" busy={busy}>
-              {editing === undefined ? "Record usage" : "Save entry"}
-            </Button>
-            {editing === undefined ? null : (
-              <Button variant="ghost" onClick={reset}>
-                Cancel
-              </Button>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
             )}
-          </div>
-        </form>
-      </Section>
 
-      <Section title="What has gone out">
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" busy={busy}>
+                {editing === undefined ? "Record usage" : "Save entry"}
+              </Button>
+              {editing === undefined ? null : (
+                <Button variant="ghost" onClick={reset}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      <Section
+        title="What has gone out"
+        actions={<Button onClick={openEditor}>Record usage</Button>}
+      >
         <Card>
           <DataTable
             caption="Supply usage"
@@ -1205,10 +1251,14 @@ function Durables({
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+  // The editor is a side dialog now, so it has an open state of its own —
+  // `editing` alone cannot express "adding a new one".
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const closing = condition === "retired" || condition === "lost";
 
   function reset() {
+    setEditorOpen(false);
     setEditing(undefined);
     setQuantity("1");
     setCondition("good");
@@ -1220,7 +1270,12 @@ function Durables({
     setError(undefined);
   }
 
+  function openEditor(): void {
+    setEditorOpen(true);
+  }
+
   function startEdit(assignment: DurableAssignment) {
+    setEditorOpen(true);
     setEditing(assignment);
     setSupplyItemId(assignment.supplyItemId);
     setQuantity(String(assignment.quantity));
@@ -1425,96 +1480,103 @@ function Durables({
         </CardGrid>
       </Section>
 
-      <Section
-        title={editing === undefined ? "Assign, or retire" : "Edit this assignment"}
-        description="Where something is, and what condition it is in. Marking one retired or lost takes it off the in-service count and closes the assignment."
-      >
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
-            <Select
-              label="Item"
-              value={supplyItemId}
-              placeholder="Choose a durable"
-              onChange={(event) => setSupplyItemId(event.target.value)}
-              options={durables.map((item) => ({ value: item.id, label: item.name }))}
-              required
-            />
-            <TextInput
-              label="How many"
-              type="number"
-              inputMode="numeric"
-              numeric
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-              required
-            />
-            <Select
-              label="Condition"
-              value={condition}
-              onChange={(event) => setCondition(event.target.value as DurableCondition)}
-              options={DURABLE_CONDITIONS.map((value) => ({ value, label: value }))}
-            />
-            <Select
-              label="With which animal"
-              value={animalId}
-              placeholder="Nobody in particular"
-              onChange={(event) => setAnimalId(event.target.value)}
-              options={animals
-                .filter((animal) => animal.status === "active")
-                .map((animal) => ({ value: animal.id, label: displayName(animal) }))}
-            />
-            <Select
-              label="…or which pen"
-              value={zoneId}
-              placeholder="Nowhere in particular"
-              onChange={(event) => setZoneId(event.target.value)}
-              options={zones.map((zone) => ({ value: zone.id, label: zone.name }))}
-            />
-            <TextInput
-              label="From"
-              type="date"
-              value={from}
-              onChange={(event) => setFrom(event.target.value)}
-              required
-            />
-            <TextInput
-              label="Until"
-              hint={
-                closing
-                  ? "Required for retired and lost — today if left blank."
-                  : "Leave blank while it is still out."
-              }
-              type="date"
-              value={to}
-              onChange={(event) => setTo(event.target.value)}
-            />
-            <TextInput
-              label="Notes"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-            />
-          </div>
+      {editorOpen || editing !== undefined ? (
+        <Modal
+          placement="side"
+          title={editing === undefined ? "Assign, or retire" : "Edit this assignment"}
+          description="Where something is, and what condition it is in. Marking one retired or lost takes it off the in-service count and closes the assignment."
+          onClose={reset}
+        >
+          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
+            <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
+              <Select
+                label="Item"
+                value={supplyItemId}
+                placeholder="Choose a durable"
+                onChange={(event) => setSupplyItemId(event.target.value)}
+                options={durables.map((item) => ({ value: item.id, label: item.name }))}
+                required
+              />
+              <TextInput
+                label="How many"
+                type="number"
+                inputMode="numeric"
+                numeric
+                value={quantity}
+                onChange={(event) => setQuantity(event.target.value)}
+                required
+              />
+              <Select
+                label="Condition"
+                value={condition}
+                onChange={(event) => setCondition(event.target.value as DurableCondition)}
+                options={DURABLE_CONDITIONS.map((value) => ({ value, label: value }))}
+              />
+              <Select
+                label="With which animal"
+                value={animalId}
+                placeholder="Nobody in particular"
+                onChange={(event) => setAnimalId(event.target.value)}
+                options={animals
+                  .filter((animal) => animal.status === "active")
+                  .map((animal) => ({ value: animal.id, label: displayName(animal) }))}
+              />
+              <Select
+                label="…or which pen"
+                value={zoneId}
+                placeholder="Nowhere in particular"
+                onChange={(event) => setZoneId(event.target.value)}
+                options={zones.map((zone) => ({ value: zone.id, label: zone.name }))}
+              />
+              <TextInput
+                label="From"
+                type="date"
+                value={from}
+                onChange={(event) => setFrom(event.target.value)}
+                required
+              />
+              <TextInput
+                label="Until"
+                hint={
+                  closing
+                    ? "Required for retired and lost — today if left blank."
+                    : "Leave blank while it is still out."
+                }
+                type="date"
+                value={to}
+                onChange={(event) => setTo(event.target.value)}
+              />
+              <TextInput
+                label="Notes"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+              />
+            </div>
 
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" busy={busy}>
-              {editing === undefined ? "Record it" : "Save assignment"}
-            </Button>
-            {editing === undefined ? null : (
-              <Button variant="ghost" onClick={reset}>
-                Cancel
-              </Button>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
             )}
-          </div>
-        </form>
-      </Section>
 
-      <Section title="Where things have been">
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" busy={busy}>
+                {editing === undefined ? "Record it" : "Save assignment"}
+              </Button>
+              {editing === undefined ? null : (
+                <Button variant="ghost" onClick={reset}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      <Section
+        title="Where things have been"
+        actions={<Button onClick={openEditor}>Assign, or retire</Button>}
+      >
         <Card>
           <DataTable
             caption="Durable assignments"

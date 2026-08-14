@@ -34,16 +34,22 @@ describe("the dialog", () => {
     expect(screen.getByRole("dialog")).toHaveFocus();
   });
 
-  it("closes on Escape", async () => {
+  it("closes on Escape", () => {
+    // A real `<dialog>` reports Escape as a `cancel` event rather than as a
+    // keydown, and the default action would shut it without telling the caller
+    // — leaving the state that opened it untouched and the editor unable to
+    // reopen. Dispatching what the browser dispatches is the point.
     const onClose = vi.fn();
-    const user = userEvent.setup();
     render(
-      <Modal title="Editing" onClose={onClose}>
-        <p>body</p>
+      <Modal title="Edit" onClose={onClose}>
+        <p>Body</p>
       </Modal>,
     );
 
-    await user.keyboard("{Escape}");
+    screen
+      .getByRole("dialog")
+      .dispatchEvent(new Event("cancel", { bubbles: true, cancelable: true }));
+
     expect(onClose).toHaveBeenCalledOnce();
   });
 
@@ -98,5 +104,24 @@ describe("the dialog", () => {
     );
 
     expect(screen.getByRole("dialog")).toHaveAccessibleDescription("Off the certificate.");
+  });
+  it("can arrive from the side, for a form about a row still worth seeing", () => {
+    // Centring an editor covers the rows somebody is copying a tag number off.
+    // The placement is a class rather than inline geometry because a `<dialog>`
+    // in the top layer is positioned against the viewport, and that belongs in
+    // one stylesheet rather than in every caller.
+    const { rerender } = render(
+      <Modal title="Edit" onClose={() => {}} placement="side">
+        <p>Body</p>
+      </Modal>,
+    );
+    expect(screen.getByRole("dialog")).toHaveClass("gf-modal--side");
+
+    rerender(
+      <Modal title="Edit" onClose={() => {}}>
+        <p>Body</p>
+      </Modal>,
+    );
+    expect(screen.getByRole("dialog")).toHaveClass("gf-modal--center");
   });
 });
