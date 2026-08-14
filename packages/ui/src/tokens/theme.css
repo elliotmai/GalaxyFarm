@@ -177,6 +177,87 @@
 }
 
 /*
+ * The sheet's geometry (see `primitives/sheet.tsx`).
+ *
+ * Bottom on a phone, because that is where a thumb is; right on a laptop,
+ * because that is where the space is and because a list reads left to right.
+ * The direction is a media query rather than a prop — it is a property of the
+ * surface, and a caller that had to pass it would eventually pass the wrong
+ * one.
+ *
+ * Here rather than in Tailwind classes because a `<dialog>` in the top layer
+ * is positioned against the viewport, and the safe-area insets have to be paid
+ * on the panel itself: the surface padding in globals.css is on an element the
+ * dialog is no longer inside.
+ */
+.gf-sheet {
+  position: fixed;
+  inset: auto 0 0 0;
+  width: 100%;
+  max-height: 92dvh;
+}
+
+.gf-sheet .gf-sheet-panel {
+  max-height: 92dvh;
+  border-top-width: 1px;
+  border-top-left-radius: calc(var(--gf-radius) + 6px);
+  border-top-right-radius: calc(var(--gf-radius) + 6px);
+  padding-bottom: calc(var(--gf-gap) + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 40rem) {
+  .gf-sheet {
+    inset: 0 0 0 auto;
+    width: min(30rem, 92vw);
+    max-height: none;
+    height: 100dvh;
+  }
+
+  .gf-sheet .gf-sheet-panel {
+    max-height: none;
+    min-height: 100dvh;
+    border-top-width: 0;
+    border-left-width: 1px;
+    border-radius: 0;
+    padding-right: calc(var(--gf-gap) + env(safe-area-inset-right));
+    padding-bottom: var(--gf-gap);
+  }
+}
+
+/*
+ * The slide, and the reason it is short.
+ *
+ * Long enough to say which direction the panel came from — which is what tells
+ * somebody the list is still behind it rather than replaced — and short enough
+ * not to be a wait. The reduced-motion rule above turns it off entirely.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .gf-sheet[open] {
+    animation: gf-sheet-up 180ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  @media (min-width: 40rem) {
+    .gf-sheet[open] {
+      animation-name: gf-sheet-in;
+    }
+  }
+}
+
+@keyframes gf-sheet-up {
+  from {
+    transform: translateY(6%);
+    opacity: 0.6;
+  }
+}
+
+@keyframes gf-sheet-in {
+  from {
+    transform: translateX(6%);
+    opacity: 0.6;
+  }
+}
+
+/*
  * Respect a reduced-motion preference everywhere rather than per component.
  * A kiosk in a barn has no business animating at someone who asked it not to.
  */

@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 
-import { Card, CardGrid, EmptyState, Pill, RecordCard, SafetyBadge, Tile } from "@galaxy-farm/ui";
+import {
+  Card,
+  CardGrid,
+  EmptyState,
+  Pill,
+  RecordCard,
+  SafetyBadge,
+  SkeletonScreen,
+  Tile,
+} from "@galaxy-farm/ui";
 import {
   coversToFit,
   effectiveSafetyLevel,
@@ -52,12 +61,10 @@ export function Dashboard({
   const heading = <h1 className="font-heading text-2xl font-semibold text-ink">Today</h1>;
 
   if (zonesLoading) {
-    return (
-      <div className="flex flex-col gap-density">
-        {heading}
-        <p className="text-muted">Loading the farm…</p>
-      </div>
-    );
+    // The layout is known long before the records are, so draw it. A line of
+    // grey text told the reader nothing about what was coming and let the page
+    // jump the moment it did — this holds the geometry the tiles will land in.
+    return <SkeletonScreen title="Today" stats={4} rows={5} />;
   }
 
   const inUse = new Set(assignments.filter((a) => a.periodTo === undefined).map((a) => a.zoneId))

@@ -4,6 +4,7 @@ import { ConfirmProvider, ToastProvider } from "@galaxy-farm/ui";
 
 import { AdminNav } from "@/app/(admin)/_components/admin-nav";
 import { Refreshable } from "@/app/(admin)/_components/refreshable";
+import { SectionStrip } from "@/app/(admin)/_components/section-strip";
 import { SyncProvider } from "@/app/_components/sync-provider";
 import { currentActor } from "@/lib/auth";
 import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
@@ -56,7 +57,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                   375px screen is 7% of the width, and every table and form
                   inside is competing for the rest. */}
               <main className="min-w-0 flex-1 px-3 py-density md:p-density">
-                <Refreshable>{children}</Refreshable>
+                <Refreshable>
+                  {/*
+                    In the layout rather than in each screen, so a page cannot
+                    forget it and so it survives a navigation without
+                    remounting — which is what keeps a thirteen-tab strip from
+                    losing its scroll every time you change view.
+                  */}
+                  <SectionStrip />
+                  {children}
+                </Refreshable>
               </main>
             </div>
           </ConfirmProvider>

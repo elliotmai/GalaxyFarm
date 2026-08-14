@@ -1,12 +1,20 @@
 /**
- * The shape of the admin nav (spec §7).
+ * The shape of the admin nav (spec §7, §8 v0.9).
  *
- * Split from the component so the route-map test can read it without
- * rendering React, and so the nesting is visible as data rather than as JSX.
+ * Five destinations and a utility rail, where there used to be nine collapsing
+ * groups holding fifty-five links. The groups were not the problem — the
+ * hierarchy was wrong. Breeding, Calving, Health, Weights, Sales and the rest
+ * are not siblings of the herd; they are *views of* it, and putting them in the
+ * sidebar made every one of them compete with Pastures and Invoices for the
+ * same attention.
  *
- * Two levels, because §7 has fifty-five routes and one flat list of fifty-five
- * is not navigation. The groups match how the farm is actually divided; the
- * subsections inside Cattle match the way §7 itself divides it.
+ * So the sidebar answers "which part of the farm", and the screen answers
+ * "which view of it". No route moved and none was merged — §7 is untouched.
+ * Everything that was a sidebar row under Cattle is now a tab on the Cattle
+ * screen, which is where it always belonged.
+ *
+ * Split from the component so it can be read as data, and so a test can assert
+ * every route in §7 is still reachable from one place or the other.
  */
 
 export interface NavItem {
@@ -21,51 +29,52 @@ export interface NavItem {
   readonly owns?: readonly string[];
 }
 
-export interface NavGroup {
-  readonly label: string;
-  readonly items: readonly NavItem[];
+export interface NavDestination extends NavItem {
   /**
-   * Closed until asked for.
-   *
-   * Everything a person touches daily stays open; the rest starts collapsed so
-   * the sidebar is a short list rather than a wall. Somebody who opens a group
-   * has it remembered.
+   * A glyph, not an icon set. One character each, so the rail costs no
+   * dependency and nothing to download — and at five entries a shape is enough
+   * to tell them apart before the word is read.
    */
-  readonly collapsedByDefault?: boolean;
+  readonly glyph: string;
+  /** The in-page tab strip for this destination. */
+  readonly sections: readonly NavItem[];
 }
 
-export const NAV: readonly NavGroup[] = [
+/**
+ * The five.
+ *
+ * `href` is where the destination lands when clicked: the first section, or the
+ * one somebody actually wants. Animals lands on cattle because that is the herd
+ * this farm runs; the other species are a tab away.
+ */
+export const NAV: readonly NavDestination[] = [
   {
+    href: "/admin",
     label: "Today",
-    items: [
+    glyph: "◈",
+    sections: [
       { href: "/admin", label: "Dashboard" },
-      { href: "/admin/calendar", label: "Calendar" },
       { href: "/admin/chores", label: "Chores" },
+      { href: "/admin/calendar", label: "Calendar" },
       { href: "/admin/map", label: "Property map" },
     ],
   },
   {
-    label: "Cattle",
-    items: [
-      { href: "/admin/cattle", label: "Herd", owns: ["/admin/cattle/"] },
-      { href: "/admin/cattle/breeding", label: "Breeding" },
-      { href: "/admin/cattle/calving", label: "Calving" },
-      { href: "/admin/cattle/health", label: "Health" },
-      { href: "/admin/cattle/weights", label: "Weights" },
-      { href: "/admin/cattle/supplies", label: "Tank and fridge" },
-      { href: "/admin/cattle/feed", label: "Feed plans" },
-      { href: "/admin/cattle/sales", label: "Sales" },
-      { href: "/admin/cattle/roadmap", label: "Roadmap" },
-      { href: "/admin/cattle/candidates", label: "Candidates" },
-      { href: "/admin/cattle/ancestors", label: "Ancestors" },
-      { href: "/admin/cattle/catalogue", label: "Catalogue" },
-      { href: "/admin/cattle/risks", label: "Worth a look" },
+    href: "/admin/cattle",
+    label: "Animals",
+    glyph: "✦",
+    sections: [
+      { href: "/admin/cattle", label: "Cattle", owns: ["/admin/cattle/"] },
+      { href: "/admin/chickens/flock", label: "Flock" },
+      { href: "/admin/horses", label: "Horses", owns: ["/admin/horses/"] },
+      { href: "/admin/pets", label: "Pets" },
     ],
   },
   {
+    href: "/admin/pastures",
     label: "Land",
-    collapsedByDefault: true,
-    items: [
+    glyph: "▢",
+    sections: [
       { href: "/admin/pastures", label: "Pastures and water" },
       { href: "/admin/garden/layout", label: "Garden layout" },
       { href: "/admin/garden/plantings", label: "Plantings" },
@@ -74,28 +83,20 @@ export const NAV: readonly NavGroup[] = [
     ],
   },
   {
-    label: "Flock",
-    collapsedByDefault: true,
-    items: [
-      { href: "/admin/chickens/flock", label: "Flocks" },
-      { href: "/admin/chickens/eggs", label: "Eggs" },
-    ],
-  },
-  {
+    href: "/admin/equipment",
     label: "Kit",
-    collapsedByDefault: true,
-    items: [
+    glyph: "⚙",
+    sections: [
       { href: "/admin/equipment", label: "Equipment", owns: ["/admin/equipment/"] },
-      { href: "/admin/equipment/roadmap", label: "Equipment roadmap" },
-      { href: "/admin/equipment/candidates", label: "Equipment candidates" },
       { href: "/admin/feed", label: "Feed inventory" },
       { href: "/admin/supplies", label: "Supplies" },
     ],
   },
   {
+    href: "/admin/business/bookings",
     label: "Business",
-    collapsedByDefault: true,
-    items: [
+    glyph: "◇",
+    sections: [
       { href: "/admin/business/bookings", label: "Bookings" },
       { href: "/admin/business/clients", label: "Clients" },
       { href: "/admin/business/program", label: "Program roster" },
@@ -104,40 +105,77 @@ export const NAV: readonly NavGroup[] = [
       { href: "/admin/business/invoices", label: "Invoices" },
     ],
   },
-  {
-    label: "Horses",
-    collapsedByDefault: true,
-    // The live two first, then the shells §5.9 asks for. There are no horses
-    // here for years yet; what gets used in the meantime goes at the top.
-    items: [
-      { href: "/admin/horses", label: "Horses" },
-      { href: "/admin/horses/roadmap", label: "Roadmap" },
-      { href: "/admin/horses/candidates", label: "Candidates" },
-      { href: "/admin/horses/herd", label: "Herd" },
-      { href: "/admin/horses/pens", label: "Pens" },
-      { href: "/admin/horses/feeding", label: "Feeding" },
-      { href: "/admin/horses/breeding", label: "Breeding" },
-    ],
-  },
-  {
-    label: "People & places",
-    collapsedByDefault: true,
-    items: [
-      { href: "/admin/contacts", label: "Contacts" },
-      { href: "/admin/pets", label: "Pets" },
-      { href: "/admin/housesitter", label: "Housesitter" },
-      { href: "/admin/reports", label: "Reports" },
-    ],
-  },
-  {
-    label: "Settings",
-    collapsedByDefault: true,
-    items: [
-      { href: "/admin/settings", label: "Settings" },
-      { href: "/admin/settings/trash", label: "Trash" },
-    ],
-  },
 ];
+
+/**
+ * Beneath the rule, quieter.
+ *
+ * Reached deliberately and rarely, which is the difference between these and
+ * the five above. Putting Trash and Reports at the same weight as the herd was
+ * a large part of what made the sidebar a wall.
+ */
+export const UTILITY: readonly NavItem[] = [
+  { href: "/admin/contacts", label: "Contacts" },
+  { href: "/admin/reports", label: "Reports" },
+  { href: "/admin/housesitter", label: "Housesitter" },
+  { href: "/admin/settings", label: "Settings", owns: ["/admin/settings/"] },
+];
+
+/**
+ * The second strip, for destinations whose sections have views of their own.
+ *
+ * This is where the thirteen cattle routes went. Thirteen tabs is a lot, but a
+ * tab strip scrolls and a sidebar does not — and every one of them is a view of
+ * the herd, so they belong beside each other rather than beside Invoices.
+ */
+export const SUB_SECTIONS: Readonly<Record<string, readonly NavItem[]>> = {
+  "/admin/cattle": [
+    { href: "/admin/cattle", label: "Herd", owns: ["/admin/cattle/"] },
+    { href: "/admin/cattle/breeding", label: "Breeding" },
+    { href: "/admin/cattle/calving", label: "Calving" },
+    { href: "/admin/cattle/health", label: "Health" },
+    { href: "/admin/cattle/weights", label: "Weights" },
+    { href: "/admin/cattle/feed", label: "Feed plans" },
+    { href: "/admin/cattle/supplies", label: "Tank and fridge" },
+    { href: "/admin/cattle/sales", label: "Sales" },
+    { href: "/admin/cattle/ancestors", label: "Ancestors" },
+    { href: "/admin/cattle/catalogue", label: "Catalogue" },
+    { href: "/admin/cattle/roadmap", label: "Roadmap" },
+    { href: "/admin/cattle/candidates", label: "Candidates" },
+    { href: "/admin/cattle/risks", label: "Worth a look" },
+  ],
+  "/admin/horses": [
+    { href: "/admin/horses", label: "Horses" },
+    { href: "/admin/horses/herd", label: "Herd" },
+    { href: "/admin/horses/pens", label: "Pens" },
+    { href: "/admin/horses/feeding", label: "Feeding" },
+    { href: "/admin/horses/breeding", label: "Breeding" },
+    { href: "/admin/horses/roadmap", label: "Roadmap" },
+    { href: "/admin/horses/candidates", label: "Candidates" },
+  ],
+  "/admin/equipment": [
+    { href: "/admin/equipment", label: "Fleet", owns: ["/admin/equipment/"] },
+    { href: "/admin/equipment/roadmap", label: "Roadmap" },
+    { href: "/admin/equipment/candidates", label: "Candidates" },
+  ],
+  "/admin/chickens/flock": [
+    { href: "/admin/chickens/flock", label: "Flocks" },
+    { href: "/admin/chickens/eggs", label: "Eggs" },
+  ],
+  "/admin/settings": [
+    { href: "/admin/settings", label: "Settings" },
+    { href: "/admin/settings/trash", label: "Trash" },
+  ],
+};
+
+/** Every route the nav can reach, wherever it lives. */
+export function allNavRoutes(): readonly string[] {
+  return [
+    ...NAV.flatMap((destination) => destination.sections.map((section) => section.href)),
+    ...UTILITY.map((item) => item.href),
+    ...Object.values(SUB_SECTIONS).flatMap((items) => items.map((item) => item.href)),
+  ];
+}
 
 /**
  * Is this the route we are on?
@@ -152,18 +190,39 @@ export function isCurrent(href: string, pathname: string): boolean {
   return href === pathname;
 }
 
+/** Every href the nav knows, used to keep `owns` from swallowing a sibling. */
+const KNOWN = new Set(allNavRoutes());
+
 export function isWithin(item: NavItem, pathname: string): boolean {
   if (isCurrent(item.href, pathname)) return true;
   return (item.owns ?? []).some(
     (prefix) =>
       pathname.startsWith(prefix) &&
-      // A declared child, not a sibling that shares the prefix and has its own
-      // entry in the nav.
-      !NAV.some((group) => group.items.some((other) => other.href === pathname)),
+      // A declared child, not a sibling that shares the prefix and has an entry
+      // of its own somewhere in the nav.
+      !KNOWN.has(pathname),
   );
 }
 
-/** Which group holds this route, so it can be opened on arrival. */
-export function groupContaining(pathname: string): string | undefined {
-  return NAV.find((group) => group.items.some((item) => isWithin(item, pathname)))?.label;
+/** Which of the five holds this route, so the rail can mark it. */
+export function destinationFor(pathname: string): NavDestination | undefined {
+  return NAV.find((destination) =>
+    destination.sections.some(
+      (section) =>
+        isWithin(section, pathname) ||
+        (SUB_SECTIONS[section.href] ?? []).some((sub) => isWithin(sub, pathname)),
+    ),
+  );
+}
+
+/** The section within that destination, which owns the second strip. */
+export function sectionFor(pathname: string): NavItem | undefined {
+  const destination = destinationFor(pathname);
+  if (destination === undefined) return undefined;
+
+  return destination.sections.find(
+    (section) =>
+      isWithin(section, pathname) ||
+      (SUB_SECTIONS[section.href] ?? []).some((sub) => isWithin(sub, pathname)),
+  );
 }
