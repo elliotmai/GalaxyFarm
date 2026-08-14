@@ -3,9 +3,10 @@
  *
  * Almost nothing in this app reads from Postgres — screens read the device's
  * own store, which is what makes the barn usable at zero bars. The exceptions
- * are the two pages that cannot: settings, which lists people, and the
- * invitation page, which has to look a token up. Both render on the server, so
- * both make somebody wait.
+ * are the pages that cannot: settings, which lists people; the invitation
+ * page, which has to look a token up; and the kiosk home, which asks whether a
+ * PIN is set before it offers the gate. All render on the server, so all of
+ * them make somebody wait.
  *
  * That wait needs a ceiling, and the driver does not give it one that helps.
  * `connect_timeout` is thirty seconds — deliberately, to survive a Neon cold
