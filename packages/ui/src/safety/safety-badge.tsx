@@ -17,6 +17,17 @@ import type { SafetyLevel } from "@galaxy-farm/core";
  * see `tests/contrast.test.ts`.
  */
 
+/**
+ * The five colours, for anything that draws a safety level without a badge.
+ *
+ * Re-exported rather than imported from the preset directly, so a consumer
+ * needs only this package: the property map paints a pen's border on the
+ * safety scale (§8) and is drawn on a canvas, where a Tailwind class cannot
+ * reach. One source keeps the map and the badges the same five colours, which
+ * is the whole point of a scale.
+ */
+export { safetyScale };
+
 export type SafetyBadgeSize = "compact" | "default" | "kiosk";
 
 export interface SafetyBadgeProps {
