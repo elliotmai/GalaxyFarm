@@ -1,7 +1,13 @@
-import { PagePlaceholder } from "../../../_components/page-placeholder";
+import { redirect } from "next/navigation";
+
+import { PenBoardScreen } from "@/app/(kiosk)/kiosk/pen-board/pen-board-screen";
+import { currentActor } from "@/lib/auth";
 
 export const metadata = { title: "Pen Board" };
 
-export default function KioskPenBoardPage() {
-  return <PagePlaceholder title={"Pen Board"} route={"/kiosk/pen-board"} />;
+export default async function KioskPenBoardPage() {
+  const actor = await currentActor();
+  if (actor === undefined) redirect("/login?next=/kiosk/pen-board");
+
+  return <PenBoardScreen propertyId={actor.propertyId} />;
 }

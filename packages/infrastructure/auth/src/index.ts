@@ -10,3 +10,4 @@
 export * from "./password.js";
 export * from "./invitation.js";
 export * from "./sign-in.js";
+export * from "./pairing.js";

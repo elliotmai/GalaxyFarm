@@ -1214,6 +1214,29 @@ export const kioskDevices = pgTable(
 );
 
 /**
+ * The shared PIN a kiosk screen asks for beyond its whitelist (spec §4.3,
+ * §4.4, §4.5 tier "Elevated").
+ *
+ * One row per property, not per device: it is a "someone is really standing
+ * here" latch, the same code the whole household uses, not a credential that
+ * identifies who. It never widens what a `kiosk`-role session may do — §4.3's
+ * grant table has no PIN-gated branch — it only gates the one Elevated action
+ * a screen can take on itself (unpairing). Hashed with scrypt like a password,
+ * not SHA-256 like a token: a human chooses this one, so it *is* the kind of
+ * secret a dictionary attack is worth being resistant to.
+ *
+ * Deliberately outside `allTables`. It is not a synced entity, has no domain
+ * schema, and is never handed a `Repository` — `schema-conformance.test.ts`
+ * and `sync/entities.ts` both walk `allTables`, and this row must never appear
+ * in either: the hash must not be a column a device could ever be sent.
+ */
+export const kioskPins = pgTable("kiosk_pins", {
+  propertyId: text("property_id").primaryKey(),
+  pinHash: text("pin_hash"),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
+});
+
+/**
  * Who last wrote each field, and when (§4.2).
  *
  * The merge is per-field last-write-wins, so the server has to know when each

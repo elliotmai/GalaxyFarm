@@ -44,6 +44,9 @@ export const authConfig = {
         token["propertyId"] = source["propertyId"];
         token["accessFrom"] = source["accessFrom"];
         token["accessTo"] = source["accessTo"];
+        // Set only by the kiosk-device provider. Carried through so a
+        // revoked screen can be told apart from the person who paired it.
+        token["deviceId"] = source["deviceId"];
       }
       return token;
     },
@@ -51,6 +54,7 @@ export const authConfig = {
     session({ session, token }) {
       const from = token["accessFrom"];
       const to = token["accessTo"];
+      const deviceId = token["deviceId"];
 
       session.actor = {
         id: token.sub as Ulid,
@@ -59,6 +63,7 @@ export const authConfig = {
         ...(typeof from === "string" && typeof to === "string"
           ? { accessWindow: { from: new Date(from), to: new Date(to) } }
           : {}),
+        ...(typeof deviceId === "string" ? { deviceId } : {}),
       };
       return session;
     },

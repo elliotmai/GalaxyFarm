@@ -1,7 +1,13 @@
-import { PagePlaceholder } from "../../../_components/page-placeholder";
+import { redirect } from "next/navigation";
+
+import { CalendarBoardScreen } from "@/app/(kiosk)/kiosk/calendar/calendar-board-screen";
+import { currentActor } from "@/lib/auth";
 
 export const metadata = { title: "Calendar" };
 
-export default function KioskCalendarPage() {
-  return <PagePlaceholder title={"Calendar"} route={"/kiosk/calendar"} />;
+export default async function KioskCalendarPage() {
+  const actor = await currentActor();
+  if (actor === undefined) redirect("/login?next=/kiosk/calendar");
+
+  return <CalendarBoardScreen propertyId={actor.propertyId} />;
 }

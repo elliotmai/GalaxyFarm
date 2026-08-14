@@ -6,6 +6,8 @@ import { SettingsScreen } from "@/app/(admin)/admin/settings/_components/setting
 import type { PersonRow } from "@/app/(admin)/admin/settings/_components/people-screen";
 import { currentActor } from "@/lib/auth";
 import { withDeadline } from "@/lib/deadline";
+import { listDevices, type KioskDevice } from "@/lib/device-store";
+import { hasKioskPin } from "@/lib/kiosk-pin-store";
 import { listDeletedUsers, listUsers } from "@/lib/user-store";
 
 export const metadata = { title: "Settings" };
@@ -42,6 +44,7 @@ export default async function AdminSettingsPage() {
   // Owners only. The tab's absence is presentation; the push handler is what
   // actually refuses a branding write from anybody else (§4.3).
   const mayManageBranding = can(actor, "branding.manage", now);
+  const mayManageDevices = can(actor, "devices.manage", now);
 
   let people: readonly PersonRow[] = [];
   let deleted: readonly PersonRow[] = [];
@@ -62,6 +65,23 @@ export default async function AdminSettingsPage() {
     }
   }
 
+  let devices: readonly KioskDevice[] = [];
+  let pinSet = false;
+  let devicesUnavailable: string | undefined;
+
+  if (mayManageDevices) {
+    try {
+      [devices, pinSet] = await withDeadline(
+        Promise.all([listDevices(actor.propertyId), hasKioskPin(actor.propertyId)]),
+        "the kiosk device list",
+      );
+    } catch (error) {
+      console.error("[settings:devices]", error);
+      devicesUnavailable =
+        "Could not reach the database, so the list of kiosk devices is not here. Everything else on this page is read from this device and is unaffected.";
+    }
+  }
+
   return (
     <SettingsScreen
       propertyId={actor.propertyId}
@@ -70,7 +90,11 @@ export default async function AdminSettingsPage() {
       deleted={deleted}
       mayManagePeople={mayManagePeople}
       mayManageBranding={mayManageBranding}
+      mayManageDevices={mayManageDevices}
+      devices={devices}
+      pinSet={pinSet}
       {...(unavailable === undefined ? {} : { unavailable })}
+      {...(devicesUnavailable === undefined ? {} : { devicesUnavailable })}
     />
   );
 }
