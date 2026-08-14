@@ -10,9 +10,9 @@ import {
   Modal,
   Section,
   Select,
-  Stat,
   StatRow,
   TextArea,
+  Tile,
   TextInput,
   useConfirmDelete,
   useToast,
@@ -276,13 +276,13 @@ export function DispositionsPanel({
       >
         <Card>
           <StatRow>
-            <Stat label="Kept" value={byKind.get("kept") ?? 0} hint="Into the house" />
-            <Stat label="Given" value={byKind.get("given") ?? 0} hint="To whoever was passing" />
-            <Stat label="Sold" value={byKind.get("sold") ?? 0} />
+            <Tile label="Kept" value={byKind.get("kept") ?? 0} hint="Into the house" />
+            <Tile label="Given" value={byKind.get("given") ?? 0} hint="To whoever was passing" />
+            <Tile label="Sold" value={byKind.get("sold") ?? 0} />
             {/* What is left is the tile at the top of the screen rather than a
                 fifth stat here — this section is the thirty days, not the
                 balance, and the two would be read as the same window. */}
-            <Stat label="Brought in" value={formatMoney(revenue)} emphasis />
+            <Tile label="Brought in" value={formatMoney(revenue)} emphasis />
           </StatRow>
         </Card>
       </Section>

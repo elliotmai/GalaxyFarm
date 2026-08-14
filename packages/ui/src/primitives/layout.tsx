@@ -204,35 +204,19 @@ export function DetailList({ items, columns = 2 }: DetailListProps) {
   );
 }
 
-export interface StatProps {
-  readonly label: string;
-  readonly value: ReactNode;
-  readonly hint?: ReactNode;
-  /** Draws the eye when the number is the point of the screen. */
-  readonly emphasis?: boolean;
-}
-
 /**
- * One number, said loudly.
+ * A responsive rank of numbers. Two up on a phone, four on a laptop.
  *
- * Tabular figures throughout: a row of stats whose digits are different widths
- * jitters as the values change, and these change on every sync.
+ * Distinct from `CardGrid`, which goes one up on a phone: two small numbers
+ * side by side are readable on a 375px screen and two record cards are not.
+ * What goes inside is `Tile`.
+ *
+ * There used to be a `Stat` to put in it, which was `Tile` with the tone edge
+ * and the badge slot removed and every other line the same — same wrapper,
+ * same label, same figure, same hint. Two components that differ by three
+ * pixels are not two components; they are one component and a screen that
+ * looks subtly unlike its neighbour for no reason anybody can name.
  */
-export function Stat({ label, value, hint, emphasis = false }: StatProps) {
-  return (
-    <div className="flex flex-col gap-1 rounded-density border border-rule bg-raised px-density py-3">
-      <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
-      <span
-        className={`text-ink ${emphasis ? "gf-figure" : "gf-numeric text-[1.35em] font-semibold"}`}
-      >
-        {value}
-      </span>
-      {hint === undefined ? null : <span className="text-xs text-muted">{hint}</span>}
-    </div>
-  );
-}
-
-/** A responsive rank of stats. Two up on a phone, four on a laptop. */
 export function StatRow({ children }: { readonly children: ReactNode }) {
   return <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{children}</div>;
 }

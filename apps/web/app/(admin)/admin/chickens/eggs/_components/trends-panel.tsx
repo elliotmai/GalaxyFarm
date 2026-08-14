@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Card, EmptyState, Meter, Pill, Section, Select, Stat, StatRow } from "@galaxy-farm/ui";
+import { Card, EmptyState, Meter, Pill, Section, Select, StatRow, Tile } from "@galaxy-farm/ui";
 import { addCalendarDays, endOfDay, startOfDay } from "@galaxy-farm/core";
 import {
   breakdownTotals,
@@ -129,13 +129,13 @@ export function TrendsPanel({
         ) : (
           <Card>
             <StatRow>
-              <Stat
+              <Tile
                 label="Last 30 days"
                 value={monthly}
                 hint={`${collected} logged in total`}
                 emphasis
               />
-              <Stat
+              <Tile
                 label="Per bird per day"
                 value={rate === undefined ? "—" : rate.toFixed(2)}
                 hint={
@@ -144,7 +144,7 @@ export function TrendsPanel({
                     : `${birds} bird${birds === 1 ? "" : "s"}, over 30 days`
                 }
               />
-              <Stat
+              <Tile
                 label="Best in this view"
                 value={peak}
                 hint={

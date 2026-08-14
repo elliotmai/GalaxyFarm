@@ -16,8 +16,8 @@ import {
   PageHeader,
   Section,
   Select,
-  Stat,
   StatRow,
+  Tile,
   TextInput,
   useConfirmDelete,
   useToast,
@@ -260,15 +260,15 @@ export function CalvingScreen({
       />
 
       <StatRow>
-        <Stat label="Calvings" value={calvings.length} />
-        <Stat label="Live calves" value={live.length} />
-        <Stat
+        <Tile label="Calvings" value={calvings.length} />
+        <Tile label="Live calves" value={live.length} />
+        <Tile
           label="Being watched"
           value={watching.length}
           emphasis={watching.length > 0}
           hint={watching.length > 0 ? "In the window now" : undefined}
         />
-        <Stat
+        <Tile
           label="Unassisted"
           value={
             calvings.length === 0

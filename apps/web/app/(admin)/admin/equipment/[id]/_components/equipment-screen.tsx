@@ -16,9 +16,9 @@ import {
   Pill,
   Section,
   Select,
-  Stat,
   StatRow,
   Tabs,
+  Tile,
   TextInput,
   useConfirmDelete,
   useToast,
@@ -221,14 +221,14 @@ export function EquipmentScreen({
       />
 
       <StatRow>
-        <Stat label="Hours" value={num(hours, 1)} hint={hours === undefined ? "Never read" : ""} />
-        <Stat label="Miles" value={num(miles)} hint={miles === undefined ? "Never read" : ""} />
-        <Stat
+        <Tile label="Hours" value={num(hours, 1)} hint={hours === undefined ? "Never read" : ""} />
+        <Tile label="Miles" value={num(miles)} hint={miles === undefined ? "Never read" : ""} />
+        <Tile
           label="Fuel and service"
           value={formatMoney(running)}
           hint="What it has cost to run"
         />
-        <Stat
+        <Tile
           label="Miles per gallon"
           value={mpg === undefined ? "—" : num(mpg, 1)}
           hint={mpg === undefined ? "Two fills with odometer readings" : "Tank to tank"}
@@ -1224,14 +1224,14 @@ function Fuel({
   return (
     <div className="flex flex-col gap-density">
       <StatRow>
-        <Stat label="Spent on fuel" value={formatMoney(spent)} />
-        <Stat label="Gallons" value={num(burned, 1)} />
-        <Stat
+        <Tile label="Spent on fuel" value={formatMoney(spent)} />
+        <Tile label="Gallons" value={num(burned, 1)} />
+        <Tile
           label="Miles per gallon"
           value={mpg === undefined ? "—" : num(mpg, 1)}
           hint="Tank to tank, so the first fill is excluded"
         />
-        <Stat
+        <Tile
           label="Fills"
           value={fuel.length}
           hint={fuel.length < 2 ? "Two with odometer readings gives a figure" : ""}

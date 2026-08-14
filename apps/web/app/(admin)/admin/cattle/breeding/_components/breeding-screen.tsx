@@ -17,8 +17,8 @@ import {
   Section,
   SearchSelect,
   Select,
-  Stat,
   StatRow,
+  Tile,
   TextInput,
   useConfirmDelete,
   useToast,
@@ -269,15 +269,15 @@ export function BreedingScreen({
       />
 
       <StatRow>
-        <Stat label="Bred" value={breedings.length} />
-        <Stat
+        <Tile label="Bred" value={breedings.length} />
+        <Tile
           label="In the window"
           value={watched.length}
           emphasis={watched.length > 0}
           hint={watched.length > 0 ? "Watch these" : undefined}
         />
-        <Stat label="Preg checks due" value={openChecks.length} />
-        <Stat
+        <Tile label="Preg checks due" value={openChecks.length} />
+        <Tile
           label="Next due"
           value={
             breedings.length === 0

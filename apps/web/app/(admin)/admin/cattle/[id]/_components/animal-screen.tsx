@@ -12,13 +12,13 @@ import {
   DetailList,
   EmptyState,
   Select,
+  Tile,
   TextInput,
   PageBody,
   PageHeader,
   SafetyBadge,
   Section,
   TextArea,
-  Stat,
   StatRow,
   Tabs,
   useConfirmDelete,
@@ -236,14 +236,14 @@ export function AnimalScreen({
       )}
 
       <StatRow>
-        <Stat label="Tag" value={animal.tagNumber ?? "—"} />
-        <Stat
+        <Tile label="Tag" value={animal.tagNumber ?? "—"} />
+        <Tile
           label="Age"
           value={months === undefined ? "—" : `${Math.floor(months / 12)}y ${months % 12}m`}
           hint={animal.dobIsEstimate ? "Date of birth is an estimate" : undefined}
         />
-        <Stat label="Sex" value={animal.sex} />
-        <Stat
+        <Tile label="Sex" value={animal.sex} />
+        <Tile
           label="Where"
           value={outside?.zone?.name ?? inside?.zone?.name ?? "Unassigned"}
           {...(outside !== undefined && inside !== undefined

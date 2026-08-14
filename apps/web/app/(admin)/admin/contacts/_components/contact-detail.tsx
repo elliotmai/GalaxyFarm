@@ -8,8 +8,8 @@ import {
   EmptyState,
   Pill,
   Section,
-  Stat,
   StatRow,
+  Tile,
   type Column,
 } from "@galaxy-farm/ui";
 import {
@@ -236,9 +236,9 @@ export function ContactDetail({
         ) : (
           <div className="flex flex-col gap-density">
             <StatRow>
-              <Stat label="What we have paid them" value={formatMoney(ledger.paid)} />
-              <Stat label="What they have paid us" value={formatMoney(ledger.received)} />
-              <Stat
+              <Tile label="What we have paid them" value={formatMoney(ledger.paid)} />
+              <Tile label="What they have paid us" value={formatMoney(ledger.received)} />
+              <Tile
                 label="Net"
                 value={formatMoney(ledger.net)}
                 emphasis
