@@ -44,7 +44,7 @@ export default async function KioskLayout({ children }: { children: React.ReactN
   if (actor === undefined) {
     return (
       <div data-surface="kiosk" data-theme="flying-auto" data-density="kiosk">
-        <main>{children}</main>
+        <main className="p-density">{children}</main>
       </div>
     );
   }
@@ -59,7 +59,7 @@ export default async function KioskLayout({ children }: { children: React.ReactN
       <SyncProvider pushEnabled={actor.role === "owner" || actor.role === "member"}>
         <ToastProvider>
           <ConfirmProvider>
-            <main>{children}</main>
+            <main className="p-density">{children}</main>
           </ConfirmProvider>
         </ToastProvider>
       </SyncProvider>
