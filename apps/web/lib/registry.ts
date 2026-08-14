@@ -2,7 +2,7 @@ import { neo4jRegistryGraph } from "@galaxy-farm/infra-registry-graph";
 import type { RegistryGraph } from "@galaxy-farm/module-cattle";
 
 /**
- * The catalogue's composition root (spec §4.1).
+ * The catalog's composition root (spec §4.1).
  *
  * The one place that reads the environment. The adapter takes its credentials
  * as arguments and knows nothing about `process.env`, which is what lets it be
@@ -44,12 +44,12 @@ export function registryGraph(): RegistryGraph | undefined {
   });
 }
 
-/** What to tell somebody looking at a catalogue that is not there. */
+/** What to tell somebody looking at a catalog that is not there. */
 export function registryNotConfigured(): string {
   const missing = missingRegistrySettings();
 
   return (
-    "The association catalogue is not connected on this server. Everything else " +
+    "The association catalog is not connected on this server. Everything else " +
     "on the site works without it — it is the crawled herdbooks that are " +
     `missing, not your own records. ${
       missing.length === NEEDED.length

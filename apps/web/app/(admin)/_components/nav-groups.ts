@@ -139,7 +139,7 @@ export const SUB_SECTIONS: Readonly<Record<string, readonly NavItem[]>> = {
     { href: "/admin/cattle/supplies", label: "Tank and fridge" },
     { href: "/admin/cattle/sales", label: "Sales" },
     { href: "/admin/cattle/ancestors", label: "Ancestors" },
-    { href: "/admin/cattle/catalogue", label: "Catalogue" },
+    { href: "/admin/cattle/catalog", label: "Catalog" },
     { href: "/admin/cattle/roadmap", label: "Roadmap" },
     { href: "/admin/cattle/candidates", label: "Candidates" },
     { href: "/admin/cattle/risks", label: "Worth a look" },

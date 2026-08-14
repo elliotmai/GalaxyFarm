@@ -7,7 +7,7 @@ import { registryGraph, registryNotConfigured } from "@/lib/registry";
  * /api/registry/search — find an animal anywhere in the associations (§5.2).
  *
  * On the server for two reasons. The graph's credentials must never reach a
- * browser, and the catalogue is a hundred thousand animals — far too many to
+ * browser, and the catalog is a hundred thousand animals — far too many to
  * ship to a phone, which is why this one screen is the exception to the
  * offline-first rule the rest of the site keeps.
  *
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     // passing on: a wrong database name and an expired password look identical
     // from the outside and are fixed in different places.
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "The catalogue could not be searched." },
+      { error: error instanceof Error ? error.message : "The catalog could not be searched." },
       { status: 502 },
     );
   }

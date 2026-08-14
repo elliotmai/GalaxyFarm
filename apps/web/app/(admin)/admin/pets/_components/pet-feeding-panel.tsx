@@ -125,7 +125,7 @@ export function PetFeedingPanel({
    * yet should still be able to write the plan rather than be stopped by a
    * dropdown with nothing in it.
    */
-  const catalogue = [...feeds]
+  const catalog = [...feeds]
     .filter((feed) => feed.active)
     .sort((left, right) =>
       left.category === right.category
@@ -159,7 +159,7 @@ export function PetFeedingPanel({
       portion: "per_head",
       active: true,
       specialNotes: "",
-      lines: [{ ...BLANK_LINE, feedTypeId: catalogue[0]?.id ?? "" }],
+      lines: [{ ...BLANK_LINE, feedTypeId: catalog[0]?.id ?? "" }],
     });
     setErrors({});
   }
@@ -311,10 +311,10 @@ export function PetFeedingPanel({
 
   return (
     <div className="flex flex-col gap-density">
-      {catalogue.length === 0 ? (
-        <Section title="Nothing to feed" description="A ration names a feed from the catalogue.">
+      {catalog.length === 0 ? (
+        <Section title="Nothing to feed" description="A ration names a feed from the catalog.">
           <EmptyState
-            title="No feed catalogued"
+            title="No feed cataloged"
             detail="Add the kibble on the Feed inventory screen — category 'pet', so it stays out of the cattle ration's totals — and it will be offered here."
           />
         </Section>
@@ -336,7 +336,7 @@ export function PetFeedingPanel({
                   key={pet.id}
                   title={displayName(pet)}
                   actions={
-                    <Button onClick={() => startAdd(pet.id)} disabled={catalogue.length === 0}>
+                    <Button onClick={() => startAdd(pet.id)} disabled={catalog.length === 0}>
                       Add a ration
                     </Button>
                   }
@@ -497,7 +497,7 @@ export function PetFeedingPanel({
                       <Select
                         label="Feed"
                         value={line.feedTypeId}
-                        options={catalogue.map((feed) => ({
+                        options={catalog.map((feed) => ({
                           value: feed.id,
                           label: `${feed.name}${feed.category === "pet" ? "" : ` (${feed.category})`}`,
                         }))}
@@ -576,7 +576,7 @@ export function PetFeedingPanel({
                         ...draft.lines,
                         {
                           ...BLANK_LINE,
-                          feedTypeId: draft.lines[0]?.feedTypeId ?? catalogue[0]?.id ?? "",
+                          feedTypeId: draft.lines[0]?.feedTypeId ?? catalog[0]?.id ?? "",
                           timeOfDay: "evening",
                         },
                       ],

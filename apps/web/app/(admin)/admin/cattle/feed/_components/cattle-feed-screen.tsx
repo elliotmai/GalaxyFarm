@@ -211,7 +211,7 @@ export function CattleFeedScreen({
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile label="Plans" value={plans.length} />
         <Tile label="Feeding now" value={active.length} tone="calm" />
-        <Tile label="Feeds in the catalogue" value={feeds.length} tone="identity" />
+        <Tile label="Feeds in the catalog" value={feeds.length} tone="identity" />
         <Tile
           label="Feed types in use"
           value={demand.length}
@@ -274,13 +274,13 @@ export function CattleFeedScreen({
       )}
 
       <Section
-        title="The feed catalogue"
+        title="The feed catalog"
         description="What a plan's lines can name. Cross-species — the same bale feeds cattle and the same scratch feeds chickens."
       >
         <FeedTypeForm propertyId={propertyId} actorId={actorId} />
         {feeds.length === 0 ? (
           <EmptyState
-            title="Nothing in the catalogue"
+            title="Nothing in the catalog"
             detail="Add a feed above and plans can start naming it."
           />
         ) : (
@@ -420,7 +420,7 @@ export function CattleFeedScreen({
 }
 
 /**
- * A feed in the catalogue, added or corrected.
+ * A feed in the catalog, added or corrected.
  *
  * Correcting matters more than it looks. Every plan line points at one of
  * these by id, so a feed that could only be created and deleted would leave
@@ -477,7 +477,7 @@ function FeedTypeForm({
         setName("");
         setWeight("");
       }
-      show({ message: editing ? "Feed updated" : "Added to the catalogue", tone: "success" });
+      show({ message: editing ? "Feed updated" : "Added to the catalog", tone: "success" });
       onSaved?.();
     } finally {
       setBusy(false);
@@ -531,7 +531,7 @@ function FeedTypeForm({
  *
  * The unit is on the line rather than taken from the feed, because they are
  * genuinely different questions. Cubes are *bought* by the bag and *fed* by
- * the scoop, and a form that reads the unit off the catalogue makes somebody
+ * the scoop, and a form that reads the unit off the catalog makes somebody
  * write "0.15 bags" twice a day.
  */
 interface LineDraft {
@@ -785,7 +785,7 @@ function PlanForm({
               value={line.feedId}
               onChange={(event) => {
                 const feed = feedById.get(event.target.value);
-                // The catalogue's unit is the sensible starting point, and
+                // The catalog's unit is the sensible starting point, and
                 // nothing more than that — it stays changeable, because a bag
                 // of cubes is fed by the scoop.
                 editLine(line.key, {

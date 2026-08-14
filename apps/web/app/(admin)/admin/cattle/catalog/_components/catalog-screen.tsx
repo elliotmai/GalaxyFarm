@@ -40,18 +40,18 @@ import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
- * The association catalogue (spec §5.2, §7).
+ * The association catalog (spec §5.2, §7).
  *
  * Every animal the crawler found in the herdbooks — a hundred thousand of
  * them, none of them ours. This is the one screen on the site that is not
- * offline-first, and deliberately so: the catalogue is far too large to sit on
+ * offline-first, and deliberately so: the catalog is far too large to sit on
  * a phone, and it is the one thing nobody needs in the barn at zero bars. It
  * is used at a desk, once, when a straw is being considered.
  *
  * It is kept apart from the Ancestors screen because the two are trusted
  * differently. The ancestors are the pedigree behind this herd: a few dozen
  * records, corrected by hand when a page is misread, and the thing every
- * relatedness figure and colour prediction is drawn from. The catalogue is
+ * relatedness figure and colour prediction is drawn from. The catalog is
  * somebody else's crawl. Merging them would bury the thirty records that
  * matter and let a mistyped crawl quietly rewrite a pedigree built by hand.
  *
@@ -87,7 +87,7 @@ async function ask<T>(url: string): Promise<T> {
 const dayOf = (value: Date | string | undefined): string =>
   value === undefined ? "—" : new Date(value).toISOString().slice(0, 10);
 
-export function CatalogueScreen({
+export function CatalogScreen({
   propertyId,
   actorId,
 }: {
@@ -309,7 +309,7 @@ export function CatalogueScreen({
     <PageBody>
       <PageHeader
         eyebrow="Cattle"
-        title="Association catalogue"
+        title="Association catalog"
         subtitle="Every animal the crawl found in the herdbooks. Read-only — search it, then bring what you need across into Ancestors."
         meta={
           result === undefined ? undefined : (
@@ -380,7 +380,7 @@ export function CatalogueScreen({
       </Section>
 
       {error === undefined ? null : (
-        <Callout tone="danger" title="The catalogue could not be reached">
+        <Callout tone="danger" title="The catalog could not be reached">
           {error}
         </Callout>
       )}
@@ -400,7 +400,7 @@ export function CatalogueScreen({
           }
         >
           <DataTable
-            caption="Catalogue search results"
+            caption="Catalog search results"
             columns={columns}
             rows={result.found}
             rowKey={(animal) => `${animal.association}:${animal.regNumber}`}

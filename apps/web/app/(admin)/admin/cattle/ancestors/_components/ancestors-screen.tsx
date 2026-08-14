@@ -32,6 +32,7 @@ import {
   breedsInUse,
   breedsOf,
   canBe,
+  cattleProfileSchema,
   externalAnimalSchema,
   filterAncestors,
   inferAncestorSexes,
@@ -125,6 +126,15 @@ export function AncestorsScreen({
     "externalAnimals",
     "externalAnimals",
     externalAnimalSchema,
+    propertyId,
+    actorId,
+  );
+  // Clearing every ancestor has to detach whatever pointed at them, so this
+  // screen needs to write profiles as well as ancestors.
+  const profileApi = useMutations<CattleProfile>(
+    "cattleProfiles",
+    "cattleProfiles",
+    cattleProfileSchema,
     propertyId,
     actorId,
   );
@@ -453,6 +463,99 @@ export function AncestorsScreen({
     show({ message: `${outsider.name} deleted`, tone: "danger" });
   }
 
+  /**
+   * Empty the ancestors, so the catalog can be pulled from again cleanly.
+   *
+   * The one operation on this screen that ignores the restrict rule above,
+   * deliberately: "clear the lot" is not the same request as "delete this
+   * one", and refusing it because something points at an ancestor would leave
+   * no way to do the thing at all. So instead of refusing, it *detaches* —
+   * every sire or dam on file naming one of these is cleared first, and only
+   * then are the records tombstoned.
+   *
+   * Detaching before deleting, in that order, because the reverse leaves a
+   * window where a live pedigree points at a record that is gone, and half a
+   * link is worse than none: a reference to an id that no longer resolves
+   * breaks the pedigree walk everywhere it is followed, while "no sire on
+   * file" is at least true.
+   *
+   * What it cannot do is put the links back. A fresh pull writes new records
+   * with new ids, so nothing reconnects on its own — which is why the dialog
+   * says so before anything is written rather than after.
+   */
+  async function clearAll() {
+    if (outsiders.length === 0) return;
+
+    const ids = new Set(outsiders.map((entry) => entry.id));
+    const detaching = profiles.filter(
+      (profile) =>
+        (profile.sire?.kind === "external" && ids.has(profile.sire.id)) ||
+        (profile.dam?.kind === "external" && ids.has(profile.dam.id)),
+    );
+
+    const named = new Map(animals.map((animal) => [animal.id, displayName(animal)]));
+
+    const confirmed = await confirmDelete({
+      // Typed: §4.5 puts a bulk delete above Standard, and this is every
+      // ancestor on the place at once.
+      tier: "typed",
+      recordName: "Clear all ancestors",
+      entity: "ancestors",
+      bulkCount: outsiders.length,
+      // Named, not counted. "12 records affected" is not something anybody can
+      // act on; the list of pedigrees that lose a parent is.
+      dependents: detaching.map((profile) => ({
+        entity: "Pedigree",
+        label: named.get(profile.animalId) ?? "an animal",
+        effect: "detached" as const,
+      })),
+      consequence:
+        `${outsiders.length} ancestors go to Trash. ` +
+        (detaching.length === 0
+          ? "Nothing on this farm names any of them as a parent."
+          : `${detaching.length} of this farm's own pedigrees lose a sire or dam and will need pointing at the new records by hand — a fresh pull writes new records with new ids, so nothing reconnects on its own.`),
+      action: "Clear them",
+    });
+    if (!confirmed) return;
+
+    setBusy(true);
+    let cleared = 0;
+    let failed = 0;
+
+    try {
+      // Detach first. A live pedigree must never point at a record that is
+      // already gone, even for the moment in between.
+      for (const profile of detaching) {
+        const patch: Partial<CattleProfile> = {
+          ...(profile.sire?.kind === "external" && ids.has(profile.sire.id)
+            ? { sire: undefined }
+            : {}),
+          ...(profile.dam?.kind === "external" && ids.has(profile.dam.id)
+            ? { dam: undefined }
+            : {}),
+        };
+        const detached = await profileApi.update(profile.id, patch);
+        if (!detached.ok) failed += 1;
+      }
+
+      for (const outsider of outsiders) {
+        const removed = await api.remove(outsider.id, "Cleared before a fresh catalog pull");
+        if (removed.ok) cleared += 1;
+        else failed += 1;
+      }
+
+      show({
+        tone: failed === 0 ? "success" : "warning",
+        message:
+          failed === 0
+            ? `${cleared} ancestors cleared. Pull what you need from the catalog.`
+            : `${cleared} cleared, ${failed} could not be saved.`,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const columns: readonly Column<ExternalAnimal>[] = [
     {
       key: "name",
@@ -615,6 +718,11 @@ export function AncestorsScreen({
             {checkable(outsiders).length === 0 ? null : (
               <Button variant="ghost" onClick={() => setCheckingAll(true)}>
                 Check all against the associations
+              </Button>
+            )}
+            {outsiders.length === 0 ? null : (
+              <Button variant="danger" onClick={() => void clearAll()} disabled={busy}>
+                Clear all
               </Button>
             )}
             <Button variant="primary" onClick={startCreate}>

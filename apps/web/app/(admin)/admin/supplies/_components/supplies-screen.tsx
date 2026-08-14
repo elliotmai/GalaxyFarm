@@ -354,7 +354,7 @@ const BLANK_ITEM: ItemDraft = {
 };
 
 /**
- * The catalogue.
+ * The catalog.
  *
  * Deleting an item is **restrict**, not cascade — every purchase and every
  * usage entry names one by id, and cascading would take a year of what the
@@ -492,7 +492,7 @@ function Items({
     if (!confirmed) return;
 
     if (editing?.id === item.id) reset();
-    await api.remove(item.id, "Removed from the supply catalogue");
+    await api.remove(item.id, "Removed from the supply catalog");
     show({
       message: "Item deleted",
       tone: "danger",
@@ -632,7 +632,7 @@ function Items({
         </Modal>
       ) : null}
 
-      <Section title="The catalogue" actions={<Button onClick={openEditor}>Add an item</Button>}>
+      <Section title="The catalog" actions={<Button onClick={openEditor}>Add an item</Button>}>
         <Card>
           <DataTable
             caption="Supply items"

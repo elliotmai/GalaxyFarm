@@ -48,7 +48,7 @@ export async function GET(request: Request) {
 
     if (animal === undefined) {
       return NextResponse.json(
-        { error: `${association} ${regNumber} is not in the catalogue.` },
+        { error: `${association} ${regNumber} is not in the catalog.` },
         { status: 404 },
       );
     }
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ animal, pedigree });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "The catalogue could not be read." },
+      { error: error instanceof Error ? error.message : "The catalog could not be read." },
       { status: 502 },
     );
   }
