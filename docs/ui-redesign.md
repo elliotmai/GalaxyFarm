@@ -386,3 +386,49 @@ repository — how the boarding business should be perceived, what competing
 software looks like, whether the farm's existing printed material has a voice
 this should match. If any of that points elsewhere, the token work is the same
 size whichever direction wins.
+
+---
+
+## What shipped, and where the proposal was wrong
+
+Written after the fact, against the built app rather than the mockups. Three of
+the claims above did not survive contact.
+
+**The pedigree.** Proposed as a "three-generation certificate grid"; shipped as
+a bracket at whatever depth the papers go back. Rendering the old constellation
+on the new ground was what settled it, and the reason was not the one this
+document gave. Its docstring argued that a star chart draws an unknown ancestor
+as an unnamed star, so a gap "looks like something rather than like nothing" —
+and the code never did that. `place` returned early on `undefined`, so an
+incomplete pedigree was a large blank area. What did break was quieter and
+worse: a repeated ancestor was marked by switching to the identity colour, and
+in Ink Navy identity and action are the same navy, so line breeding — the one
+thing the chart existed to surface — was invisible. The bracket marks a repeat
+with the word.
+
+**"Only type treatment and container shape vary."** True, and it hid the
+mechanism the app was missing. Headings were Tailwind's fixed rem steps, which
+do not move with density at all: the kiosk ran 20px body text under the same
+24px heading the laptop got at 15px, so the hierarchy grew *weaker* as the
+screen got further away. One palette and one set of roles was never the
+constraint that mattered; one *scale*, expressed in em against the density
+root, was.
+
+**The caveat was right, and the screen it named is not the one that broke.**
+The eleven-tab animal profile came through the redesign intact, because `Tabs`
+takes a render function and only ever mounts the active panel. What the
+mockups could not show was the prose: 199 section descriptions, median 116
+characters, longest 283 — so Supplies opened with three lines about how a
+running total is computed before a single supply appeared. A mockup writes one
+plausible subtitle and moves on. Two grey lines above every heading on every
+screen was a good part of what "cluttered" meant, and no still image of one
+morning would have surfaced it.
+
+**Two things this document treated as settled and were not.** `flying-night`
+was described as defined-but-unwired for longer than that was defensible; it
+now runs on `/admin`, `/kiosk` and `/sitter`, and stays off `/account` and the
+public pages, which are the farm presented rather than worked. And the nav
+restructure left five screens announcing "People & places", a group it had
+removed, while the rail beside them highlighted something else — found by
+reading the rendered DOM, not the source, which is also how the sections strip
+turned out to be lighting nothing at all on a cattle sub-view.
