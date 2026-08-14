@@ -106,7 +106,15 @@ export function SalesScreen({
   const { records: processing } = useRecords<ProcessingRecord>("processingRecords", query);
 
   const now = new Date();
+  // Every animal on the place, for reading a record back. One Animal model
+  // serves every species (§2), so a row written before an animal changed hands
+  // still finds its name here whatever it is.
   const byId = useMemo(() => new Map(animals.map((a) => [a.id, a])), [animals]);
+
+  // What the pickers below offer. This is a cattle screen, and an unfiltered
+  // list puts the hens and the dogs in the dropdown that books a steer to the
+  // processor — the same rule the breeding and calving pickers already keep.
+  const cattle = useMemo(() => animals.filter((a) => a.species === "cattle"), [animals]);
 
   // Every animal that has a figure of any kind against it. An animal with
   // nothing recorded has no P&L worth a row — it would read as a clean zero.
@@ -215,7 +223,7 @@ export function SalesScreen({
               </Section>
             ) : active === "sales" ? (
               <SalesTab
-                animals={animals}
+                cattle={cattle}
                 sales={sales}
                 health={health}
                 byId={byId}
@@ -225,7 +233,7 @@ export function SalesScreen({
               />
             ) : active === "acquisitions" ? (
               <AcquisitionsTab
-                animals={animals}
+                cattle={cattle}
                 acquisitions={acquisitions}
                 byId={byId}
                 propertyId={propertyId}
@@ -233,7 +241,7 @@ export function SalesScreen({
               />
             ) : (
               <ProcessingTab
-                animals={animals}
+                cattle={cattle}
                 processing={processing}
                 health={health}
                 byId={byId}
@@ -250,7 +258,7 @@ export function SalesScreen({
 }
 
 function SalesTab({
-  animals,
+  cattle,
   sales,
   health,
   byId,
@@ -258,7 +266,8 @@ function SalesTab({
   propertyId,
   actorId,
 }: {
-  readonly animals: readonly Animal[];
+  /** The herd, already narrowed to cattle — never the whole menagerie. */
+  readonly cattle: readonly Animal[];
   readonly sales: readonly SaleRecord[];
   readonly health: readonly HealthRecord[];
   readonly byId: ReadonlyMap<Ulid, Animal>;
@@ -296,7 +305,7 @@ function SalesTab({
   const [override, setOverride] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
 
-  const chosen = animals.find((entry) => entry.id === animalId);
+  const chosen = cattle.find((entry) => entry.id === animalId);
   const clear = animalId === "" || isClearForSale(health, animalId as Ulid, now);
   const withdrawal =
     animalId === ""
@@ -419,7 +428,7 @@ function SalesTab({
               value={animalId}
               onChange={(event) => setAnimalId(event.target.value)}
               placeholder="Choose an animal"
-              options={animals.map((entry) => ({
+              options={cattle.map((entry) => ({
                 value: entry.id,
                 label: `${displayName(entry)}${isClearForSale(health, entry.id, now) ? "" : " · under withdrawal"}`,
               }))}
@@ -518,13 +527,14 @@ function SalesTab({
 }
 
 function AcquisitionsTab({
-  animals,
+  cattle,
   acquisitions,
   byId,
   propertyId,
   actorId,
 }: {
-  readonly animals: readonly Animal[];
+  /** The herd, already narrowed to cattle — never the whole menagerie. */
+  readonly cattle: readonly Animal[];
   readonly acquisitions: readonly AcquisitionRecord[];
   readonly byId: ReadonlyMap<Ulid, Animal>;
   readonly propertyId: Ulid;
@@ -631,7 +641,7 @@ function AcquisitionsTab({
               value={animalId}
               onChange={(event) => setAnimalId(event.target.value)}
               placeholder="Choose an animal"
-              options={animals.map((entry) => ({ value: entry.id, label: displayName(entry) }))}
+              options={cattle.map((entry) => ({ value: entry.id, label: displayName(entry) }))}
               required
             />
             <TextInput
@@ -708,7 +718,7 @@ function AcquisitionsTab({
  * and what gets typed goes on the record.
  */
 function ProcessingTab({
-  animals,
+  cattle,
   processing,
   health,
   byId,
@@ -716,7 +726,8 @@ function ProcessingTab({
   propertyId,
   actorId,
 }: {
-  readonly animals: readonly Animal[];
+  /** The herd, already narrowed to cattle — never the whole menagerie. */
+  readonly cattle: readonly Animal[];
   readonly processing: readonly ProcessingRecord[];
   readonly health: readonly HealthRecord[];
   readonly byId: ReadonlyMap<Ulid, Animal>;
@@ -743,7 +754,7 @@ function ProcessingTab({
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
-  const chosen = animals.find((entry) => entry.id === animalId);
+  const chosen = cattle.find((entry) => entry.id === animalId);
   const clear = animalId === "" || isClearForSale(health, animalId as Ulid, now);
   const withdrawal =
     animalId === ""
@@ -884,7 +895,7 @@ function ProcessingTab({
               value={animalId}
               onChange={(event) => setAnimalId(event.target.value)}
               placeholder="Choose an animal"
-              options={animals
+              options={cattle
                 .filter((entry) => entry.status === "active")
                 .map((entry) => ({
                   value: entry.id,

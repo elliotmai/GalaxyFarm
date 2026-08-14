@@ -199,7 +199,10 @@ export function PairingPlanner({
 
   const sireOptions: SearchOption[] = [
     ...animals
-      .filter((animal) => animal.sex === "male" && animal.status === "active")
+      .filter(
+        (animal) =>
+          animal.species === "cattle" && animal.sex === "male" && animal.status === "active",
+      )
       .map((animal) => ({
         value: `animal:${animal.id}`,
         label: displayName(animal),
@@ -223,7 +226,10 @@ export function PairingPlanner({
   ];
 
   const damOptions: SearchOption[] = animals
-    .filter((animal) => animal.sex === "female" && animal.status === "active")
+    .filter(
+      (animal) =>
+        animal.species === "cattle" && animal.sex === "female" && animal.status === "active",
+    )
     .map((animal) => ({
       value: animal.id,
       label: displayName(animal),

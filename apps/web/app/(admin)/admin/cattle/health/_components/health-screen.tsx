@@ -517,8 +517,17 @@ function AddHealth({
           value={animalId}
           onChange={(event) => setAnimalId(event.target.value)}
           placeholder="Choose an animal"
+          // Cattle only. The entity is species-agnostic and the pets screen
+          // writes to the same table, so an unfiltered list offers the dogs on
+          // the screen that draws a dose out of the cattle fridge. The record
+          // being edited stays in the list whatever it is, or opening a pet's
+          // row from the table below would blank the field it came in with.
           options={animals
-            .filter((entry) => entry.status === "active" || entry.id === editing?.animalId)
+            .filter(
+              (entry) =>
+                (entry.species === "cattle" && entry.status === "active") ||
+                entry.id === editing?.animalId,
+            )
             .map((entry) => ({
               value: entry.id,
               label: `${displayName(entry)}${heldSet.has(entry.id) ? " · under withdrawal" : ""}`,

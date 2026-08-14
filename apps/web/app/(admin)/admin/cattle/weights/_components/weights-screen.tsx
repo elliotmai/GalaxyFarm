@@ -81,6 +81,11 @@ export function WeightsScreen({
 
   const byId = useMemo(() => new Map(animals.map((a) => [a.id, a])), [animals]);
 
+  // One Animal model serves every species (§2), so the store hands this screen
+  // the hens and the dogs alongside the herd. A weight is recorded against
+  // cattle here, and the picker below says so.
+  const cattle = useMemo(() => animals.filter((a) => a.species === "cattle"), [animals]);
+
   /** One row per animal that has ever been weighed, with what follows from it. */
   const growth = useMemo(() => {
     const weighed = [...new Set(weights.map((w) => w.animalId))];
@@ -209,7 +214,7 @@ export function WeightsScreen({
       </div>
 
       <Section title="Record a weight">
-        <AddWeight animals={animals} api={api} />
+        <AddWeight cattle={cattle} api={api} />
       </Section>
 
       {growth.length === 0 ? null : (
@@ -296,10 +301,11 @@ export function WeightsScreen({
 }
 
 function AddWeight({
-  animals,
+  cattle,
   api,
 }: {
-  readonly animals: readonly Animal[];
+  /** The herd, already narrowed to cattle — never the whole menagerie. */
+  readonly cattle: readonly Animal[];
   readonly api: ReturnType<typeof useMutations<WeightRecord>>;
 }) {
   const { show } = useToast();
@@ -355,7 +361,7 @@ function AddWeight({
           value={animalId}
           onChange={(event) => setAnimalId(event.target.value)}
           placeholder="Choose an animal"
-          options={animals
+          options={cattle
             .filter((entry) => entry.status === "active")
             .map((entry) => ({ value: entry.id, label: displayName(entry) }))}
           required

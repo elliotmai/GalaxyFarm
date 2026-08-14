@@ -607,7 +607,22 @@ function PlanForm({
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
-  const targets = target === "animal" ? animals : target === "zone" ? zones : [];
+  /**
+   * What the target picker offers.
+   *
+   * Cattle only. A feeding plan is species-agnostic and the pets screen writes
+   * to the same table, so an unfiltered list puts the dogs in the dropdown on
+   * the screen that rations the herd. The plan being edited keeps its own
+   * target whatever species it is — otherwise opening a plan written on
+   * another screen would blank the field it came in with, and saving would
+   * quietly move the plan onto somebody else.
+   */
+  const targets =
+    target === "animal"
+      ? animals.filter((entry) => entry.species === "cattle" || entry.id === plan?.targetId)
+      : target === "zone"
+        ? zones
+        : [];
   const feedById = new Map<string, FeedType>(feeds.map((feed) => [feed.id, feed]));
 
   const editLine = (key: string, patch: Partial<LineDraft>): void =>
