@@ -20,8 +20,11 @@ import {
   type Column,
 } from "@galaxy-farm/ui";
 import {
+  groupedZones,
   isOverCapacity,
+  possibleGroupsFor,
   SAFETY_LEVEL_DEFAULTS,
+  slotForZone,
   ZONE_TYPES,
   zoneSchema,
   type Animal,
@@ -61,6 +64,7 @@ const SAFETY_OPTIONS = Object.values(SAFETY_LEVEL_DEFAULTS).map((level) => ({
 interface Draft {
   readonly name: string;
   readonly type: ZoneType;
+  readonly parentZoneId: string;
   readonly indoor: boolean;
   readonly capacity: string;
   readonly baselineSafetyLevel: SafetyLevel;
@@ -72,6 +76,7 @@ interface Draft {
 const BLANK: Draft = {
   name: "",
   type: "pen",
+  parentZoneId: "",
   indoor: false,
   capacity: "",
   baselineSafetyLevel: 2,
@@ -114,6 +119,19 @@ export function ZonesPanel({
   const [draft, setDraft] = useState<Draft | undefined>();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  /**
+   * What this zone could be put in.
+   *
+   * Asked of the kernel rather than filtered here, so the screen and the
+   * chore that reads the tree agree about what a barn may hold — and so the
+   * one genuinely dangerous option, putting a barn inside its own stall, is
+   * excluded by the same code that knows what a descendant is.
+   */
+  const groupOptions =
+    draft === undefined
+      ? []
+      : possibleGroupsFor(zones, { id: editing?.id ?? ("" as Ulid), type: draft.type });
+
   function startCreate() {
     setEditing(undefined);
     setDraft(BLANK);
@@ -125,6 +143,7 @@ export function ZonesPanel({
     setDraft({
       name: zone.name,
       type: zone.type,
+      parentZoneId: zone.parentZoneId ?? "",
       indoor: zone.indoor,
       capacity: zone.capacity === undefined ? "" : String(zone.capacity),
       baselineSafetyLevel: zone.baselineSafetyLevel,
@@ -141,6 +160,9 @@ export function ZonesPanel({
     const fields = {
       name: draft.name.trim(),
       type: draft.type,
+      // Cleared travels as undefined, or a zone taken out of a group would
+      // stay in it — the patch would simply never mention the field.
+      parentZoneId: draft.parentZoneId === "" ? undefined : (draft.parentZoneId as Ulid),
       indoor: draft.indoor,
       baselineSafetyLevel: draft.baselineSafetyLevel,
       waterSourceIds: draft.waterSourceIds,
@@ -251,7 +273,22 @@ export function ZonesPanel({
     {
       key: "type",
       header: "Type",
-      render: (zone) => <Badge tone="neutral">{zone.type.replace(/_/g, " ")}</Badge>,
+      render: (zone) => (
+        <span className="flex flex-wrap items-center gap-2">
+          <Badge tone="neutral">{zone.type.replace(/_/g, " ")}</Badge>
+          {/*
+            Inside or outside, on every row.
+            An animal holds one of each at once — a stall in the barn and a
+            pasture to go out in — and which slot a zone fills is read straight
+            off this. Left as a tickbox nobody sees, a stall marked outside
+            quietly takes the pasture's place and the horse looks like it has
+            no turnout.
+          */}
+          <Badge tone={zone.indoor ? "identity" : "calm"}>
+            {slotForZone(zone) === "inside" ? "inside" : "outside"}
+          </Badge>
+        </span>
+      ),
     },
     {
       key: "occupancy",
@@ -334,8 +371,50 @@ export function ZonesPanel({
               label="Type"
               options={TYPE_OPTIONS}
               value={draft.type}
-              hint="A working facility holds cattle under handling but nothing lives there."
+              hint="An area is a named part of the place — North, South — that pens and pastures group into. A working facility holds cattle under handling but nothing lives there."
               onChange={(event) => setDraft({ ...draft, type: event.target.value as ZoneType })}
+            />
+
+            {/*
+              The group, offered by name and filtered to what can actually hold
+              this: barns for a stall, areas and barns for a pen. An empty list
+              means there is nowhere to put it yet, and saying so beats an
+              empty dropdown that looks broken.
+            */}
+            <Select
+              label="Part of"
+              value={draft.parentZoneId}
+              hint={
+                groupOptions.length === 0
+                  ? "Nothing can hold this yet — add an area (North, South) or a barn first."
+                  : "Leave it on its own if it belongs to nothing. That is a state, not a gap."
+              }
+              options={[
+                { value: "", label: "On its own" },
+                ...groupOptions.map((group) => ({
+                  value: group.id,
+                  label: `${group.name} (${group.type.replace(/_/g, " ")})`,
+                })),
+              ]}
+              onChange={(event) => setDraft({ ...draft, parentZoneId: event.target.value })}
+            />
+
+            {/*
+              Inside or outside, asked outright rather than as a tickbox
+              labelled "Indoor". It decides which of an animal's two places
+              this fills — one inside, one outside — so a stall marked outside
+              silently takes the pasture's slot, and the horse reads as having
+              no turnout.
+            */}
+            <Select
+              label="Inside or outside"
+              value={draft.indoor ? "inside" : "outside"}
+              hint="An animal holds one of each at once: a stall in the barn and a pasture to go out in."
+              options={[
+                { value: "outside", label: "Outside — pasture, trap, lot" },
+                { value: "inside", label: "Inside — stall, barn pen, coop" },
+              ]}
+              onChange={(event) => setDraft({ ...draft, indoor: event.target.value === "inside" })}
             />
             <TextInput
               label="Capacity"
@@ -389,11 +468,6 @@ export function ZonesPanel({
             </fieldset>
 
             <Checkbox
-              label="Indoor"
-              checked={draft.indoor}
-              onChange={(event) => setDraft({ ...draft, indoor: event.target.checked })}
-            />
-            <Checkbox
               label="Resting"
               hint="Out of rotation — no animals should be assigned here."
               checked={draft.resting}
@@ -418,25 +492,64 @@ export function ZonesPanel({
         </Modal>
       ) : null}
 
-      <Card>
-        <DataTable
-          caption="Zones on this property"
-          columns={columns}
-          rows={zones}
-          rowKey={(zone) => zone.id}
-          empty={
-            <EmptyState
-              title="No zones yet"
-              detail="Pens, pastures, and working facilities go here. Everything else hangs off them."
-              action={
-                <Button variant="primary" onClick={startCreate}>
-                  Add the first zone
-                </Button>
-              }
-            />
-          }
-        />
-      </Card>
+      {zones.length === 0 ? (
+        <Card>
+          <EmptyState
+            title="No zones yet"
+            detail="Pens, pastures, and working facilities go here. Everything else hangs off them."
+            action={
+              <Button variant="primary" onClick={startCreate}>
+                Add the first zone
+              </Button>
+            }
+          />
+        </Card>
+      ) : (
+        /*
+         * One table per group, rather than one table with a group column and
+         * nothing else to say. The place is read as North, South and the barn
+         * — a flat list of nine sorted by name is a list somebody has to
+         * re-sort in their head every time they open it.
+         *
+         * The ungrouped come last under their own heading. A zone in no group
+         * is its own group, so they are collected rather than flagged.
+         */
+        groupedZones(zones).map((entry) => (
+          <Card key={entry.group?.id ?? "on-their-own"}>
+            <div className="flex flex-wrap items-baseline justify-between gap-2 pb-density">
+              <h3 className="font-heading text-lg font-semibold text-ink">
+                {entry.group?.name ?? "On their own"}
+              </h3>
+              <span className="flex flex-wrap items-center gap-2">
+                {entry.group === undefined ? (
+                  <span className="text-sm text-muted">In no group — each its own</span>
+                ) : (
+                  <Badge tone="neutral">{entry.group.type.replace(/_/g, " ")}</Badge>
+                )}
+                <Pill>
+                  {entry.members.length} zone{entry.members.length === 1 ? "" : "s"}
+                </Pill>
+              </span>
+            </div>
+
+            {entry.members.length === 0 ? (
+              // Made this morning, filled this afternoon. A group that
+              // disappeared while empty would read as one the app lost.
+              <EmptyState
+                title="Nothing in it yet"
+                detail={`Set a zone's "Part of" to ${entry.group?.name ?? "this"} and it appears here.`}
+              />
+            ) : (
+              <DataTable
+                caption={`Zones in ${entry.group?.name ?? "no group"}`}
+                columns={columns}
+                rows={entry.members}
+                rowKey={(zone) => zone.id}
+              />
+            )}
+          </Card>
+        ))
+      )}
     </div>
   );
 }

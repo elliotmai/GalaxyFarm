@@ -33,8 +33,59 @@ export const ZONE_TYPES = [
    * nothing to walk to, so it must never raise a chore or appear on the map.
    */
   "off_site",
+  /**
+   * A named part of the place — North, South, the home forty (added v1.5).
+   *
+   * Pens and pastures group into these, and the group is a Zone rather than a
+   * string on each pen for the reason every other shared thing here is a
+   * record: a string is retyped, and "North", "north" and "Norht" become three
+   * groups nobody meant. Renaming the area renames it everywhere, and it can
+   * carry a boundary of its own so the map can draw where North actually is.
+   *
+   * Nothing lives in an area — it holds pens, it is not one — so it stays off
+   * the Pen Board for the same reason `working_facility` does.
+   */
+  "area",
 ] as const;
 export type ZoneType = (typeof ZONE_TYPES)[number];
+
+/**
+ * What can hold what.
+ *
+ * Two containments, one mechanism. **Stalls are in barns** and **pens and
+ * pastures are in areas**, and both are the same sentence — this zone sits
+ * inside that one — so both are `parentZoneId` rather than a parent field for
+ * barns and a separate group field for areas. It also means a barn is picked
+ * by *name*: a stall is in the Red Barn, not in "a barn".
+ *
+ * The pairs are listed rather than left open because the wrong ones are
+ * nonsense that would be hard to notice afterwards: an area inside an area
+ * ("North contains South"), or a stall sitting loose in a field.
+ */
+const CONTAINS: Readonly<Record<ZoneType, readonly ZoneType[]>> = {
+  // A named part of the property. Holds anything that sits on ground —
+  // including a barn, which can perfectly well be in the North end.
+  area: ["pasture", "pen", "barn", "coop", "garden_area", "working_facility"],
+  // Inside the barn: the stalls, and whatever pens are made up in there.
+  barn: ["stall", "pen", "working_facility"],
+  pen: [],
+  pasture: [],
+  coop: [],
+  stall: [],
+  garden_area: [],
+  working_facility: [],
+  // Not this property. Nothing here holds anything here.
+  off_site: [],
+};
+
+export function canContain(parent: ZoneType, child: ZoneType): boolean {
+  return CONTAINS[parent].includes(child);
+}
+
+/** Types that hold other zones — what the group picker offers. */
+export function isGroupingType(type: ZoneType): boolean {
+  return CONTAINS[type].length > 0;
+}
 
 /** A polygon vertex in real-world coordinates, never screen space (§8). */
 export interface GeoPoint {
@@ -85,6 +136,14 @@ export interface Divider {
 export interface Zone extends BaseRecord {
   readonly name: string;
   readonly type: ZoneType;
+  /**
+   * The area or barn this sits in, if any.
+   *
+   * Undefined is not missing data — it is a zone that is **its own group**,
+   * which is the ordinary state for a pasture nobody has lumped in with
+   * anything. See `canContain` for which pairings mean something.
+   */
+  readonly parentZoneId?: Ulid | undefined;
   readonly indoor: boolean;
   readonly capacity?: number | undefined;
   /** Real lat/lng so the same pens render over Google or cached NAIP (§8). */
@@ -125,6 +184,7 @@ export const dividerSchema = z.object({
 export const zoneSchema = baseRecordSchema.extend({
   name: z.string().min(1, "A zone needs a name").max(80),
   type: z.enum(ZONE_TYPES),
+  parentZoneId: ulidSchema.optional(),
   indoor: z.boolean(),
   capacity: z.number().int().positive().optional(),
   boundary: z.array(geoPointSchema).min(3, "A boundary needs at least three points").optional(),
@@ -206,4 +266,89 @@ export function describeZoneExtent(zone: Pick<Zone, "name" | "dividers">): strin
     .join(", ");
 
   return `${zone.name} — part of it only, shut out of ${shut}`;
+}
+
+/** Everything sitting directly inside one zone. */
+export function childrenOf(zones: readonly Zone[], parentId: Ulid): Zone[] {
+  return zones
+    .filter((zone) => zone.parentZoneId === parentId)
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/**
+ * Every zone inside this one, however deep.
+ *
+ * Walks with a seen-set rather than trusting the data to be a tree. Nothing in
+ * `canContain` permits a loop, but this is what a bad import or a hand-edited
+ * row would land on, and the cost of being wrong is a page that hangs rather
+ * than a page that is wrong — the worse of the two.
+ */
+export function descendantsOf(zones: readonly Zone[], parentId: Ulid): Zone[] {
+  const found: Zone[] = [];
+  const seen = new Set<Ulid>([parentId]);
+  const queue: Ulid[] = [parentId];
+
+  while (queue.length > 0) {
+    const next = queue.shift() as Ulid;
+    for (const child of childrenOf(zones, next)) {
+      if (seen.has(child.id)) continue;
+      seen.add(child.id);
+      found.push(child);
+      queue.push(child.id);
+    }
+  }
+
+  return found;
+}
+
+/**
+ * The groups a zone could be put in.
+ *
+ * Filtered three ways, and each one is a mistake somebody would otherwise
+ * make: by type, so a stall is only ever offered barns; minus itself, because
+ * a zone cannot be inside itself; and minus everything already inside it, or
+ * putting the Red Barn into a stall it contains would strand both of them in a
+ * loop no screen could draw.
+ */
+export function possibleGroupsFor(zones: readonly Zone[], zone: Pick<Zone, "id" | "type">): Zone[] {
+  const inside = new Set(descendantsOf(zones, zone.id).map((child) => child.id));
+
+  return zones
+    .filter(
+      (candidate) => candidate.active && candidate.id !== zone.id && !inside.has(candidate.id),
+    )
+    .filter((candidate) => canContain(candidate.type, zone.type))
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+export interface ZoneGrouping {
+  /** The area or barn holding them. Undefined for the ones on their own. */
+  readonly group?: Zone | undefined;
+  readonly members: readonly Zone[];
+}
+
+/**
+ * The zone list as somebody thinks of it: North, South, the barn, and the
+ * handful that belong to nothing.
+ *
+ * A zone with no group is **its own group** rather than an error state, so the
+ * ungrouped are not hidden or flagged — they are collected at the end, which
+ * is where a list of them belongs once the named groups have been read.
+ *
+ * A group that holds nothing still appears. An empty North is a group somebody
+ * made and has not filled yet, and dropping it off the screen is how they
+ * conclude the app lost it.
+ */
+export function groupedZones(zones: readonly Zone[]): ZoneGrouping[] {
+  const groups = zones
+    .filter((zone) => isGroupingType(zone.type) || childrenOf(zones, zone.id).length > 0)
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map((group) => ({ group, members: childrenOf(zones, group.id) }));
+
+  const grouped = new Set(groups.map((entry) => entry.group.id));
+  const alone = zones
+    .filter((zone) => zone.parentZoneId === undefined && !grouped.has(zone.id))
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  return alone.length === 0 ? groups : [...groups, { members: alone }];
 }

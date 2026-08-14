@@ -183,7 +183,11 @@ function PenBoard({
   const byId = new Map(animals.map((animal) => [animal.id, animal]));
 
   const rows: PenRow[] = zones
-    .filter((zone) => zone.active)
+    // An area is not a place — it is North, holding four pens — so it must not
+    // sit on the board as an empty card among them. Same reason
+    // `working_facility` exists: the board is what is standing where, and a
+    // row nothing can stand in is a row that trains people to skim it.
+    .filter((zone) => zone.active && zone.type !== "area")
     .map((zone) => {
       // The open assignment is the current one — a closed period is history,
       // and history is never overwritten (§5.1).

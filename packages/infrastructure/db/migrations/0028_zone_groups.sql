@@ -1,0 +1,24 @@
+-- Grouping the place up: North, South, and the barn the stalls are in.
+--
+-- Two containments that are really one sentence — a stall is in a barn, a pen
+-- is in the North end — so they are one column rather than a parent field for
+-- barns and a separate group name for areas. It also means a barn is picked by
+-- *name*: a stall is in the Red Barn, not in "a barn".
+--
+-- The group is a zone, not a string on each pen. A string gets retyped, and
+-- "North", "north" and "Norht" become three groups nobody meant; renaming an
+-- area that is a record renames it everywhere at once. An area can also carry
+-- a boundary of its own, so the map can eventually draw where North actually
+-- is rather than inferring it from whatever is inside it.
+--
+-- Nullable, and null is not missing data: it is a zone that is **its own
+-- group**, which is the ordinary state of a pasture nobody has lumped in with
+-- anything. Every zone on the place is in exactly that state today, which is
+-- why there is no backfill here — no group exists yet to put anything in.
+--
+-- No foreign key, deliberately. Every other reference between records here is
+-- a plain id column for the same reason: rows arrive from devices in whatever
+-- order the outbox drains, and a constraint would reject a pen whose area has
+-- not landed yet. `possibleGroupsFor` in the kernel is what keeps the pairings
+-- honest, including refusing to put a barn inside one of its own stalls.
+ALTER TABLE "zones" ADD COLUMN "parent_zone_id" text;

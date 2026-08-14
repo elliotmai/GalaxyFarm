@@ -46,7 +46,11 @@ export function LandScreen({
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
   const { records: animals } = useRecords<Animal>("animals", query);
 
-  const live = zones.filter((zone) => zone.active);
+  // Areas are not counted: North is four pens with a name on them, not a fifth
+  // place, and a count that says five when somebody can walk to four is a
+  // count they stop reading.
+  const live = zones.filter((zone) => zone.active && zone.type !== "area");
+  const groups = zones.filter((zone) => zone.active && zone.type === "area");
   const resting = live.filter((zone) => zone.resting);
   const out = water.filter((source) => source.active);
   /**
@@ -83,7 +87,13 @@ export function LandScreen({
           label="Zones in use"
           value={live.length}
           tone="identity"
-          hint={resting.length === 0 ? undefined : `${resting.length} resting`}
+          hint={
+            resting.length > 0
+              ? `${resting.length} resting`
+              : groups.length > 0
+                ? `in ${groups.length} area${groups.length === 1 ? "" : "s"}`
+                : undefined
+          }
         />
         <Tile
           label="Tanks out"

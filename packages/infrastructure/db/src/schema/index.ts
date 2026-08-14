@@ -98,6 +98,8 @@ export const zones = pgTable(
     ...baseColumns,
     name: text("name").notNull(),
     type: text("type").notNull(),
+    /** The area or barn this sits in. Null is a zone that is its own group. */
+    parentZoneId: text("parent_zone_id"),
     indoor: boolean("indoor").notNull(),
     capacity: integer("capacity"),
     /** Real lat/lng, so pens render over Google or cached NAIP alike (§8). */

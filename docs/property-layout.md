@@ -31,6 +31,26 @@ pasture is in regular use.
 Also on the property, not animal zones: barn, alley way, lean-to creep, well
 house, chicken coop, garden, house and carport.
 
+## Grouping — still to be filled in
+
+Zones group into one another as of v1.5: **stalls go in barns, pens and
+pastures go in areas** (North, South, whatever this place calls its ends).
+Both are the same field, so a barn is picked by name — a stall is in the Red
+Barn, not in "a barn".
+
+Nothing here is grouped yet, which is a legitimate state: **a zone with no
+group is its own group**, and that is what all nine currently are. Two things
+are needed before that changes, and neither is guessable from the sketch:
+
+- **What the areas are called.** North and South were the example given, not a
+  statement about this place.
+- **The barn's name.** The barn is listed above as a structure but has never
+  been created as a zone, so there is nothing yet for a stall to be in.
+
+Whether a zone is **inside or outside** is already recorded, and it is load
+bearing: an animal holds one of each at once — a stall and a pasture — so a
+stall marked outside would quietly take the pasture's place.
+
 ## Water — four tanks, no heaters
 
 | Tank | Serves | Type |
