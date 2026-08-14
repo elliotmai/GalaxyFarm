@@ -141,6 +141,64 @@ ${footer}
   return { subject: blocks.subject, body: textLines.join("\n").trimEnd(), html };
 }
 
+export interface InvitationEmailInput {
+  readonly farmName: string;
+  /** Who is being invited, so the mail opens with their name. */
+  readonly name: string;
+  /** Who added them. The one thing that makes this not look like spam. */
+  readonly invitedBy: string;
+  /** The single-use link. Shown once here and once on the screen. */
+  readonly url: string;
+  readonly expiresInDays: number;
+  /** Set for a housesitter: the window their access actually runs for. */
+  readonly accessWindow?: { readonly from: string; readonly to: string } | undefined;
+  /** True when this replaces an earlier link rather than being the first. */
+  readonly reissued?: boolean;
+}
+
+/**
+ * The invitation, and the password reset, which are the same email.
+ *
+ * §4.3 makes them one action deliberately — re-issuing puts the account back
+ * to having no password and one live link — so they are one message with one
+ * sentence different. Two templates would drift, and the one that drifted
+ * would be the reset, because it is the one sent least often.
+ *
+ * The link is in the body rather than behind a "click here": somebody reading
+ * this on a barn phone with images off still needs to be able to get in, and
+ * `renderEmail` puts the URL in the text part for exactly that reason.
+ */
+export function invitationEmail(input: InvitationEmailInput): EmailContent {
+  const lapses = `The link works once and lapses after ${input.expiresInDays} ${
+    input.expiresInDays === 1 ? "day" : "days"
+  }. Nobody at the farm ever sees the password you choose.`;
+
+  return renderEmail({
+    farmName: input.farmName,
+    subject:
+      input.reissued === true
+        ? `Reset your password for ${input.farmName}`
+        : `${input.invitedBy} added you to ${input.farmName}`,
+    heading: input.reissued === true ? "Choose a new password" : `Welcome, ${input.name}`,
+    paragraphs: [
+      input.reissued === true
+        ? `${input.invitedBy} issued you a new link for the ${input.farmName} farm records. Any earlier one has stopped working.`
+        : `${input.invitedBy} added you to the ${input.farmName} farm records. Choose a password and you are in.`,
+      ...(input.accessWindow === undefined
+        ? []
+        : // Said plainly, because outside it they have no access at all and an
+          // account that stops working without explanation reads as a fault.
+          [
+            `Your access runs from ${input.accessWindow.from} to ${input.accessWindow.to}. Outside those dates you will not be able to sign in.`,
+          ]),
+      lapses,
+    ],
+    action: { label: "Choose a password", url: input.url },
+    footer:
+      "If you were not expecting this, you can ignore it — the link lapses on its own and nothing was set up in your name.",
+  });
+}
+
 export interface TestEmailInput {
   readonly farmName: string;
   /** Who pressed the button, so the person receiving it knows why. */

@@ -50,7 +50,14 @@ import {
  *
  * Adding somebody never sets their password. The account is created without
  * one and carries a single-use link instead; they choose their own on the way
- * in. The link is shown exactly once, because only its hash is kept.
+ * in. The link is emailed to them, and shown here exactly once, because only
+ * its hash is kept.
+ *
+ * **Both, rather than either.** The email is the convenience and the shown
+ * link is the guarantee: Resend can be unreachable, a sender domain can be
+ * unverified, an address can be wrong by a letter — and in every one of those
+ * cases the account has already been created and somebody still has to be able
+ * to get in. So the box says which of the two happened.
  */
 
 const ROLE_LABELS: Readonly<Record<Role, string>> = {
@@ -134,7 +141,13 @@ export function PeopleScreen({
    * of it and nothing else.
    */
   const [link, setLink] = useState<
-    { readonly url: string; readonly message: string } | undefined
+    | {
+        readonly url: string;
+        readonly message: string;
+        /** What became of the emailed copy, shown inside the same box. */
+        readonly email?: { readonly ok: boolean; readonly detail: string } | undefined;
+      }
+    | undefined
   >();
 
   /**
@@ -152,6 +165,7 @@ export function PeopleScreen({
   >();
 
   function run(action: () => Promise<ActionResult>, onDone?: () => void) {
+    setNote(undefined);
     startTransition(async () => {
       const result = await action();
 
@@ -163,7 +177,7 @@ export function PeopleScreen({
 
       setErrors({});
       if (result.link === undefined) show({ message: result.message, tone: "success" });
-      else setLink({ url: result.link, message: result.message });
+      else setLink({ url: result.link, message: result.message, email: result.email });
       onDone?.();
     });
   }
@@ -192,8 +206,8 @@ export function PeopleScreen({
       }
 
       show({ message: result.message, tone: "success" });
-      if (result.note !== undefined) {
-        setNote({ tone: "action", title: "Sent, with one catch", detail: result.note });
+      if (result.email !== undefined) {
+        setNote({ tone: "action", title: "Sent, with one catch", detail: result.email.detail });
       }
     });
   }
@@ -290,7 +304,7 @@ export function PeopleScreen({
         action: "Reset it",
         dependents: [],
         consequence:
-          "Their current password stops working straight away, and they cannot sign in until they have used the new link. You will need to get it to them.",
+          "Their current password stops working straight away, and they cannot sign in until they have used the new link. It is emailed to them, and shown to you once in case it does not arrive.",
       });
       if (!confirmed) return;
     }
@@ -403,7 +417,7 @@ export function PeopleScreen({
     <div className="flex flex-col gap-density">
       <Section
         title="People"
-        description="Everyone who can sign in. Adding somebody sends them nothing — it makes a link you hand over, and they choose their own password from it."
+        description="Everyone who can sign in. Adding somebody emails them a single-use link to choose their own password — and shows you the same link once, to hand over yourself if the email does not land."
         actions={
           <Button
             variant="primary"
@@ -439,8 +453,15 @@ export function PeopleScreen({
         )}
         {link === undefined ? null : (
           <Callout
-            tone="action"
-            title="Their link — copy it now"
+            // Danger when the email did not go: the link is no longer a
+            // convenience copy, it is the only way that person gets in, and
+            // the box has to look different from the one that means "done".
+            tone={link.email?.ok === false ? "danger" : "action"}
+            title={
+              link.email?.ok === false
+                ? "Not emailed — copy the link now"
+                : "Emailed to them. Copy the link too, just in case"
+            }
             actions={
               <>
                 <Button
@@ -454,6 +475,11 @@ export function PeopleScreen({
             }
           >
             <p>{link.message}</p>
+            {link.email === undefined ? null : (
+              // `break-words`: a Resend failure quotes its own JSON body, and
+              // one long unbroken token would push the box past a phone.
+              <p className="mt-2 break-words font-semibold">{link.email.detail}</p>
+            )}
             {/*
               Selectable and wrapping. Somebody is going to paste this into a
               text message on a phone, and a link that overflows its box is a
@@ -525,7 +551,7 @@ export function PeopleScreen({
           title={editing === undefined ? "Add someone" : `Editing ${editing.user.name}`}
           description={
             editing === undefined
-              ? "They get a link, not a password. Nobody here ever knows anybody else's."
+              ? "They are emailed a link, not a password. Nobody here ever knows anybody else's."
               : "Changing a role takes effect the next time they sign in."
           }
           onClose={() => setDraft(undefined)}
@@ -592,7 +618,7 @@ export function PeopleScreen({
 
             <div className="flex gap-2">
               <Button variant="primary" busy={pending} onClick={save}>
-                {editing === undefined ? "Add and make a link" : "Save changes"}
+                {editing === undefined ? "Add and email a link" : "Save changes"}
               </Button>
               <Button onClick={() => setDraft(undefined)}>Cancel</Button>
             </div>

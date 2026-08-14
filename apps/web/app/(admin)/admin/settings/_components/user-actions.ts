@@ -3,9 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
-import { ROLES, can, refuseUserChange, type Role, type Ulid } from "@galaxy-farm/core";
+import {
+  INVITATION_DAYS,
+  ROLES,
+  can,
+  refuseUserChange,
+  type Role,
+  type Ulid,
+} from "@galaxy-farm/core";
 import { invitationUrl } from "@galaxy-farm/infra-auth";
-import { testEmailMessage } from "@galaxy-farm/infra-email";
+import { invitationEmail, testEmailMessage } from "@galaxy-farm/infra-email";
 
 import { currentActor } from "@/lib/auth";
 import { farmName } from "@/lib/farm-name";
@@ -42,12 +49,15 @@ export type ActionResult =
       readonly message: string;
       readonly link?: string;
       /**
-       * A caveat on a success. The one that exists today is Resend's shared
-       * sender, which accepts every message and only delivers to the account
-       * holder — so "sent" is true and misleading at the same time, and a
-       * toast that vanishes in five seconds is the wrong place to say so.
+       * What happened to the email, when one was part of the action.
+       *
+       * Carried separately from `message` because it is a *second* outcome
+       * with its own success: an invitation whose email bounced still created
+       * the account and still produced a working link, so "added" and "not
+       * emailed" are both true and the screen has to say both. `ok` is data
+       * rather than a colour — the screen decides how alarmed to look.
        */
-      readonly note?: string;
+      readonly email?: { readonly ok: boolean; readonly detail: string };
     }
   | { readonly ok: false; readonly error: string; readonly field?: string };
 
@@ -84,6 +94,81 @@ async function origin(): Promise<string> {
 
 function isRole(value: string): value is Role {
   return (ROLES as readonly string[]).includes(value);
+}
+
+/** For the access window in a housesitter's invitation. */
+function emailDate(value: Date): string {
+  return value.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+}
+
+/**
+ * Email somebody their invitation link, and report what happened to it.
+ *
+ * **Never throws, and never fails the invitation.** The account is already
+ * created and the link already works by the time this runs, so an unreachable
+ * Resend has to degrade to a sentence on the screen — rolling the invitation
+ * back would destroy a good account because a third party was down, and
+ * leaving the caller to catch would mean the link never got shown.
+ *
+ * Which is also why the screen still shows the link. Sending it is a
+ * convenience laid on top; handing it over is the path that always works, and
+ * it stays the one the screen is built around (§4.3).
+ */
+async function emailInvitation(input: {
+  readonly to: string;
+  readonly name: string;
+  readonly url: string;
+  readonly invitedBy: string;
+  readonly propertyId: Ulid;
+  readonly accessFrom?: Date | undefined;
+  readonly accessTo?: Date | undefined;
+  readonly reissued: boolean;
+}): Promise<{ readonly ok: boolean; readonly detail: string }> {
+  const config = emailConfig();
+  const send = notifier();
+  if (!config.ok || send === undefined) {
+    return {
+      ok: false,
+      detail: `${config.ok ? "Email is not configured." : config.reason} Hand them the link below instead.`,
+    };
+  }
+
+  const message = invitationEmail({
+    farmName: await farmName(input.propertyId),
+    name: input.name,
+    invitedBy: input.invitedBy,
+    url: input.url,
+    expiresInDays: INVITATION_DAYS,
+    ...(input.accessFrom === undefined || input.accessTo === undefined
+      ? {}
+      : {
+          accessWindow: { from: emailDate(input.accessFrom), to: emailDate(input.accessTo) },
+        }),
+    reissued: input.reissued,
+  });
+
+  try {
+    await send.send({
+      to: input.to,
+      subject: message.subject,
+      body: message.body,
+      html: message.html,
+    });
+  } catch (error) {
+    console.error("[settings:invitation-email]", error);
+    return {
+      ok: false,
+      detail: `Emailed nothing — Resend refused it: ${trimmed(error)}. Hand them the link below instead.`,
+    };
+  }
+
+  return {
+    ok: true,
+    detail:
+      config.limitation === undefined
+        ? `Emailed to ${input.to}.`
+        : `Sent to ${input.to}, but ${config.limitation} Until then, hand them the link below.`,
+  };
 }
 
 /**
@@ -185,11 +270,25 @@ export async function invitePerson(input: InviteInput): Promise<ActionResult> {
     now,
   );
 
+  const url = invitationUrl(await origin(), token);
+  const sender = await findUser(actor.id, now);
+  const sent = await emailInvitation({
+    to: email,
+    name: user.name,
+    url,
+    invitedBy: sender?.user.name ?? "An owner",
+    propertyId: actor.propertyId,
+    accessFrom,
+    accessTo,
+    reissued: false,
+  });
+
   revalidated();
   return {
     ok: true,
-    message: `${user.name} added. Send them this link — it is the only time it is shown.`,
-    link: invitationUrl(await origin(), token),
+    message: `${user.name} added. This is the only time the link is shown.`,
+    link: url,
+    email: sent,
   };
 }
 
@@ -212,11 +311,27 @@ export async function resendInvitation(id: Ulid): Promise<ActionResult> {
 
   const token = await reinviteUser(id, now);
 
+  const url = invitationUrl(await origin(), token);
+  const sender = await findUser(actor.id, now);
+  const sent = await emailInvitation({
+    to: found.user.email,
+    name: found.user.name,
+    url,
+    invitedBy: sender?.user.name ?? "An owner",
+    propertyId: actor.propertyId,
+    accessFrom: found.user.accessFrom,
+    accessTo: found.user.accessTo,
+    // The reset path as well as the never-accepted one — §4.3 makes them the
+    // same action, so they are the same email with one sentence different.
+    reissued: true,
+  });
+
   revalidated();
   return {
     ok: true,
     message: `New link for ${found.user.name}. Any earlier one has stopped working.`,
-    link: invitationUrl(await origin(), token),
+    link: url,
+    email: sent,
   };
 }
 
@@ -283,7 +398,9 @@ export async function sendTestEmail(id: Ulid): Promise<ActionResult> {
       message: `Test email sent to ${found.user.email}${
         receipt.id === undefined ? "" : ` — Resend id ${receipt.id}`
       }.`,
-      ...(config.limitation === undefined ? {} : { note: config.limitation }),
+      ...(config.limitation === undefined
+        ? {}
+        : { email: { ok: true, detail: config.limitation } }),
     };
   } catch (error) {
     // Logged as well as shown. The shown copy is trimmed to something that

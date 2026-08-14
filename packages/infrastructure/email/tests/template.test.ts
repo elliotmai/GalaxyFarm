@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { escapeHtml, renderEmail, testEmailMessage } from "../src/template.js";
+import { escapeHtml, invitationEmail, renderEmail, testEmailMessage } from "../src/template.js";
 
 /**
  * What a notification says (spec §5.1, §6).
@@ -122,6 +122,75 @@ describe("testEmailMessage", () => {
   it("tells an unexpecting reader what happened", () => {
     // The address may belong to a housesitter who has never heard of this app.
     expect(testEmailMessage(input).body).toContain("If you were not expecting this");
+  });
+});
+
+describe("invitationEmail", () => {
+  const input = {
+    farmName: "Flying Double M",
+    name: "Sam",
+    invitedBy: "Eli",
+    url: "https://galaxyfarm.netlify.app/invite/abc123",
+    expiresInDays: 7,
+  };
+
+  it("names who added them, which is what makes it not look like spam", () => {
+    const email = invitationEmail(input);
+
+    expect(email.subject).toBe("Eli added you to Flying Double M");
+    expect(email.body).toContain("Eli");
+    expect(email.body).toContain("Sam");
+  });
+
+  it("carries the link in both parts", () => {
+    // The text part matters here more than anywhere else: this is the one
+    // email where being unable to reach the link means being unable to sign in.
+    const email = invitationEmail(input);
+
+    expect(email.html).toContain("https://galaxyfarm.netlify.app/invite/abc123");
+    expect(email.body).toContain("https://galaxyfarm.netlify.app/invite/abc123");
+  });
+
+  it("says the link is single-use and when it lapses", () => {
+    expect(invitationEmail(input).body).toContain("works once and lapses after 7 days");
+  });
+
+  it("says day rather than days when there is one", () => {
+    expect(invitationEmail({ ...input, expiresInDays: 1 }).body).toContain("after 1 day.");
+  });
+
+  it("promises nobody sees the password they pick", () => {
+    expect(invitationEmail(input).body).toContain("Nobody at the farm ever sees the password");
+  });
+
+  it("states a housesitter's window, because outside it nothing works", () => {
+    // An account that stops working on a date nobody mentioned reads as a
+    // fault, and the window is the whole reason the role exists (§4.3).
+    const email = invitationEmail({
+      ...input,
+      accessWindow: { from: "June 1, 2026", to: "June 14, 2026" },
+    });
+
+    expect(email.body).toContain("June 1, 2026 to June 14, 2026");
+    expect(email.body).toContain("Outside those dates");
+  });
+
+  it("leaves the window out for everybody else", () => {
+    expect(invitationEmail(input).body).not.toContain("Outside those dates");
+  });
+
+  it("reads as a reset when it is one", () => {
+    // §4.3 makes re-issuing and resetting the same action, so it is the same
+    // email with one sentence different — two templates would drift.
+    const email = invitationEmail({ ...input, reissued: true });
+
+    expect(email.subject).toBe("Reset your password for Flying Double M");
+    expect(email.body).toContain("Any earlier one has stopped working");
+    expect(email.body).toContain("https://galaxyfarm.netlify.app/invite/abc123");
+  });
+
+  it("tells an unexpecting reader nothing was set up in their name", () => {
+    expect(invitationEmail(input).body).toContain("nothing was set up in your name");
   });
 });
 
