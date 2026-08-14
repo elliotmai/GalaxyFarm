@@ -67,12 +67,16 @@ test.describe("admin surface", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 
-  test("renders Midnight Nebula, per spec §8", async ({ page }) => {
+  test("follows the device, per spec §8", async ({ page }) => {
     await page.goto("/admin");
 
+    // `flying-auto`, not `flying-day`: §8 decision 37 puts the three worked
+    // surfaces on the device's setting, because a barn screen at four in the
+    // morning during calving is the one place a white page is a torch in the
+    // face. The presented surfaces stay in daylight — asserted below.
     await expect(page.locator('[data-surface="admin"]')).toHaveAttribute(
       "data-theme",
-      "flying-day",
+      "flying-auto",
     );
   });
 
@@ -97,12 +101,12 @@ test.describe("admin surface", () => {
 test.describe("kiosk surface", () => {
   test.use({ storageState: storageStatePath("owner") });
 
-  test("renders Midnight Nebula with the barn boards reachable", async ({ page }) => {
+  test("follows the device, with the barn boards reachable", async ({ page }) => {
     await page.goto("/kiosk");
 
     await expect(page.locator('[data-surface="kiosk"]')).toHaveAttribute(
       "data-theme",
-      "flying-day",
+      "flying-auto",
     );
   });
 
@@ -155,7 +159,7 @@ test.describe("public surfaces", () => {
   });
 
   for (const route of ["/", "/book", "/login"] as const) {
-    test(`${route} renders Bluebonnet Linen`, async ({ page }) => {
+    test(`${route} stays in daylight`, async ({ page }) => {
       const response = await page.goto(route);
 
       expect(response?.status()).toBe(200);
@@ -172,7 +176,7 @@ test.describe("the customer portal", () => {
   // `/account` to their own home surface, so this would assert the redirect.
   test.use({ storageState: storageStatePath("customer") });
 
-  test("/account renders Bluebonnet Linen", async ({ page }) => {
+  test("/account stays in daylight", async ({ page }) => {
     const response = await page.goto("/account");
 
     expect(response?.status()).toBe(200);
@@ -186,13 +190,15 @@ test.describe("the customer portal", () => {
 test.describe("the housesitter surface", () => {
   test.use({ storageState: storageStatePath("housesitter") });
 
-  test("/sitter renders Bluebonnet Linen", async ({ page }) => {
+  test("/sitter follows the device", async ({ page }) => {
     const response = await page.goto("/sitter");
 
     expect(response?.status()).toBe(200);
+    // A worked surface, not a presented one: the sitter is out there at
+    // feeding time in the dark like anybody else (§8 decision 37).
     await expect(page.locator('[data-surface="sitter"]')).toHaveAttribute(
       "data-theme",
-      "flying-day",
+      "flying-auto",
     );
   });
 

@@ -78,17 +78,26 @@ test.describe("kit", () => {
     await page.goto("/admin/supplies");
 
     await page.getByRole("tab", { name: "Items" }).click();
-    await page.getByLabel("Name").fill("Pine shavings");
-    await page.getByLabel("Unit").selectOption("bag");
-    await page.getByLabel("Opening count").fill("10");
-    await page.getByLabel("Reorder at").fill("4");
-    await page.getByRole("button", { name: "Add item" }).click();
+    // The item form lives in a side dialog now, behind "Add an item" — the
+    // catalog is the thing the tab is for, and the form was pushing it below
+    // the fold.
+    await page.getByRole("button", { name: "Add an item" }).click();
+    const item = page.getByRole("dialog");
+    await item.getByLabel("Name").fill("Pine shavings");
+    await item.getByLabel("Unit").selectOption("bag");
+    await item.getByLabel("Opening count").fill("10");
+    await item.getByLabel("Reorder at").fill("4");
+    await item.getByRole("button", { name: "Add item" }).click();
     await expect(page.getByRole("cell", { name: "Pine shavings" })).toBeVisible();
 
     await page.getByRole("tab", { name: "Used" }).click();
-    await page.locator("form").getByLabel(/^Item/).selectOption({ label: "Pine shavings (bag)" });
-    await page.getByLabel("Quantity").fill("7");
+    // Behind a button, like the item form: the tab is for the log, not the
+    // form that adds to it.
     await page.getByRole("button", { name: "Record usage" }).click();
+    const usage = page.getByRole("dialog");
+    await usage.getByLabel(/^Item/).selectOption({ label: "Pine shavings (bag)" });
+    await usage.getByLabel("Quantity").fill("7");
+    await usage.getByRole("button", { name: "Record usage" }).click();
 
     // Ten less seven is three, which is under the reorder point of four. The
     // count is derived — nothing anywhere stores it.
@@ -101,22 +110,27 @@ test.describe("kit", () => {
   }) => {
     await page.goto("/admin/equipment/roadmap");
 
-    await page.getByLabel("What").fill("Three-quarter-ton truck");
-    await page.getByLabel("Priority").selectOption("need");
-    await page.getByLabel("Budget ($)").fill("35000");
-    await page.getByRole("button", { name: "Add to roadmap" }).click();
+    // Behind a button now, like the rest of the Kit forms.
+    await page.getByRole("button", { name: "Add to the roadmap" }).click();
+    const wish = page.getByRole("dialog");
+    await wish.getByLabel("What").fill("Three-quarter-ton truck");
+    await wish.getByLabel("Priority").selectOption("need");
+    await wish.getByLabel("Budget ($)").fill("35000");
+    await wish.getByRole("button", { name: "Add to roadmap" }).click();
     await expect(page.getByText("Three-quarter-ton truck", { exact: true })).toBeVisible();
 
     await page.getByRole("link", { name: "Find one" }).click();
     await expect(page).toHaveURL(/\/admin\/equipment\/candidates\?item=/);
 
-    await page.getByLabel("What it is").fill("2018 F-250");
-    await page.getByLabel("Asking ($)").fill("34500");
-    await page.getByLabel("Mileage").fill("96000");
+    await page.getByRole("button", { name: "Add a candidate" }).click();
+    const candidate = page.getByRole("dialog");
+    await candidate.getByLabel("What it is").fill("2018 F-250");
+    await candidate.getByLabel("Asking ($)").fill("34500");
+    await candidate.getByLabel("Mileage").fill("96000");
     // Hauling, itemised — the whole reason the comparison does not sort on the
     // asking price.
-    await page.getByPlaceholder("$").first().fill("900");
-    await page.getByRole("button", { name: "Add candidate" }).click();
+    await candidate.getByPlaceholder("$").first().fill("900");
+    await candidate.getByRole("button", { name: "Add candidate" }).click();
 
     await expect(page.getByRole("cell", { name: "$35,400.00" })).toBeVisible();
     // $35,400 over 96,000 miles, and $400 past the budget on the want above.
