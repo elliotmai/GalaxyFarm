@@ -8,6 +8,7 @@
  */
 
 export * from "./button.js";
+export * from "./filter-panel.js";
 export * from "./field.js";
 export * from "./layout.js";
 export * from "./modal.js";

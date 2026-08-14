@@ -11,6 +11,7 @@ import {
   Checkbox,
   DataTable,
   EmptyState,
+  FilterPanel,
   Modal,
   SafetyBadge,
   Select,
@@ -41,6 +42,12 @@ import {
   animalsUnderWithdrawal,
   breedsInUse,
   breedsOf,
+  CATTLE_CLASS_LABELS,
+  CATTLE_CLASS_SINGULAR,
+  CATTLE_CLASSES,
+  cattleClass,
+  classCounts,
+  unclassified,
   type CattleProfile,
   type HealthRecord,
 } from "@galaxy-farm/module-cattle";
@@ -63,6 +70,10 @@ import { useRecords } from "@/lib/local/use-records";
  */
 
 const SEX_OPTIONS = SEXES.map((sex) => ({ value: sex, label: sex }));
+const CLASS_OPTIONS = CATTLE_CLASSES.map((name) => ({
+  value: name,
+  label: CATTLE_CLASS_LABELS[name],
+}));
 const STATUS_OPTIONS = ANIMAL_STATUSES.map((status) => ({ value: status, label: status }));
 const SAFETY_OPTIONS = Object.values(SAFETY_LEVEL_DEFAULTS).map((level) => ({
   value: String(level.level),
@@ -79,6 +90,8 @@ interface Filters {
   readonly zoneId: string;
   readonly status: string;
   readonly sex: string;
+  /** A cattle class — cow, bull, steer, calf — or "" for all of them. */
+  readonly cattleClass: string;
   /** A breed name, or "" for all of them. */
   readonly breed: string;
   readonly safetyLevel: string;
@@ -89,6 +102,7 @@ const NO_FILTERS: Filters = {
   zoneId: "",
   status: "",
   sex: "",
+  cattleClass: "",
   breed: "",
   safetyLevel: "",
   withdrawnOnly: false,
@@ -171,6 +185,16 @@ export function HerdScreen({
     return map;
   }, [assignments]);
 
+  /**
+   * Fixed for one render, so an animal cannot change class mid-list.
+   *
+   * A calf a day short of a year is a calf in the count, in the filter and in
+   * its own row, and reading the clock three times could disagree on the
+   * morning of its birthday.
+   */
+  const asOf = useMemo(() => new Date(), []);
+  const classOf = (animal: Animal) => cattleClass(animal, asOf);
+
   const animals = cattle.filter((animal) => {
     if (
       filters.zoneId !== "" &&
@@ -188,6 +212,7 @@ export function HerdScreen({
       return false;
     }
     if (filters.sex !== "" && animal.sex !== filters.sex) return false;
+    if (filters.cattleClass !== "" && classOf(animal) !== filters.cattleClass) return false;
     if (filters.safetyLevel !== "" && String(animal.safetyLevel) !== filters.safetyLevel) {
       return false;
     }
@@ -196,6 +221,27 @@ export function HerdScreen({
   });
 
   const filtered = animals.length !== cattle.length;
+
+  // Counted over the whole herd, not the filtered list: these are what the
+  // filter is chosen *from*, and counts that shrank as they were used would
+  // leave nothing to go back to.
+  const counts = useMemo(() => classCounts(cattle, asOf), [cattle, asOf]);
+  const unsexed = useMemo(() => unclassified(cattle, asOf), [cattle, asOf]);
+
+  /** What is on, in the words the controls use — shown even when folded. */
+  const activeFilters = [
+    filters.zoneId === ""
+      ? undefined
+      : `Pen: ${zones.find((zone) => zone.id === filters.zoneId)?.name ?? "a pen"}`,
+    filters.status === "" ? undefined : `Status: ${filters.status}`,
+    filters.sex === "" ? undefined : `Sex: ${filters.sex}`,
+    filters.cattleClass === ""
+      ? undefined
+      : CATTLE_CLASS_LABELS[filters.cattleClass as keyof typeof CATTLE_CLASS_LABELS],
+    filters.breed === "" ? undefined : `Breed: ${filters.breed}`,
+    filters.safetyLevel === "" ? undefined : `Level ${filters.safetyLevel}`,
+    filters.withdrawnOnly ? "Under withdrawal" : undefined,
+  ].filter((entry): entry is string => entry !== undefined);
 
   const mutations = useMutations<Animal>("animals", "animals", animalSchema, propertyId, actorId);
   const placements = useMutations<ZoneAssignment>(
@@ -392,6 +438,16 @@ export function HerdScreen({
     },
     { key: "sex", header: "Sex", render: (animal) => animal.sex },
     {
+      key: "class",
+      header: "Class",
+      // The same fact the class row and the filter select on, on the row
+      // itself — so nobody has to work out why a cow is in the calf list.
+      render: (animal) => {
+        const name = classOf(animal);
+        return name === undefined ? "—" : CATTLE_CLASS_SINGULAR[name];
+      },
+    },
+    {
       key: "breed",
       header: "Breed",
       render: (animal) => {
@@ -482,7 +538,58 @@ export function HerdScreen({
         rather than replace each other: "bulls in the north pen still under
         withdrawal" is one question, not three.
       */}
-      <Card title="Narrow the herd">
+      {/*
+        The four classes, as a row of counts that are also the filter. This is
+        the split somebody asks for out loud — "how many steers have we got" —
+        and making the answer the control means it takes one press rather than
+        opening a panel and finding the right select.
+
+        Counted over the whole herd rather than the filtered list, so the
+        numbers do not shrink as they are used.
+      */}
+      <Card title="The herd, by class">
+        <div className="flex flex-wrap gap-2">
+          {counts.map((entry) => {
+            const on = filters.cattleClass === entry.cattleClass;
+            return (
+              <Button
+                key={entry.cattleClass}
+                variant={on ? "primary" : "secondary"}
+                aria-pressed={on}
+                onClick={() =>
+                  setFilters({
+                    ...filters,
+                    // Pressing the one already on clears it, so the row is a
+                    // way back to the whole herd as well as a way into a part.
+                    cattleClass: on ? "" : entry.cattleClass,
+                  })
+                }
+              >
+                {entry.label} {entry.count}
+              </Button>
+            );
+          })}
+          {unsexed === 0 ? null : (
+            <span className="self-center text-sm text-muted">
+              {unsexed} with no sex recorded, in none of these.
+            </span>
+          )}
+        </div>
+      </Card>
+
+      <FilterPanel
+        title="Narrow the herd"
+        active={activeFilters.length}
+        summary={activeFilters.join(" · ")}
+        count={
+          filtered ? (
+            <>
+              Showing {animals.length} of {cattle.length}.
+            </>
+          ) : undefined
+        }
+        onClear={() => setFilters(NO_FILTERS)}
+      >
         <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-6">
           <Select
             label="Pen"
@@ -506,6 +613,14 @@ export function HerdScreen({
             onChange={(event) => setFilters({ ...filters, sex: event.target.value })}
           />
           <Select
+            label="Class"
+            hint="Calves are under a year. A steer is a steer whatever his age."
+            value={filters.cattleClass}
+            placeholder="Any class"
+            options={CLASS_OPTIONS}
+            onChange={(event) => setFilters({ ...filters, cattleClass: event.target.value })}
+          />
+          <Select
             label="Breed"
             hint="Typed on the animal, or worked out from its makeup."
             value={filters.breed}
@@ -527,18 +642,7 @@ export function HerdScreen({
             onChange={(event) => setFilters({ ...filters, withdrawnOnly: event.target.checked })}
           />
         </div>
-
-        {filtered ? (
-          <p className="mt-density flex flex-wrap items-center gap-3 text-sm text-muted">
-            <span>
-              Showing {animals.length} of {cattle.length}.
-            </span>
-            <Button variant="ghost" onClick={() => setFilters(NO_FILTERS)}>
-              Clear filters
-            </Button>
-          </p>
-        ) : null}
-      </Card>
+      </FilterPanel>
 
       {draft !== undefined ? (
         <Modal
