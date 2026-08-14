@@ -15,6 +15,62 @@ import type { HTMLAttributes, ReactNode } from "react";
  * tabular figures so a column of weights lines up.
  */
 
+/**
+ * The first sentence, and everything after it.
+ *
+ * Deliberately conservative: it needs a terminator followed by whitespace and
+ * a non-space, so a decimal, a version or a §-reference is never a break. The
+ * whole corpus was checked for the case that would defeat it — an abbreviation
+ * ending in a full stop, "Dr.", "a.m.", "e.g." — and there is not one. If one
+ * is written later it splits a sentence in half, which is visible the moment
+ * the screen is opened rather than silent.
+ */
+const SENTENCE = /^(.+?[.?!])\s+(\S[\s\S]*)$/;
+
+/**
+ * The explanation, folded (spec §8 v0.9).
+ *
+ * `subtitle` is documented below as "one line under the title", and `Section`
+ * says much the same. What they were actually passed is a paragraph: a hundred
+ * and ninety-nine of them, median 116 characters, up to 283 — so the Supplies
+ * screen opened with three lines about how a running total is computed before
+ * a single supply appeared. Two grey lines above every heading on every screen
+ * is most of what "cluttered" meant.
+ *
+ * None of it is deleted, because none of it is padding. The arithmetic behind
+ * an on-hand count is genuinely non-obvious, and a farm app that hides why a
+ * number moved is worse than a wordy one. But it is read once, on the day
+ * somebody meets the screen, and it competes with the records every day after.
+ *
+ * So the first sentence stays — it names the thing, which is what the prop
+ * promised — and the rest goes behind a disclosure. On paper the whole text
+ * prints, since a folded explanation is no use to somebody holding a sheet.
+ *
+ * A description with only one sentence is already within its contract and is
+ * left exactly as it was, toggle and all.
+ */
+function Explainer({ children, className }: { readonly children: ReactNode; className: string }) {
+  const split = typeof children === "string" ? SENTENCE.exec(children) : null;
+  if (split === null) return <p className={className}>{children}</p>;
+
+  return (
+    <details className={className}>
+      <summary
+        // The native marker is dropped for a word. A triangle beside a
+        // sentence reads as a tree node — as though the section itself
+        // collapsed — and this only ever opens one more line of prose.
+        className="gf-summary cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+      >
+        {split[1]}{" "}
+        <span className="whitespace-nowrap text-action underline decoration-dotted underline-offset-2">
+          More
+        </span>
+      </summary>
+      <p className="mt-1">{split[2]}</p>
+    </details>
+  );
+}
+
 export interface PageHeaderProps {
   readonly title: string;
   /** One line under the title — a count, a status, where this sits. */
@@ -45,7 +101,7 @@ export function PageHeader({ title, subtitle, eyebrow, actions, meta }: PageHead
           )}
           <h1 className="text-ink">{title}</h1>
           {subtitle === undefined ? null : (
-            <p className="max-w-prose text-sm text-muted">{subtitle}</p>
+            <Explainer className="max-w-prose text-sm text-muted">{subtitle}</Explainer>
           )}
         </div>
         {actions === undefined ? null : (
@@ -88,7 +144,7 @@ export function Section({
         <div className="flex flex-col gap-0.5">
           <h2 className="text-ink">{title}</h2>
           {description === undefined ? null : (
-            <p className="max-w-prose text-sm text-muted">{description}</p>
+            <Explainer className="max-w-prose text-sm text-muted">{description}</Explainer>
           )}
         </div>
         {actions}

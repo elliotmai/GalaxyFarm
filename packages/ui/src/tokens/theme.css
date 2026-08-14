@@ -424,6 +424,25 @@
     display: none;
   }
 
+  /*
+   * Except where the summary *is* content.
+   *
+   * The rule above assumes a summary is a label for what it hides — "Show
+   * details" — which on paper is a button nobody can press. `Explainer` uses
+   * one the other way round: the first sentence of the description is the
+   * summary, and the fold only holds the rest. Hiding it would take the
+   * sentence that names the section off the page entirely.
+   *
+   * The "More" cue inside it goes, since the text below is already unfolded.
+   */
+  .gf-summary {
+    display: revert !important;
+  }
+
+  .gf-summary span {
+    display: none;
+  }
+
   details::details-content {
     content-visibility: visible !important;
     block-size: auto !important;

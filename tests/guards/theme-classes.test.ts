@@ -80,6 +80,20 @@ const NOT_COLOURS = new Set([
   "border-dashed",
   "border-dotted",
   "border-none",
+  // The same five line styles, on the underline rather than the box. Missing
+  // from this list, `decoration-dotted` reads as a request for a colour called
+  // "dotted" and the guard fails on a class Tailwind emits perfectly well.
+  "decoration-solid",
+  "decoration-double",
+  "decoration-dotted",
+  "decoration-dashed",
+  "decoration-wavy",
+  "decoration-none",
+  "decoration-0",
+  "decoration-1",
+  "decoration-2",
+  "decoration-4",
+  "decoration-8",
   "border-collapse",
   "border-separate",
   "border-spacing-0",
