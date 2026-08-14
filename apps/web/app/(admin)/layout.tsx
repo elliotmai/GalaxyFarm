@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import { redirect } from "next/navigation";
 
 import { ConfirmProvider, ToastProvider } from "@galaxy-farm/ui";
@@ -8,6 +9,22 @@ import { SectionStrip } from "@/app/(admin)/_components/section-strip";
 import { SyncProvider } from "@/app/_components/sync-provider";
 import { currentActor } from "@/lib/auth";
 import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
+
+/**
+ * The browser chrome, matched to the surface (spec §8 v0.9).
+ *
+ * This surface runs `flying-auto`, so on a device set to dark the page is the
+ * night canvas — and the root layout's light chrome would sit above it as a
+ * bar of the wrong colour across the top of every screen. Overridden here
+ * rather than at the root because `/account` and the public pages stay light
+ * whatever the device says.
+ */
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0F1419" },
+    { media: "(prefers-color-scheme: light)", color: "#F5F6F8" },
+  ],
+};
 
 /**
  * The admin surface. Theme is fixed per surface (spec §8): flying-day.
@@ -26,7 +43,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME;
 
   return (
-    <div data-surface="admin" data-theme="flying-day">
+    <div data-surface="admin" data-theme="flying-auto">
       <SyncProvider>
         <ToastProvider>
           <ConfirmProvider>

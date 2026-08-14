@@ -69,6 +69,27 @@ html {
   background-color: var(--gf-canvas, #f5f6f8);
 }
 
+/*
+ * The same seam, on the working surfaces at night.
+ *
+ * `--gf-canvas` is declared on `[data-theme]`, a descendant of `html`, so the
+ * rule above can only ever resolve to its literal fallback — the day canvas.
+ * That is invisible until a surface goes dark, and then it is a white band
+ * revealed by every rubber-band scroll on a phone.
+ *
+ * Asked as a question about the document rather than hard-coded per route:
+ * `:has()` matches only when the page really does contain an auto surface, so
+ * `/account` and the public pages keep their light ground on the same device.
+ * A browser without `:has()` ignores the rule and keeps today's behaviour,
+ * which is the right way round for a progressive enhancement — unlike a
+ * fallback that would leave the colour unset.
+ */
+@media (prefers-color-scheme: dark) {
+  html:has([data-theme="flying-auto"]) {
+    background-color: #0f1419;
+  }
+}
+
 body {
   margin: 0;
   /*

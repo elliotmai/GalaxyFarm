@@ -25,7 +25,13 @@
  * invisible until someone photographs a badge that has gone unreadable.
  */
 
-[data-theme="flying-day"] {
+/*
+ * `flying-auto` takes the day palette here and swaps to night below, when the
+ * device asks for it. Sharing the block rather than repeating it means the two
+ * cannot disagree about what daylight looks like.
+ */
+[data-theme="flying-day"],
+[data-theme="flying-auto"] {
   --gf-canvas: #f5f6f8;
   --gf-panel: #ffffff;
   --gf-raised: #edeff3;
@@ -57,6 +63,47 @@
   --gf-danger: #e8897c;
 
   color-scheme: dark;
+}
+
+/*
+ * "Whatever the device is set to" (spec §8 v0.9).
+ *
+ * `flying-night` had tokens, a contrast suite and an entry in §8, and nothing
+ * anywhere selected it — a mode that existed only in the stylesheet. This is
+ * what selects it. A surface asks for `flying-auto` and gets the day palette
+ * unless the device says dark, which is the honest default: nobody sets a
+ * preference for a farm app, they set one for their phone, at five in the
+ * morning, and then open whatever they open.
+ *
+ * A media query rather than `light-dark()`. That function would state both
+ * values on one line and never drift, but it is a 2024 feature, and on a
+ * browser that does not know it the whole declaration is invalid — which does
+ * not fall back to the day colour, it leaves the token unset and paints the
+ * surface transparent. A barn kiosk is exactly the machine still running an
+ * old browser, so the boring construction wins.
+ *
+ * The values below are the `flying-night` block again, and duplicated values
+ * drift. `theme-tokens.test.ts` compares the two character for character, so
+ * a colour changed in one and not the other fails rather than shipping a barn
+ * screen that is half one theme.
+ */
+@media (prefers-color-scheme: dark) {
+  [data-theme="flying-auto"] {
+    --gf-canvas: #0f1419;
+    --gf-panel: #171d24;
+    --gf-raised: #1f2831;
+    --gf-text: #e8ebef;
+    --gf-muted: #9ba5b0;
+    --gf-border: #63727b;
+    --gf-rule: #2a333d;
+    --gf-action: #8fb3d9;
+    --gf-action-ink: #0f1419;
+    --gf-identity: #8fb3d9;
+    --gf-calm: #a3bca9;
+    --gf-danger: #e8897c;
+
+    color-scheme: dark;
+  }
 }
 
 /* Surfaces paint their own ground; nothing inherits a colour from the host. */

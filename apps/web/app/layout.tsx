@@ -110,11 +110,10 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  // Both entries are the day canvas. Theme is a property of the surface rather
-  // than of the device (§8), so a phone set to dark does not get a dark app —
-  // and a browser chrome that disagreed with the page under it would be a
-  // visible seam at the top of every screen. `flying-night` is entered
-  // deliberately, and will set its own colour when it is.
+  // The day canvas, which is what the front door and the customer portal are
+  // fixed to. The working surfaces override this: they run `flying-auto` and
+  // go dark when the device does, and chrome that stayed light above a dark
+  // page is a visible seam across the top of every screen.
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#F5F6F8" },
     { media: "(prefers-color-scheme: light)", color: "#F5F6F8" },

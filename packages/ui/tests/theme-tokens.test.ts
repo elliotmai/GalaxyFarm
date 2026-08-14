@@ -18,16 +18,30 @@ import { density, themes } from "@galaxy-farm/config/tailwind";
 // readFileSync refuses it.
 const CSS = readFileSync(join(process.cwd(), "packages/ui/src/tokens/theme.css"), "utf8");
 
-/** Custom properties declared inside one selector block. */
-function variablesIn(selector: string): Record<string, string> {
-  const block = new RegExp(`\\${selector}\\s*\\{([^}]*)\\}`).exec(CSS);
-  if (block === null) throw new Error(`No block for ${selector} in theme.css`);
-
+/** Every `--name: value` pair inside a block body. */
+function pairs(body: string): Record<string, string> {
   const variables: Record<string, string> = {};
-  for (const [, name, value] of block[1]!.matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) {
+  for (const [, name, value] of body.matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) {
     variables[name!] = value!.trim();
   }
   return variables;
+}
+
+/**
+ * Custom properties declared inside one selector block.
+ *
+ * The selector may head a list — `flying-day` shares its block with
+ * `flying-auto`, which is what keeps the two from disagreeing about daylight —
+ * so anything up to the brace that is not itself a brace is allowed between.
+ */
+function variablesIn(selector: string, occurrence = 0): Record<string, string> {
+  const blocks = [
+    ...CSS.matchAll(new RegExp(`\\${selector}\\s*(?:,[^{]*)?\\{([^}]*)\\}`, "g")),
+  ].map((match) => match[1]!);
+
+  const block = blocks[occurrence];
+  if (block === undefined) throw new Error(`No block for ${selector} in theme.css`);
+  return pairs(block);
 }
 
 /** `actionInk` in TypeScript is `--gf-action-ink` in CSS. */
@@ -55,6 +69,24 @@ describe("theme.css matches the preset", () => {
       }
     });
   }
+
+  it("gives flying-auto the day palette to start from", () => {
+    // It shares the block, so this is really asserting the selector list did
+    // not lose one of its two halves — which would leave every token unset and
+    // paint the surface transparent rather than falling back to anything.
+    expect(CSS).toMatch(/\[data-theme="flying-day"\],\s*\[data-theme="flying-auto"\]\s*\{/);
+  });
+
+  it("swaps flying-auto to exactly the night palette, not to something near it", () => {
+    // The night values are written twice: once for the surface that asks for
+    // night outright, once for the surface that asks the device. Two copies of
+    // a palette drift, and the failure is a screen that is half one theme and
+    // half the other — so they are compared here rather than trusted.
+    const night = variablesIn('[data-theme="flying-night"]');
+    const auto = variablesIn('[data-theme="flying-auto"]', 1);
+
+    expect(auto, "the dark-preference copy has drifted from flying-night").toEqual(night);
+  });
 
   for (const [name, values] of Object.entries(density)) {
     it(`declares the ${name} density, with the same measurements`, () => {
