@@ -9,6 +9,7 @@ import {
   sectionFor,
 } from "../app/(admin)/_components/nav-groups.js";
 import { appPageRoutes } from "../../../tools/routes.js";
+import { listFiles, readText } from "../../../tools/workspace.js";
 
 /**
  * The nav restructure must not orphan a route (spec §7, §8 v0.9).
@@ -84,6 +85,29 @@ describe("admin nav reachability", () => {
     // `owns` exists so opening a cow does not black out the nav.
     expect(destinationFor("/admin/cattle/01ARZ3NDEKTSV4RRFFQ69G5FAV")?.label).toBe("Animals");
     expect(sectionFor("/admin/cattle/01ARZ3NDEKTSV4RRFFQ69G5FAV")?.label).toBe("Cattle");
+  });
+
+  it("never puts a page under a heading the nav has never heard of", () => {
+    // A screen's eyebrow is its trail, written by hand on each page. The
+    // restructure renamed the groups underneath them, and five screens went on
+    // announcing "People & places" — a group that no longer exists — while the
+    // rail beside them highlighted something else entirely. A reader has no way
+    // to tell which of the two is lying.
+    const labels = new Set([
+      ...NAV.map((destination) => destination.label),
+      ...NAV.flatMap((destination) => destination.sections.map((section) => section.label)),
+      ...Object.values(SUB_SECTIONS).flatMap((subs) => subs.map((sub) => sub.label)),
+      ...UTILITY.map((item) => item.label),
+    ]);
+
+    const stray: string[] = [];
+    for (const file of listFiles("apps/web/app", ["page.tsx", ".tsx"])) {
+      for (const [, eyebrow] of readText(file).matchAll(/eyebrow="([^"]+)"/g)) {
+        if (!labels.has(eyebrow!)) stray.push(`${file} — "${eyebrow}" is not a place in the nav`);
+      }
+    }
+
+    expect(stray).toEqual([]);
   });
 
   it("does not let a prefix swallow a sibling", () => {

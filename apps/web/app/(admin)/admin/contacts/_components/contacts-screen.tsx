@@ -230,7 +230,6 @@ export function ContactsScreen({
   return (
     <PageBody>
       <PageHeader
-        eyebrow="People & places"
         title="Contacts"
         subtitle="Vets, techs, haulers, buyers, vendors and neighbours — one list, tagged by what they are to the farm."
         actions={

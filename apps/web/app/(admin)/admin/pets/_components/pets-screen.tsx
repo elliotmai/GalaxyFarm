@@ -77,7 +77,7 @@ export function PetsScreen({
   return (
     <PageBody>
       <PageHeader
-        eyebrow="People & places"
+        eyebrow="Animals"
         title="Pets"
         subtitle="The dogs and the cats — what they eat, what they are on, and what a helper needs to know."
       />

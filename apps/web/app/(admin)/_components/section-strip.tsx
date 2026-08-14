@@ -3,12 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import {
-  SUB_SECTIONS,
-  destinationFor,
-  isWithin,
-  sectionFor,
-} from "@/app/(admin)/_components/nav-groups";
+import { SUB_SECTIONS, destinationFor, sectionFor } from "@/app/(admin)/_components/nav-groups";
 import type { NavItem } from "@/app/(admin)/_components/nav-groups";
 
 /**
@@ -29,12 +24,22 @@ import type { NavItem } from "@/app/(admin)/_components/nav-groups";
 
 function Strip({
   items,
-  pathname,
+  current,
   label,
   quiet = false,
 }: {
   readonly items: readonly NavItem[];
-  readonly pathname: string;
+  /**
+   * Which item to mark, resolved by the caller.
+   *
+   * Not recomputed here with `isWithin`. That predicate refuses to match a
+   * route the nav already knows — its job is to stop `owns: ["/admin/cattle/"]`
+   * swallowing a sibling with a top-level entry — and a section's own declared
+   * sub-views are exactly such routes. So standing on /admin/cattle/breeding
+   * lit nothing at all in the sections strip: Cattle was rejected for owning a
+   * page the nav had heard of, which is its whole purpose.
+   */
+  readonly current: string | undefined;
   readonly label: string;
   readonly quiet?: boolean;
 }) {
@@ -50,7 +55,7 @@ function Strip({
       role="navigation"
     >
       {items.map((item) => {
-        const here = isWithin(item, pathname);
+        const here = item.href === current;
 
         return (
           <Link
@@ -89,17 +94,23 @@ export function SectionStrip() {
   const showPrimary = destination.sections.length > 1;
   if (!showPrimary && subs === undefined) return null;
 
+  // The sub-view being looked at, if any. These carry no `owns`, so an exact
+  // match is the whole rule — /admin/cattle/breeding lights Breeding and
+  // nothing else, and an animal's detail page lights none of them while still
+  // sitting inside Cattle.
+  const view = subs?.find((sub) => sub.href === pathname);
+
   return (
     <div className="mb-density flex flex-col gap-2">
       {showPrimary ? (
         <Strip
           items={destination.sections}
-          pathname={pathname}
+          current={section?.href}
           label={`${destination.label} sections`}
         />
       ) : null}
       {subs === undefined ? null : (
-        <Strip items={subs} pathname={pathname} label={`${section?.label ?? ""} views`} quiet />
+        <Strip items={subs} current={view?.href} label={`${section?.label ?? ""} views`} quiet />
       )}
     </div>
   );

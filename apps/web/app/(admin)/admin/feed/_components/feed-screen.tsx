@@ -179,7 +179,7 @@ export function FeedScreen({
   return (
     <PageBody>
       <PageHeader
-        eyebrow="Feed"
+        eyebrow="Kit"
         title="Feed inventory"
         subtitle="What is in the barn, what the plans are eating through it, and the date you have to order by. Daily demand comes from the plans — it is never typed in."
       />

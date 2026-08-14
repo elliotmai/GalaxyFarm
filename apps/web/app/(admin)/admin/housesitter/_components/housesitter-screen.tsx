@@ -94,7 +94,6 @@ export function HousesitterScreen({
   return (
     <PageBody>
       <PageHeader
-        eyebrow="People & places"
         title="Housesitter guide"
         subtitle="Written once, composed live. The pens, the routine and the numbers come from the farm's own records every time it is opened."
       />

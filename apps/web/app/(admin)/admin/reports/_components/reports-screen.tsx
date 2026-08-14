@@ -254,7 +254,6 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
   return (
     <PageBody>
       <PageHeader
-        eyebrow="People & places"
         title="Reports"
         subtitle="Computed from the records, never stored. Correct a cost anywhere and the number here moves."
         actions={

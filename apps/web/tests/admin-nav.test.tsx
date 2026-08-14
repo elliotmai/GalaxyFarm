@@ -95,6 +95,57 @@ describe("SectionStrip", () => {
     }
   });
 
+  it("keeps the section lit while a view of it is open", () => {
+    // Both strips answer at once: which animal, and which view of it. Standing
+    // on Breeding used to light Breeding and nothing above it, so the upper
+    // strip read as though no species were selected — `isWithin` refuses a
+    // route the nav already knows, which is precisely what a declared sub-view
+    // is.
+    at("/admin/cattle/breeding");
+    render(<SectionStrip />);
+
+    const sections = screen.getByRole("navigation", { name: "Animals sections" });
+    const lit = within(sections)
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("aria-current") === "page");
+
+    expect(lit).toHaveLength(1);
+    expect(lit[0]).toHaveAccessibleName("Cattle");
+  });
+
+  it("keeps the section lit on an animal's own page, where no view applies", () => {
+    at("/admin/cattle/01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    render(<SectionStrip />);
+
+    const sections = screen.getByRole("navigation", { name: "Animals sections" });
+    expect(
+      within(sections)
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("aria-current") === "page")[0],
+    ).toHaveAccessibleName("Cattle");
+
+    // …and no view is claimed, because a detail page is not one of the views.
+    const views = screen.getByRole("navigation", { name: "Cattle views" });
+    expect(
+      within(views)
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("aria-current") === "page"),
+    ).toHaveLength(0);
+  });
+
+  it("lights a single-level section with no views under it", () => {
+    at("/admin/supplies");
+    render(<SectionStrip />);
+
+    const sections = screen.getByRole("navigation", { name: "Kit sections" });
+    const lit = within(sections)
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("aria-current") === "page");
+
+    expect(lit).toHaveLength(1);
+    expect(lit[0]).toHaveAccessibleName("Supplies");
+  });
+
   it("marks the view being looked at, not merely its prefix", () => {
     at("/admin/cattle/breeding");
     render(<SectionStrip />);
