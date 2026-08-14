@@ -10,7 +10,15 @@ import {
   resolveFarmName,
   type BrandingConfig,
 } from "../src/entities/branding-config.js";
-import { isOverCapacity, zoneSchema } from "../src/entities/zone.js";
+import {
+  describeZoneExtent,
+  dividerSchema,
+  dividersWithoutWater,
+  isOverCapacity,
+  standingDividers,
+  zoneSchema,
+  type Divider,
+} from "../src/entities/zone.js";
 import {
   ageInDays,
   ageInMonths,
@@ -153,6 +161,90 @@ describe("Zone", () => {
     expect(isOverCapacity({ capacity: 4 }, 5)).toBe(true);
     expect(isOverCapacity({ capacity: 4 }, 4)).toBe(false);
     expect(isOverCapacity({ capacity: undefined }, 500)).toBe(false);
+  });
+});
+
+/**
+ * Temporary fencing across a zone (see docs/property-layout.md).
+ *
+ * The Pasture gets sectioned so the cattle can be shut out of the large
+ * portion. It goes up and comes down, so what the app needs to know is whether
+ * it is standing now — and, because the tank sits on one side of the line,
+ * whether the side they were left on has anything to drink.
+ */
+describe("temporary fencing", () => {
+  const tank = "01ARZ3NDEKTSV4RRFFQ69G5FA1" as Ulid;
+  const stowed = "01ARZ3NDEKTSV4RRFFQ69G5FA2" as Ulid;
+
+  const fence = (over: Partial<Divider> = {}): Divider => ({
+    id: "cross",
+    name: "Pasture cross-fence",
+    line: [
+      { lat: 33.05, lng: -97.47 },
+      { lat: 33.051, lng: -97.47 },
+    ],
+    up: true,
+    waterSourceIds: [tank],
+    closes: "the big end",
+    ...over,
+  });
+
+  it("takes a two-point line, since a run between two corners is the usual one", () => {
+    expect(dividerSchema.safeParse(fence()).success).toBe(true);
+  });
+
+  it("refuses a single point, which is not a fence", () => {
+    expect(dividerSchema.safeParse(fence({ line: [{ lat: 33.05, lng: -97.47 }] })).success).toBe(
+      false,
+    );
+  });
+
+  it("counts only the fencing actually standing", () => {
+    const zone = { dividers: [fence(), fence({ id: "second", up: false })] };
+
+    expect(standingDividers(zone)).toHaveLength(1);
+    expect(standingDividers({ dividers: undefined })).toEqual([]);
+  });
+
+  it("says nothing about a zone with no fencing up", () => {
+    expect(describeZoneExtent({ name: "Pasture", dividers: [fence({ up: false })] })).toBe(
+      "Pasture",
+    );
+  });
+
+  it("names what the cattle are shut out of, for somebody who does not know", () => {
+    // "Pasture" while the fence is standing means a strip of it, and a
+    // housesitter reading the board walks the whole field otherwise.
+    expect(describeZoneExtent({ name: "Pasture", dividers: [fence()] })).toBe(
+      "Pasture — part of it only, shut out of the big end",
+    );
+  });
+
+  it("catches a fence that shut the cattle away from the tank", () => {
+    // The pasture still has a tank and they still have grass. They just
+    // cannot reach it, and nothing about that shows from the gate.
+    const cutOff = { dividers: [fence({ waterSourceIds: [] })] };
+
+    expect(dividersWithoutWater(cutOff, new Set([tank]))).toHaveLength(1);
+  });
+
+  it("is satisfied when the side they kept has the tank on it", () => {
+    // Which is how the fence on the sketch is actually run.
+    expect(dividersWithoutWater({ dividers: [fence()] }, new Set([tank]))).toEqual([]);
+  });
+
+  it("does not count a tank that is stowed for the season", () => {
+    // A fence relying on West Pen's static tank in January leaves the same
+    // empty field as a fence relying on no tank at all.
+    const relyingOnStowed = { dividers: [fence({ waterSourceIds: [stowed] })] };
+
+    expect(dividersWithoutWater(relyingOnStowed, new Set([tank]))).toHaveLength(1);
+  });
+
+  it("says nothing about a fence lying on the ground", () => {
+    const down = { dividers: [fence({ up: false, waterSourceIds: [] })] };
+
+    expect(dividersWithoutWater(down, new Set([tank]))).toEqual([]);
   });
 });
 

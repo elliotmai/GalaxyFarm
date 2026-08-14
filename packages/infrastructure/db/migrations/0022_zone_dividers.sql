@@ -1,0 +1,24 @@
+-- Temporary fencing across a zone.
+--
+-- The dashed line through the Pasture on the hand-drawn map turned out not to
+-- be a planned fence or a mistake in the drawing: it is temporary fencing that
+-- goes up so the cattle can be shut out of the large portion, and comes down
+-- again. That makes it a state, like a tank's cover, and there was nowhere to
+-- record either that a zone can be divided or that it currently is.
+--
+-- On `zones` rather than in a table of its own, unlike `water_sources`. A tank
+-- earned its own table because tanks are shared between zones and a chore per
+-- zone would send somebody to the same trough twice. A temporary fence is the
+-- opposite — it has no existence apart from the one zone it cuts, and nothing
+-- else ever refers to it.
+--
+-- Nullable rather than defaulted to an empty array, so "no fencing here" and
+-- "nobody has said" stay the same answer. Every zone on the place is the first
+-- of those and only one is ever likely to be the second.
+--
+-- The reason each fence carries its own water_source_ids, rather than reading
+-- the zone's: the tank sits on one side of the line. Putting the fence up can
+-- leave the cattle on the other side of it, and nothing about that is visible
+-- from the gate — the pasture still has a tank, the cattle still have grass,
+-- and they simply cannot reach it.
+ALTER TABLE "zones" ADD COLUMN "dividers" jsonb;

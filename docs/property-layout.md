@@ -3,8 +3,12 @@
 **1220 County Road 4651, Rhome TX 76078** (Wise County)
 
 Transcribed from the hand-drawn sketch of 2 June 2026 and corrected against
-answers given 11 August 2026. These zone records are what the Pen Board, the
-housesitter guide, and the freeze alerts all hang off.
+answers given 11 August 2026 and 14 August 2026. These zone records are what the
+Pen Board, the housesitter guide, and the freeze alerts all hang off.
+
+The sketch itself is not in this repository. It was re-read on 14 August and
+what it settles is written down here, because a fact that only exists in a photo
+somebody has to go and find is a fact this app cannot use.
 
 ## Zones
 
@@ -14,7 +18,7 @@ pasture is in regular use.
 
 | Zone | Type | Water | Notes |
 |---|---|---|---|
-| Pasture | `pasture` | Auto-refill tank, **shared with Hay Field** | Dashed line on the sketch — cross-fence, existing or planned, unconfirmed |
+| Pasture | `pasture` | Auto-refill tank, **shared with Hay Field** | Dashed line on the sketch is a **temporary cross-fence** — see below |
 | Hay Field | `pasture` | Same auto tank as Pasture | Hay is stored in a section of it; cattle can graze it |
 | West Pen | `pen` | Static tank, **only when one is put out** | Not plumbed |
 | Pen 1 | `pen` | Auto-refill tank, **shared with 2nd Pen** | |
@@ -56,6 +60,52 @@ should never name. All three covers are currently off.
 | 2 — Pen 1 + 2nd Pen + Randy's | Auto-refill | Yes, off |
 | 3 — Pen A + Pen B | Auto-refill | Yes, off |
 | 4 — West Pen | Static, seasonal | None |
+
+## The dashed line — a temporary cross-fence (answered 14 August 2026)
+
+Not a planned fence and not a mistake in the drawing. It is **temporary fencing
+that gets put up to section the Pasture, so the cattle can be locked out of the
+large portion.** It goes up and comes down, which makes it a state rather than a
+fact about the place — the same reason `WaterSource.cover` and `active` are
+states.
+
+It matters to three things:
+
+- **The Pen Board.** "Pasture" while the fence is up means a strip of it. A
+  housesitter reading the board would otherwise walk the whole field looking for
+  cattle standing in one corner of it.
+- **Grazing.** The area actually being eaten is a fraction of the zone, so
+  anything reasoning about how long the pasture lasts is wrong by the same
+  fraction while the fence stands.
+- **Water, which is the one that could hurt something.** The Pasture's tank is
+  shared with the Hay Field and sits at that end. A cross-fence put up between
+  the cattle and the tank leaves them shut in with no water, and nothing about
+  the arrangement looks unusual from the gate. In the configuration drawn, the
+  cattle keep the end the tank is on — but that is a fact about where this fence
+  goes, not a guarantee about the next one, so it is checked rather than assumed.
+
+Modelled as `Zone.dividers` — see the decision below.
+
+## What the sketch confirms
+
+- **Three tanks are drawn, in the places the records already had them**: at the
+  Pasture/Hay corner, on the fence between Pen 1 and 2nd Pen, and between Pen A
+  and Pen B. The fourth — West Pen's — is not on the sketch at all, which is
+  what a tank that is only put out seasonally should look like.
+- **The buildings and the drive** are as recorded: barn, alley way, tub/chute,
+  chicken coop, lean-to creep and well house at the top corner, garden, and the
+  house and carport off the drive.
+- **Randy's pasture is not on it**, because it is the neighbour's. That settles
+  the open question below in favour of not giving it a boundary here.
+
+Two things to check when the boundaries are actually drawn:
+
+- **Hay Field's size.** On the sketch "Hay" is a small shape beside the garden,
+  not a field. The 11 August correction says it is a field cattle can graze, and
+  that wins — but the two readings disagree about how much ground it is, and the
+  boundary is where that gets settled.
+- **The acreage note.** There is a circled figure near the south boundary that
+  reads as an area. Worth confirming what it covers.
 
 ## Livestock
 

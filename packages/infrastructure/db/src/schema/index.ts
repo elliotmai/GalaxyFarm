@@ -102,6 +102,18 @@ export const zones = pgTable(
     capacity: integer("capacity"),
     /** Real lat/lng, so pens render over Google or cached NAIP alike (§8). */
     boundary: jsonb("boundary").$type<{ lat: number; lng: number }[]>(),
+    /** Temporary fencing across the zone — the Pasture's cross-fence (§5.1). */
+    dividers: jsonb("dividers").$type<
+      {
+        id: string;
+        name: string;
+        line: { lat: number; lng: number }[];
+        up: boolean;
+        waterSourceIds: string[];
+        closes?: string;
+        notes?: string;
+      }[]
+    >(),
     baselineSafetyLevel: integer("baseline_safety_level").notNull(),
     waterSourceIds: text("water_source_ids").array().notNull().default([]),
     customInstructions: text("custom_instructions"),

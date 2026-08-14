@@ -322,22 +322,26 @@ describe("a server whose migrations have not been run", () => {
     const db = await freshServer(6); // 0000..0005: no breeding_records.
     const stack = localStack(db);
 
-    // A zone: `zones` has not changed since 0005, so this one is the entry
-    // that has to go through whatever else is behind.
+    // The control: an entry whose table is fully migrated at this baseline, so
+    // it is the one that has to go through whatever else is behind.
+    //
+    // It must be a table **nothing has altered since 0005**, which is a moving
+    // target — this was `zones` until 0022 added the Pasture's cross-fence to
+    // it, at which point the control quietly became a third behind-table case
+    // and the test failed for the right reason. If it fails that way again,
+    // the fix is to move it to another untouched table, not to loosen the
+    // assertion.
     await stack.engine.enqueue("create", {
-      entity: "zones",
+      entity: "zoneAssignments",
       recordId: encodeUlid(29) as Ulid,
       changes: [
         { field: "propertyId", value: PROPERTY as never, at: now, deviceId: "test-device" },
         { field: "createdAt", value: now as never, at: now, deviceId: "test-device" },
         { field: "updatedAt", value: now as never, at: now, deviceId: "test-device" },
-        { field: "name", value: "North pen" as never, at: now, deviceId: "test-device" },
-        { field: "type", value: "pen" as never, at: now, deviceId: "test-device" },
-        { field: "indoor", value: false as never, at: now, deviceId: "test-device" },
-        { field: "baselineSafetyLevel", value: 2 as never, at: now, deviceId: "test-device" },
-        { field: "waterSourceIds", value: [] as never, at: now, deviceId: "test-device" },
-        { field: "resting", value: false as never, at: now, deviceId: "test-device" },
-        { field: "active", value: true as never, at: now, deviceId: "test-device" },
+        { field: "animalId", value: encodeUlid(28) as never, at: now, deviceId: "test-device" },
+        { field: "zoneId", value: encodeUlid(27) as never, at: now, deviceId: "test-device" },
+        { field: "periodFrom", value: now as never, at: now, deviceId: "test-device" },
+        { field: "slot", value: "outside" as never, at: now, deviceId: "test-device" },
       ],
     });
 
