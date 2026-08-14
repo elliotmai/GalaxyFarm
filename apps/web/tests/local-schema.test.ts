@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { ENTITY_WRITE_CAPABILITY } from "@galaxy-farm/core";
+
 import { LOCAL_SCHEMA_VERSION, LOCAL_STORES } from "../lib/local/store.js";
 
 /**
@@ -79,5 +81,19 @@ describe("the local schema version tracks the store list", () => {
     // A duplicate would build two DexieRepository instances for one table and
     // the second would silently win.
     expect(new Set(LOCAL_STORES).size).toBe(LOCAL_STORES.length);
+  });
+});
+
+describe("the entities that need more than records.write", () => {
+  it("names stores that exist", () => {
+    // The kernel keys this table by the entity name a `Patch` carries, which
+    // is the local store's name for it — and the two live in different
+    // packages, so nothing but this compares them. A key that matched no store
+    // would not fail anywhere: the push handler's lookup would miss and fall
+    // through to `records.write`, quietly granting the permission the entry
+    // exists to withhold.
+    for (const entity of Object.keys(ENTITY_WRITE_CAPABILITY)) {
+      expect(LOCAL_STORES, entity).toContain(entity);
+    }
   });
 });

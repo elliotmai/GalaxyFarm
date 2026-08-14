@@ -42,6 +42,16 @@ export const CAPABILITIES = [
   // Administration
   "users.manage",
   "settings.manage",
+  /**
+   * What the farm is called (§5.1).
+   *
+   * Separate from `settings.manage` because it is not the same decision.
+   * Settings holds thresholds and preferences — things a member tunes while
+   * doing the job. The farm and business names are injected into every page
+   * title, email, PDF, kiosk board and the customer portal, so renaming the
+   * farm renames it to everybody the farm deals with. That is an owner's call.
+   */
+  "branding.manage",
   "devices.manage",
   "billing.manage",
 ] as const;
@@ -67,9 +77,10 @@ const GRANTS: Readonly<Record<Role, readonly Capability[]>> = {
     "eggs.log",
     "animals.move",
     "settings.manage",
-    // Deliberately not `records.purge`, `users.manage`, `devices.manage`, or
-    // `billing.manage`. Purge is the one action §4.5 makes unrecoverable, and
-    // the three others decide who else gets in.
+    // Deliberately not `records.purge`, `users.manage`, `devices.manage`,
+    // `billing.manage` or `branding.manage`. Purge is the one action §4.5
+    // makes unrecoverable, two of the others decide who else gets in, and
+    // branding renames the farm to everyone it deals with.
   ],
 
   customer: ["records.read.own"],
@@ -98,6 +109,40 @@ export interface Actor {
 
 export function capabilitiesOf(role: Role): readonly Capability[] {
   return GRANTS[role];
+}
+
+/**
+ * Synced entities a general `records.write` does not cover.
+ *
+ * The push channel takes a patch for any entity a device holds, so hiding a
+ * screen hides nothing — §4.3's "a hidden button is not a permission check",
+ * stated as data. Anything named here is checked against its own capability
+ * before the patch is applied; everything else needs `records.write`.
+ *
+ * Keyed by the entity name a `Patch` carries, which is the local store's name
+ * for it. A typo is a silently *widened* permission rather than a compile
+ * error — the lookup would simply miss — so `capabilities.test.ts` asserts
+ * every key here is a real synced entity.
+ */
+export const ENTITY_WRITE_CAPABILITY: Readonly<Record<string, Capability>> = {
+  brandingConfigs: "branding.manage",
+};
+
+/** What it takes to write this entity. */
+export function capabilityToWrite(entity: string): Capability {
+  return ENTITY_WRITE_CAPABILITY[entity] ?? "records.write";
+}
+
+/**
+ * May this actor write this entity at all?
+ *
+ * Asked per patch by the push handler, before anything is merged. A device
+ * whose user lost a capability between queueing and syncing is the ordinary
+ * case here, not an attack: the patch is refused, the outbox sets it aside,
+ * and the sync panel reports it rather than the write vanishing quietly.
+ */
+export function canWriteEntity(actor: Actor, entity: string, now: Date): boolean {
+  return can(actor, capabilityToWrite(entity), now);
 }
 
 /**

@@ -5,8 +5,10 @@ import { hasCoordinates, propertySchema } from "../src/entities/property.js";
 import {
   FALLBACK_FARM_NAME,
   nameForSignedDocument,
+  resolveBranding,
   resolveBusinessName,
   resolveFarmName,
+  type BrandingConfig,
 } from "../src/entities/branding-config.js";
 import { isOverCapacity, zoneSchema } from "../src/entities/zone.js";
 import {
@@ -76,6 +78,43 @@ describe("BrandingConfig — spec §5.1", () => {
     expect(resolveBusinessName({ farmName: "Home Place", businessName: "Show Cattle" }, {})).toBe(
       "Show Cattle",
     );
+  });
+
+  describe("resolveBranding — one config per property", () => {
+    const config = (id: string, farmName: string, updatedAt: string) =>
+      ({ ...base(), id: id as Ulid, farmName, updatedAt: new Date(updatedAt) }) as BrandingConfig;
+
+    it("is undefined when nothing has been saved", () => {
+      expect(resolveBranding([])).toBeUndefined();
+    });
+
+    it("returns the only one there is", () => {
+      const only = config("01B", "Home Place", "2026-01-01");
+
+      expect(resolveBranding([only])?.farmName).toBe("Home Place");
+    });
+
+    it("breaks a tie by id, so every device reaches the same answer", () => {
+      // Two devices offline, both naming the farm, both rows arriving. The
+      // *later edit* is deliberately not what wins: `updatedAt` would make the
+      // farm's name depend on whose clock was ahead, and two kiosks could
+      // disagree about it indefinitely.
+      const first = config("01A", "Chosen", "2026-01-01");
+      const second = config("01B", "Also chosen", "2026-06-01");
+
+      expect(resolveBranding([second, first])?.farmName).toBe("Chosen");
+      expect(resolveBranding([first, second])?.farmName).toBe("Chosen");
+    });
+
+    it("does not reorder the caller's array", () => {
+      // The list comes straight from a live query, and sorting it in place
+      // would mutate what React is holding.
+      const given = [config("01B", "Second", "2026-01-01"), config("01A", "First", "2026-01-01")];
+
+      resolveBranding(given);
+
+      expect(given.map((entry) => entry.farmName)).toEqual(["Second", "First"]);
+    });
   });
 });
 

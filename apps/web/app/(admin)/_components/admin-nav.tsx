@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Badge, Logomark } from "@galaxy-farm/ui";
+import type { Ulid } from "@galaxy-farm/core";
 
 import { useSync } from "@/app/_components/sync-provider";
 import { NAV, UTILITY, destinationFor, isWithin } from "@/app/(admin)/_components/nav-groups";
+import { useFarmName } from "@/lib/branding";
 
 export { NAV, isCurrent } from "@/app/(admin)/_components/nav-groups";
 
@@ -25,10 +27,21 @@ export { NAV, isCurrent } from "@/app/(admin)/_components/nav-groups";
  * See `SectionStrip` and `nav-groups.ts` for where each one went.
  */
 
-export function AdminNav({ farmName }: { readonly farmName: string }) {
+export function AdminNav({
+  propertyId,
+  farmName,
+}: {
+  readonly propertyId: Ulid;
+  /** What the server rendered. Stands until the device answers with a name. */
+  readonly farmName: string;
+}) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const current = destinationFor(pathname);
+  // Read here rather than passed down from the layout: the layout is a server
+  // component and cannot see the device, so a name saved in Settings would sit
+  // there unread until a deploy.
+  const name = useFarmName(propertyId, farmName);
 
   // On a phone the menu covers the screen, so leaving it open after a tap means
   // arriving at the page you asked for and seeing none of it.
@@ -44,7 +57,7 @@ export function AdminNav({ farmName }: { readonly farmName: string }) {
       <div className="flex items-center justify-between gap-2 border-b border-rule px-density py-3">
         <Link href="/admin" className="flex min-w-0 items-center gap-2 text-ink">
           <Logomark size="small" decorative />
-          <span className="truncate">{farmName}</span>
+          <span className="truncate">{name}</span>
         </Link>
         <button
           type="button"

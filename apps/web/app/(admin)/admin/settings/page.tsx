@@ -39,6 +39,9 @@ export default async function AdminSettingsPage() {
 
   const now = new Date();
   const mayManagePeople = can(actor, "users.manage", now);
+  // Owners only. The tab's absence is presentation; the push handler is what
+  // actually refuses a branding write from anybody else (§4.3).
+  const mayManageBranding = can(actor, "branding.manage", now);
 
   let people: readonly PersonRow[] = [];
   let deleted: readonly PersonRow[] = [];
@@ -66,6 +69,7 @@ export default async function AdminSettingsPage() {
       people={people}
       deleted={deleted}
       mayManagePeople={mayManagePeople}
+      mayManageBranding={mayManageBranding}
       {...(unavailable === undefined ? {} : { unavailable })}
     />
   );

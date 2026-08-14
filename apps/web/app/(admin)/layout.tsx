@@ -37,9 +37,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const actor = await currentActor();
   if (actor === undefined) redirect("/login?next=/admin");
 
-  // Farm name is a BrandingConfig value (§5.1). Until the settings store is
-  // wired it falls back to the environment, so there is still one place to
-  // change it and no string literal in a component.
+  // Farm name is a BrandingConfig value (§5.1), edited in Settings and stored
+  // on the device. This is only the first paint: `AdminNav` reads the stored
+  // name itself and prefers it. A server component cannot — the value lives in
+  // IndexedDB, and reading it from Postgres here would put a database round
+  // trip in front of every admin page, which is the one thing §4.2 spends the
+  // whole local-first design avoiding.
   const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME;
 
   return (
@@ -68,7 +71,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 where you would have to scroll to reach it.
               */}
               <aside className="sticky top-0 z-20 border-b border-edge bg-panel md:h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
-                <AdminNav farmName={farmName} />
+                <AdminNav propertyId={actor.propertyId} farmName={farmName} />
               </aside>
               {/* Tighter gutters on a phone: 14px of padding either side of a
                   375px screen is 7% of the width, and every table and form

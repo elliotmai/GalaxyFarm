@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   CAPABILITIES,
+  ENTITY_WRITE_CAPABILITY,
   ROLES,
   can,
   canSeeRecord,
+  canWriteEntity,
   capabilitiesOf,
+  capabilityToWrite,
   isWithinAccessWindow,
   requireCapability,
   type Actor,
@@ -40,20 +43,24 @@ describe("the grant table", () => {
     expect([...capabilitiesOf("owner")].sort()).toEqual([...CAPABILITIES].sort());
   });
 
-  it("withholds the four irreversible or gatekeeping powers from members", () => {
-    // Purge is the one action §4.5 makes unrecoverable; the other three decide
-    // who else gets in. Both of the people using this app day to day are
-    // owners, so `member` costs nothing today and matters the first time
-    // someone is hired.
+  it("withholds the irreversible, gatekeeping and naming powers from members", () => {
+    // Purge is the one action §4.5 makes unrecoverable; two of the others
+    // decide who else gets in; branding renames the farm to everyone it deals
+    // with. Both of the people using this app day to day are owners, so
+    // `member` costs nothing today and matters the first time someone is hired.
     for (const capability of [
       "records.purge",
       "users.manage",
       "devices.manage",
       "billing.manage",
+      "branding.manage",
     ] as const) {
       expect(can(actor("member"), capability, NOW), capability).toBe(false);
     }
     expect(can(actor("member"), "records.write", NOW)).toBe(true);
+    // Settings and branding are deliberately not the same permission: a member
+    // tunes thresholds while doing the job, and does not rename the farm.
+    expect(can(actor("member"), "settings.manage", NOW)).toBe(true);
   });
 
   it("gives a customer nothing but their own records", () => {
@@ -93,6 +100,46 @@ describe("the grant table", () => {
     for (const role of ROLES) {
       expect(can(actor(role), "records.purge", NOW), role).toBe(role === "owner");
     }
+  });
+
+  it("lets nobody but the owner rename the farm", () => {
+    for (const role of ROLES) {
+      expect(can(actor(role), "branding.manage", NOW), role).toBe(role === "owner");
+    }
+  });
+});
+
+describe("writing an entity", () => {
+  it("asks for records.write by default", () => {
+    expect(capabilityToWrite("animals")).toBe("records.write");
+    expect(canWriteEntity(actor("member"), "animals", NOW)).toBe(true);
+  });
+
+  it("asks for branding.manage on the farm's name", () => {
+    expect(capabilityToWrite("brandingConfigs")).toBe("branding.manage");
+    expect(canWriteEntity(actor("owner"), "brandingConfigs", NOW)).toBe(true);
+    // The one that matters. A member can reach the push endpoint — they are
+    // allowed to sync — so hiding the Branding tab protects nothing on its own.
+    expect(canWriteEntity(actor("member"), "brandingConfigs", NOW)).toBe(false);
+  });
+
+  it("names only capabilities that exist", () => {
+    // A typo in the table is a silently *widened* permission rather than a
+    // compile error, because the lookup would simply miss and fall through to
+    // `records.write`.
+    for (const capability of Object.values(ENTITY_WRITE_CAPABILITY)) {
+      expect(CAPABILITIES).toContain(capability);
+    }
+  });
+
+  it("refuses an entity write to a housesitter whose window has closed", () => {
+    // The window is checked before the grant table, so an expired sitter is
+    // refused everything — including the entities that need nothing special.
+    const lapsed = actor("housesitter", {
+      accessWindow: { from: new Date("2026-11-01"), to: new Date("2026-11-08") },
+    });
+
+    expect(canWriteEntity(lapsed, "animals", NOW)).toBe(false);
   });
 });
 

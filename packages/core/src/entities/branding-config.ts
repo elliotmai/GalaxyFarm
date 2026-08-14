@@ -28,6 +28,24 @@ export const brandingConfigSchema = baseRecordSchema.extend({
 export const FALLBACK_FARM_NAME = "Flying Double M";
 
 /**
+ * The one branding config for a property, out of however many exist.
+ *
+ * There should only ever be one, and the app writes it that way. But the store
+ * is local-first: two devices that both go to name the farm while offline each
+ * create a row, and both rows arrive. Nothing about that is an error worth
+ * showing somebody — it is two people agreeing to do the same thing.
+ *
+ * So the tie is broken by id rather than by `updatedAt`. Ids are ULIDs, which
+ * sort by creation time and never collide, and the point is that every device
+ * reaches the same answer without talking to the others. `updatedAt` would
+ * make the farm's name depend on who edited last on which clock, and two
+ * kiosks could disagree about it indefinitely.
+ */
+export function resolveBranding(configs: readonly BrandingConfig[]): BrandingConfig | undefined {
+  return [...configs].sort((left, right) => left.id.localeCompare(right.id))[0];
+}
+
+/**
  * Resolve the farm name from config, then environment, then a neutral fallback.
  * Exactly one place decides this.
  */

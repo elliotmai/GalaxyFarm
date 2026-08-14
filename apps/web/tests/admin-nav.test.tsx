@@ -1,6 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { Ulid } from "@galaxy-farm/core";
+
 const pathname = vi.hoisted(() => ({ current: "/admin" }));
 
 vi.mock("next/navigation", () => ({
@@ -30,6 +32,8 @@ const { SectionStrip } = await import("../app/(admin)/_components/section-strip.
  * they belong to, and that exactly one thing is marked current.
  */
 
+const PROPERTY = "01ARZ3NDEKTSV4RRFFQ69G5FP1" as Ulid;
+
 function at(route: string) {
   pathname.current = route;
 }
@@ -37,7 +41,7 @@ function at(route: string) {
 describe("AdminNav", () => {
   it("shows five destinations, not fifty-five links", () => {
     at("/admin");
-    render(<AdminNav farmName="Flying Double M" />);
+    render(<AdminNav propertyId={PROPERTY} farmName="Flying Double M" />);
 
     const nav = screen.getByRole("navigation", { name: "Admin sections" });
     for (const label of ["Today", "Animals", "Land", "Kit", "Business"]) {
@@ -52,7 +56,7 @@ describe("AdminNav", () => {
 
   it("keeps the utility rail reachable but quiet", () => {
     at("/admin");
-    render(<AdminNav farmName="Flying Double M" />);
+    render(<AdminNav propertyId={PROPERTY} farmName="Flying Double M" />);
 
     const nav = screen.getByRole("navigation", { name: "Admin sections" });
     for (const label of ["Contacts", "Reports", "Housesitter", "Settings"]) {
@@ -62,7 +66,7 @@ describe("AdminNav", () => {
 
   it("marks exactly one destination as current", () => {
     at("/admin/cattle/breeding");
-    render(<AdminNav farmName="Flying Double M" />);
+    render(<AdminNav propertyId={PROPERTY} farmName="Flying Double M" />);
 
     const nav = screen.getByRole("navigation", { name: "Admin sections" });
     const current = within(nav)
