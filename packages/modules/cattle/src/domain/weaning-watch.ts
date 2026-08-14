@@ -10,17 +10,22 @@ import type { CattleProfile } from "./cattle-profile.js";
  * 205-day figure computed from one. A calf could be weighed at weaning; nothing
  * ever said one was due.
  *
- * ## Why the age here is not 205 days
+ * ## A window, not a birthday
  *
- * 205 days is a *measurement* standard — the age every adjusted weaning weight
- * is projected to so that two calves born a month apart can be compared. It is
- * not a management instruction, and taking it as one would put this farm's
- * calves two months late.
+ * Weaning is not a thing that happens on one correct day. Here a calf **may**
+ * come off from 120 days and **must** be off by 150, and everything between is
+ * a judgement about what else is going on that week. So the watch carries two
+ * dates rather than one: the day a calf becomes eligible, and the day it runs
+ * out of road.
  *
- * This is a show place, and show calves come off early: they need to be on feed,
- * halter-broke and gaining well before a show season fixed by a calendar
- * somebody else owns. The default is the middle of the range actually worked to,
- * and it is a setting because a club calf and a replacement heifer differ.
+ * A single figure could only be one of those, and either choice is wrong. Set
+ * at the early end it nags for a month about work that is not late; set at the
+ * late end it never warns until it already is.
+ *
+ * 205 days, which the app computes elsewhere, is neither. It is a *measurement*
+ * standard — the age every adjusted weaning weight is projected to so that two
+ * calves born a month apart can be compared — and taking it as a management
+ * instruction would put these calves two months late.
  *
  * ## Batches, not calves
  *
@@ -30,9 +35,17 @@ import type { CattleProfile } from "./cattle-profile.js";
  * times over three weeks, and the first three raisings would all be answered by
  * doing nothing — which is exactly how an alert stops being read.
  *
- * That means the group is deliberately held past the oldest calf's own date.
- * Waiting a fortnight to wean a calf with its contemporaries costs nothing;
- * splitting a pen twice costs a morning and unsettles the ones left behind.
+ * That means the group is deliberately held past the day its oldest member
+ * became eligible. Waiting a fortnight to wean a calf with its contemporaries
+ * costs nothing; splitting a pen twice costs a morning and unsettles the ones
+ * left behind.
+ *
+ * The 150-day deadline is what stops that being open-ended, and the two rules
+ * can genuinely conflict: if a batch were spread wider than the thirty days
+ * between the two ages, its oldest calf would pass its deadline before its
+ * youngest became eligible. The watch says so rather than silently breaking
+ * whichever rule is cheaper to break — with the default three-week window it
+ * cannot arise, but the window is a setting.
  *
  * ## Calves run with their dams until this happens
  *
@@ -63,13 +76,15 @@ import type { CattleProfile } from "./cattle-profile.js";
  * seeing beside "out of Jenna" — one is the pen and the other is the papers.
  */
 
+/** Old enough to come off. Nothing is weaned before this. */
+export const WEANING_EARLIEST_DAYS = 120;
+
 /**
- * Days old at which a show calf comes off.
+ * The day it stops being a choice.
  *
- * The middle of the 120–150 band. Deliberately well short of the 205-day
- * benchmark, for the reason above.
+ * A calf still on its dam past this is late, however convenient the week was.
  */
-export const DEFAULT_WEANING_AGE_DAYS = 135;
+export const WEANING_LATEST_DAYS = 150;
 
 /** How far ahead the watch opens, so there is time to set the pens up. */
 export const DEFAULT_WEANING_LEAD_DAYS = 14;
@@ -100,19 +115,39 @@ export interface WeaningCandidate {
   readonly raisedByOther?: "recipient" | "grafted" | undefined;
   readonly bornOn: Date;
   readonly ageDays: number;
-  /** The day this calf on its own reaches weaning age. */
+  /** The day it becomes eligible — 120 days. */
   readonly readyOn: Date;
-  /** Negative once its own day has passed. */
+  /** Negative once it is old enough. */
   readonly daysUntilReady: number;
+  /** The day it must be off by — 150 days. */
+  readonly mustGoBy: Date;
+  /** Negative once that day has passed. */
+  readonly daysUntilDeadline: number;
 }
 
 export interface WeaningBatch {
   /** Oldest first, which is the order they are looked at in the pen. */
   readonly calves: readonly WeaningCandidate[];
-  /** When the whole batch comes off — the youngest calf's day. */
+  /** When the whole batch may come off — set by the *youngest* calf. */
   readonly readyOn: Date;
   readonly daysUntilReady: number;
+  /** Every calf in it is old enough now. */
+  readonly ready: boolean;
+  /** When it must be off by — set by the *oldest* calf, who runs out first. */
+  readonly mustGoBy: Date;
+  readonly daysUntilDeadline: number;
+  /** A calf in it is past 150 days. */
   readonly overdue: boolean;
+  /**
+   * The two rules cannot both be kept for this group.
+   *
+   * Its oldest calf passes its deadline before its youngest becomes eligible,
+   * which can only happen if the batch is spread wider than the thirty days
+   * between the two ages. Said out loud rather than silently breaking whichever
+   * rule is cheaper: the answer is to wean the older ones now and the rest
+   * later, and that is a decision, not a default.
+   */
+  readonly splitNeeded: boolean;
 }
 
 export interface WeaningWatchInput {
@@ -127,7 +162,10 @@ export interface WeaningWatchInput {
    */
   readonly calvings?: readonly { readonly damId: Ulid; readonly calfAnimalId?: Ulid | undefined }[];
   readonly asOf: Date;
-  readonly weaningAgeDays?: number | undefined;
+  /** Old enough to come off. Defaults to 120 days. */
+  readonly earliestDays?: number | undefined;
+  /** Must be off by. Defaults to 150 days. */
+  readonly latestDays?: number | undefined;
   readonly leadDays?: number | undefined;
   readonly batchWindowDays?: number | undefined;
 }
@@ -154,7 +192,8 @@ const daysApart = (left: Date, right: Date): number =>
  * - **Not cattle.** One Animal model serves every species (§2).
  */
 export function weaningCandidates(input: WeaningWatchInput): WeaningCandidate[] {
-  const weaningAge = input.weaningAgeDays ?? DEFAULT_WEANING_AGE_DAYS;
+  const earliest = input.earliestDays ?? WEANING_EARLIEST_DAYS;
+  const latest = input.latestDays ?? WEANING_LATEST_DAYS;
   const profileFor = new Map(input.profiles.map((profile) => [profile.animalId, profile]));
 
   const calvedBy = new Map<Ulid, Ulid>();
@@ -192,8 +231,10 @@ export function weaningCandidates(input: WeaningWatchInput): WeaningCandidate[] 
         : {}),
       bornOn: animal.dob,
       ageDays,
-      readyOn: addDays(animal.dob, weaningAge),
-      daysUntilReady: weaningAge - ageDays,
+      readyOn: addDays(animal.dob, earliest),
+      daysUntilReady: earliest - ageDays,
+      mustGoBy: addDays(animal.dob, latest),
+      daysUntilDeadline: latest - ageDays,
     });
   }
 
@@ -242,18 +283,39 @@ export function weaningBatches(input: WeaningWatchInput): WeaningBatch[] {
 
   return groupIntoBatches(candidates, input.batchWindowDays ?? DEFAULT_BATCH_WINDOW_DAYS)
     .map((calves) => {
-      // The youngest is the last, since candidates are sorted oldest first.
+      // Candidates are sorted oldest first, so the last is the youngest. The
+      // youngest sets when the group *may* go; the oldest sets when it must.
       const youngest = calves[calves.length - 1] as WeaningCandidate;
+      const oldest = calves[0] as WeaningCandidate;
 
       return {
         calves,
         readyOn: youngest.readyOn,
         daysUntilReady: youngest.daysUntilReady,
-        overdue: youngest.daysUntilReady < 0,
+        ready: youngest.daysUntilReady <= 0,
+        mustGoBy: oldest.mustGoBy,
+        daysUntilDeadline: oldest.daysUntilDeadline,
+        overdue: oldest.daysUntilDeadline < 0,
+        // Kept together would put the oldest past its deadline. Only reachable
+        // when the batch window is set wider than the weaning range.
+        splitNeeded: youngest.readyOn.getTime() > oldest.mustGoBy.getTime(),
       };
     })
-    .filter((batch) => batch.daysUntilReady <= lead)
-    .sort((left, right) => left.daysUntilReady - right.daysUntilReady);
+    .filter(
+      (batch) =>
+        // Approaching eligibility, so the pens can be got ready; or eligible
+        // now; or running out of road, which must be said whatever else is true.
+        batch.daysUntilReady <= lead || batch.overdue || batch.splitNeeded,
+    )
+    .sort((left, right) => {
+      // The deadline is the hard constraint, so it orders the list: the batch
+      // with the least road left is the one to deal with first, whether or not
+      // it is the one that became eligible earliest.
+      if (left.daysUntilDeadline !== right.daysUntilDeadline) {
+        return left.daysUntilDeadline - right.daysUntilDeadline;
+      }
+      return left.daysUntilReady - right.daysUntilReady;
+    });
 }
 
 /** Just the batches already past the day, which the dashboard leads with. */
@@ -273,17 +335,42 @@ export function describeBatch(batch: WeaningBatch): string {
   const head = batch.calves.length;
   const subject = head === 1 ? "1 calf" : `${head} calves`;
 
-  const when = batch.overdue
-    ? `${Math.abs(batch.daysUntilReady)} ${Math.abs(batch.daysUntilReady) === 1 ? "day" : "days"} past weaning age`
-    : batch.daysUntilReady === 0
-      ? "ready to wean today"
-      : `ready to wean in ${batch.daysUntilReady} ${batch.daysUntilReady === 1 ? "day" : "days"}`;
+  const spread = (() => {
+    if (head === 1) return "";
+    const oldest = batch.calves[0] as WeaningCandidate;
+    const youngest = batch.calves[head - 1] as WeaningCandidate;
+    const days = Math.round(daysApart(oldest.bornOn, youngest.bornOn));
+    return `, born ${days} ${days === 1 ? "day" : "days"} apart`;
+  })();
 
-  if (head === 1) return `${subject} — ${when}.`;
+  const late = (() => {
+    const over = Math.abs(batch.daysUntilDeadline);
+    return `${over} ${over === 1 ? "day" : "days"} past the day ${
+      head === 1 ? "it" : "the oldest"
+    } had to be off`;
+  })();
 
-  const oldest = batch.calves[0] as WeaningCandidate;
-  const youngest = batch.calves[head - 1] as WeaningCandidate;
-  const spread = Math.round(daysApart(oldest.bornOn, youngest.bornOn));
+  // Checked before overdue, and usually true alongside it: a group only ends up
+  // spread this wide by having been left, so both are nearly always the case.
+  // This one goes first because it changes what somebody *does* — the deadline
+  // says hurry, this says the group cannot go in one piece.
+  if (batch.splitNeeded) {
+    return `${subject}${spread} — too spread out to come off together${
+      batch.overdue ? `, and ${late}` : ""
+    }. The oldest runs out before the youngest is old enough.`;
+  }
 
-  return `${subject}, born ${spread} ${spread === 1 ? "day" : "days"} apart — ${when} when the youngest is ready.`;
+  if (batch.overdue) return `${subject}${spread} — ${late}.`;
+
+  if (batch.ready) {
+    const left = batch.daysUntilDeadline;
+    return `${subject}${spread} — ready now, and the oldest must be off within ${left} ${
+      left === 1 ? "day" : "days"
+    }.`;
+  }
+
+  const wait = batch.daysUntilReady;
+  return `${subject}${spread} — old enough in ${wait} ${
+    wait === 1 ? "day" : "days"
+  }, once the youngest is 120.`;
 }

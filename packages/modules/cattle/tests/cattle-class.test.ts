@@ -111,6 +111,50 @@ describe("the herd split by class", () => {
     expect(of("calf")).toBe(2);
   });
 
+  it("counts a donor as a cow even when every calf came out of a recipient", () => {
+    // Two females behind one calf: the recipient carried and calved it, the
+    // donor produced it. Both have had calves, and filing the donor as a
+    // maiden heifer beside her own daughters is plainly wrong.
+    const donor = "01ARZ3NDEKTSV4RRFFQ69G5FD1" as never;
+    const recip = "01ARZ3NDEKTSV4RRFFQ69G5FR1" as never;
+    const breeding = "01ARZ3NDEKTSV4RRFFQ69G5FB1" as never;
+
+    const calved = damsThatHaveCalved(
+      [{ damId: recip, breedingRecordId: breeding }],
+      [{ id: breeding, embryoDonorId: donor }],
+    );
+
+    expect(calved.has(donor)).toBe(true);
+    expect(calved.has(recip)).toBe(true);
+  });
+
+  it("does not promote a heifer merely for having been flushed", () => {
+    // A heifer can be flushed before she has ever carried anything, so being a
+    // donor is a plan rather than a calf on the ground. What counts is a
+    // calving that names her breeding.
+    const donor = "01ARZ3NDEKTSV4RRFFQ69G5FD2" as never;
+    const breeding = "01ARZ3NDEKTSV4RRFFQ69G5FB2" as never;
+
+    const calved = damsThatHaveCalved([], [{ id: breeding, embryoDonorId: donor }]);
+
+    expect(calved.has(donor)).toBe(false);
+  });
+
+  it("cannot attribute a calving that names no breeding", () => {
+    // The cost of that precision, stated: the donor behind an unlinked calving
+    // stays a heifer until the two are joined up. Visible and fixable, unlike
+    // silently promoting maiden heifers.
+    const recip = "01ARZ3NDEKTSV4RRFFQ69G5FR2" as never;
+    const donor = "01ARZ3NDEKTSV4RRFFQ69G5FD3" as never;
+
+    const calved = damsThatHaveCalved(
+      [{ damId: recip }],
+      [{ id: "01ARZ3NDEKTSV4RRFFQ69G5FB3" as never, embryoDonorId: donor }],
+    );
+
+    expect(calved.has(donor)).toBe(false);
+  });
+
   it("moves a female to cows once a calving is on file", () => {
     const dolly = { ...beast("female", 1200), id: "01ARZ3NDEKTSV4RRFFQ69G5FA1" as never };
     const calved = damsThatHaveCalved([{ damId: dolly.id }]);

@@ -163,12 +163,48 @@ export function unclassified(animals: readonly Pick<Animal, "sex" | "dob">[], as
 }
 
 /**
- * Every female with a calving on file, as a set to hand to the two above.
+ * Every female who has produced a calf, as a set to hand to the two above.
  *
  * Built from the records rather than a flag on the animal, so a calving entered
- * or corrected moves her between heifer and cow without anything else needing
- * to be remembered.
+ * or corrected moves her between heifer and cow with nothing else to remember.
+ *
+ * ## Donors are cows
+ *
+ * Two females can be behind one calf. The recipient carried and calved it, so
+ * she is on the calving record; the donor produced it, and is on the breeding
+ * record that calving answers. Both are cows — a donor whose every calf came
+ * out of a recipient has still had calves, and filing her as a maiden heifer
+ * beside her own daughters is plainly wrong.
+ *
+ * Reached through the calving rather than through the flush, deliberately. A
+ * heifer can be flushed before she has ever carried anything, so *being* a
+ * donor is a plan rather than a calf on the ground. What counts is a calving,
+ * linked to the breeding it answers, whose donor is named.
+ *
+ * The cost of that precision is that a calving carrying no `breedingRecordId`
+ * cannot be attributed, so the donor behind it stays a heifer until the two are
+ * linked. That is visible and fixable; the alternative silently promotes maiden
+ * heifers, which is not.
  */
-export function damsThatHaveCalved(calvings: readonly { readonly damId: Ulid }[]): Set<Ulid> {
-  return new Set(calvings.map((record) => record.damId));
+export function damsThatHaveCalved(
+  calvings: readonly { readonly damId: Ulid; readonly breedingRecordId?: Ulid | undefined }[],
+  breedings: readonly { readonly id: Ulid; readonly embryoDonorId?: Ulid | undefined }[] = [],
+): Set<Ulid> {
+  const donorOf = new Map<Ulid, Ulid>();
+  for (const breeding of breedings) {
+    if (breeding.embryoDonorId !== undefined) donorOf.set(breeding.id, breeding.embryoDonorId);
+  }
+
+  const calved = new Set<Ulid>();
+  for (const record of calvings) {
+    // Whoever carried it.
+    calved.add(record.damId);
+
+    // And whoever it came from, when that was somebody else.
+    const donor =
+      record.breedingRecordId === undefined ? undefined : donorOf.get(record.breedingRecordId);
+    if (donor !== undefined) calved.add(donor);
+  }
+
+  return calved;
 }

@@ -14,10 +14,11 @@ import {
 } from "@galaxy-farm/core";
 import {
   cattleProfileSchema,
-  DEFAULT_WEANING_AGE_DAYS,
   describeBatch,
   overdueToWean,
   weaningBatches,
+  WEANING_EARLIEST_DAYS,
+  WEANING_LATEST_DAYS,
   type CalvingRecord,
   type CattleProfile,
   type WeaningBatch,
@@ -257,7 +258,9 @@ export function WeaningCard({
 
           return (
             <section key={batch.calves[0]?.calfId} className="flex flex-col gap-2">
-              <p className={batch.overdue ? "font-medium text-ink" : "text-ink"}>
+              <p
+                className={batch.overdue || batch.splitNeeded ? "font-medium text-ink" : "text-ink"}
+              >
                 {describeBatch(batch)}
               </p>
 
@@ -317,9 +320,10 @@ export function WeaningCard({
       </div>
 
       <p className="mt-density text-sm text-muted">
-        Weaning at {DEFAULT_WEANING_AGE_DAYS} days — early, as show calves come off. A batch waits
-        for its youngest. The 205-day figure elsewhere is what weaning weights are adjusted to for
-        comparison, not when to wean.
+        Calves may come off from {WEANING_EARLIEST_DAYS} days and must be off by{" "}
+        {WEANING_LATEST_DAYS}. A group waits for its youngest to be old enough, and is ordered by
+        whichever calf runs out of road first. The 205-day figure elsewhere is what weaning weights
+        are adjusted to for comparison, not when to wean.
       </p>
     </Card>
   );

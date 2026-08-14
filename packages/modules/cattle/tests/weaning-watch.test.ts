@@ -5,12 +5,13 @@ import type { Animal, Ulid } from "@galaxy-farm/core";
 import type { CattleProfile } from "../src/domain/cattle-profile.js";
 import {
   DEFAULT_BATCH_WINDOW_DAYS,
-  DEFAULT_WEANING_AGE_DAYS,
   describeBatch,
   groupIntoBatches,
   overdueToWean,
   weaningBatches,
   weaningCandidates,
+  WEANING_EARLIEST_DAYS,
+  WEANING_LATEST_DAYS,
 } from "../src/domain/weaning-watch.js";
 
 /**
@@ -90,14 +91,14 @@ describe("which calves are on the list at all", () => {
 
 describe("when a batch comes up", () => {
   it("raises one that has reached weaning age", () => {
-    expect(watch([calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS })])).toHaveLength(1);
+    expect(watch([calf({ bornDaysAgo: WEANING_EARLIEST_DAYS })])).toHaveLength(1);
   });
 
   it("opens a fortnight ahead, because weaning is not done the morning it is thought of", () => {
     // The pair has to be separated far enough apart not to hear each other and
     // the calf's pen and water have to be ready. An alert on the day is late.
-    expect(watch([calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS - 10 })])).toHaveLength(1);
-    expect(watch([calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS - 40 })])).toHaveLength(0);
+    expect(watch([calf({ bornDaysAgo: WEANING_EARLIEST_DAYS - 10 })])).toHaveLength(1);
+    expect(watch([calf({ bornDaysAgo: WEANING_EARLIEST_DAYS - 40 })])).toHaveLength(0);
   });
 
   it("does not wait for 205 days, which is a measurement and not an instruction", () => {
@@ -111,8 +112,8 @@ describe("calves born close together come off together", () => {
   it("holds an older calf back until its contemporaries are ready", () => {
     // Waiting a fortnight to wean a calf with its contemporaries costs nothing;
     // splitting a pen twice costs a morning and unsettles the ones left behind.
-    const older = calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS + 10, name: "Older" });
-    const younger = calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS - 5, name: "Younger" });
+    const older = calf({ bornDaysAgo: WEANING_EARLIEST_DAYS + 10, name: "Older" });
+    const younger = calf({ bornDaysAgo: WEANING_EARLIEST_DAYS - 5, name: "Younger" });
 
     const batches = watch([older, younger]);
 
@@ -127,7 +128,7 @@ describe("calves born close together come off together", () => {
     // Four calves over a fortnight is one morning's work, and raising it four
     // times means three raisings answered by doing nothing.
     const born = [0, 5, 10, 14].map((offset) =>
-      calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS + offset }),
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS + offset }),
     );
 
     expect(watch(born)).toHaveLength(1);
@@ -137,8 +138,8 @@ describe("calves born close together come off together", () => {
   it("keeps separate calving groups apart", () => {
     // Two months apart is not one batch, and weaning them together would hold
     // the first group back to no purpose.
-    const spring = calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS });
-    const autumn = calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS - 60 });
+    const spring = calf({ bornDaysAgo: WEANING_EARLIEST_DAYS });
+    const autumn = calf({ bornDaysAgo: WEANING_EARLIEST_DAYS - 60 });
 
     expect(watch([spring, autumn])).toHaveLength(1);
   });
@@ -154,6 +155,8 @@ describe("calves born close together come off together", () => {
       ageDays: 200 - offset,
       readyOn: TODAY,
       daysUntilReady: 0,
+      mustGoBy: TODAY,
+      daysUntilDeadline: 0,
     }));
 
     const batches = groupIntoBatches(trickle, DEFAULT_BATCH_WINDOW_DAYS);
@@ -168,8 +171,8 @@ describe("calves born close together come off together", () => {
 
   it("lists a batch oldest first, the order they are looked at in the pen", () => {
     const found = watch([
-      calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS - 2, name: "Younger" }),
-      calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS + 8, name: "Older" }),
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS - 2, name: "Younger" }),
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS + 8, name: "Older" }),
     ]);
 
     expect(found[0]?.calves.map((entry) => entry.calfName)).toEqual(["Older", "Younger"]);
@@ -251,37 +254,91 @@ describe("which cow the calf is actually on", () => {
   });
 });
 
+describe("the two ends of the window", () => {
+  it("is not overdue merely for being old enough", () => {
+    // The month between 120 and 150 is a choice, not a delay. A watch that
+    // called it late would nag for four weeks about work that is not.
+    const batch = watch([calf({ bornDaysAgo: WEANING_EARLIEST_DAYS + 10 })])[0];
+
+    expect(batch?.ready).toBe(true);
+    expect(batch?.overdue).toBe(false);
+  });
+
+  it("is overdue once a calf passes the day it had to be off", () => {
+    const batch = watch([calf({ bornDaysAgo: WEANING_LATEST_DAYS + 6 })])[0];
+
+    expect(batch?.overdue).toBe(true);
+    expect(batch?.daysUntilDeadline).toBe(-6);
+    expect(describeBatch(batch as never)).toBe("1 calf — 6 days past the day it had to be off.");
+  });
+
+  it("takes the deadline from the oldest calf, who runs out first", () => {
+    const batch = watch([
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS + 15, name: "Older" }),
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS, name: "Younger" }),
+    ])[0];
+
+    // The older one is 135 days: fifteen days of road left, not thirty.
+    expect(batch?.daysUntilDeadline).toBe(WEANING_LATEST_DAYS - (WEANING_EARLIEST_DAYS + 15));
+  });
+
+  it("takes eligibility from the youngest calf, who is ready last", () => {
+    const batch = watch([
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS + 15 }),
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS - 5 }),
+    ])[0];
+
+    expect(batch?.ready).toBe(false);
+    expect(batch?.daysUntilReady).toBe(5);
+  });
+
+  it("says so when a group cannot keep both rules", () => {
+    // Only reachable when the batch window is set wider than the thirty days
+    // between the two ages. Said out loud rather than silently breaking
+    // whichever rule is cheaper — the answer is a decision, not a default.
+    const batches = weaningBatches({
+      animals: [
+        calf({ bornDaysAgo: WEANING_LATEST_DAYS + 5 }),
+        calf({ bornDaysAgo: WEANING_EARLIEST_DAYS - 40 }),
+      ],
+      profiles: [],
+      asOf: TODAY,
+      batchWindowDays: 120,
+    });
+
+    expect(batches[0]?.splitNeeded).toBe(true);
+    expect(describeBatch(batches[0] as never)).toContain("too spread out to come off together");
+  });
+});
+
 describe("what the watch says", () => {
-  it("counts the days past for a lone calf, and marks it overdue", () => {
-    const late = watch([calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS + 20 })])[0];
+  it("counts down to the day the youngest is old enough", () => {
+    const soon = watch([calf({ bornDaysAgo: WEANING_EARLIEST_DAYS - 7 })])[0];
 
-    expect(late?.overdue).toBe(true);
-    expect(late?.daysUntilReady).toBe(-20);
-    expect(describeBatch(late as never)).toBe("1 calf — 20 days past weaning age.");
+    expect(describeBatch(soon as never)).toBe(
+      "1 calf — old enough in 7 days, once the youngest is 120.",
+    );
   });
 
-  it("counts the days remaining while there are any", () => {
-    const soon = watch([calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS - 7 })])[0];
+  it("names the road left once the batch is eligible", () => {
+    // What is wanted at that point is not "ready" — it is how long there is.
+    const due = watch([calf({ bornDaysAgo: WEANING_EARLIEST_DAYS })])[0];
 
-    expect(describeBatch(soon as never)).toBe("1 calf — ready to wean in 7 days.");
-  });
-
-  it("says today on the day", () => {
-    const due = watch([calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS })])[0];
-
-    expect(describeBatch(due as never)).toBe("1 calf — ready to wean today.");
+    expect(describeBatch(due as never)).toBe(
+      "1 calf — ready now, and the oldest must be off within 30 days.",
+    );
   });
 
   it("shows the spread of a batch, since it changes what the morning looks like", () => {
     // Four calves born the same day is a different job from four spanning
     // three weeks.
     const batch = watch([
-      calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS + 12 }),
-      calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS }),
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS + 12 }),
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS }),
     ])[0];
 
     expect(describeBatch(batch as never)).toBe(
-      "2 calves, born 12 days apart — ready to wean today when the youngest is ready.",
+      "2 calves, born 12 days apart — ready now, and the oldest must be off within 18 days.",
     );
   });
 });
@@ -289,8 +346,8 @@ describe("what the watch says", () => {
 describe("the order batches come in", () => {
   it("puts the nearest deadline first", () => {
     const found = watch([
-      calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS - 5, name: "Later" }),
-      calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS + 90, name: "Worst" }),
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS - 5, name: "Later" }),
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS + 90, name: "Worst" }),
     ]);
 
     expect(found.map((batch) => batch.calves[0]?.calfName)).toEqual(["Worst", "Later"]);
@@ -298,31 +355,34 @@ describe("the order batches come in", () => {
 
   it("separates out the batches already past the day", () => {
     const found = watch([
-      calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS - 5 }),
-      calf({ bornDaysAgo: DEFAULT_WEANING_AGE_DAYS + 90 }),
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS - 5 }),
+      calf({ bornDaysAgo: WEANING_EARLIEST_DAYS + 90 }),
     ]);
 
     expect(overdueToWean(found)).toHaveLength(1);
   });
 });
 
-describe("the age is a setting, not a constant", () => {
-  it("takes a different weaning age for an operation that runs one", () => {
-    // A club calf and a replacement heifer do not come off at the same age.
-    // 195 days old against a 205-day age: ten days out, inside the fortnight.
-    const bandit = calf({ bornDaysAgo: 195 });
+describe("the window is a setting, not a constant", () => {
+  const bandit = calf({ bornDaysAgo: 195 });
+  const later = {
+    animals: [bandit],
+    profiles: [],
+    asOf: TODAY,
+    earliestDays: 205,
+    latestDays: 240,
+  };
 
-    expect(
-      weaningBatches({ animals: [bandit], profiles: [], asOf: TODAY, weaningAgeDays: 205 }),
-    ).toHaveLength(1);
-    expect(
-      weaningBatches({
-        animals: [bandit],
-        profiles: [],
-        asOf: TODAY,
-        weaningAgeDays: 205,
-        leadDays: 3,
-      }),
-    ).toHaveLength(0);
+  it("takes a different window for an operation that runs one", () => {
+    // A club calf and a replacement heifer do not come off at the same age.
+    // 195 days against a 205-day start: ten days out, inside the fortnight.
+    expect(weaningBatches(later)).toHaveLength(1);
+    expect(weaningBatches({ ...later, leadDays: 3 })).toHaveLength(0);
+  });
+
+  it("raises a calf past the deadline whatever the lead time is", () => {
+    // Running out of road has to be said even when nothing else would show it:
+    // a short lead must not be able to hide a calf that is already late.
+    expect(weaningBatches({ ...later, latestDays: 180, leadDays: 1 })[0]?.overdue).toBe(true);
   });
 });

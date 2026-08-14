@@ -49,6 +49,7 @@ import {
   classCounts,
   damsThatHaveCalved,
   unclassified,
+  type BreedingRecord,
   type CalvingRecord,
   type CattleProfile,
   type HealthRecord,
@@ -146,6 +147,9 @@ export function HerdScreen({
   const { records: all, loading } = useRecords<Animal>("animals", { propertyId, search });
   const { records: zones } = useRecords<Zone>("zones", { propertyId });
   const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", { propertyId });
+  // Needed to see past a recipient to the donor: a donor whose every calf came
+  // out of a recip has still had calves, and is a cow.
+  const { records: breedings } = useRecords<BreedingRecord>("breedingRecords", { propertyId });
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", { propertyId });
   const { records: health } = useRecords<HealthRecord>("healthRecords", { propertyId });
   // Breed lives on the profile rather than the animal, because most of what a
@@ -200,7 +204,7 @@ export function HerdScreen({
   // A heifer becomes a cow by calving, not by ageing — so the calvings decide
   // which of the two a female is. Built from the records rather than a flag, so
   // a calving entered or corrected moves her without anything else to remember.
-  const calved = useMemo(() => damsThatHaveCalved(calvings), [calvings]);
+  const calved = useMemo(() => damsThatHaveCalved(calvings, breedings), [calvings, breedings]);
   const classOf = (animal: Animal) =>
     cattleClass(animal, asOf, { hasCalved: calved.has(animal.id) });
 
