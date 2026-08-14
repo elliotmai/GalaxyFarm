@@ -182,28 +182,38 @@ export async function moveAnimalForKiosk(
       deviceId,
       attempts: 0,
     })),
-    {
-      id: ids.next(),
-      operation: "create" as const,
-      patch: {
-        entity: "zoneAssignments",
-        recordId: opened.id,
-        changes: diff(
-          {},
+    // Absent when she is already standing in the target zone — the whole
+    // move is a no-op past whatever `closed` repaired, and writing a second
+    // identical assignment is exactly the fault `moveToZone` now refuses to
+    // produce.
+    ...(opened === undefined
+      ? []
+      : [
           {
-            animalId: opened.animalId,
-            zoneId: opened.zoneId,
-            slot: opened.slot,
-            periodFrom: opened.periodFrom,
-          } as Record<string, FieldValue>,
-          meta,
-        ),
-      },
-      queuedAt: at,
-      deviceId,
-      attempts: 0,
-    },
+            id: ids.next(),
+            operation: "create" as const,
+            patch: {
+              entity: "zoneAssignments",
+              recordId: opened.id,
+              changes: diff(
+                {},
+                {
+                  animalId: opened.animalId,
+                  zoneId: opened.zoneId,
+                  slot: opened.slot,
+                  periodFrom: opened.periodFrom,
+                } as Record<string, FieldValue>,
+                meta,
+              ),
+            },
+            queuedAt: at,
+            deviceId,
+            attempts: 0,
+          },
+        ]),
   ];
+
+  if (entries.length === 0) return { ok: true };
 
   const result = await applyPush(db, entries, {
     propertyId: actor.propertyId,
