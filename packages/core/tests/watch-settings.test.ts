@@ -140,3 +140,84 @@ describe("isWithinLead", () => {
     expect(isWithinLead(off, "cold_snap", event, new Date("2026-11-20T18:00:00Z"))).toBe(false);
   });
 });
+
+/**
+ * The weaning window, as a setting (spec §6).
+ *
+ * Two ages rather than one, because weaning does not happen on a single
+ * correct day: a calf may come off from the first and must be off by the
+ * second. A lone figure could only ever be one of the two, and either choice
+ * is wrong — the early one nags for a month about work that is not late, the
+ * late one never warns until it already is.
+ */
+describe("the weaning window", () => {
+  const valid = { ...DEFAULT_WATCH_SETTINGS };
+
+  it("ships the range this farm works to", () => {
+    expect(DEFAULT_WATCH_SETTINGS.weaningEarliestDays).toBe(120);
+    expect(DEFAULT_WATCH_SETTINGS.weaningLatestDays).toBe(150);
+  });
+
+  it("refuses a deadline that falls before the earliest day", () => {
+    // Neither figure is wrong on its own; the pair is. Every calf would be
+    // overdue the moment it appeared, and none could ever be weaned in time.
+    const backwards = watchSettingsSchema.safeParse({
+      ...valid,
+      weaningEarliestDays: 150,
+      weaningLatestDays: 120,
+    });
+
+    expect(backwards.success).toBe(false);
+    expect(backwards.error?.issues[0]?.path).toEqual(["weaningLatestDays"]);
+  });
+
+  it("refuses the two being equal, which leaves no window at all", () => {
+    expect(
+      watchSettingsSchema.safeParse({
+        ...valid,
+        weaningEarliestDays: 140,
+        weaningLatestDays: 140,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("takes a wider window for an operation that runs one", () => {
+    expect(
+      watchSettingsSchema.safeParse({
+        ...valid,
+        weaningEarliestDays: 180,
+        weaningLatestDays: 240,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("will not take an age that is not a calf's", () => {
+    // Below about two months nothing is ready to be off milk; past a year it
+    // is not a calf.
+    expect(watchSettingsSchema.safeParse({ ...valid, weaningEarliestDays: 10 }).success).toBe(
+      false,
+    );
+    expect(watchSettingsSchema.safeParse({ ...valid, weaningLatestDays: 400 }).success).toBe(false);
+  });
+
+  it("fills the window in for a property saved before it existed", () => {
+    // The merge is what stops a new setting silently resetting the two
+    // somebody had already tuned.
+    const older = resolveWatchSettings({ calfChillF: 25, gestationDays: 279 } as never);
+
+    expect(older.weaningEarliestDays).toBe(120);
+    expect(older.weaningLatestDays).toBe(150);
+    expect(older.calfChillF).toBe(25);
+    expect(older.gestationDays).toBe(279);
+  });
+
+  it("keeps a window somebody has set", () => {
+    const tuned = resolveWatchSettings({
+      weaningEarliestDays: 100,
+      weaningLatestDays: 130,
+    } as never);
+
+    expect(tuned.weaningEarliestDays).toBe(100);
+    expect(tuned.weaningLatestDays).toBe(130);
+  });
+});

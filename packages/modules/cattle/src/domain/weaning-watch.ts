@@ -1,4 +1,14 @@
-import { ageInDays, displayName, isOnFarm, type Animal, type Ulid } from "@galaxy-farm/core";
+import {
+  ageInDays,
+  DEFAULT_WEANING_BATCH_WINDOW_DAYS,
+  DEFAULT_WEANING_EARLIEST_DAYS,
+  DEFAULT_WEANING_LATEST_DAYS,
+  DEFAULT_WEANING_LEAD_DAYS,
+  displayName,
+  isOnFarm,
+  type Animal,
+  type Ulid,
+} from "@galaxy-farm/core";
 
 import type { CattleProfile } from "./cattle-profile.js";
 
@@ -76,29 +86,25 @@ import type { CattleProfile } from "./cattle-profile.js";
  * seeing beside "out of Jenna" — one is the pen and the other is the papers.
  */
 
-/** Old enough to come off. Nothing is weaned before this. */
-export const WEANING_EARLIEST_DAYS = 120;
-
 /**
- * The day it stops being a choice.
+ * Re-exported, not redeclared.
  *
- * A calf still on its dam past this is late, however convenient the week was.
- */
-export const WEANING_LATEST_DAYS = 150;
-
-/** How far ahead the watch opens, so there is time to set the pens up. */
-export const DEFAULT_WEANING_LEAD_DAYS = 14;
-
-/**
- * How far apart two calves can be born and still come off together.
+ * The figures live in the kernel beside the rest of the watch settings, because
+ * they are property-wide and the poller that will eventually read them is not
+ * cattle code (§4.1) — the same reason `WATCH_SIGNALS` lives there. A caller
+ * holding a weaning batch should not have to know that.
  *
- * Three weeks — roughly one heat cycle, which is the natural width of a calving
- * group when the cows were bred together. Measured against the *earliest* calf
- * in the batch rather than the previous one, so a run of calves born a
- * fortnight apart all season cannot chain into a single batch that never
- * becomes ready.
+ * Every one of them is a *default*: what a property gets until somebody sets it
+ * under Settings → Watch. Nothing here reads the settings itself; they arrive
+ * as arguments, which is what keeps this testable against a farm that weans at
+ * any age.
  */
-export const DEFAULT_BATCH_WINDOW_DAYS = 21;
+export {
+  DEFAULT_WEANING_BATCH_WINDOW_DAYS,
+  DEFAULT_WEANING_EARLIEST_DAYS,
+  DEFAULT_WEANING_LATEST_DAYS,
+  DEFAULT_WEANING_LEAD_DAYS,
+};
 
 export interface WeaningCandidate {
   readonly calfId: Ulid;
@@ -192,8 +198,8 @@ const daysApart = (left: Date, right: Date): number =>
  * - **Not cattle.** One Animal model serves every species (§2).
  */
 export function weaningCandidates(input: WeaningWatchInput): WeaningCandidate[] {
-  const earliest = input.earliestDays ?? WEANING_EARLIEST_DAYS;
-  const latest = input.latestDays ?? WEANING_LATEST_DAYS;
+  const earliest = input.earliestDays ?? DEFAULT_WEANING_EARLIEST_DAYS;
+  const latest = input.latestDays ?? DEFAULT_WEANING_LATEST_DAYS;
   const profileFor = new Map(input.profiles.map((profile) => [profile.animalId, profile]));
 
   const calvedBy = new Map<Ulid, Ulid>();
@@ -251,7 +257,7 @@ export function weaningCandidates(input: WeaningWatchInput): WeaningCandidate[] 
  */
 export function groupIntoBatches(
   candidates: readonly WeaningCandidate[],
-  batchWindowDays: number = DEFAULT_BATCH_WINDOW_DAYS,
+  batchWindowDays: number = DEFAULT_WEANING_BATCH_WINDOW_DAYS,
 ): WeaningCandidate[][] {
   const batches: WeaningCandidate[][] = [];
 
@@ -281,7 +287,7 @@ export function weaningBatches(input: WeaningWatchInput): WeaningBatch[] {
   const lead = input.leadDays ?? DEFAULT_WEANING_LEAD_DAYS;
   const candidates = weaningCandidates(input);
 
-  return groupIntoBatches(candidates, input.batchWindowDays ?? DEFAULT_BATCH_WINDOW_DAYS)
+  return groupIntoBatches(candidates, input.batchWindowDays ?? DEFAULT_WEANING_BATCH_WINDOW_DAYS)
     .map((calves) => {
       // Candidates are sorted oldest first, so the last is the youngest. The
       // youngest sets when the group *may* go; the oldest sets when it must.

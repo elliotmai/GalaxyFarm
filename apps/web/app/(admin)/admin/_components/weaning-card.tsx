@@ -6,8 +6,10 @@ import { Badge, Button, Card, Checkbox, Select, useConfirmDelete, useToast } fro
 import {
   encodeUlid,
   moveToZone,
+  resolveWatchSettings,
   zoneAssignmentSchema,
   type Animal,
+  type Property,
   type Ulid,
   type Zone,
   type ZoneAssignment,
@@ -17,8 +19,6 @@ import {
   describeBatch,
   overdueToWean,
   weaningBatches,
-  WEANING_EARLIEST_DAYS,
-  WEANING_LATEST_DAYS,
   type CalvingRecord,
   type CattleProfile,
   type WeaningBatch,
@@ -62,6 +62,16 @@ export function WeaningCard({
   const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", { propertyId });
   const { records: zones } = useRecords<Zone>("zones", { propertyId });
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", { propertyId });
+  const { records: properties } = useRecords<Property>("properties", { propertyId });
+
+  // Read from the property, not from the defaults: the whole point of the
+  // setting is that a farm weaning at another age gets its own answer here,
+  // and `resolveWatchSettings` fills the gaps for a property saved before the
+  // fields existed.
+  const settings = useMemo(
+    () => resolveWatchSettings(properties.find((entry) => entry.id === propertyId)?.watchSettings),
+    [properties, propertyId],
+  );
 
   const profileApi = useMutations<CattleProfile>(
     "cattleProfiles",
@@ -85,8 +95,18 @@ export function WeaningCard({
   const asOf = useMemo(() => new Date(), []);
 
   const batches = useMemo(
-    () => weaningBatches({ animals, profiles, calvings, asOf }),
-    [animals, profiles, calvings, asOf],
+    () =>
+      weaningBatches({
+        animals,
+        profiles,
+        calvings,
+        asOf,
+        earliestDays: settings.weaningEarliestDays,
+        latestDays: settings.weaningLatestDays,
+        leadDays: settings.weaningLeadDays,
+        batchWindowDays: settings.weaningBatchWindowDays,
+      }),
+    [animals, profiles, calvings, asOf, settings],
   );
 
   /** Calves ticked for this round, keyed by id. Everything starts ticked. */
@@ -320,10 +340,9 @@ export function WeaningCard({
       </div>
 
       <p className="mt-density text-sm text-muted">
-        Calves may come off from {WEANING_EARLIEST_DAYS} days and must be off by{" "}
-        {WEANING_LATEST_DAYS}. A group waits for its youngest to be old enough, and is ordered by
-        whichever calf runs out of road first. The 205-day figure elsewhere is what weaning weights
-        are adjusted to for comparison, not when to wean.
+        Calves may come off from {settings.weaningEarliestDays} days and must be off by{" "}
+        {settings.weaningLatestDays}. A group waits for its youngest to be old enough, and is
+        ordered by whichever calf runs out of road first. Change either under Settings → Watch.
       </p>
     </Card>
   );

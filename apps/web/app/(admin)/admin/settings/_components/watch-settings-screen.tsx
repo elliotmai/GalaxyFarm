@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   Badge,
   Button,
+  Callout,
   Card,
   Checkbox,
   DetailList,
@@ -163,6 +164,59 @@ export function WatchSettingsScreen({
           </p>
         </Card>
       )}
+
+      <Section
+        title="Weaning"
+        description="A window, not a birthday. Calves may come off from the first age and must be off by the second — everything between is a judgement about what else is on that week. Not to be confused with the 205-day figure used to adjust weaning weights for comparison, which is a measurement and not an instruction."
+      >
+        <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
+          <TextInput
+            label="May be weaned from (days)"
+            hint={`Default ${DEFAULT_WATCH_SETTINGS.weaningEarliestDays}. A group waits for its youngest to reach this.`}
+            type="number"
+            value={String(settings.weaningEarliestDays)}
+            onChange={(event) => change({ weaningEarliestDays: Number(event.target.value) })}
+          />
+          <TextInput
+            label="Must be weaned by (days)"
+            hint={`Default ${DEFAULT_WATCH_SETTINGS.weaningLatestDays}. Set by the oldest calf, who runs out first.`}
+            type="number"
+            value={String(settings.weaningLatestDays)}
+            onChange={(event) => change({ weaningLatestDays: Number(event.target.value) })}
+          />
+          <TextInput
+            label="Warning (days ahead)"
+            hint={`Default ${DEFAULT_WATCH_SETTINGS.weaningLeadDays}. Time to get a pen and water ready.`}
+            type="number"
+            value={String(settings.weaningLeadDays)}
+            onChange={(event) => change({ weaningLeadDays: Number(event.target.value) })}
+          />
+          <TextInput
+            label="Group calves born within (days)"
+            hint={`Default ${DEFAULT_WATCH_SETTINGS.weaningBatchWindowDays}, about one heat cycle. Contemporaries come off together.`}
+            type="number"
+            value={String(settings.weaningBatchWindowDays)}
+            onChange={(event) => change({ weaningBatchWindowDays: Number(event.target.value) })}
+          />
+        </div>
+
+        {/*
+          Said here rather than left to the save to reject, because somebody
+          typing a window wider than the range has done something reasonable
+          that produces an unreasonable result — every group too spread out to
+          come off in one piece — and finding that out from the dashboard a
+          week later is a bad way to learn it.
+        */}
+        {settings.weaningBatchWindowDays >
+        settings.weaningLatestDays - settings.weaningEarliestDays ? (
+          <Callout tone="danger" title="Groups wider than the window they have to fit in">
+            Calves grouped up to {settings.weaningBatchWindowDays} days apart, but only{" "}
+            {settings.weaningLatestDays - settings.weaningEarliestDays} days between the earliest
+            they may come off and the day they must. A group spread wider than that has its oldest
+            calf run out before its youngest is old enough, and cannot be weaned in one piece.
+          </Callout>
+        ) : null}
+      </Section>
 
       <Section
         title="Thresholds"

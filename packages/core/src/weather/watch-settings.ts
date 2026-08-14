@@ -26,6 +26,40 @@ import {
 export const WATCH_SIGNALS = ["cold_snap", "pressure_fall", "full_moon"] as const;
 export type WatchSignal = (typeof WATCH_SIGNALS)[number];
 
+/**
+ * When calves come off (spec §6), in days.
+ *
+ * Here rather than in the cattle module for the same reason the signal names
+ * are: these are property-wide settings, and the thing that will eventually
+ * poll them and send an email is not cattle code (§4.1).
+ * `@galaxy-farm/module-cattle` re-exports them so a caller holding a weaning
+ * batch does not have to know that.
+ *
+ * A window rather than one age. Weaning is not a thing that happens on one
+ * correct day: a calf **may** come off from the earlier figure and **must** be
+ * off by the later one, and everything between is a judgement about what else
+ * is on that week. A single number could only be one of the two, and either
+ * choice is wrong — the early one nags for a month about work that is not late,
+ * the late one never warns until it already is.
+ *
+ * Not to be confused with 205 days, which the app also computes. That is a
+ * measurement standard for comparing calves born a month apart, and taking it
+ * as a management instruction would put a show calf two months late.
+ */
+export const DEFAULT_WEANING_EARLIEST_DAYS = 120;
+export const DEFAULT_WEANING_LATEST_DAYS = 150;
+
+/** How far ahead of eligibility to speak up, so the pens can be got ready. */
+export const DEFAULT_WEANING_LEAD_DAYS = 14;
+
+/**
+ * How far apart two calves can be born and still come off together.
+ *
+ * Three weeks — roughly one heat cycle, which is the natural width of a calving
+ * group when the cows were bred together.
+ */
+export const DEFAULT_WEANING_BATCH_WINDOW_DAYS = 21;
+
 export interface WatchTrigger {
   readonly enabled: boolean;
   /**
@@ -49,6 +83,14 @@ export interface WatchSettings {
   readonly calvingWindowDays: number;
   /** §12 decision 2: a flat 283 days, editable here. */
   readonly gestationDays: number;
+  /** A calf may be weaned from this age. */
+  readonly weaningEarliestDays: number;
+  /** A calf must be weaned by this age. Always the later of the two. */
+  readonly weaningLatestDays: number;
+  /** Days of warning before the youngest in a group becomes eligible. */
+  readonly weaningLeadDays: number;
+  /** How far apart calves can be born and still be weaned as one group. */
+  readonly weaningBatchWindowDays: number;
   readonly frostF: number;
   readonly hardFreezeF: number;
   readonly triggers: Readonly<Record<WatchSignal, WatchTrigger>>;
@@ -69,6 +111,10 @@ export const DEFAULT_WATCH_SETTINGS: WatchSettings = {
   fullMoonDays: 1,
   calvingWindowDays: 14,
   gestationDays: 283,
+  weaningEarliestDays: DEFAULT_WEANING_EARLIEST_DAYS,
+  weaningLatestDays: DEFAULT_WEANING_LATEST_DAYS,
+  weaningLeadDays: DEFAULT_WEANING_LEAD_DAYS,
+  weaningBatchWindowDays: DEFAULT_WEANING_BATCH_WINDOW_DAYS,
   frostF: DEFAULT_FROST_F,
   hardFreezeF: DEFAULT_HARD_FREEZE_F,
   triggers: {
@@ -83,20 +129,35 @@ const triggerSchema = z.object({
   leadHours: z.number().int().min(0).max(168),
 });
 
-export const watchSettingsSchema = z.object({
-  calfChillF: z.number().min(-40).max(80),
-  pressureFallHpa: z.number().min(0.5).max(50),
-  fullMoonDays: z.number().int().min(0).max(7),
-  calvingWindowDays: z.number().int().min(1).max(45),
-  gestationDays: z.number().int().min(240).max(320),
-  frostF: z.number().min(-40).max(80),
-  hardFreezeF: z.number().min(-40).max(80),
-  triggers: z.object({
-    cold_snap: triggerSchema,
-    pressure_fall: triggerSchema,
-    full_moon: triggerSchema,
-  }),
-});
+export const watchSettingsSchema = z
+  .object({
+    calfChillF: z.number().min(-40).max(80),
+    pressureFallHpa: z.number().min(0.5).max(50),
+    fullMoonDays: z.number().int().min(0).max(7),
+    calvingWindowDays: z.number().int().min(1).max(45),
+    gestationDays: z.number().int().min(240).max(320),
+    // Floors and ceilings rather than opinions: below about two months a calf
+    // is not ready to be off milk at all, and past a year it is not a calf.
+    weaningEarliestDays: z.number().int().min(60).max(365),
+    weaningLatestDays: z.number().int().min(60).max(365),
+    weaningLeadDays: z.number().int().min(0).max(90),
+    weaningBatchWindowDays: z.number().int().min(0).max(120),
+    frostF: z.number().min(-40).max(80),
+    hardFreezeF: z.number().min(-40).max(80),
+    triggers: z.object({
+      cold_snap: triggerSchema,
+      pressure_fall: triggerSchema,
+      full_moon: triggerSchema,
+    }),
+  })
+  // Checked across the pair, because neither figure is wrong on its own and
+  // the combination is: a deadline before the earliest eligible day would make
+  // every calf overdue the moment it appeared, and no calf could ever be weaned
+  // in time.
+  .refine((settings) => settings.weaningLatestDays > settings.weaningEarliestDays, {
+    message: "Calves must be weaned by a later age than the one they may be weaned from",
+    path: ["weaningLatestDays"],
+  });
 
 /**
  * Fill the gaps from the defaults.
