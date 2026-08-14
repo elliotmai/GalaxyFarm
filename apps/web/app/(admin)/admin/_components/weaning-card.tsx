@@ -224,6 +224,15 @@ export function WeaningCard({
           for (const entry of closed) {
             await placements.update(entry.id, { periodTo: entry.periodTo });
           }
+
+          // A calf already standing in the pen it is being weaned into needs no
+          // assignment written — it is still weaned, and a second identical row
+          // would be the fault this now avoids.
+          if (opened === undefined) {
+            moved += 1;
+            continue;
+          }
+
           const placed = await placements.create(opened);
           if (!placed.ok) failed += 1;
           else moved += 1;

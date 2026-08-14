@@ -94,8 +94,8 @@ describe("moveToZone", () => {
     expect(closed).toHaveLength(1);
     expect(closed[0]?.zoneId).toBe(TRAP);
     expect(closed[0]?.periodTo).toEqual(later);
-    expect(opened.zoneId).toBe(NORTH);
-    expect(opened.slot).toBe("outside");
+    expect(opened?.zoneId).toBe(NORTH);
+    expect(opened?.slot).toBe("outside");
   });
 
   it("leaves the pasture assignment alone when she goes into the barn", () => {
@@ -119,7 +119,7 @@ describe("moveToZone", () => {
     );
 
     expect(closed).toEqual([]);
-    expect(opened.slot).toBe("inside");
+    expect(opened?.slot).toBe("inside");
   });
 
   it("closes every open assignment in the slot, not just the first", () => {
@@ -272,5 +272,138 @@ describe("doubleBookedAnimals", () => {
     ];
 
     expect(doubleBookedAnimals(existing, INDOOR)).toEqual([]);
+  });
+});
+
+/**
+ * Moving an animal into the pen she is already in.
+ *
+ * Reported from the field: a cow was set to her zone, and ended up assigned to
+ * that same zone twice — two open rows, same animal, same zone, same slot.
+ *
+ * `moveToZone` was right that closing and reopening the same zone writes a
+ * zero-length period into the history for no reason. It then opened the new
+ * one anyway, which is the half of that reasoning that does not follow: if she
+ * is already there, the answer is to do *nothing*, not to skip the close and
+ * keep the open.
+ *
+ * It is reachable from every screen that moves an animal — picking her current
+ * pen from a list of pens is the obvious thing to do — and it leaves a record
+ * that no screen can show correctly afterwards.
+ */
+describe("moving an animal into the zone she is already in", () => {
+  const already = [assignment({ id: id(70), zoneId: TRAP })];
+
+  const moveHere = () =>
+    moveToZone(
+      already,
+      {
+        id: id(71),
+        propertyId: id(0),
+        createdAt: later,
+        updatedAt: later,
+        animalId: COW,
+        zoneId: TRAP,
+        indoor: false,
+        at: later,
+      },
+      INDOOR,
+    );
+
+  it("opens nothing, rather than a second row beside the first", () => {
+    const { opened, closed } = moveHere();
+
+    expect(opened).toBeUndefined();
+    expect(closed).toEqual([]);
+  });
+
+  it("says she was already there, so a screen can tell somebody", () => {
+    // Silence would read as a move that happened. It did not, and the
+    // difference matters to whoever pressed the button.
+    expect(moveHere().alreadyThere).toBe(true);
+  });
+
+  it("still moves her when the zone is genuinely different", () => {
+    const { opened, alreadyThere } = moveToZone(
+      already,
+      {
+        id: id(72),
+        propertyId: id(0),
+        createdAt: later,
+        updatedAt: later,
+        animalId: COW,
+        zoneId: NORTH,
+        indoor: false,
+        at: later,
+      },
+      INDOOR,
+    );
+
+    expect(alreadyThere).toBe(false);
+    expect(opened?.zoneId).toBe(NORTH);
+  });
+
+  it("repairs the slot while leaving her where she is", () => {
+    // She is in the trap twice over — once on a legacy `primary` row. Setting
+    // her to that same trap should tidy the duplicate rather than add a third.
+    const twice = [
+      assignment({ id: id(73), zoneId: TRAP }),
+      assignment({ id: id(74), zoneId: TRAP, slot: "primary" }),
+    ];
+
+    const { closed, opened, alreadyThere } = moveToZone(
+      twice,
+      {
+        id: id(75),
+        propertyId: id(0),
+        createdAt: later,
+        updatedAt: later,
+        animalId: COW,
+        zoneId: TRAP,
+        indoor: false,
+        at: later,
+      },
+      INDOOR,
+    );
+
+    expect(alreadyThere).toBe(true);
+    expect(opened).toBeUndefined();
+    // The oldest stays open — it holds the true date she arrived. The rest are
+    // closed, because two open rows for one place is the fault being repaired.
+    expect(closed).toHaveLength(1);
+    expect(closed[0]?.id).toBe(id(74));
+  });
+});
+
+describe("finding a cow booked into one place twice", () => {
+  it("catches two open rows for the same zone, not only for different ones", () => {
+    // The detector counted *distinct zones* per slot, so the duplicate the
+    // field reported — same animal, same zone, same slot, twice — gave a set
+    // of size one and passed. The check written for this class of fault was
+    // blind to the shape it actually took.
+    const duplicated = [
+      assignment({ id: id(80), zoneId: TRAP }),
+      assignment({ id: id(81), zoneId: TRAP }),
+    ];
+
+    expect(doubleBookedAnimals(duplicated, INDOOR)).toEqual([COW]);
+  });
+
+  it("still catches the two-pastures case it was written for", () => {
+    const twoPastures = [
+      assignment({ id: id(82), zoneId: TRAP }),
+      assignment({ id: id(83), zoneId: NORTH }),
+    ];
+
+    expect(doubleBookedAnimals(twoPastures, INDOOR)).toEqual([COW]);
+  });
+
+  it("says nothing about a cow with one pen and one stall", () => {
+    const proper = [
+      assignment({ id: id(84), zoneId: TRAP }),
+      assignment({ id: id(85), zoneId: STALL, slot: "inside" }),
+    ];
+
+    expect(doubleBookedAnimals(proper, INDOOR)).toEqual([]);
   });
 });

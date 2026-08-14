@@ -142,27 +142,33 @@ export function conflictingAssignments(
 }
 
 /**
- * Animals standing in more than one zone in the same slot.
+ * Animals with more than one open assignment in the same slot.
  *
  * For a check that can be run over the whole herd — a cow in two pastures is
  * invisible on any one screen and obvious across all of them.
+ *
+ * Counts **rows, not distinct zones**, and that distinction is the whole of a
+ * bug this missed. It used to collect the zone ids into a set and complain when
+ * the set held more than one, which silently excused the commonest corruption
+ * of the two: the same animal open twice *in the same zone*. One zone, set of
+ * size one, no complaint — while the record said she was in the North Trap
+ * twice over. The check written for this class of fault was blind to the shape
+ * it actually took in the field.
  */
 export function doubleBookedAnimals(
   assignments: readonly ZoneAssignment[],
   indoorZoneIds: ReadonlySet<Ulid>,
 ): Ulid[] {
-  const perSlot = new Map<string, Set<Ulid>>();
+  const perSlot = new Map<string, number>();
 
   for (const assignment of assignments.filter(isCurrent)) {
     const key = `${assignment.animalId}:${effectiveSlot(assignment, indoorZoneIds)}`;
-    const zones = perSlot.get(key) ?? new Set<Ulid>();
-    zones.add(assignment.zoneId);
-    perSlot.set(key, zones);
+    perSlot.set(key, (perSlot.get(key) ?? 0) + 1);
   }
 
   const doubled = new Set<Ulid>();
-  for (const [key, zones] of perSlot) {
-    if (zones.size > 1) doubled.add(key.split(":")[0] as Ulid);
+  for (const [key, count] of perSlot) {
+    if (count > 1) doubled.add(key.split(":")[0] as Ulid);
   }
   return [...doubled];
 }
@@ -188,6 +194,26 @@ export function move(
   };
 }
 
+export interface ZoneMove {
+  /** Assignments to close. Persist these before the new one. */
+  readonly closed: ZoneAssignment[];
+  /**
+   * The assignment to create — absent when she is already there.
+   *
+   * Undefined rather than a no-op record, so a caller cannot write it by
+   * accident. A move that does not need to happen must produce no row at all.
+   */
+  readonly opened?: ZoneAssignment | undefined;
+  /**
+   * She was already standing in this zone for this slot.
+   *
+   * Worth reporting rather than swallowing: somebody pressed a button, and
+   * "she is already in the North Trap" and "moved to the North Trap" are
+   * different answers to it.
+   */
+  readonly alreadyThere: boolean;
+}
+
 /**
  * Move an animal into a zone, closing whatever it was in for that slot.
  *
@@ -195,6 +221,22 @@ export function move(
  * pasture assignment open and moving her to another trap closes the first one.
  * That is the rule stated once, in the one place both the herd screen and the
  * pen board go through.
+ *
+ * ## Moving her where she already is
+ *
+ * Reported from the field: a cow set to her own zone ended up assigned to it
+ * twice — two open rows, same animal, same zone, same slot, which no screen can
+ * render honestly and which every count downstream reads as two animals'-worth
+ * of one animal.
+ *
+ * The old code was half right. It refused to close her existing row, correctly,
+ * because closing and reopening the same zone writes a zero-length period into
+ * the history for no reason — and then opened the new row anyway, which does
+ * not follow from that at all. If she is already there, the whole move is a
+ * no-op: nothing closes and nothing opens.
+ *
+ * It is reachable from every screen that moves an animal, because picking her
+ * current pen out of a list of pens is an ordinary thing to do.
  */
 export function moveToZone(
   assignments: readonly ZoneAssignment[],
@@ -203,17 +245,34 @@ export function moveToZone(
     readonly indoor: boolean;
   },
   indoorZoneIds: ReadonlySet<Ulid>,
-): { readonly closed: ZoneAssignment[]; readonly opened: ZoneAssignment } {
+): ZoneMove {
   const { at, indoor, ...rest } = next;
   const slot = slotForZone({ indoor });
 
-  const closed = conflictingAssignments(assignments, rest.animalId, slot, indoorZoneIds)
-    // Already there: closing and reopening the same zone would write a
-    // zero-length period into the history for no reason.
-    .filter((a) => a.zoneId !== rest.zoneId)
-    .map((a) => ({ ...a, periodTo: at, updatedAt: at }));
+  const open = conflictingAssignments(assignments, rest.animalId, slot, indoorZoneIds);
+  const here = open.filter((a) => a.zoneId === rest.zoneId);
+  const elsewhere = open.filter((a) => a.zoneId !== rest.zoneId);
 
-  return { closed, opened: { ...rest, slot, periodFrom: at } };
+  if (here.length > 0) {
+    // Already there, so no new row. Any *extra* rows for the same zone are
+    // still repaired: the oldest keeps the true date she arrived and the rest
+    // are closed, because more than one open row for one place is exactly the
+    // fault this is here for.
+    const duplicates = [...here]
+      .sort((left, right) => left.periodFrom.getTime() - right.periodFrom.getTime())
+      .slice(1);
+
+    return {
+      closed: [...duplicates, ...elsewhere].map((a) => ({ ...a, periodTo: at, updatedAt: at })),
+      alreadyThere: true,
+    };
+  }
+
+  return {
+    closed: elsewhere.map((a) => ({ ...a, periodTo: at, updatedAt: at })),
+    opened: { ...rest, slot, periodFrom: at },
+    alreadyThere: false,
+  };
 }
 
 /** Occupants of a zone at a moment — the Pen Board's core query. */

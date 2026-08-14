@@ -380,9 +380,22 @@ export function HerdScreen({
       indoorZoneIds,
     );
 
+    // Closes first, including any duplicate rows for a zone she is already in
+    // — that is the repair, and it runs whether or not there is a move to make.
     for (const entry of closed) {
       await placements.update(entry.id, { periodTo: entry.periodTo });
     }
+
+    if (opened === undefined) {
+      // Already there. Saying so is the honest answer to the button that was
+      // pressed; writing a second identical assignment was the old one.
+      show({
+        message: `${animal.name ?? "Animal"} is already in ${zone.name}`,
+        tone: "info",
+      });
+      return;
+    }
+
     const result = await placements.create(opened);
 
     if (!result.ok) {
