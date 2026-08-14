@@ -254,7 +254,17 @@ build command so a deploy cannot publish without it.
 
 ### Environment
 
-Copy `.env.example` to `.env.local` and fill it in. It covers `DATABASE_URL` (Neon), the Auth.js secret, Cloudflare R2 credentials, the Resend API key, the Google Maps browser key, and the `NEXT_PUBLIC_FARM_NAME` / business-name branding fallbacks. `.env.local` is gitignored and must stay that way — no real value belongs in `.env.example`.
+Copy `.env.example` to `.env.local` and fill it in. It covers `DATABASE_URL` (Neon), the Auth.js secret, Cloudflare R2 credentials, the Resend API key and sender, the Google Maps browser key, and the `NEXT_PUBLIC_FARM_NAME` / business-name branding fallbacks. `.env.local` is gitignored and must stay that way — no real value belongs in `.env.example`.
+
+### Email
+
+`RESEND_API_KEY` and `EMAIL_FROM` are the whole of it. Both are read in exactly one place — `apps/web/lib/notifier.ts`, the composition root — and everything else asks for the kernel's `Notifier` port, which is what makes §6's "web push later" a change to that one file.
+
+**Check it from the app.** `/admin/settings` → People has a **Test email** button on every row. It sends a real email through Resend and reports what came back: the provider's message id on success, and on failure Resend's own words rather than a generic apology, because an unverified domain, a revoked key and a typo in `EMAIL_FROM` are indistinguishable from outside and only Resend knows which it is. Owner-only, like everything else on that screen.
+
+**Until a domain is verified, mail only reaches one inbox.** With `EMAIL_FROM` unset, sending falls back to Resend's shared `onboarding@resend.dev`, which accepts every message and delivers only to the address the Resend account was opened with. That is enough to prove the wiring and no use at all for alerting a housesitter — so the app says so in a box on the People screen rather than leaving somebody to work it out from an empty inbox. To send anywhere else: add the farm's domain at [resend.com/domains](https://resend.com/domains), publish the DKIM and SPF records it gives you, and set `EMAIL_FROM` to an address on it.
+
+Set both in `.env.local` for a laptop **and** in the Netlify environment variables for the deployed site. A key set in only one of the two is the failure that looks like the button being broken.
 
 ### A note on where the working copy lives
 

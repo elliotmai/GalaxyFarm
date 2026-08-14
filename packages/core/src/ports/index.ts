@@ -54,12 +54,43 @@ export interface IdGenerator {
   next(): Ulid;
 }
 
+/**
+ * One notification, in both the forms a mail client might render it.
+ *
+ * `body` is the plain text and is required; `html` is optional and is a richer
+ * rendering of the same thing, never additional content. Two reasons it is
+ * that way round rather than the other: a text part is what a watch, a
+ * screen reader, and a barn phone with images switched off actually show, and
+ * an email sent as HTML alone is markedly more likely to be filed as spam.
+ *
+ * Web push, which §6 says arrives later behind this same port, has no HTML at
+ * all — it will use `subject` and `body` and ignore the rest, which is the
+ * property that keeps this a port and not a Resend-shaped hole.
+ */
+export interface NotificationMessage {
+  readonly to: string;
+  readonly subject: string;
+  readonly body: string;
+  readonly html?: string | undefined;
+  /** Where a reply should go, when that is not the sender. */
+  readonly replyTo?: string | undefined;
+}
+
+/**
+ * What came back from handing a message over.
+ *
+ * The id is the provider's, and it is the whole reason this is not `void`:
+ * "the farm sent it and the provider accepted it" and "it reached an inbox"
+ * are different claims, and when somebody says an alert never arrived the id
+ * is what turns that into a question a provider's log can answer. Optional,
+ * because not every notifier has one to give.
+ */
+export interface NotificationReceipt {
+  readonly id?: string | undefined;
+}
+
 export interface Notifier {
-  send(input: {
-    readonly to: string;
-    readonly subject: string;
-    readonly body: string;
-  }): Promise<void>;
+  send(input: NotificationMessage): Promise<NotificationReceipt>;
 }
 
 /** A fixed clock, for tests and for replaying a sync batch at one timestamp. */

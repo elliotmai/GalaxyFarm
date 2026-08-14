@@ -5,8 +5,11 @@ import { headers } from "next/headers";
 
 import { ROLES, can, refuseUserChange, type Role, type Ulid } from "@galaxy-farm/core";
 import { invitationUrl } from "@galaxy-farm/infra-auth";
+import { testEmailMessage } from "@galaxy-farm/infra-email";
 
 import { currentActor } from "@/lib/auth";
+import { farmName } from "@/lib/farm-name";
+import { emailConfig, notifier } from "@/lib/notifier";
 import {
   findUser,
   findUserByEmail,
@@ -34,7 +37,18 @@ import {
  */
 
 export type ActionResult =
-  | { readonly ok: true; readonly message: string; readonly link?: string }
+  | {
+      readonly ok: true;
+      readonly message: string;
+      readonly link?: string;
+      /**
+       * A caveat on a success. The one that exists today is Resend's shared
+       * sender, which accepts every message and only delivers to the account
+       * holder — so "sent" is true and misleading at the same time, and a
+       * toast that vanishes in five seconds is the wrong place to say so.
+       */
+      readonly note?: string;
+    }
   | { readonly ok: false; readonly error: string; readonly field?: string };
 
 const REFUSED: ActionResult = {
@@ -204,6 +218,88 @@ export async function resendInvitation(id: Ulid): Promise<ActionResult> {
     message: `New link for ${found.user.name}. Any earlier one has stopped working.`,
     link: invitationUrl(await origin(), token),
   };
+}
+
+/**
+ * Send one real email to somebody on the list, and report what came back.
+ *
+ * This is the only path in the app that proves email works end to end, and it
+ * exists because every other path is one nobody wants to exercise on purpose:
+ * §6's twenty-two triggers fire on a schedule, from a cron route, about things
+ * that have to actually be true — you cannot check the wiring by waiting for a
+ * cow to reach day 279.
+ *
+ * **Every failure is reported in the provider's own words.** Deliberately, and
+ * it is the whole value of the button: an unverified sender domain, a revoked
+ * key and a typo in `EMAIL_FROM` all look identical from outside, and Resend
+ * says which it is. The alternative — "Could not send the email" — leaves
+ * somebody reading Netlify logs for a sentence that was already in their hand.
+ * Nothing here is secret; the key never appears in a Resend error.
+ *
+ * Owner-only, like everything else in this file: sending mail from the farm's
+ * address to an address of the caller's choosing is not something a member
+ * gets, and a hidden button is not a permission check (§4.3).
+ */
+export async function sendTestEmail(id: Ulid): Promise<ActionResult> {
+  const actor = await managingActor();
+  if (actor === undefined) return REFUSED;
+
+  const now = new Date();
+  const found = await findUser(id, now);
+  if (found === undefined || found.user.propertyId !== actor.propertyId) {
+    return { ok: false, error: "That account is not on this property." };
+  }
+
+  const config = emailConfig();
+  const send = notifier();
+  if (!config.ok || send === undefined) {
+    // The reason names the variable and where to set it. Not a field error:
+    // there is no input on this screen that would fix it.
+    return { ok: false, error: config.ok ? "Email is not configured." : config.reason };
+  }
+
+  // Named in the body so the person opening it knows who to ask about it.
+  // `Actor` carries a role and an id rather than a name — it is what the
+  // session holds, and a name is not a permission — so it comes from the row.
+  const sender = await findUser(actor.id, now);
+
+  const message = testEmailMessage({
+    farmName: await farmName(actor.propertyId),
+    sentBy: sender?.user.name ?? "Somebody with an owner account",
+    sentAt: now,
+    origin: await origin(),
+  });
+
+  try {
+    const receipt = await send.send({
+      to: found.user.email,
+      subject: message.subject,
+      body: message.body,
+      html: message.html,
+    });
+
+    return {
+      ok: true,
+      message: `Test email sent to ${found.user.email}${
+        receipt.id === undefined ? "" : ` — Resend id ${receipt.id}`
+      }.`,
+      ...(config.limitation === undefined ? {} : { note: config.limitation }),
+    };
+  } catch (error) {
+    // Logged as well as shown. The shown copy is trimmed to something that
+    // fits in a box; the log keeps the whole of it.
+    console.error("[settings:test-email]", error);
+    return {
+      ok: false,
+      error: `Resend refused it: ${trimmed(error)}`,
+    };
+  }
+}
+
+/** Enough of a provider's complaint to act on, without a wall of JSON. */
+function trimmed(error: unknown): string {
+  const text = error instanceof Error ? error.message : String(error);
+  return text.length <= 400 ? text : `${text.slice(0, 400)}…`;
 }
 
 export interface EditInput {

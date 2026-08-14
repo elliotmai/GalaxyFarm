@@ -33,6 +33,7 @@ import {
   invitePerson,
   resendInvitation,
   restorePerson,
+  sendTestEmail,
   setPersonActive,
   type ActionResult,
 } from "@/app/(admin)/admin/settings/_components/user-actions";
@@ -136,6 +137,20 @@ export function PeopleScreen({
     { readonly url: string; readonly message: string } | undefined
   >();
 
+  /**
+   * A caveat on something that worked, or the reason something did not.
+   *
+   * A box rather than a toast because both are longer than a toast should
+   * hold and both are things somebody acts on: the failures name a variable
+   * or quote Resend, and the one caveat says an email that reported itself
+   * sent will only actually arrive for one address. Five seconds is not
+   * enough time to read either, let alone act on it.
+   */
+  const [note, setNote] = useState<
+    | { readonly tone: "action" | "danger"; readonly title: string; readonly detail: string }
+    | undefined
+  >();
+
   function run(action: () => Promise<ActionResult>, onDone?: () => void) {
     startTransition(async () => {
       const result = await action();
@@ -150,6 +165,36 @@ export function PeopleScreen({
       if (result.link === undefined) show({ message: result.message, tone: "success" });
       else setLink({ url: result.link, message: result.message });
       onDone?.();
+    });
+  }
+
+  /**
+   * Send one real email, and keep whatever came back on screen.
+   *
+   * Not routed through `run`: this is the one action whose *failure* is the
+   * useful outcome as often as its success. Resend's own words — an
+   * unverified domain, a key that has been revoked — are what somebody needs
+   * in front of them while they go and fix it, and a danger toast takes them
+   * away after five seconds.
+   */
+  function testEmail(row: PersonRow) {
+    setNote(undefined);
+    startTransition(async () => {
+      const result = await sendTestEmail(row.user.id);
+
+      if (!result.ok) {
+        setNote({
+          tone: "danger",
+          title: `Nothing sent to ${row.user.email}`,
+          detail: result.error,
+        });
+        return;
+      }
+
+      show({ message: result.message, tone: "success" });
+      if (result.note !== undefined) {
+        setNote({ tone: "action", title: "Sent, with one catch", detail: result.note });
+      }
     });
   }
 
@@ -317,6 +362,19 @@ export function PeopleScreen({
           <Button variant="ghost" disabled={pending} onClick={() => void reissue(row)}>
             {row.state === "active" ? "Reset password" : "New link"}
           </Button>
+          {/*
+            Sends a real email to a real address. Safe to press twice and safe
+            to press on anybody — it says what it is in the subject line — so
+            it stays a plain button with no confirmation in front of it.
+          */}
+          <Button
+            variant="ghost"
+            disabled={pending}
+            title={`Send a test email to ${row.user.email}`}
+            onClick={() => testEmail(row)}
+          >
+            Test email
+          </Button>
           <Button variant="ghost" disabled={pending} onClick={() => startEdit(row)}>
             Edit
           </Button>
@@ -364,6 +422,19 @@ export function PeopleScreen({
               plainly, and every button that would act on the list is off.
             */}
             <p>{unavailable}</p>
+          </Callout>
+        )}
+        {note === undefined ? null : (
+          <Callout
+            tone={note.tone}
+            title={note.title}
+            actions={<Button onClick={() => setNote(undefined)}>Dismiss</Button>}
+          >
+            {/*
+              `break-words`: a Resend failure quotes its own JSON body, and one
+              long unbroken token would push the box past the width of a phone.
+            */}
+            <p className="break-words">{note.detail}</p>
           </Callout>
         )}
         {link === undefined ? null : (

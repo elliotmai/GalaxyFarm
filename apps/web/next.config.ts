@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
     "@galaxy-farm/ui",
     "@galaxy-farm/infra-auth",
     "@galaxy-farm/infra-db",
+    "@galaxy-farm/infra-email",
   ],
   typedRoutes: false,
   eslint: {

@@ -71,6 +71,9 @@ importers:
       '@galaxy-farm/infra-db':
         specifier: workspace:*
         version: link:../../packages/infrastructure/db
+      '@galaxy-farm/infra-email':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure/email
       '@galaxy-farm/infra-geocoding':
         specifier: workspace:*
         version: link:../../packages/infrastructure/geocoding
