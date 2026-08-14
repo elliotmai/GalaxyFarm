@@ -5,16 +5,22 @@ leg, with a crest on each outer shoulder. Drawn in livestock-brand grammar: read
 outside in and top to bottom, the crests are named before the letters, and two
 of the same letter are read "Double M" rather than M M.
 
-| File                                     | Surface                                | Ground                   |
-| ---------------------------------------- | -------------------------------------- | ------------------------ |
-| `flying-double-m-connected-admin.svg`    | `/admin`, `/kiosk`                     | Midnight Nebula (dark)   |
-| `flying-double-m-connected-customer.svg` | `/account`, `/book`, `/sitter`, public | Bluebonnet Linen (light) |
+| File                                     | Ground             | Identity              |
+| ---------------------------------------- | ------------------ | --------------------- |
+| `flying-double-m-connected-customer.svg` | `flying-day` light | Ink Navy `#1B3A5C`    |
+| `flying-double-m-connected-admin.svg`    | `flying-night`     | Lifted navy `#8FB3D9` |
 
 ## Why it is two files
 
-Theme is fixed per surface (spec §8), so a single mark on a single ground was
-never going to work. The two variants are the same drawing in two colourways,
-each carrying its surface's identity colour.
+A mark is one colour, and the one colour has to change with the ground under
+it. The two variants are the same drawing in the two identity values —
+day and night — so whichever ground a mark is placed on, there is a file that
+reads on it.
+
+The filenames are older than the split they now describe. They date from when
+theme was fixed per surface and `/admin` meant dark; the working surfaces run
+`flying-auto` now and follow the device, so the useful distinction is the
+ground, not the route. Renaming them is worth doing and is not done here.
 
 The marks are **transparent**. They carry no background, because they sit on the
 ground the surface theme provides.
@@ -24,7 +30,7 @@ ground the surface theme provides.
 A brand is a burn: the iron does not change weight or colour partway through a
 mark. This one is a single connected figure, so there is no second element to
 give a second colour to even if it wanted one. Identity carries the whole mark
-on both surfaces — 7.0:1 on linen, 6.2:1 on midnight.
+on both grounds — 10.75:1 on the day canvas, 8.48:1 on the night one.
 
 ## Rules
 

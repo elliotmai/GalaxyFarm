@@ -27,9 +27,12 @@ OUT = ROOT / "apps" / "web" / "public" / "icons"
 
 # Kept identical to theme.css. Literals here because a browser's home screen
 # and app switcher paint this with no theme of ours in scope.
-GROUND = (14, 16, 38, 255)  # --gf-canvas, midnight nebula
-IDENTITY = (157, 133, 232, 255)  # --gf-identity, the mark
-INK = (242, 239, 230, 255)  # --gf-text, the sky
+#
+# The day palette, not the night one: `flying-night` is a mode for the barn
+# after dark, not the look of a surface, and a home screen icon has no device
+# preference to read anyway. Navy on canvas measures 10.75:1.
+GROUND = (245, 246, 248, 255)  # --gf-canvas, flying-day
+IDENTITY = (27, 58, 92, 255)  # --gf-identity, Ink Navy — the mark
 
 # The mark from `logomark.tsx`, in the 100x100 viewBox. The pair and its shared
 # leg are drawn; the crests are curves, flattened below.
@@ -40,8 +43,10 @@ CRESTS = [((27.6, 33.09), (18.64, 17.41), (11.92, 24.13)),
           ((72.4, 33.09), (81.36, 17.41), (88.08, 24.13))]
 STROKE = 7.84
 
-# Faint stars, so the mark reads as a sky rather than a shape on navy.
-SKY = [(17, 20, 1.6, INK), (83, 26, 1.2, INK), (28, 86, 1.1, INK), (88, 82, 1.5, IDENTITY)]
+# There used to be four faint stars here, so the mark read as a sky rather than
+# a shape on navy. The sky went with Midnight Nebula: the language this replaced
+# it with is a brand iron on paperwork, the ground is daylight, and a star has
+# no token to be drawn in. The mark carries the tile on its own.
 
 # Supersampled, then reduced. Pillow has no antialiasing on lines, and a mark
 # made entirely of diagonals is nothing but places for jaggies to show.
@@ -88,11 +93,6 @@ def draw_icon(size, maskable):
         centred_x = (x - 50) * inset + 50
         centred_y = (y - 50) * inset + 50
         return (centred_x * scale, centred_y * scale)
-
-    for x, y, radius, colour in SKY:
-        cx, cy = point(x, y)
-        r = radius * scale * inset
-        draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=colour)
 
     # Every stroke, then a disc at every vertex of it. The discs are not only
     # for the round ends: Pillow leaves a wedge open on the outside of each

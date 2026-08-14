@@ -8,16 +8,17 @@
     set, so the values are literal here and must be kept in step with
     `packages/ui/src/tokens/theme.css` by hand.
 
+    Ink Navy on the day canvas — the app's own ground, and the colour the mark
+    is drawn in on every screen inside it. The brand rule is that identity
+    carries the whole mark, so this is not inverted for the tile: an icon that
+    reversed the mark would be the one place the mark appears backwards.
+
     A filled ground rather than transparency, because a transparent favicon on
     a dark browser tab shows a dark mark on dark and reads as nothing at all.
+    Navy on canvas is 10.75:1, so the mark holds at 16px either way.
   -->
-  <rect width="100" height="100" rx="22" fill="#0E1026"/>
-  <!-- A few stars, so the mark reads as a sky rather than as a shape on navy. -->
-  <circle cx="17" cy="20" r="1.6" fill="#F2EFE6" opacity="0.75"/>
-  <circle cx="83" cy="26" r="1.2" fill="#F2EFE6" opacity="0.55"/>
-  <circle cx="28" cy="86" r="1.1" fill="#F2EFE6" opacity="0.45"/>
-  <circle cx="88" cy="82" r="1.5" fill="#9D85E8" opacity="0.7"/>
-  <g fill="none" stroke="#9D85E8" stroke-width="7.84" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="100" height="100" rx="22" fill="#F5F6F8"/>
+  <g fill="none" stroke="#1B3A5C" stroke-width="7.84" stroke-linecap="round" stroke-linejoin="round">
     <path d="M22 77.89 L27.6 33.09 L38.8 54.37 L50 33.09 L61.2 54.37 L72.4 33.09 L78 77.89"/>
     <path d="M50 33.09 L50 77.89"/>
     <path d="M27.6 33.09 Q18.64 17.41 11.92 24.13 M72.4 33.09 Q81.36 17.41 88.08 24.13"/>
