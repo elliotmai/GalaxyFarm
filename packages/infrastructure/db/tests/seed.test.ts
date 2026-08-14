@@ -59,10 +59,26 @@ describe("seed", () => {
   it("puts the farm that actually exists into the database", async () => {
     const summary = await seed(db, { now: NOW });
 
-    expect(summary.zones).toBe(9);
+    // Nine places on the property, plus "Off site" — which is a zone because
+    // an animal away at a collection facility is still ours, and the
+    // alternative is marking it sold to get it off the Pen Board.
+    expect(summary.zones).toBe(10);
     expect(summary.waterSources).toBe(4);
-    expect(await db.select().from(zones)).toHaveLength(9);
+    expect(await db.select().from(zones)).toHaveLength(10);
     expect(await db.select().from(waterSources)).toHaveLength(4);
+  });
+
+  it("seeds somewhere to put an animal that is away", async () => {
+    // Seeded rather than made when first needed: the moment it is needed is
+    // the moment somebody is stood at a trailer looking for somewhere to put a
+    // bull, and that is not when to be designing a zone.
+    await seed(db, { now: NOW });
+
+    const away = (await db.select().from(zones)).filter((zone) => zone.type === "off_site");
+
+    expect(away).toHaveLength(1);
+    // Nothing to water and nothing to walk to, so it can raise no chore.
+    expect(away[0]?.waterSourceIds).toEqual([]);
   });
 
   it("records that not one tank has a heater", async () => {
@@ -171,7 +187,7 @@ describe("seed", () => {
     await seed(db, { now: NOW });
     await seed(db, { now: LATER });
 
-    expect(await db.select().from(zones)).toHaveLength(9);
+    expect(await db.select().from(zones)).toHaveLength(10);
     expect(await db.select().from(waterSources)).toHaveLength(4);
     expect(await db.select().from(animals)).toHaveLength(1);
     expect(await db.select().from(zoneAssignments)).toHaveLength(1);

@@ -6,6 +6,7 @@ import {
   CALF_MAX_DAYS,
   cattleClass,
   classCounts,
+  damsThatHaveCalved,
   unclassified,
 } from "../src/domain/cattle-class.js";
 
@@ -27,9 +28,29 @@ const beast = (sex: Animal["sex"], bornDaysAgo?: number): Pick<Animal, "sex" | "
 });
 
 describe("what kind of animal this is", () => {
-  it("calls a grown female a cow and a grown intact male a bull", () => {
-    expect(cattleClass(beast("female", 900), TODAY)).toBe("cow");
+  it("calls a grown intact male a bull", () => {
     expect(cattleClass(beast("male", 900), TODAY)).toBe("bull");
+  });
+
+  it("separates a heifer from a cow by what she has done, not her age", () => {
+    // A four-year-old who has never calved is still a heifer; a two-year-old
+    // who has raised one is a cow. It is the distinction that decides whether
+    // she is on a breeding list, a replacement list or a cull list.
+    expect(cattleClass(beast("female", 1500), TODAY)).toBe("heifer");
+    expect(cattleClass(beast("female", 1500), TODAY, { hasCalved: true })).toBe("cow");
+  });
+
+  it("reads a female with nothing on file as a heifer", () => {
+    // The honest default: a female with no calving recorded is far likelier
+    // never to have calved than to have calved without anybody writing it down.
+    expect(cattleClass(beast("female", 900), TODAY, {})).toBe("heifer");
+  });
+
+  it("calls a young female with a calf at side a cow, not a calf", () => {
+    // A bought-in two-year-old with a calf at side is not a heifer whatever
+    // her birthday says — and without this she would land in the calf bucket
+    // if she were young enough, which is the one plainly wrong reading.
+    expect(cattleClass(beast("female", 300), TODAY, { hasCalved: true })).toBe("cow");
   });
 
   it("calls anything under a year a calf, either sex", () => {
@@ -39,9 +60,9 @@ describe("what kind of animal this is", () => {
     expect(cattleClass(beast("male", 120), TODAY)).toBe("calf");
   });
 
-  it("turns a calf into a cow or a bull on its first birthday", () => {
+  it("turns a calf into a heifer or a bull on its first birthday", () => {
     expect(cattleClass(beast("female", CALF_MAX_DAYS - 1), TODAY)).toBe("calf");
-    expect(cattleClass(beast("female", CALF_MAX_DAYS), TODAY)).toBe("cow");
+    expect(cattleClass(beast("female", CALF_MAX_DAYS), TODAY)).toBe("heifer");
     expect(cattleClass(beast("male", CALF_MAX_DAYS), TODAY)).toBe("bull");
   });
 
@@ -58,7 +79,7 @@ describe("what kind of animal this is", () => {
     // that came onto the place already grown than one born here — calves born
     // here arrive through a calving record, which carries the date. The other
     // way round puts every bought cow in the calf count.
-    expect(cattleClass(beast("female"), TODAY)).toBe("cow");
+    expect(cattleClass(beast("female"), TODAY)).toBe("heifer");
     expect(cattleClass(beast("male"), TODAY)).toBe("bull");
   });
 
@@ -67,7 +88,7 @@ describe("what kind of animal this is", () => {
   });
 });
 
-describe("the herd split four ways", () => {
+describe("the herd split by class", () => {
   const herd = [
     beast("female", 1200),
     beast("female", 900),
@@ -82,10 +103,23 @@ describe("the herd split four ways", () => {
     const counts = classCounts(herd, TODAY);
     const of = (name: string) => counts.find((entry) => entry.cattleClass === name)?.count;
 
-    expect(of("cow")).toBe(2);
+    // Both grown females read as heifers with no calvings supplied.
+    expect(of("cow")).toBe(0);
+    expect(of("heifer")).toBe(2);
     expect(of("bull")).toBe(1);
     expect(of("steer")).toBe(1);
     expect(of("calf")).toBe(2);
+  });
+
+  it("moves a female to cows once a calving is on file", () => {
+    const dolly = { ...beast("female", 1200), id: "01ARZ3NDEKTSV4RRFFQ69G5FA1" as never };
+    const calved = damsThatHaveCalved([{ damId: dolly.id }]);
+
+    const counts = classCounts([dolly], TODAY, calved);
+    const of = (name: string) => counts.find((entry) => entry.cattleClass === name)?.count;
+
+    expect(of("cow")).toBe(1);
+    expect(of("heifer")).toBe(0);
   });
 
   it("keeps the order fixed, so it is not re-read every morning", () => {
@@ -93,6 +127,7 @@ describe("the herd split four ways", () => {
     // word by word every time.
     expect(classCounts(herd, TODAY).map((entry) => entry.cattleClass)).toEqual([
       "cow",
+      "heifer",
       "bull",
       "steer",
       "calf",

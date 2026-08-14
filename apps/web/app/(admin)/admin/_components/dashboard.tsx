@@ -25,6 +25,7 @@ import {
 } from "@galaxy-farm/core";
 
 import { CalvingWatchCard } from "@/app/(admin)/admin/_components/calving-watch-card";
+import { WeaningCard } from "@/app/(admin)/admin/_components/weaning-card";
 import { ChoresCard } from "@/app/(admin)/admin/_components/chores-card";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -101,6 +102,13 @@ export function Dashboard({
         card that has to be scrolled to is a card nobody reads at 2am.
       */}
       <CalvingWatchCard propertyId={propertyId} />
+
+      {/*
+        Under the calving watch, which is the more urgent of the two: a calving
+        is a night's work decided by the weather, weaning is a week's work
+        decided by a date. This renders nothing at all when nothing is due.
+      */}
+      <WeaningCard propertyId={propertyId} actorId={actorId} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {/*

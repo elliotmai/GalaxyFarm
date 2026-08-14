@@ -17,6 +17,7 @@ import {
 } from "@galaxy-farm/ui";
 import {
   describeZoneExtent,
+  isOnProperty,
   standingDividers,
   zoneSchema,
   type GeoPoint,
@@ -69,7 +70,10 @@ export function PropertyMapScreen({
   const api = useMutations<Zone>("zones", "zones", zoneSchema, propertyId, actorId);
   const { show } = useToast();
 
-  const { records: zones } = useRecords<Zone>("zones", { propertyId });
+  const { records: allZones } = useRecords<Zone>("zones", { propertyId });
+  // Off-site zones have no ground here to draw, and prompting somebody to
+  // trace a boundary for a collection facility two counties away is noise.
+  const zones = useMemo(() => allZones.filter(isOnProperty), [allZones]);
   const { records: properties } = useRecords<Property>("properties", { propertyId });
   const property = properties.find((entry) => entry.id === propertyId) ?? properties[0];
 

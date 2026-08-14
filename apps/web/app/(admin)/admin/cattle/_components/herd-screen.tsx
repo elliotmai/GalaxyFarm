@@ -47,7 +47,9 @@ import {
   CATTLE_CLASSES,
   cattleClass,
   classCounts,
+  damsThatHaveCalved,
   unclassified,
+  type CalvingRecord,
   type CattleProfile,
   type HealthRecord,
 } from "@galaxy-farm/module-cattle";
@@ -143,6 +145,7 @@ export function HerdScreen({
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const { records: all, loading } = useRecords<Animal>("animals", { propertyId, search });
   const { records: zones } = useRecords<Zone>("zones", { propertyId });
+  const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", { propertyId });
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", { propertyId });
   const { records: health } = useRecords<HealthRecord>("healthRecords", { propertyId });
   // Breed lives on the profile rather than the animal, because most of what a
@@ -193,7 +196,13 @@ export function HerdScreen({
    * morning of its birthday.
    */
   const asOf = useMemo(() => new Date(), []);
-  const classOf = (animal: Animal) => cattleClass(animal, asOf);
+
+  // A heifer becomes a cow by calving, not by ageing — so the calvings decide
+  // which of the two a female is. Built from the records rather than a flag, so
+  // a calving entered or corrected moves her without anything else to remember.
+  const calved = useMemo(() => damsThatHaveCalved(calvings), [calvings]);
+  const classOf = (animal: Animal) =>
+    cattleClass(animal, asOf, { hasCalved: calved.has(animal.id) });
 
   const animals = cattle.filter((animal) => {
     if (
@@ -225,7 +234,7 @@ export function HerdScreen({
   // Counted over the whole herd, not the filtered list: these are what the
   // filter is chosen *from*, and counts that shrank as they were used would
   // leave nothing to go back to.
-  const counts = useMemo(() => classCounts(cattle, asOf), [cattle, asOf]);
+  const counts = useMemo(() => classCounts(cattle, asOf, calved), [cattle, asOf, calved]);
   const unsexed = useMemo(() => unclassified(cattle, asOf), [cattle, asOf]);
 
   /** What is on, in the words the controls use — shown even when folded. */

@@ -20,6 +20,19 @@ export const ZONE_TYPES = [
   "garden_area",
   /** Tub, chute, alley — holds cattle under handling, nothing lives there. */
   "working_facility",
+  /**
+   * Somewhere that is not this property at all.
+   *
+   * A bull standing at a collection facility, a cow away to be bred, a calf at
+   * a show for a week. They are still ours and still cost money, so they must
+   * not be marked sold or retired to get them off the Pen Board — the only
+   * honest answer to "where is he" is the name of the place he is at.
+   *
+   * The type exists so everything derived from a zone can tell the difference.
+   * An off-site zone has no water to break ice on, no ground to rest, and
+   * nothing to walk to, so it must never raise a chore or appear on the map.
+   */
+  "off_site",
 ] as const;
 export type ZoneType = (typeof ZONE_TYPES)[number];
 
@@ -131,6 +144,23 @@ export const zoneSchema = baseRecordSchema.extend({
 
 export function isOverCapacity(zone: Pick<Zone, "capacity">, occupantCount: number): boolean {
   return zone.capacity !== undefined && occupantCount > zone.capacity;
+}
+
+/**
+ * Somewhere on this property, as opposed to away.
+ *
+ * The test every derived list wants. An animal at a collection facility is
+ * still ours and still costs money, but there is no trough to break ice on and
+ * no gate to walk to — so a chore, a headcount of who is on the place, or a
+ * shape on the map must all leave it out, while a list of what we own must not.
+ */
+export function isOnProperty(zone: Pick<Zone, "type">): boolean {
+  return zone.type !== "off_site";
+}
+
+/** The zone standing for "away", if one has been set up. */
+export function offSiteZones(zones: readonly Zone[]): Zone[] {
+  return zones.filter((zone) => zone.type === "off_site" && zone.active);
 }
 
 /** The fencing across this zone that is standing right now. */

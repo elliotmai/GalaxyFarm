@@ -224,6 +224,10 @@ export const cattleProfiles = pgTable(
       >()
       .notNull()
       .default([]),
+    /** The day this calf came off its dam — what clears the weaning watch (§6). */
+    weanedOn: timestamp("weaned_on", { withTimezone: true, mode: "date" }),
+    /** The cow raising it, when a graft means she is not the one who calved it. */
+    raisedById: text("raised_by_id"),
     /** Sire and dam resolve to an on-farm animal or an ExternalAnimal (§5.2). */
     sire: jsonb("sire").$type<{ kind: string; id: string }>(),
     dam: jsonb("dam").$type<{ kind: string; id: string }>(),

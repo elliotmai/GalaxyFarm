@@ -91,6 +91,31 @@ export interface CattleProfile extends BaseRecord {
   readonly colour?: string | undefined;
   readonly markings?: string | undefined;
   readonly registrations: readonly Registration[];
+  /**
+   * The day this calf came off its dam.
+   *
+   * A date rather than a flag, because "when" is the question asked afterwards
+   * — a weaning weight is only interpretable against it, and the weaning watch
+   * needs somewhere to record that the job is done. Recorded here rather than
+   * inferred from a weight labelled "weaning": a calf weighed the week before
+   * it is separated would read as weaned, and a calf weaned without being
+   * weighed would never clear the alert. An alert that doing the work cannot
+   * dismiss is one people learn to ignore.
+   */
+  readonly weanedOn?: Date | undefined;
+  /**
+   * The cow actually raising this calf, when she is not the one who calved it.
+   *
+   * Grafting: a calf whose dam died or would not take it, put onto another cow.
+   * Nothing else on file can say that — it happens after the birth, so the
+   * calving record still names the cow who calved, and the pedigree still names
+   * the genetic dam. Both are right and neither is the pen this calf stands in.
+   *
+   * Embryo transfer needs no field here. The recipient is the cow who calved, so
+   * `CalvingRecord.damId` already names her, and `BreedingRecord.embryoDonorId`
+   * already names the donor the pedigree comes from.
+   */
+  readonly raisedById?: Ulid | undefined;
   readonly sire?: ParentRef | undefined;
   readonly dam?: ParentRef | undefined;
 }
@@ -172,6 +197,8 @@ export const cattleProfileSchema = baseRecordSchema
     colour: z.string().max(120).optional(),
     markings: z.string().max(500).optional(),
     registrations: z.array(registrationSchema),
+    weanedOn: z.coerce.date().optional(),
+    raisedById: ulidSchema.optional(),
     sire: parentRefSchema.optional(),
     dam: parentRefSchema.optional(),
   })

@@ -39,7 +39,8 @@ export interface SeedWaterSource {
 export interface SeedZone {
   readonly key: string;
   readonly name: string;
-  readonly type: "pen" | "pasture" | "coop" | "barn" | "stall" | "garden_area" | "working_facility";
+  readonly type:
+    "pen" | "pasture" | "coop" | "barn" | "stall" | "garden_area" | "working_facility" | "off_site";
   readonly indoor: boolean;
   readonly baselineSafetyLevel: 1 | 2 | 3 | 4 | 5;
   readonly waterSourceKeys: readonly string[];
@@ -174,6 +175,32 @@ export const SEED_ZONES: readonly SeedZone[] = [
     baselineSafetyLevel: 2,
     waterSourceKeys: ["tank-pens-ab"],
     resting: false,
+  },
+  {
+    /**
+     * Away.
+     *
+     * A bull standing at a collection facility, a cow gone to be bred, a calf
+     * at a show for a week. They are still ours and still cost money, so the
+     * alternative — marking one sold or retired to get it off the Pen Board —
+     * would lose an animal from every list it belongs on and put it in two it
+     * does not.
+     *
+     * Seeded rather than left to be made when first needed, because the moment
+     * it is needed is the moment somebody is standing at a trailer looking for
+     * somewhere to put a bull, and that is not when to be designing a zone.
+     */
+    key: "off-site",
+    name: "Off site",
+    type: "off_site",
+    indoor: false,
+    // Somebody else's facility, and their handling rules. Nothing about the
+    // place itself is known here, so it claims no safety level it cannot back.
+    baselineSafetyLevel: 1,
+    waterSourceKeys: [],
+    resting: false,
+    customInstructions:
+      "Not on this property — a collection facility, another farm, a show. Raises no chores and appears on no map. Note where in the animal's own record.",
   },
   {
     key: "tub",

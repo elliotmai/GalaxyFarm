@@ -1,0 +1,32 @@
+-- When a calf came off its dam.
+--
+-- The weaning watch (§6) needs somewhere to record that the job is done, and
+-- there was nowhere: "wean" existed in this app only as a label on a weight
+-- and as the 205-day adjustment computed from one.
+--
+-- Not inferred from a weight labelled 'weaning', which was the alternative. A
+-- calf weighed the week before it is separated would read as already weaned,
+-- and a calf weaned without being weighed would never clear the alert. An
+-- alert that doing the work cannot dismiss is one people learn to ignore, and
+-- an ignored alert is worse than no alert because it is also in the way of the
+-- ones that matter.
+--
+-- A date rather than a boolean, because "when" is the question asked
+-- afterwards: a weaning weight means nothing without the day it belongs to,
+-- and this farm weans early enough that the gap between two calves' weaning
+-- dates is a real difference rather than a rounding one.
+ALTER TABLE "cattle_profiles" ADD COLUMN "weaned_on" timestamptz;
+
+-- Who is actually raising the calf, when she is not the cow who calved it.
+--
+-- Grafting: a calf whose dam died or would not take it, put onto another cow.
+-- Nothing already on file can say that, because it happens after the birth —
+-- the calving record still names the cow who calved and the pedigree still
+-- names the genetic dam. Both are correct and neither is the pen the calf is
+-- standing in, which is the only thing weaning cares about.
+--
+-- Embryo transfer needs no column. The recipient is the cow who calved, so
+-- `calving_records.dam_id` already names her, and `breeding_records
+-- .embryo_donor_id` already names the donor the pedigree comes from. Adding a
+-- second way to say the same thing would let the two disagree.
+ALTER TABLE "cattle_profiles" ADD COLUMN "raised_by_id" text;
