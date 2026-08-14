@@ -6,13 +6,13 @@ import {
   Button,
   Callout,
   Card,
-  Constellation,
   DetailList,
   EmptyState,
+  PedigreeChart,
   Pill,
   Section,
   Tile,
-  type ConstellationNode,
+  type Ancestor,
 } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -390,10 +390,10 @@ export function AncestorDetail({
             detail="Set its sire and dam and everything above them follows from the ancestors already on file. Importing the association page fills in four generations at once."
           />
         ) : (
-          <Constellation
-            root={toConstellation(tree)}
+          <PedigreeChart
+            root={toAncestor(tree)}
             generations={Math.min(depth, 4)}
-            caption="Filled stars are ours, hollow ones are on paper only."
+            caption="Solid cells are ours; dashed ones are on paper only."
           />
         )}
       </Section>
@@ -456,14 +456,14 @@ export function AncestorDetail({
 }
 
 /** The module's tree, flattened into the shape the chart draws. */
-function toConstellation(node: PedigreeNode): ConstellationNode {
+function toAncestor(node: PedigreeNode): Ancestor {
   return {
     id: `${node.ref.kind}:${node.ref.id}`,
     label: node.name,
     ...(node.regNumber === undefined ? {} : { sublabel: node.regNumber }),
     outside: node.ref.kind === "external",
     repeated: false,
-    ...(node.sire === undefined ? {} : { sire: toConstellation(node.sire) }),
-    ...(node.dam === undefined ? {} : { dam: toConstellation(node.dam) }),
+    ...(node.sire === undefined ? {} : { sire: toAncestor(node.sire) }),
+    ...(node.dam === undefined ? {} : { dam: toAncestor(node.dam) }),
   };
 }

@@ -472,7 +472,7 @@ Supersedes v0.8's "Midnight Nebula / Bluebonnet Linen", which was retired becaus
 
 IBM Plex Mono carries tag numbers, registration numbers and serials on all three. Tabular figures wherever numbers carry meaning. All four faces are SIL Open Font License and are committed under `apps/web/app/fonts/` and loaded with `next/font/local` — a build that must reach Google for a typeface is the same bargain this project refuses for its database.
 
-Signature elements: the **Flying Double M Connected** mark, and pedigrees drawn as a **three-generation certificate grid** rather than v0.8's constellation — on paper it has been that grid for a century, and the grid is what a buyer can read.
+Signature elements: the **Flying Double M Connected** mark, and pedigrees drawn as a **certificate bracket** rather than v0.8's constellation — on paper it has been that bracket for a century, and the bracket is what a buyer can read. Every slot is drawn including the empty ones, quietly, because "dam unknown" is a fact about the animal; a repeat is marked with the word, never a hue, since `identity` and `action` are the same navy here.
 
 - **Design system first** (`packages/ui`): tokens above, then components. Clean, professional, generous whitespace; no template feel. Distinct density modes: desktop (data-dense tables + side panels), mobile (card stacks, bottom nav, one-thumb logging), kiosk (oversized type + targets).
 - **The Pen Board is the heart of the app** — the property map with live animal positions, merged instructions, halter-color swatches, and **safety-level color coding** (pen borders show effective level; chips show each animal's) is what you'll glance at ten times a day and what barn screens show by default.

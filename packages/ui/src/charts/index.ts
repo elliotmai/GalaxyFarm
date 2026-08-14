@@ -5,4 +5,4 @@
  * that had to be written again for horses.
  */
 
-export * from "./constellation.js";
+export * from "./pedigree.js";

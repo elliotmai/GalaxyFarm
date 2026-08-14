@@ -7,11 +7,11 @@ import {
   Button,
   Callout,
   Card,
-  Constellation,
   DataTable,
   DetailList,
   EmptyState,
   Meter,
+  PedigreeChart,
   Pill,
   SearchSelect,
   Section,
@@ -19,8 +19,8 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
+  type Ancestor,
   type Column,
-  type ConstellationNode,
   type SearchOption,
 } from "@galaxy-farm/ui";
 import { displayName, formatMoney, type Animal, type Ulid } from "@galaxy-farm/core";
@@ -316,7 +316,7 @@ export function BreedComposition({
 /* ---------------------------------------------------------------- pedigree */
 
 /**
- * The pedigree, drawn as a constellation (issue #16, §8).
+ * The pedigree, drawn as a certificate bracket (issue #16, §8 v0.9).
  *
  * Depth-limited for two reasons and the second is not theoretical: §5.2 asks
  * for a 3/4/5-generation view, and a pedigree can genuinely contain a cycle
@@ -391,16 +391,16 @@ export function Pedigree({
           />
         ) : (
           <div className="flex flex-col gap-density">
-            <Constellation
-              root={toConstellation(tree, repeats)}
+            <PedigreeChart
+              root={toAncestor(tree, repeats)}
               generations={generations}
               caption={
                 <>
                   {depth === 0
                     ? "No ancestors recorded."
                     : `Papers go back ${depth} generation${depth === 1 ? "" : "s"}.`}{" "}
-                  Filled stars are ours, hollow ones are on paper only
-                  {repeats.size === 0 ? "" : ", and the coloured ones appear more than once"}.
+                  Solid cells are ours; dashed ones are on paper only
+                  {repeats.size === 0 ? "" : ', and one marked "repeat" appears more than once'}.
                 </>
               }
             />
@@ -447,10 +447,10 @@ export function Pedigree({
 }
 
 /** The module's tree, flattened into the shape the chart draws. */
-function toConstellation(
+function toAncestor(
   node: PedigreeNode,
   repeats: ReadonlyMap<string, number>,
-): ConstellationNode {
+): Ancestor {
   const key = `${node.ref.kind}:${node.ref.id}`;
   return {
     id: key,
@@ -458,8 +458,8 @@ function toConstellation(
     ...(node.regNumber === undefined ? {} : { sublabel: node.regNumber }),
     outside: node.ref.kind === "external",
     repeated: repeats.has(key),
-    ...(node.sire === undefined ? {} : { sire: toConstellation(node.sire, repeats) }),
-    ...(node.dam === undefined ? {} : { dam: toConstellation(node.dam, repeats) }),
+    ...(node.sire === undefined ? {} : { sire: toAncestor(node.sire, repeats) }),
+    ...(node.dam === undefined ? {} : { dam: toAncestor(node.dam, repeats) }),
   };
 }
 
