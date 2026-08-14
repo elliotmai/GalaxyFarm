@@ -81,9 +81,7 @@ export function ConfirmDialog({ request, onConfirm, onCancel }: ConfirmDialogPro
         data-tier={request.tier}
         className="flex max-h-[90dvh] w-full max-w-lg flex-col gap-density overflow-y-auto rounded-t-density border border-edge bg-panel p-density text-ink shadow-[0_-8px_32px_rgba(0,0,0,0.5)] sm:rounded-density"
       >
-        <h2 id={titleId} className="font-heading text-lg font-semibold">
-          {confirmTitle(request)}
-        </h2>
+        <h2 id={titleId}>{confirmTitle(request)}</h2>
 
         <div id={descriptionId} className="flex flex-col gap-3 text-density">
           {summary !== undefined && (

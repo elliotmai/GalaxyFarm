@@ -42,10 +42,7 @@ export function AdminNav({ farmName }: { readonly farmName: string }) {
       }`}
     >
       <div className="flex items-center justify-between gap-2 border-b border-rule px-density py-3">
-        <Link
-          href="/admin"
-          className="flex min-w-0 items-center gap-2 font-heading text-lg font-semibold text-ink"
-        >
+        <Link href="/admin" className="flex min-w-0 items-center gap-2 text-ink">
           <Logomark size="small" decorative />
           <span className="truncate">{farmName}</span>
         </Link>

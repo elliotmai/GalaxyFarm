@@ -182,7 +182,7 @@ export function SitterScreen({
           <div className="flex flex-col gap-density">
             {composed.pens.map((pen) => (
               <div key={pen.zoneId} className="border-l-2 border-edge pl-4">
-                <h3 className="flex flex-wrap items-center gap-2 font-heading text-density font-semibold text-ink">
+                <h3 className="flex flex-wrap items-center gap-2 text-ink">
                   <SafetyBadge level={pen.effectiveLevel} showLabel size="compact" />
                   {pen.zoneName}
                 </h3>
@@ -225,7 +225,7 @@ export function SitterScreen({
           <div className="flex flex-col gap-density">
             {pets.map((pet) => (
               <div key={pet.animalId} className="border-l-2 border-edge pl-4">
-                <h3 className="flex flex-wrap items-center gap-2 font-heading text-density font-semibold text-ink">
+                <h3 className="flex flex-wrap items-center gap-2 text-ink">
                   <SafetyBadge level={pet.safetyLevel} showLabel size="compact" />
                   {pet.name}
                   <span className="font-body text-sm font-normal text-muted">{pet.species}</span>

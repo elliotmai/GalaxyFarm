@@ -170,7 +170,7 @@ export function TrashScreen({
   return (
     <div className="flex flex-col gap-density">
       <header className="flex flex-wrap items-center justify-between gap-density">
-        <h1 className="font-heading text-2xl font-semibold text-ink">Trash</h1>
+        <h1 className="text-ink">Trash</h1>
         <Select
           label="Kind of record"
           options={LOCAL_STORES.map((name) => ({ value: name, label: LABELS[name] ?? name }))}

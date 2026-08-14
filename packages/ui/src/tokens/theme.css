@@ -155,6 +155,61 @@
 }
 
 /*
+ * The type scale (§8 v0.9).
+ *
+ * In `em`, not `rem`, and that is the whole design. The density block above
+ * sets `font-size` on the surface root, so an `em` heading is measured against
+ * *that* — a title is 1.75× the body text of whichever surface it is on, and
+ * comes out at 26px on a laptop, 28px on a phone and 35px on the barn screen
+ * without a single component knowing which one it is drawing for.
+ *
+ * The sizes it replaces were Tailwind's fixed rem steps, picked per screen:
+ * `text-2xl` on most page titles, `text-3xl` and `text-xl` on a few, `text-lg`
+ * for section headings. Fixed steps do not move with density, so the kiosk had
+ * 20px body text under the same 24px heading a laptop got at 15px body — the
+ * hierarchy inverted as the surface got bigger. They were also unrelated to
+ * each other: four sizes, no ratio, chosen one page at a time.
+ *
+ * A minor third (1.25) between the steps, which is close enough to the ratios
+ * printed matter has used for centuries to look deliberate and far enough
+ * apart that two adjacent levels are never mistaken for each other.
+ *
+ * In `@layer base` so a utility still wins. Every heading that genuinely needs
+ * a size of its own keeps its class and overrides this; the point is that the
+ * ones that do not need it can now say nothing at all.
+ */
+@layer base {
+  [data-theme] :is(h1, h2, h3, h4) {
+    font-weight: 600;
+    /* Display faces set tighter than body text; at title size the default
+       leading opens a gap that reads as two separate lines. */
+    line-height: 1.2;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  [data-theme] h1 {
+    font-size: 1.75em;
+    /* Only at the top size, and only a little: a serif set large looks loose
+       at the tracking that suits it at 15px. */
+    letter-spacing: -0.011em;
+  }
+
+  [data-theme] h2 {
+    font-size: 1.3em;
+  }
+
+  [data-theme] h3 {
+    font-size: 1.1em;
+  }
+
+  [data-theme] h4 {
+    font-size: 1em;
+    line-height: 1.35;
+  }
+}
+
+/*
  * The one thing the kiosk does to the display face.
  *
  * Condensed caps are signage, not prose: the case change is what makes a label
@@ -174,6 +229,29 @@
 .gf-numeric {
   font-family: var(--gf-font-numeric);
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The one number a tile exists to show — a head count, a weight, a balance.
+ *
+ * A heading rule cannot reach these: they are `<p>` and `<span>`, because the
+ * number is the content, not a title for it. So the scale is given a name of
+ * its own rather than each tile picking a `text-3xl` — which is what they did
+ * before, and which froze the figure at 30px whether the reader was at a desk
+ * or across the barn.
+ *
+ * `2.2em`, a step above the title, because on a stat tile the number outranks
+ * the label above it. Tabular figures for the same reason `.gf-numeric` has
+ * them: these end up in columns, and a column of proportional digits cannot be
+ * compared down its length.
+ */
+.gf-figure {
+  font-family: var(--gf-font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-size: 2.2em;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
 }
 
 /*

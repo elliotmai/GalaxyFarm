@@ -27,7 +27,7 @@ export function PagePlaceholder({
       data-route={route}
       className="flex flex-col gap-density"
     >
-      <h1 className="font-heading text-2xl font-semibold text-ink">{title}</h1>
+      <h1 className="text-ink">{title}</h1>
       <p className="text-muted">
         This screen is scaffolded but not implemented yet.
         {phase ? ` Planned for ${phase}.` : ""}

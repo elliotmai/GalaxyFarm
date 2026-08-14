@@ -77,7 +77,7 @@ export function SkeletonScreen({ title, stats = 4, rows = 5 }: SkeletonScreenPro
       {title === undefined ? (
         <Skeleton className="h-8 w-48" />
       ) : (
-        <h1 className="font-heading text-2xl font-semibold text-ink">{title}</h1>
+        <h1 className="text-ink">{title}</h1>
       )}
 
       {stats > 0 ? (

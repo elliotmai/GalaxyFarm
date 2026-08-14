@@ -43,7 +43,7 @@ export function PageHeader({ title, subtitle, eyebrow, actions, meta }: PageHead
           {eyebrow === undefined ? null : (
             <p className="text-xs font-semibold uppercase tracking-widest text-muted">{eyebrow}</p>
           )}
-          <h1 className="font-heading text-2xl font-semibold leading-tight text-ink">{title}</h1>
+          <h1 className="text-ink">{title}</h1>
           {subtitle === undefined ? null : (
             <p className="max-w-prose text-sm text-muted">{subtitle}</p>
           )}
@@ -86,7 +86,7 @@ export function Section({
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="flex flex-col gap-0.5">
-          <h2 className="font-heading text-lg font-semibold text-ink">{title}</h2>
+          <h2 className="text-ink">{title}</h2>
           {description === undefined ? null : (
             <p className="max-w-prose text-sm text-muted">{description}</p>
           )}
@@ -167,11 +167,7 @@ export function Stat({ label, value, hint, emphasis = false }: StatProps) {
     <div className="flex flex-col gap-1 rounded-density border border-rule bg-raised px-density py-3">
       <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
       <span
-        className={`[font-variant-numeric:tabular-nums] ${
-          emphasis
-            ? "font-heading text-3xl font-semibold text-ink"
-            : "text-xl font-semibold text-ink"
-        }`}
+        className={`text-ink ${emphasis ? "gf-figure" : "gf-numeric text-[1.35em] font-semibold"}`}
       >
         {value}
       </span>

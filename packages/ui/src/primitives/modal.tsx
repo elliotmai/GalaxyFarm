@@ -134,9 +134,7 @@ export function Modal({
       >
         <div className="flex items-start justify-between gap-density">
           <div className="flex flex-col gap-1">
-            <h2 id={titleId} className="font-heading text-lg font-semibold">
-              {title}
-            </h2>
+            <h2 id={titleId}>{title}</h2>
             {description === undefined ? null : (
               <p id={descriptionId} className="text-density text-muted">
                 {description}

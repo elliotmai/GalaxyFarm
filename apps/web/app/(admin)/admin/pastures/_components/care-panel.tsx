@@ -512,7 +512,7 @@ export function CarePanel({
 
               return (
                 <Card key={zone.id} title={zone.name}>
-                  <p className="font-heading text-xl font-semibold tabular-nums text-ink">
+                  <p className="gf-numeric text-[1.35em] font-semibold text-ink">
                     {formatMoney(spend.total)}
                   </p>
                   <p className="text-sm text-muted">

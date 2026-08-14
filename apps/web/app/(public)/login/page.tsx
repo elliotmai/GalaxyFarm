@@ -30,7 +30,7 @@ export default async function LoginPage({
     <main className="flex min-h-screen flex-col items-center justify-center gap-density p-6">
       <div className="flex flex-col items-center gap-2">
         <Logomark size="large" decorative />
-        <h1 className="font-heading text-2xl font-semibold text-ink">{farmName}</h1>
+        <h1 className="text-ink">{farmName}</h1>
       </div>
 
       <LoginForm next={next} />

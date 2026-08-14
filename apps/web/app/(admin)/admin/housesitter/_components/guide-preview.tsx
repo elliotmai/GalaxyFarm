@@ -117,7 +117,7 @@ export function GuidePreview({
       >
         <article data-print="guide" className="flex flex-col gap-6 rounded-density bg-panel p-6">
           <header className="flex flex-col gap-2 border-b border-edge pb-4">
-            <h2 className="font-heading text-2xl font-semibold text-ink">{composed.title}</h2>
+            <h2 className="text-ink">{composed.title}</h2>
             <p className="text-sm text-muted">
               Composed {printed}. Everything below is read from the farm&rsquo;s own records — if
               something changed this morning, this says so.
@@ -129,9 +129,7 @@ export function GuidePreview({
 
           {dangerous.length === 0 ? null : (
             <section className="rounded-density border-2 border-danger p-4">
-              <h3 className="font-heading text-lg font-semibold text-danger">
-                Do not handle these alone
-              </h3>
+              <h3 className="text-danger">Do not handle these alone</h3>
               <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-density text-ink">
                 {dangerous.map((line) => (
                   <li key={line}>{line}</li>
@@ -142,7 +140,7 @@ export function GuidePreview({
 
           {emergency.length === 0 ? null : (
             <section>
-              <h3 className="font-heading text-lg font-semibold text-ink">Who to ring</h3>
+              <h3 className="text-ink">Who to ring</h3>
               <ul className="mt-2 flex flex-col gap-1 text-density text-ink">
                 {emergency.map((person) => (
                   <li key={person.id}>
@@ -159,7 +157,7 @@ export function GuidePreview({
 
           {vets.length === 0 ? null : (
             <section>
-              <h3 className="font-heading text-lg font-semibold text-ink">Vet</h3>
+              <h3 className="text-ink">Vet</h3>
               <ul className="mt-2 flex flex-col gap-1 text-density text-ink">
                 {vets.map((person) => (
                   <li key={person.id}>
@@ -179,10 +177,10 @@ export function GuidePreview({
 
           {composed.pens.length === 0 ? null : (
             <section className="flex flex-col gap-4">
-              <h3 className="font-heading text-lg font-semibold text-ink">Pens</h3>
+              <h3 className="text-ink">Pens</h3>
               {composed.pens.map((pen) => (
                 <div key={pen.zoneId} className="flex flex-col gap-2 border-l-2 border-edge pl-4">
-                  <h4 className="flex flex-wrap items-center gap-2 font-heading text-density font-semibold text-ink">
+                  <h4 className="flex flex-wrap items-center gap-2 text-ink">
                     <SafetyBadge level={pen.effectiveLevel} showLabel size="compact" />
                     {pen.zoneName}
                   </h4>
@@ -221,10 +219,10 @@ export function GuidePreview({
 
           {pets.length === 0 ? null : (
             <section className="flex flex-col gap-3">
-              <h3 className="font-heading text-lg font-semibold text-ink">The dogs and cats</h3>
+              <h3 className="text-ink">The dogs and cats</h3>
               {pets.map((pet) => (
                 <div key={pet.animalId} className="flex flex-col gap-1 border-l-2 border-edge pl-4">
-                  <h4 className="flex flex-wrap items-center gap-2 font-heading text-density font-semibold text-ink">
+                  <h4 className="flex flex-wrap items-center gap-2 text-ink">
                     <SafetyBadge level={pet.safetyLevel} showLabel size="compact" />
                     {pet.name}
                     <span className="font-body text-sm font-normal text-muted">{pet.species}</span>
@@ -258,7 +256,7 @@ export function GuidePreview({
 
           {chores.length === 0 ? null : (
             <section>
-              <h3 className="font-heading text-lg font-semibold text-ink">The routine</h3>
+              <h3 className="text-ink">The routine</h3>
               <ul className="mt-2 flex flex-col gap-1 text-density text-ink">
                 {chores.map((chore) => (
                   <li key={chore.id}>
@@ -277,7 +275,7 @@ export function GuidePreview({
 
           {composed.custom.map((section) => (
             <section key={section.id}>
-              <h3 className="font-heading text-lg font-semibold text-ink">{section.title}</h3>
+              <h3 className="text-ink">{section.title}</h3>
               <p className="mt-2 whitespace-pre-wrap text-density text-ink">
                 {section.bodyMarkdown}
               </p>

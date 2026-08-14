@@ -58,7 +58,7 @@ export function Dashboard({
   // once its data arrives has no heading at all while it is loading and none
   // when it is empty — which is the state a new install spends its first week
   // in, and the state the e2e suite found it in.
-  const heading = <h1 className="font-heading text-2xl font-semibold text-ink">Today</h1>;
+  const heading = <h1 className="text-ink">Today</h1>;
 
   if (zonesLoading) {
     // The layout is known long before the records are, so draw it. A line of
@@ -192,7 +192,7 @@ function PenBoard({
   return (
     <section className="flex flex-col gap-density">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-heading text-lg font-semibold text-ink">Pen board</h2>
+        <h2 className="text-ink">Pen board</h2>
         <span className="flex gap-1.5">
           <Pill tone="action" dot>
             {occupied.length} in use

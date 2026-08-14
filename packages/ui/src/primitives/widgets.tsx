@@ -179,8 +179,7 @@ export function Tile({ label, value, hint, tone = "neutral", emphasis = false, b
       </div>
       <span
         className={[
-          "[font-variant-numeric:tabular-nums]",
-          emphasis ? "font-heading text-3xl font-semibold" : "text-xl font-semibold",
+          emphasis ? "gf-figure" : "gf-numeric text-[1.35em] font-semibold",
           emphasis ? TONE_TEXT[tone] : "text-ink",
         ].join(" ")}
       >

@@ -447,10 +447,7 @@ export function Pedigree({
 }
 
 /** The module's tree, flattened into the shape the chart draws. */
-function toAncestor(
-  node: PedigreeNode,
-  repeats: ReadonlyMap<string, number>,
-): Ancestor {
+function toAncestor(node: PedigreeNode, repeats: ReadonlyMap<string, number>): Ancestor {
   const key = `${node.ref.kind}:${node.ref.id}`;
   return {
     id: key,
@@ -966,9 +963,7 @@ export function FinanceTab({
       />
 
       <Card title={pl.net.cents >= 0 ? "In front" : "Behind"}>
-        <p className="font-heading text-3xl font-semibold [font-variant-numeric:tabular-nums] text-ink">
-          {formatMoney(pl.net)}
-        </p>
+        <p className="gf-figure text-ink">{formatMoney(pl.net)}</p>
         {pl.complete ? null : (
           // Said plainly rather than shown as a clean number. A home-raised
           // calf with no feed allocation shows a flattering profit that is

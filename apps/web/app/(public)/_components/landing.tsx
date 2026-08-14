@@ -72,7 +72,7 @@ export function Landing({
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-density py-4">
           <span className="flex min-w-0 items-center gap-2">
             <Logomark size="small" decorative />
-            <span className="truncate font-heading text-lg font-semibold text-ink">{farmName}</span>
+            <span className="truncate text-ink">{farmName}</span>
           </span>
           <Link
             href="/book"
@@ -88,7 +88,7 @@ export function Landing({
           <p className="text-xs font-semibold uppercase tracking-widest text-muted">
             Wise County, Texas
           </p>
-          <h1 className="max-w-3xl font-heading text-4xl font-semibold leading-tight text-ink sm:text-5xl">
+          <h1 className="max-w-3xl text-4xl leading-tight text-ink sm:text-5xl">
             A family cattle operation, and a place to send a show calf.
           </h1>
           <p className="max-w-2xl text-lg text-muted">
@@ -117,7 +117,7 @@ export function Landing({
           <div className="mx-auto grid w-full max-w-5xl gap-density px-density py-12 md:grid-cols-3">
             {OFFERINGS.map((offering) => (
               <div key={offering.title} className="flex flex-col gap-2">
-                <h2 className="font-heading text-lg font-semibold text-ink">{offering.title}</h2>
+                <h2 className="text-ink">{offering.title}</h2>
                 <p className="text-muted">{offering.detail}</p>
               </div>
             ))}
@@ -125,7 +125,7 @@ export function Landing({
         </section>
 
         <section className="mx-auto flex w-full max-w-5xl flex-col gap-density px-density py-12">
-          <h2 className="font-heading text-2xl font-semibold text-ink">How it works</h2>
+          <h2 className="text-ink">How it works</h2>
           <ol className="grid gap-density md:grid-cols-3">
             {HOW_IT_WORKS.map((entry) => (
               <li key={entry.step} className="flex flex-col gap-2">
@@ -135,7 +135,7 @@ export function Landing({
                 >
                   {entry.step}
                 </span>
-                <h3 className="font-heading text-lg font-semibold text-ink">{entry.title}</h3>
+                <h3 className="text-ink">{entry.title}</h3>
                 <p className="text-muted">{entry.detail}</p>
               </li>
             ))}
@@ -152,9 +152,7 @@ export function Landing({
         */}
         <section className="flex flex-1 flex-col border-t border-edge bg-panel">
           <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-density py-12">
-            <h2 className="font-heading text-2xl font-semibold text-ink">
-              Everything written down
-            </h2>
+            <h2 className="text-ink">Everything written down</h2>
             <p className="max-w-2xl text-muted">
               Every feeding, weight, treatment and working day is recorded as it happens — from a
               phone, in the barn, with or without signal. When your calf goes home you get the

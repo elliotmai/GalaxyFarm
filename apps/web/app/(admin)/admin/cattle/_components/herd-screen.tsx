@@ -462,7 +462,7 @@ export function HerdScreen({
   return (
     <div className="flex flex-col gap-density">
       <header className="flex flex-wrap items-center justify-between gap-density">
-        <h1 className="font-heading text-2xl font-semibold text-ink">Herd</h1>
+        <h1 className="text-ink">Herd</h1>
         <div className="flex items-center gap-2">
           <TextInput
             label="Search"
