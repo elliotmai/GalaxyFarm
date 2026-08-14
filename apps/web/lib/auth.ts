@@ -6,6 +6,7 @@ import { signIn as verifyCredentials } from "@galaxy-farm/infra-auth";
 
 import { authConfig } from "@/lib/auth.config";
 import { credentialStore } from "@/lib/credential-store";
+import { authenticateDevice } from "@/lib/device-store";
 
 /**
  * Auth.js, over our own users table (spec §4.3).
@@ -57,6 +58,37 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           propertyId: result.actor.propertyId,
           accessFrom: result.actor.accessWindow?.from.toISOString() ?? null,
           accessTo: result.actor.accessWindow?.to.toISOString() ?? null,
+        } as never;
+      },
+    }),
+
+    /**
+     * A barn screen, not a person (spec §4.4).
+     *
+     * Separate provider id rather than a branch inside the one above: the two
+     * have nothing in common past "a Credentials provider" — no email, no
+     * password, no decoy-hash timing (the token is 256 bits of CSPRNG, so the
+     * database lookup by its hash *is* the check; see `pairing.ts`), and no
+     * access window. Every failure still returns `null` and nothing more, the
+     * same contract the pair form already has to honour.
+     */
+    Credentials({
+      id: "kiosk-device",
+      name: "Kiosk device",
+      credentials: { token: { label: "Device token", type: "text" } },
+      async authorize(raw) {
+        const token = typeof raw?.["token"] === "string" ? raw["token"] : "";
+        if (token === "") return null;
+
+        const device = await authenticateDevice(token, systemClock().now());
+        if (device === undefined) return null;
+
+        return {
+          id: device.id,
+          name: device.name,
+          role: "kiosk",
+          propertyId: device.propertyId,
+          deviceId: device.id,
         } as never;
       },
     }),

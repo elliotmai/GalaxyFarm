@@ -6,7 +6,7 @@ import { getTableName } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { allTables } from "../src/schema/index.js";
-import { BOOKKEEPING_TABLES } from "../src/sync/entities.js";
+import { BOOKKEEPING_TABLES, UNTRACKED_TABLES } from "../src/sync/entities.js";
 
 /**
  * The migrations, applied to a real Postgres.
@@ -56,8 +56,11 @@ describe("migrations", () => {
 
     // Derived from the schema rather than written out, so the failure this
     // catches is the one that matters: a table declared in TypeScript that no
-    // migration ever created. A hardcoded list only catches itself going stale.
-    const expected = Object.values(allTables).map(getTableName).sort();
+    // migration ever created. A hardcoded list only catches itself going
+    // stale — `UNTRACKED_TABLES` is the one deliberate, documented exception,
+    // for a table that exists but is not an entity at all (see its doc
+    // comment).
+    const expected = [...Object.values(allTables).map(getTableName), ...UNTRACKED_TABLES].sort();
 
     expect(tables.rows.map((r) => r.tablename)).toEqual(expected);
   });
@@ -81,6 +84,10 @@ describe("migrations", () => {
       // Sync bookkeeping, not entities: append-only change log and per-field
       // write times. Neither is a Repository and neither carries a tombstone.
       if (table === "sync_audit" || table === "sync_field_meta") continue;
+      // Nor is `UNTRACKED_TABLES` — a single hash per property is not a
+      // record anything on the farm did, so it carries none of §5's base
+      // columns on purpose (see the doc comment where it is declared).
+      if (UNTRACKED_TABLES.includes(table)) continue;
       for (const required of ["id", "property_id", "created_at", "updated_at", "deleted_at"]) {
         expect(columns.has(required), `${table} is missing ${required}`).toBe(true);
       }

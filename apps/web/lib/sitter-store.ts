@@ -16,12 +16,15 @@ import {
   type ZoneAssignment,
 } from "@galaxy-farm/core";
 import { applyPush, repositoryFor, type Database } from "@galaxy-farm/infra-db";
-import type { CareGuide, GuideSection, GuideSectionKind } from "@galaxy-farm/module-housesitting";
+import type { CareGuide, GuideSection } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 import { isPet } from "@galaxy-farm/module-pets";
 
+import { guideForSitter, guideIncludes, visibleToSitter } from "@/lib/care-guide-selection";
 import { database } from "@/lib/credential-store";
+
+export { guideForSitter, guideIncludes, visibleToSitter };
 
 /**
  * What a housesitter's browser is allowed to be given (spec §4.3, §5.10).
@@ -74,31 +77,6 @@ export const EMPTY_SITTER_VIEW: SitterView = {
   feeds: [],
   petHealth: [],
 };
-
-/**
- * Which contacts reach the guide.
- *
- * §5.1 says the emergency-tagged subset auto-populates it, and §5.10 asks for
- * vet info beside it. Everything else in the CRM — what a buyer is like to
- * deal with, what the hauler charges — is not care information and does not
- * travel.
- */
-export function visibleToSitter(contact: Pick<Contact, "tags">): boolean {
-  return contact.tags.includes("emergency") || contact.tags.includes("vet");
-}
-
-/**
- * Which guide a sitter is shown.
- *
- * The oldest live one, so adding a second guide for a longer trip does not
- * silently move the person already reading the first. A retired guide is never
- * served: switching one off is how somebody takes it out of use.
- */
-export function guideForSitter(guides: readonly CareGuide[]): CareGuide | undefined {
-  return [...guides]
-    .filter((guide) => guide.active)
-    .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())[0];
-}
 
 /** Everything the sitter surface renders, in one round trip's worth of reads. */
 export async function sitterView(propertyId: Ulid, db: Database = database()): Promise<SitterView> {
@@ -153,17 +131,6 @@ export async function sitterView(propertyId: Ulid, db: Database = database()): P
   };
 }
 
-/**
- * Is this auto-section on the guide the owner published?
- *
- * A guide with no record at all is treated as including nothing, so a sitter
- * arriving before anybody wrote one sees an honest "nothing here yet" rather
- * than a document assembled by default that nobody has read.
- */
-export function guideIncludes(guide: CareGuide | undefined, kind: GuideSectionKind): boolean {
-  return guide !== undefined && guide.includes.includes(kind);
-}
-
 export interface TickInput {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
@@ -181,6 +148,13 @@ export interface TickInput {
   readonly date: Date;
   readonly at: Date;
   readonly done: boolean;
+  /**
+   * Whose write this is, for the sync audit log. Defaults to the housesitter
+   * themselves; a kiosk passes its own paired device id, so a chore ticked
+   * from an unattended barn screen is attributed to the screen rather than to
+   * whichever family member happened to be standing in front of it.
+   */
+  readonly deviceId?: string | undefined;
 }
 
 export type TickOutcome =
@@ -205,7 +179,7 @@ export async function tickChore(input: TickInput, db: Database = database()): Pr
 
   const clock = systemClock();
   const ids = { next: () => encodeUlid(at.getTime()) };
-  const deviceId = `sitter:${actorId}`;
+  const deviceId = input.deviceId ?? `sitter:${actorId}`;
 
   /**
    * A projected occurrence has no row yet, and finishing it writes one

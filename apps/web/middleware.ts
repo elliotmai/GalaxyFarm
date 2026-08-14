@@ -23,6 +23,13 @@ export default auth((request) => {
   const surface = surfaceOf(request.nextUrl.pathname);
   if (surface === undefined) return NextResponse.next();
 
+  // The one page inside a gated surface a signed-out visitor has to reach:
+  // pairing a fresh screen *is* how it gets a session, so gating the page
+  // that grants one would be a lock with the key on the wrong side of it
+  // (spec §4.4). Nothing here is sensitive — it is a form and a code that
+  // expires in `PAIRING_TTL_MINUTES` either way.
+  if (request.nextUrl.pathname === "/kiosk/pair") return NextResponse.next();
+
   const actor = request.auth?.actor;
 
   if (actor === undefined) {

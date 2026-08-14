@@ -67,6 +67,19 @@ vi.mock("@/app/(admin)/admin/settings/_components/user-actions", () => ({
   setPersonActive: async () => ({ ok: true, message: "" }),
 }));
 
+// The Kiosk devices tab sits beside Branding too, and reaches `kioskDevices`
+// and `kioskPins` through server actions — the same reason `user-actions` is
+// mocked above.
+vi.mock("@/app/(admin)/admin/settings/_components/device-actions", () => ({
+  addDevice: async () => ({ ok: true, message: "" }),
+  renameDeviceAction: async () => ({ ok: true, message: "" }),
+  lockDeviceAction: async () => ({ ok: true, message: "" }),
+  reissueDeviceAction: async () => ({ ok: true, message: "" }),
+  revokeDeviceAction: async () => ({ ok: true, message: "" }),
+  setKioskPinAction: async () => ({ ok: true, message: "" }),
+  clearKioskPinAction: async () => ({ ok: true, message: "" }),
+}));
+
 const { ToastProvider, ConfirmProvider } = await import("@galaxy-farm/ui");
 const { SettingsScreen } =
   await import("../app/(admin)/admin/settings/_components/settings-screen.js");
@@ -103,6 +116,9 @@ function settings(mayManageBranding: boolean) {
           deleted={[]}
           mayManagePeople={false}
           mayManageBranding={mayManageBranding}
+          mayManageDevices={false}
+          devices={[]}
+          pinSet={false}
         />
       </ConfirmProvider>
     </ToastProvider>,

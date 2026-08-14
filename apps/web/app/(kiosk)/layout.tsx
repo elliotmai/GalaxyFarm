@@ -1,5 +1,10 @@
 import type { Viewport } from "next";
 
+import { ConfirmProvider, ToastProvider } from "@galaxy-farm/ui";
+
+import { SyncProvider } from "@/app/_components/sync-provider";
+import { currentActor } from "@/lib/auth";
+
 /**
  * The browser chrome, matched to the surface (spec §8 v0.9).
  *
@@ -27,10 +32,37 @@ export const viewport: Viewport = {
  * whatever the viewport width would have suggested. Every other surface lets
  * the viewport decide.
  */
-export default function KioskLayout({ children }: { children: React.ReactNode }) {
+export default async function KioskLayout({ children }: { children: React.ReactNode }) {
+  const actor = await currentActor();
+
+  // Not `redirect("/login")` here the way the other surfaces do it: this
+  // layout wraps `/kiosk/pair` too, and `middleware.ts` carries the one
+  // exception that lets a signed-out screen reach it — pairing is how it gets
+  // a session. Rendering the bare shell rather than a login wall is what
+  // makes that exception actually usable, and a real session past this point
+  // is guaranteed for every other route the middleware already gates.
+  if (actor === undefined) {
+    return (
+      <div data-surface="kiosk" data-theme="flying-auto" data-density="kiosk">
+        <main>{children}</main>
+      </div>
+    );
+  }
+
   return (
     <div data-surface="kiosk" data-theme="flying-auto" data-density="kiosk">
-      {children}
+      {/* Off for a kiosk device (spec §4.3): its outbox is always empty —
+          writes go through the server actions in `kiosk/_actions.ts` rather
+          than `useMutations` — and `/api/sync/push` refuses anything that is
+          not `owner` or `member` outright. Pulling stays on regardless of
+          role: reads are the entire reason a barn screen keeps a local store. */}
+      <SyncProvider pushEnabled={actor.role === "owner" || actor.role === "member"}>
+        <ToastProvider>
+          <ConfirmProvider>
+            <main>{children}</main>
+          </ConfirmProvider>
+        </ToastProvider>
+      </SyncProvider>
     </div>
   );
 }

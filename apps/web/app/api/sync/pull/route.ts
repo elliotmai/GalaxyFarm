@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
+import type { Ulid } from "@galaxy-farm/core";
 import { pullSince, syncedEntities } from "@galaxy-farm/infra-db";
 
 import { syncErrorResponse } from "@/lib/api-errors";
 import { currentActor } from "@/lib/auth";
 import { database } from "@/lib/credential-store";
+import { isDeviceLive } from "@/lib/device-store";
 import { reviveCursors } from "@/lib/sync-payload";
 
 /**
@@ -28,6 +30,18 @@ export async function POST(request: Request) {
   // get nothing rather than everything.
   if (actor.role === "customer") {
     return NextResponse.json({ pages: [] });
+  }
+
+  // A revoked screen has to stop pulling within one sync interval, not merely
+  // fail to sign in again whenever its JWT next expires — sessions here are
+  // stateless (spec §4.3), so this is the live check that makes "revoke a
+  // kiosk device" (§4.5) actually take effect promptly rather than eventually.
+  if (actor.role === "kiosk") {
+    const live =
+      actor.deviceId !== undefined &&
+      (await isDeviceLive(actor.deviceId as Ulid, actor.propertyId));
+    if (!live)
+      return NextResponse.json({ error: "This screen has been unpaired" }, { status: 401 });
   }
 
   let body: { cursors: ReturnType<typeof reviveCursors>; entities?: readonly string[] };

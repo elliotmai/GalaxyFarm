@@ -52,6 +52,8 @@ const KIOSK_BOARDS = [
   "/kiosk/pen-board",
   "/kiosk/chores",
   "/kiosk/eggs",
+  "/kiosk/calendar",
+  "/kiosk/housesitter",
   "/kiosk/program-day",
 ];
 
@@ -109,8 +111,32 @@ test.describe("kiosk surface", () => {
       const response = await page.goto(board);
 
       expect(response?.status(), `${board} should not 404`).toBe(200);
+      // Every board is a real screen now, not a placeholder — see the same
+      // note on `ADMIN_ROUTES` above.
+      await expect(page.locator("main")).toBeVisible();
     });
   }
+});
+
+test.describe("pairing a barn screen", () => {
+  // Signed out on purpose: pairing is how a fresh screen gets a session in
+  // the first place, so it is the one page under `/kiosk` a stranger can
+  // reach — `middleware.ts` carries the matching exception.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("/kiosk/pair renders rather than redirecting to /login", async ({ page }) => {
+    const response = await page.goto("/kiosk/pair");
+
+    expect(response?.status()).toBe(200);
+    await expect(page).not.toHaveURL(/\/login/);
+    await expect(page.getByRole("button", { name: /pair this screen/i })).toBeVisible();
+  });
+
+  test("every other kiosk board still sends a signed-out visitor to /login", async ({ page }) => {
+    await page.goto("/kiosk/pen-board");
+
+    await expect(page).toHaveURL(/\/login\?next=%2Fkiosk%2Fpen-board/);
+  });
 });
 
 test.describe("public surfaces", () => {

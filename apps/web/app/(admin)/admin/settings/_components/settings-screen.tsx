@@ -4,12 +4,14 @@ import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import type { Ulid } from "@galaxy-farm/core";
 
 import { BrandingScreen } from "@/app/(admin)/admin/settings/_components/branding-screen";
+import { DevicesScreen } from "@/app/(admin)/admin/settings/_components/devices-screen";
 import {
   PeopleScreen,
   type PersonRow,
 } from "@/app/(admin)/admin/settings/_components/people-screen";
 import { PropertyScreen } from "@/app/(admin)/admin/settings/_components/property-screen";
 import { WatchSettingsScreen } from "@/app/(admin)/admin/settings/_components/watch-settings-screen";
+import type { KioskDevice } from "@/lib/device-store";
 
 /**
  * Settings (spec §7).
@@ -34,7 +36,11 @@ export function SettingsScreen({
   deleted,
   mayManagePeople,
   mayManageBranding,
+  mayManageDevices,
+  devices,
+  pinSet,
   unavailable,
+  devicesUnavailable,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
@@ -43,8 +49,14 @@ export function SettingsScreen({
   readonly mayManagePeople: boolean;
   /** `branding.manage` — owners only. Renaming the farm renames it to everyone. */
   readonly mayManageBranding: boolean;
+  /** `devices.manage` — owners only, the same reasoning as `users.manage`. */
+  readonly mayManageDevices: boolean;
+  readonly devices: readonly KioskDevice[];
+  readonly pinSet: boolean;
   /** Why the people list is missing, when it is. */
   readonly unavailable?: string | undefined;
+  /** Why the device list is missing, when it is. */
+  readonly devicesUnavailable?: string | undefined;
 }) {
   const tabs = [
     ...(mayManageBranding ? [{ id: "branding", label: "Branding" }] : []),
@@ -59,6 +71,15 @@ export function SettingsScreen({
             id: "people",
             label: "People",
             adornment: unavailable === undefined ? people.length : "!",
+          },
+        ]
+      : []),
+    ...(mayManageDevices
+      ? [
+          {
+            id: "devices",
+            label: "Kiosk devices",
+            adornment: devicesUnavailable === undefined ? devices.length : "!",
           },
         ]
       : []),
@@ -86,6 +107,13 @@ export function SettingsScreen({
                 deleted={deleted}
                 actorId={actorId}
                 {...(unavailable === undefined ? {} : { unavailable })}
+              />
+            ) : active === "devices" && mayManageDevices ? (
+              <DevicesScreen
+                propertyId={propertyId}
+                devices={devices}
+                pinSet={pinSet}
+                {...(devicesUnavailable === undefined ? {} : { unavailable: devicesUnavailable })}
               />
             ) : (
               <WatchSettingsScreen propertyId={propertyId} actorId={actorId} />

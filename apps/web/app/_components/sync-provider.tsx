@@ -63,7 +63,21 @@ export function useSync(): SyncState {
   return state;
 }
 
-export function SyncProvider({ children }: { readonly children: ReactNode }) {
+export function SyncProvider({
+  children,
+  pushEnabled = true,
+}: {
+  readonly children: ReactNode;
+  /**
+   * Off for a kiosk (spec §4.3, §4.4). `/api/sync/push` refuses anything that
+   * is not `owner` or `member` outright, so a kiosk's outbox — always empty,
+   * since its writes go through dedicated server actions rather than
+   * `useMutations` — would still 403 on every attempt and light up the sync
+   * badge as broken. Pulling stays on: reads are the whole reason a barn
+   * screen keeps a local store at all.
+   */
+  readonly pushEnabled?: boolean;
+}) {
   // Built in an effect, not at module scope: IndexedDB does not exist during
   // the server render, and touching it there is a crash rather than a warning.
   const [store, setStore] = useState<LocalStore | undefined>();
@@ -90,7 +104,9 @@ export function SyncProvider({ children }: { readonly children: ReactNode }) {
     running.current = true;
     setSyncing(true);
     try {
-      const outcome = await store.engine.sync();
+      const outcome = pushEnabled
+        ? await store.engine.sync()
+        : { pushed: 0, rejected: 0, audit: [], ...(await store.engine.pull()) };
       setOffline(outcome.offline);
       setProblem(outcome.problem);
       if (!outcome.offline && outcome.problem === undefined) {
@@ -103,7 +119,7 @@ export function SyncProvider({ children }: { readonly children: ReactNode }) {
       running.current = false;
       setSyncing(false);
     }
-  }, [store]);
+  }, [store, pushEnabled]);
 
   const retryStuck = useCallback(async () => {
     if (store === undefined) return;

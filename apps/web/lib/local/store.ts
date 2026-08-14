@@ -173,6 +173,15 @@ export interface LocalStore {
 let store: LocalStore | undefined;
 
 /**
+ * Exported so the kiosk pairing flow can seed this before the local store is
+ * ever built. A paired screen syncs under the `kioskDevices` row Postgres
+ * already knows about, not a fresh id generated the first time IndexedDB is
+ * touched — otherwise re-pairing, or clearing storage, forks its merge
+ * history under a new device every time (spec §4.2).
+ */
+export const DEVICE_ID_STORAGE_KEY = "galaxy-farm:device-id";
+
+/**
  * The device id.
  *
  * Persisted, because it is what the merge uses to break a tie between two
@@ -182,12 +191,11 @@ let store: LocalStore | undefined;
  * same answer without talking to the others.
  */
 export function deviceId(): string {
-  const key = "galaxy-farm:device-id";
-  const existing = globalThis.localStorage?.getItem(key);
+  const existing = globalThis.localStorage?.getItem(DEVICE_ID_STORAGE_KEY);
   if (existing !== null && existing !== undefined && existing !== "") return existing;
 
   const fresh = encodeUlid(Date.now());
-  globalThis.localStorage?.setItem(key, fresh);
+  globalThis.localStorage?.setItem(DEVICE_ID_STORAGE_KEY, fresh);
   return fresh;
 }
 

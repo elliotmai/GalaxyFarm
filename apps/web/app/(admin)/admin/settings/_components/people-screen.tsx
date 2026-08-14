@@ -60,6 +60,16 @@ const ROLE_LABELS: Readonly<Record<Role, string>> = {
   kiosk: "Kiosk — a barn screen rather than a person",
 };
 
+/**
+ * A kiosk is provisioned by pairing (spec §4.4, Settings → Kiosk devices), not
+ * by an emailed invitation — a barn screen has no inbox to send one to, and
+ * `kioskDevices` carries its own token, never a password. `kiosk` stays a
+ * `Role` (§4.3's capability table still needs it) and stays a key in every map
+ * above (TypeScript requires the coverage) — it is only missing from the
+ * dropdown a person is invited through.
+ */
+const INVITABLE_ROLES = ROLES.filter((role) => role !== "kiosk");
+
 const ROLE_SHORT: Readonly<Record<Role, string>> = {
   owner: "Owner",
   member: "Member",
@@ -488,7 +498,7 @@ export function PeopleScreen({
               label="Role"
               value={draft.role}
               error={errors["role"]}
-              options={ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] }))}
+              options={INVITABLE_ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] }))}
               onChange={(event) => setDraft({ ...draft, role: event.target.value as Role })}
             />
 

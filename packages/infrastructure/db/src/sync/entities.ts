@@ -30,6 +30,25 @@ const NOT_SYNCED = new Set(["syncAudit", "syncFieldMeta", "users", "kioskDevices
 /** Tables that are not entities at all — no CRUD, no repository, no search. */
 export const BOOKKEEPING_TABLES: readonly string[] = ["syncAudit", "syncFieldMeta"];
 
+/**
+ * Tables a migration creates that `allTables` never names — the SQL name, not
+ * the camelCase key, because these are checked against `pg_tables` directly.
+ *
+ * `kiosk_pins` is the one so far (spec §4.3, §4.4). Every other table in this
+ * schema is reachable as a `Repository` and carries the §5 base columns —
+ * `id`, `propertyId`, the soft-delete trio — because every other table is a
+ * record something on the farm did. This one is not: a single scrypt hash per
+ * property, gating one Elevated-tier action. Giving it `id`/tombstone columns
+ * it would never use, or a `Repository` nothing would ever call, would be
+ * machinery for machinery's sake — and worse, it would put the hash one
+ * `repositoryFor` typo away from being handed to a device. Kept off
+ * `allTables` entirely is what makes that impossible rather than merely
+ * unlikely, at the cost of being invisible to the checks that assume every
+ * live table is an entity — `tests/migrations.test.ts` names this list
+ * explicitly rather than silently passing an empty one.
+ */
+export const UNTRACKED_TABLES: readonly string[] = ["kiosk_pins"];
+
 export const SYNCED_ENTITIES: readonly string[] = Object.keys(allTables).filter(
   (name) => !NOT_SYNCED.has(name),
 );
