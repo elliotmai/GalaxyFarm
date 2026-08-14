@@ -103,9 +103,16 @@ export function Dashboard({
       <CalvingWatchCard propertyId={propertyId} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {/*
+          Cattle, not every animal on the place. One Animal model serves every
+          species (§2), so the unfiltered list is the herd plus the flock, the
+          dogs and the horses — and a tile labelled "Cattle" that counts the
+          hens is wrong in the quietest possible way: it reads as a plausible
+          number and is the figure somebody repeats out loud.
+        */}
         <Tile
           label="Cattle"
-          value={animals.filter((a) => a.status === "active").length}
+          value={animals.filter((a) => a.species === "cattle" && a.status === "active").length}
           tone="identity"
         />
         <Tile
