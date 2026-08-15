@@ -4,10 +4,16 @@ import { useCallback } from "react";
 
 import {
   animalSchema,
+  assignmentInSlot,
+  encodeUlid,
+  moveToZone,
   suggestedLevelAfterCalving,
+  zoneAssignmentSchema,
   type Animal,
   type SafetyLevel,
   type Ulid,
+  type Zone,
+  type ZoneAssignment,
 } from "@galaxy-farm/core";
 import {
   calfFromCalving,
@@ -26,6 +32,7 @@ import {
 
 import { publish } from "@/lib/events";
 import { useMutations } from "@/lib/local/mutations";
+import { useRecords } from "@/lib/local/use-records";
 
 /**
  * Recording a calving (spec §5.2, issue #13).
@@ -114,6 +121,16 @@ export function useRecordCalving(
     propertyId,
     actorId,
   );
+  const placements = useMutations<ZoneAssignment>(
+    "zoneAssignments",
+    "zoneAssignments",
+    zoneAssignmentSchema,
+    propertyId,
+    actorId,
+  );
+  const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", { propertyId });
+  const { records: zones } = useRecords<Zone>("zones", { propertyId });
+
   const weights = useMutations<WeightRecord>(
     "weightRecords",
     "weightRecords",
@@ -198,6 +215,35 @@ export function useRecordCalving(
           message: "Calving saved, but the calf could not be created. Add it from the herd.",
           calving,
         };
+      }
+
+      // A calf runs with its dam, so it is born into her pen rather than
+      // nowhere. Without this every calf arrives unplaced, missing from the
+      // Pen Board on the one morning somebody most wants to find it — and
+      // "everything on the place stands somewhere outdoors" would be a rule
+      // this app broke itself, every calving.
+      const indoorZoneIds = new Set(zones.filter((zone) => zone.indoor).map((zone) => zone.id));
+      const damPen = assignmentInSlot(assignments, input.damId, "outside", indoorZoneIds);
+      const pen = zones.find((zone) => zone.id === damPen?.zoneId);
+
+      if (pen !== undefined) {
+        const { opened } = moveToZone(
+          assignments,
+          {
+            id: encodeUlid(calving.date.getTime() + 1) as Ulid,
+            propertyId,
+            createdAt: calving.date,
+            updatedAt: calving.date,
+            animalId: calf.value.id,
+            zoneId: pen.id,
+            indoor: pen.indoor,
+            // Dated to the calving, not to when the form was filled in. A calf
+            // entered three days later was still in that pen for three days.
+            at: calving.date,
+          },
+          indoorZoneIds,
+        );
+        if (opened !== undefined) await placements.create(opened);
       }
 
       await profiles.create({

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { isOnFarm, type AnimalStatus } from "./animal.js";
 import { dateRange, isOpenRange, type DateRange } from "../value-objects/date-range.js";
 import { ulidSchema, type Ulid } from "../types/ids.js";
 import { baseRecordSchema, type BaseRecord } from "./record.js";
@@ -139,6 +140,57 @@ export function conflictingAssignments(
   return openAssignments(assignments, animalId).filter(
     (a) => effectiveSlot(a, indoorZoneIds) === slot,
   );
+}
+
+/**
+ * Where an animal is standing right now, in one slot.
+ *
+ * Undefined is a real answer for `inside` — most animals are not in a barn
+ * most of the time — and a problem for `outside`, which is what
+ * `animalsWithoutOutside` is for.
+ */
+export function assignmentInSlot(
+  assignments: readonly ZoneAssignment[],
+  animalId: Ulid,
+  slot: AssignmentSlot,
+  indoorZoneIds: ReadonlySet<Ulid>,
+): ZoneAssignment | undefined {
+  return conflictingAssignments(assignments, animalId, slot, indoorZoneIds)[0];
+}
+
+/**
+ * Animals on the place with nowhere outside to be.
+ *
+ * Everything that lives here stands somewhere outdoors — a pen, a pasture,
+ * or, when it is away, the off-site zone, which is not indoor and so counts.
+ * A barn or a stall is the *second* place an animal can be, never the only
+ * one: a cow whose only assignment is a stall reads as living in the barn,
+ * and the pen board cannot say where she goes back to.
+ *
+ * The mechanism is here; the policy is not. This says who has no outside
+ * assignment, and each screen decides which animals that matters for — cattle
+ * on the herd screen, since that is where the rule was asked for. Baking
+ * "cattle" into the kernel would make the same true statement about a flock
+ * unsayable.
+ *
+ * Only animals actually on the place. A sold cow needs no pen, and demanding
+ * one for her would fill the list with animals nobody can act on — which is
+ * how a list of problems stops being read.
+ */
+export function animalsWithoutOutside(
+  animals: readonly { readonly id: Ulid; readonly status: string }[],
+  assignments: readonly ZoneAssignment[],
+  indoorZoneIds: ReadonlySet<Ulid>,
+): Ulid[] {
+  const placed = new Set<Ulid>();
+
+  for (const assignment of assignments.filter(isCurrent)) {
+    if (effectiveSlot(assignment, indoorZoneIds) === "outside") placed.add(assignment.animalId);
+  }
+
+  return animals
+    .filter((animal) => isOnFarm(animal as { status: AnimalStatus }) && !placed.has(animal.id))
+    .map((animal) => animal.id);
 }
 
 /**

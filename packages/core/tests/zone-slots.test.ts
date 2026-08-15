@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  animalsWithoutOutside,
+  assignmentInSlot,
   conflictingAssignments,
   doubleBookedAnimals,
   effectiveSlot,
@@ -405,5 +407,86 @@ describe("finding a cow booked into one place twice", () => {
     ];
 
     expect(doubleBookedAnimals(proper, INDOOR)).toEqual([]);
+  });
+});
+
+/**
+ * Everything on the place stands somewhere outdoors (§5.1).
+ *
+ * A pen, a pasture, or — when it is away — the off-site zone, which is not
+ * indoor and so counts. A barn or a stall is the *second* place an animal can
+ * be, never the only one: a cow whose only assignment is a stall reads as
+ * living in the barn, and the pen board cannot say where she goes back to.
+ */
+describe("animals with nowhere outside to be", () => {
+  const onFarm = { id: COW, status: "active" };
+
+  it("names a cow with no assignment at all", () => {
+    expect(animalsWithoutOutside([onFarm], [], INDOOR)).toEqual([COW]);
+  });
+
+  it("is satisfied by a pen", () => {
+    expect(animalsWithoutOutside([onFarm], [assignment({ zoneId: TRAP })], INDOOR)).toEqual([]);
+  });
+
+  it("is not satisfied by a stall alone", () => {
+    // The failing shape, and the reason this exists. She is in the barn
+    // tonight; the record cannot say where she came from or goes back to.
+    const stalledOnly = [assignment({ zoneId: STALL, slot: "inside" })];
+
+    expect(animalsWithoutOutside([onFarm], stalledOnly, INDOOR)).toEqual([COW]);
+  });
+
+  it("is satisfied by a pen even while she is in a stall", () => {
+    const both = [
+      assignment({ id: id(90), zoneId: TRAP }),
+      assignment({ id: id(91), zoneId: STALL, slot: "inside" }),
+    ];
+
+    expect(animalsWithoutOutside([onFarm], both, INDOOR)).toEqual([]);
+  });
+
+  it("counts a legacy primary row on an outdoor zone", () => {
+    // Rows written before the slots existed say `primary`. The zone still
+    // says where she is, and demanding she be re-entered would be busywork.
+    const legacy = [assignment({ zoneId: TRAP, slot: "primary" })];
+
+    expect(animalsWithoutOutside([onFarm], legacy, INDOOR)).toEqual([]);
+  });
+
+  it("ignores an assignment she has already left", () => {
+    const past = [assignment({ zoneId: TRAP, periodTo: later })];
+
+    expect(animalsWithoutOutside([onFarm], past, INDOOR)).toEqual([COW]);
+  });
+
+  it("asks nothing of an animal that is not on the place", () => {
+    // A sold cow needs no pen, and demanding one would fill the list with
+    // animals nobody can act on — which is how a list of problems stops
+    // being read.
+    expect(animalsWithoutOutside([{ id: COW, status: "sold" }], [], INDOOR)).toEqual([]);
+    expect(animalsWithoutOutside([{ id: COW, status: "deceased" }], [], INDOOR)).toEqual([]);
+  });
+
+  it("still asks it of a boarded animal, which is here and eating", () => {
+    expect(animalsWithoutOutside([{ id: COW, status: "boarding" }], [], INDOOR)).toEqual([COW]);
+  });
+});
+
+describe("where an animal is standing in one slot", () => {
+  it("finds the pen and the stall separately", () => {
+    const both = [
+      assignment({ id: id(92), zoneId: TRAP }),
+      assignment({ id: id(93), zoneId: STALL, slot: "inside" }),
+    ];
+
+    expect(assignmentInSlot(both, COW, "outside", INDOOR)?.zoneId).toBe(TRAP);
+    expect(assignmentInSlot(both, COW, "inside", INDOOR)?.zoneId).toBe(STALL);
+  });
+
+  it("says nothing for a slot she is not in, which is the ordinary case inside", () => {
+    const outsideOnly = [assignment({ zoneId: TRAP })];
+
+    expect(assignmentInSlot(outsideOnly, COW, "inside", INDOOR)).toBeUndefined();
   });
 });

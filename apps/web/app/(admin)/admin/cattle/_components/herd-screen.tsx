@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import {
   Badge,
   Button,
+  Callout,
   Card,
   Checkbox,
   DataTable,
@@ -26,6 +27,8 @@ import {
   SAFETY_LEVEL_DEFAULTS,
   SEXES,
   animalSchema,
+  animalsWithoutOutside,
+  assignmentInSlot,
   encodeUlid,
   moveToZone,
   zoneAssignmentSchema,
@@ -113,6 +116,17 @@ const NO_FILTERS: Filters = {
 
 interface Draft {
   readonly name: string;
+  /**
+   * The pen or pasture. Required for a new animal.
+   *
+   * Everything on the place stands somewhere outdoors, and asking at the one
+   * moment somebody is already thinking about the animal is the only way that
+   * stays true — a pen asked for later is a pen filled in for the first three
+   * animals and skipped for the next thirty.
+   */
+  readonly outsideZoneId: string;
+  /** The barn or stall, if it is in one tonight. Optional, always. */
+  readonly insideZoneId: string;
   readonly tagNumber: string;
   readonly sex: Sex;
   readonly dob: string;
@@ -125,6 +139,8 @@ interface Draft {
 
 const BLANK: Draft = {
   name: "",
+  outsideZoneId: "",
+  insideZoneId: "",
   tagNumber: "",
   sex: "female",
   dob: "",
@@ -272,6 +288,31 @@ export function HerdScreen({
   const [draft, setDraft] = useState<Draft | undefined>();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  /** Pens and pastures — everywhere an animal can live outdoors. */
+  const outsideZoneOptions = zones
+    .filter((zone) => zone.active && !zone.indoor && zone.type !== "working_facility")
+    .map((zone) => ({
+      value: zone.id,
+      label: zone.type === "off_site" ? `${zone.name} (off site)` : zone.name,
+    }));
+
+  /** Barns and stalls. Never the only place an animal is. */
+  const insideZoneOptions = zones
+    .filter((zone) => zone.active && zone.indoor)
+    .map((zone) => ({ value: zone.id, label: zone.name }));
+
+  /**
+   * Cattle on the place with no pen recorded.
+   *
+   * Records written before the form asked for one, mostly. Named rather than
+   * counted, and shown rather than fixed silently: which pen an animal is in
+   * is a fact about the world that only somebody who has looked knows.
+   */
+  const unplaced = useMemo(
+    () => new Set(animalsWithoutOutside(cattle, assignments, indoorZoneIds)),
+    [cattle, assignments, indoorZoneIds],
+  );
+
   const zoneOptions = zones
     .filter((zone) => zone.active)
     .map((zone) => ({ value: zone.id, label: zone.name }));
@@ -303,12 +344,24 @@ export function HerdScreen({
       safetyLevel: animal.safetyLevel,
       safetyNotes: animal.safetyNotes ?? "",
       notes: animal.notes ?? "",
+      // Where she is now, so opening the form does not read as "nowhere".
+      outsideZoneId:
+        assignmentInSlot(assignments, animal.id, "outside", indoorZoneIds)?.zoneId ?? "",
+      insideZoneId: assignmentInSlot(assignments, animal.id, "inside", indoorZoneIds)?.zoneId ?? "",
     });
     setErrors({});
   }
 
   async function save() {
     if (draft === undefined) return;
+
+    // Checked before anything is written. The rule is about the assignment
+    // rather than a column on the animal, so no schema can state it — which
+    // is exactly why it has to be said here rather than left to the save.
+    if (draft.outsideZoneId === "") {
+      setErrors({ outsideZoneId: "Every animal on the place stands somewhere outdoors" });
+      return;
+    }
 
     const fields = {
       species: "cattle" as const,
@@ -341,9 +394,48 @@ export function HerdScreen({
       return;
     }
 
+    // The placement, after the animal exists. Both slots go through the same
+    // move as every other, so an edit that changes a pen closes the old
+    // assignment rather than overwriting it and losing where she was.
+    const animalId = editing?.id ?? (result.value as Animal).id;
+    await placeIn(animalId, draft.outsideZoneId as Ulid);
+    if (draft.insideZoneId !== "") await placeIn(animalId, draft.insideZoneId as Ulid);
+
     show({ message: editing === undefined ? "Animal added" : "Animal saved", tone: "success" });
     setDraft(undefined);
     setEditing(undefined);
+  }
+
+  /**
+   * Put an animal in a zone, quietly.
+   *
+   * The same `moveToZone` the Move button uses — which is what makes it a
+   * no-op when she is already there, rather than a second identical row.
+   */
+  async function placeIn(animalId: Ulid, zoneId: Ulid) {
+    const zone = zones.find((candidate) => candidate.id === zoneId);
+    if (zone === undefined) return;
+
+    const at = new Date();
+    const { closed, opened } = moveToZone(
+      assignments,
+      {
+        id: encodeUlid(at.getTime()) as Ulid,
+        propertyId,
+        createdAt: at,
+        updatedAt: at,
+        animalId,
+        zoneId,
+        indoor: zone.indoor,
+        at,
+      },
+      indoorZoneIds,
+    );
+
+    for (const entry of closed) {
+      await placements.update(entry.id, { periodTo: entry.periodTo });
+    }
+    if (opened !== undefined) await placements.create(opened);
   }
 
   /**
@@ -573,6 +665,23 @@ export function HerdScreen({
         Counted over the whole herd rather than the filtered list, so the
         numbers do not shrink as they are used.
       */}
+      {unplaced.size === 0 ? null : (
+        <Callout tone="danger" title={`${unplaced.size} with no pen or pasture recorded`}>
+          Everything on the place stands somewhere outdoors, and these do not say where. They are
+          missing from the Pen Board and from every headcount a pen is asked for. Open each one and
+          set its pen — or use <strong>Off site</strong> if it is away.
+          <span className="mt-2 flex flex-wrap gap-2">
+            {cattle
+              .filter((animal) => unplaced.has(animal.id))
+              .map((animal) => (
+                <Button key={animal.id} variant="secondary" onClick={() => startEdit(animal)}>
+                  {animalTitle(animal)}
+                </Button>
+              ))}
+          </span>
+        </Callout>
+      )}
+
       <Card title="The herd, by class">
         <div className="flex flex-wrap gap-2">
           {counts.map((entry) => {
@@ -706,6 +815,24 @@ export function HerdScreen({
               onChange={(event) =>
                 setDraft({ ...draft, status: event.target.value as AnimalStatus })
               }
+            />
+            <Select
+              label="Pen or pasture"
+              hint="Everything on the place stands somewhere outdoors. Use Off site while an animal is away."
+              required
+              value={draft.outsideZoneId}
+              placeholder="Pick one"
+              options={outsideZoneOptions}
+              error={errors["outsideZoneId"]}
+              onChange={(event) => setDraft({ ...draft, outsideZoneId: event.target.value })}
+            />
+            <Select
+              label="Barn or stall"
+              hint="Only if it is inside tonight. It keeps its pen either way."
+              value={draft.insideZoneId}
+              placeholder="Not inside"
+              options={insideZoneOptions}
+              onChange={(event) => setDraft({ ...draft, insideZoneId: event.target.value })}
             />
             <TextInput
               label="Date of birth"
