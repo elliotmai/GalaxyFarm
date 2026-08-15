@@ -2,7 +2,7 @@
 
 import { PullToRefresh } from "@galaxy-farm/ui";
 
-import { useSync } from "@/app/_components/sync-provider";
+import { useSyncEngine } from "@/app/_components/sync-provider";
 
 /**
  * The admin surface's pull-to-refresh (spec §8, §4.2).
@@ -17,7 +17,7 @@ import { useSync } from "@/app/_components/sync-provider";
  * still correct, and the sync badge in the nav is where that is reported.
  */
 export function Refreshable({ children }: { readonly children: React.ReactNode }) {
-  const { syncNow } = useSync();
+  const { syncNow } = useSyncEngine();
 
   return (
     <PullToRefresh onRefresh={syncNow} label="Checking the farm for changes">

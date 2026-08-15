@@ -87,6 +87,12 @@ export function AdminNav({
             <Link
               key={destination.href}
               href={destination.href}
+              // See `next.config.ts`. Next's default stops a dynamic route's
+              // prefetch at the loading boundary, so the skeleton arrives early
+              // and the page itself is still a round trip away when it is
+              // clicked. Nine destinations is a small enough set to fetch
+              // whole, and it is the set that gets clicked all day.
+              prefetch
               aria-current={here ? "page" : undefined}
               className={`flex min-h-target items-center gap-3 rounded-density px-3 text-density ${
                 here ? "bg-action/10 font-semibold text-ink" : "text-muted hover:bg-raised"
@@ -109,6 +115,7 @@ export function AdminNav({
             <Link
               key={item.href}
               href={item.href}
+              prefetch
               aria-current={here ? "page" : undefined}
               className={`flex min-h-target items-center rounded-density px-3 text-sm ${
                 here ? "font-semibold text-ink" : "text-muted hover:text-ink"

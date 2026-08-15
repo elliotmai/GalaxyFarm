@@ -6,7 +6,7 @@ import { useMemo } from "react";
 import { Card, PageBody, PageHeader } from "@galaxy-farm/ui";
 import { groupByDay, projectEvents, type CalendarEvent, type Ulid } from "@galaxy-farm/core";
 
-import { useSync } from "@/app/_components/sync-provider";
+import { useSyncEngine } from "@/app/_components/sync-provider";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -87,7 +87,7 @@ export function CalendarBoardScreen({ propertyId }: { readonly propertyId: Ulid 
 
 /** The manual half of the calendar, from this device's own store. */
 function useCalendarStore(propertyId: Ulid) {
-  const { store: local } = useSync();
+  const { store: local } = useSyncEngine();
   const query = useMemo(() => ({ propertyId }), [propertyId]);
   const { records, loading } = useRecords<CalendarEvent>("calendarEvents", query);
   return { store: records, loading: loading || local === undefined };

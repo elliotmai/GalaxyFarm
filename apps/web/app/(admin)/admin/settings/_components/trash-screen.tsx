@@ -15,7 +15,7 @@ import {
 } from "@galaxy-farm/ui";
 import { DEFAULT_RETENTION_DAYS, isPurgeable, type BaseRecord, type Ulid } from "@galaxy-farm/core";
 
-import { useSync } from "@/app/_components/sync-provider";
+import { useSyncEngine } from "@/app/_components/sync-provider";
 import { LOCAL_STORES, type LocalStoreName } from "@/lib/local/store";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -74,7 +74,7 @@ export function TrashScreen({
   readonly canPurge: boolean;
 }) {
   const [store, setStore] = useState<LocalStoreName>("animals");
-  const { store: local } = useSync();
+  const { store: local } = useSyncEngine();
   const { records, loading } = useRecords<BaseRecord>(store, {
     propertyId,
     includeDeleted: true,

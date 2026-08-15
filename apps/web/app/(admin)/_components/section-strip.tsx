@@ -61,6 +61,11 @@ function Strip({
           <Link
             key={item.href}
             href={item.href}
+            // Whole, not just as far as the loading boundary — see
+            // `next.config.ts`. A tab strip is the fastest-clicked thing in the
+            // app: thirteen views of one herd, moved between a dozen times in a
+            // sitting, and every one of them was a round trip.
+            prefetch
             aria-current={here ? "page" : undefined}
             className={
               quiet

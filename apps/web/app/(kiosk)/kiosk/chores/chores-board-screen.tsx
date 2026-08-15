@@ -15,7 +15,7 @@ import {
 } from "@galaxy-farm/core";
 
 import { setKioskChoreDone } from "@/app/(kiosk)/kiosk/_actions";
-import { useSync } from "@/app/_components/sync-provider";
+import { useSyncEngine } from "@/app/_components/sync-provider";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -34,7 +34,7 @@ function timeLabel(date: Date): string {
 }
 
 export function ChoresBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
-  const { store, syncNow } = useSync();
+  const { store, syncNow } = useSyncEngine();
   const { show } = useToast();
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | undefined>();

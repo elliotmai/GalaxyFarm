@@ -7,6 +7,7 @@ import {
 import { SyncEngine } from "@galaxy-farm/infra-sync";
 import { encodeUlid, systemClock, type BaseRecord, type Repository } from "@galaxy-farm/core";
 
+import { resetLiveRecords } from "@/lib/local/live-records";
 import { httpTransport } from "@/lib/local/transport";
 
 /**
@@ -213,6 +214,24 @@ export function localStore(): LocalStore {
     stores: [...LOCAL_STORES],
     schemaVersion: LOCAL_SCHEMA_VERSION,
   });
+
+  /*
+   * Opened now rather than on the first read.
+   *
+   * Dexie opens lazily, so without this the connection is established by
+   * whichever query happens to run first — which is a query a screen is
+   * waiting on, with the version check and any schema upgrade in front of it.
+   * Starting it here moves that off the critical path: the handshake runs
+   * while React is still hydrating, and the first read finds the database
+   * already open.
+   *
+   * Unawaited and unguarded on purpose. Dexie queues operations against a
+   * database that is still opening, so nothing is racing; a failure here is
+   * the same failure the first read would have hit, and it is reported there,
+   * where there is a screen to report it on.
+   */
+  void db.open().catch(() => {});
+
   const outbox = new DexieOutbox(db);
 
   const repositories = new Map<string, Repository<StoredRecord>>(
@@ -244,4 +263,8 @@ export function localStore(): LocalStore {
 /** Tests and hot reloads need a way back to a clean slate. */
 export function resetLocalStore(): void {
   store = undefined;
+  // Including the shared live queries. They hold both subscriptions to the
+  // database being discarded and the rows it last gave them, and rows cached
+  // out of a store that no longer exists are worse than no cache at all.
+  resetLiveRecords();
 }
