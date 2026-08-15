@@ -21,7 +21,7 @@ import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 
 import { GuidePreview } from "@/app/(admin)/admin/housesitter/_components/guide-preview";
-import { useSync } from "@/app/_components/sync-provider";
+import { useSyncEngine } from "@/app/_components/sync-provider";
 import { guideForSitter } from "@/lib/care-guide-selection";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -88,7 +88,7 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
 }
 
 function useHousesitterData(propertyId: Ulid) {
-  const { store: local } = useSync();
+  const { store: local } = useSyncEngine();
   const query = useMemo(() => ({ propertyId }), [propertyId]);
 
   const guides = useRecords<CareGuide>("careGuides", query);

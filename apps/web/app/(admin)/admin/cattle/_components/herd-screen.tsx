@@ -224,6 +224,43 @@ export function HerdScreen({
   const classOf = (animal: Animal) =>
     cattleClass(animal, asOf, { hasCalved: calved.has(animal.id) });
 
+  /*
+   * Indexed once, not scanned per row.
+   *
+   * Both of these are read by the table for every animal it draws, and both
+   * used to be a `find` over a whole table to answer for one of them — so the
+   * herd list cost animals × profiles and animals × assignments, on every
+   * render, including every keystroke in the search box. Assignments is the
+   * table that grows fastest here, because it holds every move ever made
+   * rather than where things are now, so the scan somebody would notice first
+   * is the one that gets slower every time an animal is moved.
+   *
+   * Each map keeps the *first* match, which is what `find` returned: an animal
+   * is in an outside pen and an inside pen at once (§5.1), and the column has
+   * always shown whichever assignment was written first.
+   */
+  const profileByAnimal = useMemo(() => {
+    const map = new Map<Ulid, CattleProfile>();
+    for (const profile of profiles)
+      if (!map.has(profile.animalId)) map.set(profile.animalId, profile);
+    return map;
+  }, [profiles]);
+
+  const openZoneByAnimal = useMemo(() => {
+    const byId = new Map(zones.map((zone) => [zone.id, zone]));
+    const map = new Map<Ulid, Zone | undefined>();
+    for (const assignment of assignments) {
+      if (assignment.periodTo !== undefined) continue;
+      if (map.has(assignment.animalId)) continue;
+      map.set(assignment.animalId, byId.get(assignment.zoneId));
+    }
+    return map;
+  }, [assignments, zones]);
+
+  const profileOf = (animalId: Ulid) => profileByAnimal.get(animalId);
+
+  const currentZone = (animalId: Ulid) => openZoneByAnimal.get(animalId);
+
   const animals = cattle.filter((animal) => {
     if (
       filters.zoneId !== "" &&
@@ -316,13 +353,6 @@ export function HerdScreen({
   const zoneOptions = zones
     .filter((zone) => zone.active)
     .map((zone) => ({ value: zone.id, label: zone.name }));
-
-  const profileOf = (animalId: Ulid) => profiles.find((profile) => profile.animalId === animalId);
-
-  const currentZone = (animalId: Ulid) => {
-    const open = assignments.find((a) => a.animalId === animalId && a.periodTo === undefined);
-    return open === undefined ? undefined : zones.find((zone) => zone.id === open.zoneId);
-  };
 
   function startCreate() {
     setEditing(undefined);

@@ -15,7 +15,7 @@ import {
 } from "@galaxy-farm/core";
 
 import { moveKioskAnimal } from "@/app/(kiosk)/kiosk/_actions";
-import { useSync } from "@/app/_components/sync-provider";
+import { useSyncEngine } from "@/app/_components/sync-provider";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -30,7 +30,7 @@ import { useRecords } from "@/lib/local/use-records";
  * running.
  */
 export function PenBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
-  const { store, syncNow } = useSync();
+  const { store, syncNow } = useSyncEngine();
   const { show } = useToast();
   const [pending, startTransition] = useTransition();
   const [moving, setMoving] = useState<Animal | undefined>();

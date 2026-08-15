@@ -8,7 +8,7 @@ import { dayKey, type Ulid } from "@galaxy-farm/core";
 import type { EggBreakdown, EggLog, Flock } from "@galaxy-farm/module-poultry";
 
 import { logKioskEggs } from "@/app/(kiosk)/kiosk/_actions";
-import { useSync } from "@/app/_components/sync-provider";
+import { useSyncEngine } from "@/app/_components/sync-provider";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -30,7 +30,7 @@ const PRESETS: readonly { readonly label: string; readonly breakdown: readonly E
   ];
 
 export function EggsBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
-  const { store, syncNow } = useSync();
+  const { store, syncNow } = useSyncEngine();
   const { show } = useToast();
   const [pending, startTransition] = useTransition();
   const [busyLabel, setBusyLabel] = useState<string | undefined>();
