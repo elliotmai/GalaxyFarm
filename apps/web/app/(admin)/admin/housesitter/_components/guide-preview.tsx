@@ -23,6 +23,7 @@ import { petBriefings, petsOnFarm } from "@galaxy-farm/module-pets";
 import {
   guideChores,
   guideEmergencyContacts,
+  guideFeedingPlans,
   guideVets,
   guideZonesFrom,
 } from "@/lib/guide-composition";
@@ -85,6 +86,9 @@ export function GuidePreview({
   );
   const dangerous = doNotHandleList(composed);
   const chores = includes(guide, "chores") ? guideChores(templates, zones) : [];
+  const feeding = includes(guide, "cattle_feeding")
+    ? guideFeedingPlans(plans, feeds, animals, zones, assignments, now)
+    : [];
   const emergency = includes(guide, "emergency_contacts") ? guideEmergencyContacts(contacts) : [];
   const vets = includes(guide, "vet") ? guideVets(contacts) : [];
   const pets = includes(guide, "pets")
@@ -211,6 +215,31 @@ export function GuidePreview({
                         </li>
                       ))}
                     </ul>
+                  )}
+                </div>
+              ))}
+            </section>
+          )}
+
+          {feeding.length === 0 ? null : (
+            <section className="flex flex-col gap-3">
+              <h3 className="text-ink">Feeding the cattle</h3>
+              {feeding.map((plan) => (
+                <div key={plan.id} className="flex flex-col gap-1 border-l-2 border-edge pl-4">
+                  <h4 className="text-ink">
+                    {plan.who}
+                    <span className="font-body text-sm font-normal text-muted"> · {plan.name}</span>
+                  </h4>
+                  {plan.portion === undefined ? null : (
+                    <p className="text-sm text-muted">{plan.portion}</p>
+                  )}
+                  <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink">
+                    {plan.lines.map((line, index) => (
+                      <li key={`${plan.id}-${index}`}>{line}</li>
+                    ))}
+                  </ul>
+                  {plan.notes === undefined ? null : (
+                    <p className="whitespace-pre-wrap text-sm text-ink">{plan.notes}</p>
                   )}
                 </div>
               ))}
