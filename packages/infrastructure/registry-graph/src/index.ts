@@ -290,6 +290,36 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
   }
 
   /**
+   * A text match that does not care how the crawl spaced the words.
+   *
+   * `CONTAINS` is an exact substring test, and a crawled name is not exactly
+   * what it looks like: a page that renders "ZNT MONTEGO BAY" can hold a
+   * non-breaking space between the words, or two spaces, or a tab. Typing the
+   * name as it appears on screen then matches nothing at all — while a single
+   * word with no spaces in it, like `znt`, matches perfectly. That is the
+   * reported shape exactly: one-word searches work and names do not.
+   *
+   * So each field is compared twice: as it is, and with every space taken out
+   * of both sides. The second is what survives a crawl; the first is kept
+   * because it is the one an index could ever serve.
+   *
+   * Written as nested `replace` calls because Cypher has no regular-expression
+   * replace of its own — the list is the whitespace an HTML page actually
+   * leaves behind, not every character Unicode calls a space.
+   */
+  const WHITESPACE = ["' '", "'\\u00A0'", "'\\t'", "'\\n'", "'\\r'"];
+
+  const squashed = (property: string): string =>
+    WHITESPACE.reduce(
+      (inner, character) => `replace(${inner}, ${character}, '')`,
+      `toLower(coalesce(${property}, ''))`,
+    );
+
+  /** Both spellings of one field, for the `OR` chain below. */
+  const matches = (property: string): string =>
+    `toLower(coalesce(${property}, '')) CONTAINS $text OR ${squashed(property)} CONTAINS $squashed`;
+
+  /**
    * The `WHERE` every search shares.
    *
    * Nulls mean "no filter", which keeps one statement rather than assembling
@@ -300,9 +330,9 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
     WHERE ($association IS NULL OR reg.association = $association)
       AND ($sex IS NULL OR a.sex = $sex)
       AND ($text IS NULL
-           OR toLower(coalesce(a.name, '')) CONTAINS $text
-           OR toLower(coalesce(a.tattoo, '')) CONTAINS $text
-           OR toLower(coalesce(reg.regNumber, '')) CONTAINS $text)`;
+           OR ${matches("a.name")}
+           OR ${matches("a.tattoo")}
+           OR ${matches("reg.regNumber")})`;
 
   /**
    * The same text match, against an animal with no papers at all.
@@ -332,17 +362,17 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
   const TEXT_ONLY = `
     MATCH (a:Animal)-[:HAS_REGISTRATION]->(reg:Registration)
     WHERE ($text IS NULL
-           OR toLower(coalesce(a.name, '')) CONTAINS $text
-           OR toLower(coalesce(a.tattoo, '')) CONTAINS $text
-           OR toLower(coalesce(reg.regNumber, '')) CONTAINS $text)
+           OR ${matches("a.name")}
+           OR ${matches("a.tattoo")}
+           OR ${matches("reg.regNumber")})
     RETURN count(DISTINCT a) AS total`;
 
   const UNPAPERED = `
     MATCH (a:Animal)
     WHERE ($sex IS NULL OR a.sex = $sex)
       AND ($text IS NULL
-           OR toLower(coalesce(a.name, '')) CONTAINS $text
-           OR toLower(coalesce(a.tattoo, '')) CONTAINS $text)
+           OR ${matches("a.name")}
+           OR ${matches("a.tattoo")})
       AND NOT (a)-[:HAS_REGISTRATION]->(:Registration)
     RETURN count(a) AS total`;
 
@@ -354,6 +384,13 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
     sex: query.sex === undefined ? null : query.sex === "male" ? "M" : "F",
     text:
       query.text === undefined || query.text.trim() === "" ? null : query.text.trim().toLowerCase(),
+    // The same words with every space taken out, to compare against a name the
+    // crawl spaced differently. Null in step with `text`, so the guard in front
+    // of the OR chain covers both.
+    squashed:
+      query.text === undefined || query.text.trim() === ""
+        ? null
+        : query.text.toLowerCase().replace(/\s+/gu, ""),
   });
 
   return {

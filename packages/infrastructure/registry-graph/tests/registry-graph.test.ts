@@ -291,6 +291,44 @@ describe("searching", () => {
     expect(body.statement).toContain("coalesce(reg.regNumber, '')");
   });
 
+  it("matches a name however the crawl spaced it", async () => {
+    // The reported symptom, and the tightest fit for it: `znt` worked and
+    // names did not. `CONTAINS` is an exact substring test, and a page that
+    // renders "ZNT MONTEGO BAY" can hold a non-breaking space between the
+    // words — so typing the name as it appears matches nothing, while a
+    // single word with no spaces in it matches perfectly.
+    const fetch = vi.fn().mockResolvedValue(reply(["total"], [[0]]));
+    await graphFor(fetch as never).search({ text: "ZNT Montego  Bay" });
+
+    const body = JSON.parse((fetch.mock.calls[0]?.[1] as { body: string }).body) as {
+      statement: string;
+      parameters: Record<string, unknown>;
+    };
+
+    // Both spellings of the search, so an index can still serve the plain one.
+    expect(body.parameters["text"]).toBe("znt montego  bay");
+    expect(body.parameters["squashed"]).toBe("zntmontegobay");
+    // And both spellings of the stored value, non-breaking space included.
+    expect(body.statement).toContain("CONTAINS $text");
+    expect(body.statement).toContain("CONTAINS $squashed");
+    expect(body.statement).toContain("\\u00A0");
+  });
+
+  it("leaves the squashed form null when nothing was typed", async () => {
+    // In step with `text`, so the one guard in front of the OR chain covers
+    // both and an empty box stays "no filter" rather than matching everything
+    // against an empty string.
+    const fetch = vi.fn().mockResolvedValue(reply(["total"], [[0]]));
+    await graphFor(fetch as never).search({ text: "   " });
+
+    const body = JSON.parse((fetch.mock.calls[0]?.[1] as { body: string }).body) as {
+      parameters: Record<string, unknown>;
+    };
+
+    expect(body.parameters["text"]).toBeNull();
+    expect(body.parameters["squashed"]).toBeNull();
+  });
+
   it("says how many the filters removed, when a filter is set", async () => {
     // An empty table means two completely different things — the catalogue
     // does not hold it, or your filters took it out — and they are fixed in
