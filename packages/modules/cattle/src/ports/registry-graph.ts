@@ -120,6 +120,22 @@ export interface RegistrySearchResult {
    * worse, that the animal is not there.
    */
   readonly unpapered: number;
+  /**
+   * How many the words matched that the *filters* then removed.
+   *
+   * Zero unless a registry or a sex was set, since without them there is
+   * nothing to exclude and the extra query is not worth making.
+   *
+   * A filter that removes everything is indistinguishable, on screen, from a
+   * catalogue that does not hold the animal — and the two send somebody to
+   * completely different places. Two ways it happens here and neither is
+   * obvious from the outside: a registry filter matches the *registration*, so
+   * an animal papered in two associations is invisible under the one whose
+   * number was not searched for; and `sex` compares against a value the crawl
+   * may simply not have, so filtering by bull hides every animal whose sex was
+   * never read off a page.
+   */
+  readonly excludedByFilters: number;
 }
 
 export interface RegistryGraph {

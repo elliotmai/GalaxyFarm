@@ -73,6 +73,8 @@ interface Found {
   readonly total: number;
   /** Matched, but with no papers in the crawl — see the callout below. */
   readonly unpapered?: number;
+  /** Matched the words, then removed by the registry or sex filter. */
+  readonly excludedByFilters?: number;
 }
 
 async function ask<T>(url: string): Promise<T> {
@@ -398,6 +400,46 @@ export function CatalogScreen({
         who has just seen the animal in the database looking for a fault in the
         app rather than a gap in the crawl.
       */}
+      {/*
+        A filter that removes everything looks exactly like a catalogue that
+        does not hold the animal — an empty table — and the two are fixed in
+        completely different places. Two ways it happens and neither shows from
+        outside: the registry filter matches the *registration*, so a bull
+        papered in two associations is invisible under the one whose number was
+        not searched; and the sex filter compares against a value the crawl may
+        not have, so asking for bulls hides every animal whose sex was never
+        read off a page.
+      */}
+      {result === undefined || (result.excludedByFilters ?? 0) === 0 ? null : (
+        <Callout
+          tone="danger"
+          title={`${result.excludedByFilters} matched the words, then the filters removed them`}
+        >
+          <p>
+            {[
+              search.association === "" ? undefined : `Registry: ${search.association}`,
+              search.sex === "" ? undefined : `Sex: ${search.sex}`,
+            ]
+              .filter((entry) => entry !== undefined)
+              .join(" · ")}{" "}
+            — a registry matches the number searched for, so an animal papered in two associations
+            is hidden under the other one; and a sex the crawl never read off a page matches neither
+            bull nor cow.
+          </p>
+          <div className="mt-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSearch({ ...search, association: "", sex: "" });
+                setResult(undefined);
+              }}
+            >
+              Drop the filters
+            </Button>
+          </div>
+        </Callout>
+      )}
+
       {result === undefined || (result.unpapered ?? 0) === 0 ? null : (
         <Callout
           tone="neutral"

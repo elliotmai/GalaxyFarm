@@ -322,6 +322,21 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
    *
    * No association clause: these have no registration for one to apply to.
    */
+  /**
+   * The words alone, with the registry and sex filters taken off.
+   *
+   * So the screen can tell "the catalogue does not hold this" from "your
+   * filters removed it", which look identical — an empty table — and are fixed
+   * in completely different places.
+   */
+  const TEXT_ONLY = `
+    MATCH (a:Animal)-[:HAS_REGISTRATION]->(reg:Registration)
+    WHERE ($text IS NULL
+           OR toLower(coalesce(a.name, '')) CONTAINS $text
+           OR toLower(coalesce(a.tattoo, '')) CONTAINS $text
+           OR toLower(coalesce(reg.regNumber, '')) CONTAINS $text)
+    RETURN count(DISTINCT a) AS total`;
+
   const UNPAPERED = `
     MATCH (a:Animal)
     WHERE ($sex IS NULL OR a.sex = $sex)
@@ -350,7 +365,12 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
       // it: a match on a common name is tens of thousands of animals, and
       // materialising them to learn how many there were is how a search box
       // takes a database down.
-      const [counted, page, unpapered] = await Promise.all([
+      // Only worth asking when something could have excluded a row. With no
+      // filters set it is the same query as the count, and a round trip to
+      // learn nothing is a round trip on somebody's phone.
+      const filtered = parameters.association !== null || parameters.sex !== null;
+
+      const [counted, page, unpapered, textOnly] = await Promise.all([
         run(
           `MATCH (a:Animal)-[:HAS_REGISTRATION]->(reg:Registration) ${WHERE}
            RETURN count(DISTINCT a) AS total`,
@@ -375,14 +395,21 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
           { ...parameters, limit },
         ),
         run(UNPAPERED, parameters),
+        filtered ? run(TEXT_ONLY, parameters) : Promise.resolve([]),
       ]);
+
+      const total = asNumber(counted[0]?.["total"]) ?? 0;
 
       return {
         found: oncePerAnimal(page)
           .map(toAnimal)
           .filter((entry): entry is RegistryAnimal => entry !== undefined),
-        total: asNumber(counted[0]?.["total"]) ?? 0,
+        total,
         unpapered: asNumber(unpapered[0]?.["total"]) ?? 0,
+        // Never negative: the unfiltered count can only be the larger of the
+        // two, but a graph changing between two concurrent queries could make
+        // it look otherwise, and a negative "excluded" is nonsense on screen.
+        excludedByFilters: Math.max(0, (asNumber(textOnly[0]?.["total"]) ?? total) - total),
       };
     },
 

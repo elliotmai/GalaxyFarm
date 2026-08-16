@@ -291,6 +291,52 @@ describe("searching", () => {
     expect(body.statement).toContain("coalesce(reg.regNumber, '')");
   });
 
+  it("says how many the filters removed, when a filter is set", async () => {
+    // An empty table means two completely different things — the catalogue
+    // does not hold it, or your filters took it out — and they are fixed in
+    // different places. The registry filter matches the *registration*, so a
+    // bull papered in two associations is invisible under the one whose
+    // number was not searched for.
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(reply(["total"], [[0]]))
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, []))
+      .mockResolvedValueOnce(reply(["total"], [[0]]))
+      .mockResolvedValueOnce(reply(["total"], [[3]]));
+
+    const result = await graphFor(fetch as never).search({ text: "znt", association: "Angus" });
+
+    expect(result.found).toHaveLength(0);
+    expect(result.excludedByFilters).toBe(3);
+  });
+
+  it("does not ask what the filters removed when none are set", async () => {
+    // With nothing to exclude it is the same query as the count, and a round
+    // trip to learn nothing is a round trip on somebody's phone.
+    const fetch = vi.fn().mockResolvedValue(reply(["total"], [[0]]));
+
+    const result = await graphFor(fetch as never).search({ text: "znt" });
+
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(result.excludedByFilters).toBe(0);
+  });
+
+  it("never reports a negative exclusion", async () => {
+    // The unfiltered count can only be the larger of the two, but two queries
+    // race against a graph that can change between them, and "-2 removed" is
+    // nonsense on a screen.
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(reply(["total"], [[5]]))
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, [montegoBay]))
+      .mockResolvedValueOnce(reply(["total"], [[0]]))
+      .mockResolvedValueOnce(reply(["total"], [[2]]));
+
+    const result = await graphFor(fetch as never).search({ text: "znt", sex: "male" });
+
+    expect(result.excludedByFilters).toBe(0);
+  });
+
   it("shows a bull papered twice once, not once per paper", async () => {
     // The match fans out over registrations, so an animal in two associations
     // came back on two rows — while the count beside it said DISTINCT, and the
@@ -365,6 +411,8 @@ describe("searching", () => {
       .fn()
       .mockResolvedValueOnce(reply(["total"], [[0]]))
       .mockResolvedValueOnce(reply(ANIMAL_FIELDS, []))
+      .mockResolvedValueOnce(reply(["total"], [[0]]))
+      // Both filters are set, so the "what did the filters remove" count runs.
       .mockResolvedValueOnce(reply(["total"], [[0]]));
 
     await graphFor(fetch as never).search({ association: "Shorthorn", sex: "male" });
