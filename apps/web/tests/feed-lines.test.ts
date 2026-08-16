@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { POUNDS_PER_BAG, POUNDS_PER_SCOOP } from "@galaxy-farm/module-feed";
+import type { FeedingPlanLine, Ulid } from "@galaxy-farm/core";
+import { POUNDS_PER_BAG, POUNDS_PER_SCOOP, type FeedType } from "@galaxy-farm/module-feed";
 
-import { describeLine, mixedUnitFeed, type PlanLineDraft } from "../lib/feed-lines";
+import {
+  describeLine,
+  describePlanLine,
+  mixedUnitFeed,
+  nameList,
+  type PlanLineDraft,
+} from "../lib/feed-lines";
 
 /**
  * Writing a ration in the units it is actually fed in (spec §5.3).
@@ -98,5 +105,76 @@ describe("saying a line back while it is typed", () => {
     expect(describeLine(line({ unit: "bag", amount: "18" }), undefined)).toContain(
       `about ${POUNDS_PER_BAG * 18 * 2} lb`,
     );
+  });
+});
+
+/**
+ * A saved line, said out loud (spec §5.1, §5.8, §5.10).
+ *
+ * The pet card, the plan list and the housesitter guide's cattle feeding
+ * section all read this sentence, which is the point of it having one home:
+ * three screens wording the same ration three ways is three chances to
+ * disagree about the amount.
+ */
+
+const KIBBLE = "01ARZ3NDEKTSV4RRFFQ69G5F10" as Ulid;
+
+const feeds = [
+  { id: KIBBLE, name: "Purina Pro Plan", category: "pet", unit: "scoop", active: true },
+] as unknown as FeedType[];
+
+const planLine = (overrides: Partial<FeedingPlanLine>): FeedingPlanLine => ({
+  feedTypeId: KIBBLE,
+  amount: { amount: 1, unit: "scoop" },
+  frequency: "twice_daily",
+  timeOfDay: "morning",
+  ...overrides,
+});
+
+describe("describePlanLine", () => {
+  it("says the ration the way somebody would say it out loud", () => {
+    expect(describePlanLine(planLine({}), feeds)).toBe(
+      "1 scoop of Purina Pro Plan, twice a day, morning",
+    );
+  });
+
+  it("pluralises the vessel", () => {
+    expect(describePlanLine(planLine({ amount: { amount: 2, unit: "scoop" } }), feeds)).toContain(
+      "2 scoops",
+    );
+  });
+
+  it("keeps the line's own note, which is usually the important half", () => {
+    expect(describePlanLine(planLine({ notes: "in the blue bowl" }), feeds)).toBe(
+      "1 scoop of Purina Pro Plan, twice a day, morning — in the blue bowl",
+    );
+  });
+
+  it("says 'feed' rather than nothing when the catalogue entry is gone", () => {
+    // A deleted feed must not make the whole line vanish off the guide.
+    expect(describePlanLine(planLine({}), [])).toContain("of feed");
+  });
+
+  it("reads a multi-word unit as words", () => {
+    expect(
+      describePlanLine(planLine({ amount: { amount: 1, unit: "square_bale" } }), feeds),
+    ).toContain("1 square bale");
+  });
+
+  it("names who a shared amount is split between", () => {
+    // Half a pound twice a day on each of two cards is a pound a day going
+    // into a bowl that only wanted half.
+    expect(describePlanLine(planLine({}), feeds, ["Smokey", "Boots"])).toContain(
+      "between Smokey and Boots",
+    );
+  });
+});
+
+describe("nameList", () => {
+  it("reads the way somebody would say it", () => {
+    expect(nameList([])).toBe("");
+    expect(nameList(["Rusty"])).toBe("Rusty");
+    expect(nameList(["Rusty", "Biscuit"])).toBe("Rusty and Biscuit");
+    expect(nameList(["Rusty", "Biscuit", "Tig"])).toBe("Rusty, Biscuit and Tig");
   });
 });

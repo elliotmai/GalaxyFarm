@@ -1,11 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import { composeGuide } from "@galaxy-farm/module-housesitting";
-import type { Animal, ChoreTemplate, Contact, Ulid, Zone, ZoneAssignment } from "@galaxy-farm/core";
+import type {
+  Animal,
+  ChoreTemplate,
+  Contact,
+  FeedingPlan,
+  Ulid,
+  Zone,
+  ZoneAssignment,
+} from "@galaxy-farm/core";
+import type { FeedType } from "@galaxy-farm/module-feed";
 
 import {
   guideChores,
   guideEmergencyContacts,
+  guideFeedingPlans,
   guideVets,
   guideZonesFrom,
 } from "../lib/guide-composition.js";
@@ -87,6 +97,29 @@ const template = (
     active: true,
     ...overrides,
   }) as ChoreTemplate;
+
+const plan = (overrides: Partial<FeedingPlan> & Pick<FeedingPlan, "id" | "name">): FeedingPlan =>
+  ({
+    propertyId: id(0),
+    createdAt: on(1),
+    updatedAt: on(1),
+    target: "group",
+    targetId: id(0),
+    alsoFeeds: [],
+    portion: "per_head",
+    lines: [
+      {
+        feedTypeId: id(50),
+        amount: { amount: 12, unit: "lb" },
+        frequency: "twice_daily",
+        timeOfDay: "morning",
+      },
+    ],
+    active: true,
+    ...overrides,
+  }) as FeedingPlan;
+
+const feeds = [{ id: id(50), name: "Range cubes" }] as unknown as FeedType[];
 
 describe("guideZonesFrom", () => {
   const NORTH = id(1);
@@ -262,5 +295,213 @@ describe("the numbers to ring", () => {
     ]);
 
     expect(vets.map((held) => held.name)).toEqual(["Dr. Reyes"]);
+  });
+});
+
+/**
+ * The rations, as their own section (spec §5.10's `cattle_feeding`).
+ *
+ * Separate from the pens, so the ways it can be quietly wrong are its own
+ * too: an amount read as each when it is between them empties a barn in a
+ * quarter of the time, a retired plan read as live puts feed out that nobody
+ * meant to, and a plan left off entirely is stock not fed at all.
+ */
+describe("guideFeedingPlans", () => {
+  const NORTH = id(1);
+  const DOLLY = id(10);
+  const ROSIE = id(11);
+  const RUSTY = id(12);
+
+  const herd = [
+    animal({ id: DOLLY, name: "Dolly" }),
+    animal({ id: ROSIE, name: "Rosie" }),
+    animal({ id: RUSTY, name: "Rusty", species: "dog" }),
+  ];
+
+  it("takes the whole herd, the pens and the individuals, widest first", () => {
+    const composed = guideFeedingPlans(
+      [
+        plan({ id: id(30), name: "Dolly's extra", target: "animal", targetId: DOLLY }),
+        plan({ id: id(31), name: "Winter hay" }),
+        plan({ id: id(32), name: "North Trap cubes", target: "zone", targetId: NORTH }),
+      ],
+      feeds,
+      herd,
+      [zone({ id: NORTH, name: "North Trap" })],
+      [assignment({ id: id(20), animalId: DOLLY, zoneId: NORTH })],
+      NOW,
+    );
+
+    expect(composed.map((held) => held.name)).toEqual([
+      "Winter hay",
+      "North Trap cubes",
+      "Dolly's extra",
+    ]);
+    expect(composed[0]?.who).toBe("The whole herd");
+    expect(composed[1]?.who).toBe("North Trap — 1 head");
+    expect(composed[2]?.who).toBe("Dolly");
+    expect(composed[0]?.lines).toEqual(["12 lbs of Range cubes, twice a day, morning"]);
+  });
+
+  it("leaves out a plan that is switched off", () => {
+    // Out of season is not "feed this", and nothing on the page would tell a
+    // helper the difference.
+    expect(
+      guideFeedingPlans(
+        [plan({ id: id(30), name: "Creep", active: false })],
+        feeds,
+        herd,
+        [],
+        [],
+        NOW,
+      ),
+    ).toEqual([]);
+  });
+
+  it("leaves the pets' bowls to the pets' own section", () => {
+    // Two sections naming one bowl is how a dog gets fed twice.
+    expect(
+      guideFeedingPlans(
+        [plan({ id: id(30), name: "Rusty's ration", target: "animal", targetId: RUSTY })],
+        feeds,
+        herd,
+        [],
+        [],
+        NOW,
+      ),
+    ).toEqual([]);
+  });
+
+  it("leaves out a ration for an animal that has gone", () => {
+    const sold = [animal({ id: DOLLY, name: "Dolly", status: "sold" })];
+
+    expect(
+      guideFeedingPlans(
+        [plan({ id: id(30), name: "Dolly's extra", target: "animal", targetId: DOLLY })],
+        feeds,
+        sold,
+        [],
+        [],
+        NOW,
+      ),
+    ).toEqual([]);
+  });
+
+  it("says whether a pen's amounts are each or between them", () => {
+    const inNorth = [
+      assignment({ id: id(20), animalId: DOLLY, zoneId: NORTH }),
+      assignment({ id: id(21), animalId: ROSIE, zoneId: NORTH }),
+    ];
+    const zones = [zone({ id: NORTH, name: "North Trap" })];
+
+    const perHead = guideFeedingPlans(
+      [plan({ id: id(30), name: "Cubes", target: "zone", targetId: NORTH })],
+      feeds,
+      herd,
+      zones,
+      inNorth,
+      NOW,
+    );
+    const shared = guideFeedingPlans(
+      [
+        plan({
+          id: id(31),
+          name: "Mineral tub",
+          target: "zone",
+          targetId: NORTH,
+          portion: "shared",
+        }),
+      ],
+      feeds,
+      herd,
+      zones,
+      inNorth,
+      NOW,
+    );
+
+    expect(perHead[0]?.who).toBe("North Trap — 2 head");
+    expect(perHead[0]?.portion).toContain("each one gets");
+    expect(shared[0]?.portion).toContain("between them");
+  });
+
+  it("says nothing about portions for one animal on her own plan", () => {
+    // "Each one gets" over a list of one is noise on a page read in a hurry.
+    const composed = guideFeedingPlans(
+      [plan({ id: id(30), name: "Dolly's extra", target: "animal", targetId: DOLLY })],
+      feeds,
+      herd,
+      [],
+      [],
+      NOW,
+    );
+
+    expect(composed[0]?.portion).toBeUndefined();
+  });
+
+  it("names both cows on a bowl they share", () => {
+    const composed = guideFeedingPlans(
+      [
+        plan({
+          id: id(30),
+          name: "Bucket in the barn",
+          target: "animal",
+          targetId: DOLLY,
+          alsoFeeds: [ROSIE],
+          portion: "shared",
+        }),
+      ],
+      feeds,
+      herd,
+      [],
+      [],
+      NOW,
+    );
+
+    expect(composed[0]?.who).toBe("Dolly and Rosie");
+    expect(composed[0]?.portion).toContain("between them");
+  });
+
+  it("still prints a pen plan for a pen that is empty today", () => {
+    // The plan is real and the pen fills again. Saying it is empty is honest;
+    // dropping the plan would hide a ration somebody may need next week.
+    const composed = guideFeedingPlans(
+      [plan({ id: id(30), name: "Cubes", target: "zone", targetId: NORTH })],
+      feeds,
+      herd,
+      [zone({ id: NORTH, name: "North Trap" })],
+      [],
+      NOW,
+    );
+
+    expect(composed[0]?.who).toBe("North Trap — empty at the moment");
+  });
+
+  it("counts only who is in the pen today", () => {
+    const composed = guideFeedingPlans(
+      [plan({ id: id(30), name: "Cubes", target: "zone", targetId: NORTH })],
+      feeds,
+      herd,
+      [zone({ id: NORTH, name: "North Trap" })],
+      [
+        assignment({ id: id(20), animalId: DOLLY, zoneId: NORTH, periodTo: on(10) }),
+        assignment({ id: id(21), animalId: ROSIE, zoneId: NORTH }),
+      ],
+      NOW,
+    );
+
+    expect(composed[0]?.who).toBe("North Trap — 1 head");
+  });
+
+  it("carries the plan's own notes, which are usually the important half", () => {
+    const composed = guideFeedingPlans(
+      [plan({ id: id(30), name: "Winter hay", specialNotes: "Ring feeder, not the ground." })],
+      feeds,
+      herd,
+      [],
+      [],
+      NOW,
+    );
+
+    expect(composed[0]?.notes).toBe("Ring feeder, not the ground.");
   });
 });
