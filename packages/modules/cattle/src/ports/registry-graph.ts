@@ -98,6 +98,30 @@ export function reviveRegistryAnimal<T extends RegistryAnimal>(animal: T): T {
   return revived as T;
 }
 
+export interface RegistrySearchResult {
+  readonly found: readonly RegistryAnimal[];
+  /** Everything matching, not just the page — a search that truncates silently lies. */
+  readonly total: number;
+  /**
+   * Animals that match but carry no registration in the crawl.
+   *
+   * They exist as `(:Animal)` with no `(:Registration)` hanging off them, which
+   * is what a pedigree walk leaves behind: a sire named on somebody's papers is
+   * created as a node the moment it is referenced, and its own papers are only
+   * filled in when the crawl reaches them.
+   *
+   * Everything here identifies a catalogue animal by association and number —
+   * `get`, `pedigree`, and bringing one across all key on the pair — so one
+   * without either cannot be opened or copied, and is not in `found`.
+   *
+   * But it must be *counted*. "Nothing matched" is false when three animals
+   * matched and were dropped for having no papers yet, and somebody who has
+   * just seen the animal in the database will conclude the app is broken, or
+   * worse, that the animal is not there.
+   */
+  readonly unpapered: number;
+}
+
 export interface RegistryGraph {
   /**
    * Find animals matching a query.
@@ -106,7 +130,7 @@ export interface RegistryGraph {
    * lies about what is out there, so the count of everything matching comes
    * back alongside the page.
    */
-  search(query: RegistryQuery): Promise<{ found: readonly RegistryAnimal[]; total: number }>;
+  search(query: RegistryQuery): Promise<RegistrySearchResult>;
 
   /** One animal by the number that identifies it. */
   get(association: string, regNumber: string): Promise<RegistryAnimal | undefined>;

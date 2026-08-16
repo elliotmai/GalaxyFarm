@@ -226,6 +226,71 @@ describe("reading an animal", () => {
 });
 
 describe("searching", () => {
+  it("counts an animal the crawl knows by name but has not papered", async () => {
+    // The reported symptom: an animal plainly in the database, and the search
+    // comes back empty. The search is an inner match on the registration, so a
+    // node with none cannot come back from it however well it matches — and a
+    // pedigree walk creates exactly that, since a sire becomes a node the
+    // moment somebody's papers name him.
+    //
+    // It cannot be *listed*: everything downstream identifies a catalogue
+    // animal by association and number, and it has neither. It can be counted,
+    // and "nothing matched" is a lie when it is not nought.
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(reply(["total"], [[0]]))
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, []))
+      .mockResolvedValueOnce(reply(["total"], [[2]]));
+
+    const result = await graphFor(fetch as never).search({ text: "znt" });
+
+    expect(result.found).toHaveLength(0);
+    expect(result.total).toBe(0);
+    expect(result.unpapered).toBe(2);
+  });
+
+  it("does not count an animal that has papers as unpapered", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(reply(["total"], [[1]]))
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, [montegoBay]))
+      .mockResolvedValueOnce(reply(["total"], [[0]]));
+
+    const result = await graphFor(fetch as never).search({ text: "znt" });
+
+    expect(result.found).toHaveLength(1);
+    expect(result.unpapered).toBe(0);
+  });
+
+  it("looks for the unpapered without an association clause", async () => {
+    // There is no registration for an association filter to apply to, so
+    // applying one would report nought every time somebody narrowed by
+    // registry — which is the case most likely to hide an animal.
+    const fetch = vi.fn().mockResolvedValue(reply(["total"], [[0]]));
+    await graphFor(fetch as never).search({ text: "znt", association: "Angus" });
+
+    const statements = fetch.mock.calls.map(
+      (call) => JSON.parse((call[1] as { body: string }).body) as { statement: string },
+    );
+    const unpapered = statements.find((entry) => entry.statement.includes("NOT (a)"));
+
+    expect(unpapered?.statement).not.toContain("reg.association");
+  });
+
+  it("finds an animal whose name is not recorded, by its number", async () => {
+    // `toLower(null)` is null, and a null in an OR chain is not false. Every
+    // branch is coalesced so a missing name cannot make the row unmatchable.
+    const fetch = vi.fn().mockResolvedValue(reply(["total"], [[0]]));
+    await graphFor(fetch as never).search({ text: "402303" });
+
+    const body = JSON.parse((fetch.mock.calls[0]?.[1] as { body: string }).body) as {
+      statement: string;
+    };
+
+    expect(body.statement).toContain("coalesce(a.name, '')");
+    expect(body.statement).toContain("coalesce(reg.regNumber, '')");
+  });
+
   it("shows a bull papered twice once, not once per paper", async () => {
     // The match fans out over registrations, so an animal in two associations
     // came back on two rows — while the count beside it said DISTINCT, and the
@@ -233,7 +298,8 @@ describe("searching", () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(reply(["total"], [[8]]))
-      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, [montegoBay, montegoBay]));
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, [montegoBay, montegoBay]))
+      .mockResolvedValueOnce(reply(["total"], [[0]]));
 
     const result = await graphFor(fetch as never).search({ text: "znt" });
 
@@ -250,7 +316,8 @@ describe("searching", () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(reply(["total"], [[2]]))
-      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, [montegoBay, other]));
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, [montegoBay, other]))
+      .mockResolvedValueOnce(reply(["total"], [[0]]));
 
     const result = await graphFor(fetch as never).search({ text: "znt" });
 
@@ -263,7 +330,8 @@ describe("searching", () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(reply(["total"], [[4102]]))
-      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, [montegoBay]));
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, [montegoBay]))
+      .mockResolvedValueOnce(reply(["total"], [[0]]));
 
     const result = await graphFor(fetch as never).search({ text: "montego" });
 
@@ -277,7 +345,8 @@ describe("searching", () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(reply(["total"], [[0]]))
-      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, []));
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, []))
+      .mockResolvedValueOnce(reply(["total"], [[0]]));
 
     await graphFor(fetch as never).search({ text: "'; MATCH (n) DETACH DELETE n //" });
 
@@ -295,7 +364,8 @@ describe("searching", () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(reply(["total"], [[0]]))
-      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, []));
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, []))
+      .mockResolvedValueOnce(reply(["total"], [[0]]));
 
     await graphFor(fetch as never).search({ association: "Shorthorn", sex: "male" });
 
@@ -310,7 +380,8 @@ describe("searching", () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(reply(["total"], [[0]]))
-      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, []));
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, []))
+      .mockResolvedValueOnce(reply(["total"], [[0]]));
 
     await graphFor(fetch as never).search({ text: "   ", association: "" });
 
@@ -325,7 +396,8 @@ describe("searching", () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(reply(["total"], [[0]]))
-      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, []));
+      .mockResolvedValueOnce(reply(ANIMAL_FIELDS, []))
+      .mockResolvedValueOnce(reply(["total"], [[0]]));
 
     await graphFor(fetch as never).search({ limit: 100_000 });
 

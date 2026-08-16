@@ -300,9 +300,36 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
     WHERE ($association IS NULL OR reg.association = $association)
       AND ($sex IS NULL OR a.sex = $sex)
       AND ($text IS NULL
-           OR toLower(a.name) CONTAINS $text
+           OR toLower(coalesce(a.name, '')) CONTAINS $text
            OR toLower(coalesce(a.tattoo, '')) CONTAINS $text
-           OR toLower(reg.regNumber) CONTAINS $text)`;
+           OR toLower(coalesce(reg.regNumber, '')) CONTAINS $text)`;
+
+  /**
+   * The same text match, against an animal with no papers at all.
+   *
+   * The search proper is an inner match on `HAS_REGISTRATION`, so an animal
+   * with no `(:Registration)` cannot come back from it however well it
+   * matches — and that is not a rare shape. A pedigree walk creates a sire the
+   * moment somebody's papers name him, and his own registration only appears
+   * when the crawl reaches him.
+   *
+   * Those animals cannot be opened or brought across, because everything
+   * downstream identifies a catalogue animal by association and number. What
+   * they can be is *counted*, so the screen says "two more match but have no
+   * papers yet" instead of "nothing matched" — which is false, and sends
+   * somebody who has just seen the animal in the database looking for a fault
+   * in the app.
+   *
+   * No association clause: these have no registration for one to apply to.
+   */
+  const UNPAPERED = `
+    MATCH (a:Animal)
+    WHERE ($sex IS NULL OR a.sex = $sex)
+      AND ($text IS NULL
+           OR toLower(coalesce(a.name, '')) CONTAINS $text
+           OR toLower(coalesce(a.tattoo, '')) CONTAINS $text)
+      AND NOT (a)-[:HAS_REGISTRATION]->(:Registration)
+    RETURN count(a) AS total`;
 
   const parametersFor = (query: RegistryQuery) => ({
     association:
@@ -323,7 +350,7 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
       // it: a match on a common name is tens of thousands of animals, and
       // materialising them to learn how many there were is how a search box
       // takes a database down.
-      const [counted, page] = await Promise.all([
+      const [counted, page, unpapered] = await Promise.all([
         run(
           `MATCH (a:Animal)-[:HAS_REGISTRATION]->(reg:Registration) ${WHERE}
            RETURN count(DISTINCT a) AS total`,
@@ -347,6 +374,7 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
            RETURN ${RETURN_ANIMAL}`,
           { ...parameters, limit },
         ),
+        run(UNPAPERED, parameters),
       ]);
 
       return {
@@ -354,6 +382,7 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
           .map(toAnimal)
           .filter((entry): entry is RegistryAnimal => entry !== undefined),
         total: asNumber(counted[0]?.["total"]) ?? 0,
+        unpapered: asNumber(unpapered[0]?.["total"]) ?? 0,
       };
     },
 

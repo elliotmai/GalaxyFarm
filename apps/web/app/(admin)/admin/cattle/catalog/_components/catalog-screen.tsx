@@ -71,6 +71,8 @@ const EMPTY: SearchState = { text: "", association: "", sex: "" };
 interface Found {
   readonly found: readonly RegistryAnimal[];
   readonly total: number;
+  /** Matched, but with no papers in the crawl — see the callout below. */
+  readonly unpapered?: number;
 }
 
 async function ask<T>(url: string): Promise<T> {
@@ -385,10 +387,37 @@ export function CatalogScreen({
         </Callout>
       )}
 
+      {/*
+        Counted, never hidden. The search is an inner match on the registration,
+        so an animal the crawl has created but not yet papered cannot come back
+        from it however well it matches — and a pedigree walk creates exactly
+        that: a sire is a node the moment somebody's papers name him, and his
+        own registration only appears when the crawl reaches him.
+
+        Saying "nothing matched" in that case is false, and it sends somebody
+        who has just seen the animal in the database looking for a fault in the
+        app rather than a gap in the crawl.
+      */}
+      {result === undefined || (result.unpapered ?? 0) === 0 ? null : (
+        <Callout
+          tone="neutral"
+          title={`${result.unpapered} more match, with no papers in the crawl yet`}
+        >
+          They exist in the graph — named on somebody else&apos;s pedigree — but the crawl has not
+          reached their own registration. Nothing here can open or copy an animal without an
+          association and a number, so they are counted rather than listed. Re-run the crawl over
+          those animals and they will appear.
+        </Callout>
+      )}
+
       {result === undefined ? null : result.found.length === 0 ? (
         <EmptyState
           title="Nothing matched"
-          detail="The crawl covers the registries this farm papers with. An animal from another association will not be in it — import that one from its own page on the Ancestors screen."
+          detail={
+            (result.unpapered ?? 0) > 0
+              ? "Nothing with papers, at least — see above. The crawl knows these animals by name but has not yet read their registrations."
+              : "Check the spelling, and try a registration number or a tattoo. The crawl covers the registries this farm papers with; an animal from another association will not be in it — import that one from its own page on the Ancestors screen."
+          }
         />
       ) : (
         <Section
