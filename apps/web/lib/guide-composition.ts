@@ -1,4 +1,5 @@
 import {
+  ancestorsOf,
   animalsFedBy,
   displayName,
   emergencyContacts,
@@ -71,6 +72,10 @@ export function guideZonesFrom(
         baselineSafetyLevel: zone.baselineSafetyLevel,
         customInstructions: zone.customInstructions,
         occupants,
+        // The same three levels the Pen Board merges when somebody taps a cow
+        // (§5.1). Read here by whoever is standing in the pen with nobody to
+        // ask, which is the reader the merge was written for.
+        groups: ancestorsOf(zones, zone.id),
       };
     })
     .filter((zone) => zone.occupants.length > 0 || zone.customInstructions !== undefined);

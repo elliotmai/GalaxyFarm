@@ -7,6 +7,7 @@ import {
   safetyLabel,
   ulidSchema,
   type BaseRecord,
+  type InstructionSubject,
   type ResolvedInstruction,
   type SafetyLabelOverrides,
   type SafetyLevel,
@@ -94,6 +95,15 @@ export interface GuideZone {
   readonly baselineSafetyLevel: SafetyLevel;
   readonly customInstructions?: string | undefined;
   readonly occupants: readonly GuideAnimal[];
+  /**
+   * The area or barn this pen sits in, and whatever that sits in (§5.1).
+   *
+   * An instruction written on North is written about everything in every pen
+   * in North, and this is the reader who most needs it: the Pen Board's tap
+   * merges the same three levels, and a guide that quietly held one of them
+   * back would be a second answer to the question it exists to settle.
+   */
+  readonly groups?: readonly InstructionSubject[] | undefined;
 }
 
 export interface ComposedPenSection {
@@ -144,7 +154,7 @@ export function composeGuide(
       effectiveLevel: level,
       effectiveLabel: safetyLabel(level, labels),
       animals: zone.occupants,
-      instructions: resolveZoneInstructions(zone, zone.occupants),
+      instructions: resolveZoneInstructions(zone, zone.occupants, zone.groups ?? []),
       doNotHandle: zone.occupants
         .filter((animal) => animal.safetyLevel >= 4)
         .map((animal) =>

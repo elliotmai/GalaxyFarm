@@ -19,6 +19,22 @@ import type { GeoBounds } from "./geometry.js";
  * the user did with it, and are never handed back to a caller.
  */
 
+/**
+ * One line of instruction, and where it came from.
+ *
+ * A merged set is only worth reading if every line still says what it applies
+ * to. "Gets a scoop of grain at night" is a different instruction depending on
+ * whether it is true of this calf or of everything in Pen B, and the person
+ * reading it is standing in a barn with no way to ask. The caller does the
+ * merging and the attributing — see §5.1's resolution — and the editor knows
+ * only that a line has a source and a body.
+ */
+export interface SpatialInstruction {
+  /** What this came from, in the reader's words: "Dolly", "Pen B", "North". */
+  readonly from: string;
+  readonly text: string;
+}
+
 /** A ring of ground — a pen, a pasture, a bed. */
 export interface SpatialShape {
   readonly id: string;
@@ -48,7 +64,7 @@ export interface SpatialShape {
   /** Retired ground. Quieter still, and never a drop target. */
   readonly inactive?: boolean | undefined;
   /** Shown when the shape is chosen. Merged upstream by the caller. */
-  readonly instructions?: string | undefined;
+  readonly instructions?: readonly SpatialInstruction[] | undefined;
   /** Runs across the shape that do not close — temporary fencing, a path. */
   readonly lines?: readonly SpatialLine[] | undefined;
   /**
@@ -87,7 +103,16 @@ export interface SpatialChip {
    */
   readonly accent?: string | undefined;
   readonly accentLabel?: string | undefined;
-  readonly instructions?: string | undefined;
+  /**
+   * Why this one sits where it does on the scale, in one line.
+   *
+   * "Kicks when cornered" belongs beside the level it explains rather than in
+   * among the care instructions: a level with no reason is a number somebody
+   * argues with, and a reason filed under "instructions" is a warning read
+   * fourth.
+   */
+  readonly rankNote?: string | undefined;
+  readonly instructions?: readonly SpatialInstruction[] | undefined;
 }
 
 /**

@@ -58,7 +58,7 @@ const NORTH_TRAP: SpatialShape = {
   label: "North Trap",
   boundary: square({ lat: FARM.lat + 0.002, lng: FARM.lng }),
   rank: 2,
-  instructions: "Gate chains on the south end. Watch the wire by the tank.",
+  instructions: [{ from: "North Trap", text: "Gate chains on the south end." }],
 };
 
 const PASTURE: SpatialShape = {
@@ -77,7 +77,12 @@ const DOLLY: SpatialChip = {
   rank: 4,
   accent: "#C62828",
   accentLabel: "Red",
-  instructions: "Hand feed only. She will crowd a gate.",
+  rankNote: "Kicks when cornered.",
+  instructions: [
+    { from: "Dolly", text: "Hand feed only. She will crowd a gate." },
+    { from: "North Trap", text: "Gate chains on the south end." },
+    { from: "North", text: "The road gate stays chained." },
+  ],
 };
 
 /** The middle of a shape, in panel pixels — where its chips and label sit. */
@@ -346,6 +351,38 @@ describe("tapping for instructions", () => {
       screen.getByRole("button", { name: /Safety level 2 — Safe with basic caution/ }),
     ).toBeInTheDocument();
   });
+
+  it("keeps every merged line attributed to what it came from", async () => {
+    // The whole point of merging three levels into one panel: a helper reading
+    // "hand feed only" has to know whether that is true of this cow or of
+    // everything standing in the trap.
+    render(
+      <SpatialEditor palette={propertyPalette} shapes={[NORTH_TRAP]} chips={[DOLLY]} view={VIEW} />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /Dolly, Red halter/ }));
+
+    for (const [from, text] of [
+      ["Dolly", "Hand feed only. She will crowd a gate."],
+      ["North Trap", "Gate chains on the south end."],
+      ["North", "The road gate stays chained."],
+    ]) {
+      const term = screen.getByText(from as string, { selector: "dt" });
+      expect(term.nextElementSibling).toHaveTextContent(text as string);
+    }
+  });
+
+  it("reads the level out as a number beside its colour, and says what made it that", async () => {
+    // §5.1: the colour is the fast path, never the only one. A swatch on its
+    // own is nothing to a colour-blind reader and nothing to anybody at dusk.
+    render(
+      <SpatialEditor palette={propertyPalette} shapes={[NORTH_TRAP]} chips={[DOLLY]} view={VIEW} />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /Dolly, Red halter/ }));
+    expect(screen.getByText(/Safety level 4 —/)).toBeInTheDocument();
+    expect(screen.getByText(/Kicks when cornered/)).toBeInTheDocument();
+  });
 });
 
 describe("resting ground", () => {
@@ -438,7 +475,9 @@ describe("the garden palette", () => {
       label: "Bed 1",
       boundary: square(FARM, 0.0002),
       rank: 3,
-      instructions: "Tomatoes here last year — nightshades are out until 2029.",
+      instructions: [
+        { from: "Bed 3", text: "Tomatoes here last year — nightshades are out until 2029." },
+      ],
     };
 
     render(

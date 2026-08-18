@@ -211,6 +211,43 @@ describe("guideZonesFrom", () => {
     expect(composed.pens[0]?.effectiveLevel).toBe(5);
     expect(composed.pens[0]?.doNotHandle).toEqual(["Chief — Bull. Do not enter."]);
   });
+
+  it("carries the area a pen sits in, so the guide reads the same three levels the map does", () => {
+    // §5.1's merge is one answer, not one per screen. A guide that held the
+    // group's instruction back would be the second answer it exists to end.
+    const area = id(30);
+    const composed = composeGuide(
+      { title: "While we are away" },
+      guideZonesFrom(
+        [
+          zone({
+            id: area,
+            name: "North",
+            type: "area",
+            customInstructions: "Road gate stays chained.",
+          }),
+          zone({
+            id: NORTH,
+            name: "North Trap",
+            parentZoneId: area,
+            customInstructions: "Latch sticks. Lift, then pull.",
+          }),
+        ],
+        [assignment({ id: id(20), animalId: DOLLY, zoneId: NORTH })],
+        [animal({ id: DOLLY, name: "Dolly", customInstructions: "No grain — she founders." })],
+        NOW,
+      ),
+      [],
+      NOW,
+    );
+
+    const trap = composed.pens.find((pen) => pen.zoneName === "North Trap");
+    expect(trap?.instructions.map((line) => `${line.source}:${line.sourceName}`)).toEqual([
+      "zone:North Trap",
+      "group:North",
+      "animal:Dolly",
+    ]);
+  });
 });
 
 describe("guideChores", () => {
