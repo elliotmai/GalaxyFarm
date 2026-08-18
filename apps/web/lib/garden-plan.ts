@@ -270,7 +270,14 @@ export function bedShapes(
           : { rank: rotationRank(rotationWarning(bed.id, family, history, at)) }),
         resting: bed.active && growing.length === 0,
         inactive: !bed.active,
-        ...(bed.soilNotes === undefined ? {} : { instructions: bed.soilNotes }),
+        // Attributed, because the editor now takes instructions as lines with
+        // a source rather than one blob of text (§5.1). A bed has exactly one
+        // source — itself — so this is a list of one, and it says whose note it
+        // is for the same reason the Pen Board does: a line with no source is a
+        // line somebody has to guess the scope of.
+        ...(bed.soilNotes === undefined
+          ? {}
+          : { instructions: [{ from: bed.name, text: bed.soilNotes }] }),
       };
     });
 }
@@ -306,7 +313,9 @@ export function plantingChips(
         shapeId: planting.bedId,
         ...(family === undefined ? {} : { sublabel: family, accentLabel: family }),
         ...(accent === undefined ? {} : { accent }),
-        ...(planting.notes === undefined ? {} : { instructions: planting.notes }),
+        ...(planting.notes === undefined
+          ? {}
+          : { instructions: [{ from: varietyLabel(variety, crops), text: planting.notes }] }),
       };
     })
     .sort((left, right) => left.label.localeCompare(right.label));
