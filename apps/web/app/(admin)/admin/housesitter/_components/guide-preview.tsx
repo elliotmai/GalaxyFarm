@@ -45,11 +45,13 @@ import { currentMedicinesFor, feedingLinesFor } from "@/lib/pet-care";
  * would mean the document could be out of date, which is the failure §5.10 is
  * written to prevent.
  *
- * Two things here exist only because of paper (issue #42). The document is
- * split into a running head and a body, which the print stylesheet turns into
- * a table header group so the farm name and the date repeat on every sheet;
- * and the composition is re-dated at `beforeprint`, so the date on the paper
- * is the moment the paper was made rather than the moment the tab was opened.
+ * Two things here exist only because of paper (issue #42). The document is a
+ * table with a running head, since a table head is the only thing browsers
+ * repeat across pages and the farm name and the date have to be on every
+ * sheet; and the composition is re-dated at `beforeprint`, so the date on the
+ * paper is the moment the paper was made rather than the moment the tab was
+ * opened. On screen the print stylesheet unwinds the table back into the
+ * blocks it was, so the preview is what it always was.
  */
 
 const includes = (guide: CareGuide, kind: GuideSectionKind) => guide.includes.includes(kind);
