@@ -83,6 +83,9 @@ importers:
       '@galaxy-farm/infra-registry-graph':
         specifier: workspace:*
         version: link:../../packages/infrastructure/registry-graph
+      '@galaxy-farm/infra-storage':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure/storage
       '@galaxy-farm/infra-sync':
         specifier: workspace:*
         version: link:../../packages/infrastructure/sync
