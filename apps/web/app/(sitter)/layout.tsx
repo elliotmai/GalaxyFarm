@@ -1,5 +1,7 @@
 import type { Viewport } from "next";
 
+import { PwaShell } from "@/app/_components/pwa-shell";
+
 /**
  * The browser chrome, matched to the surface (spec §8 v0.9).
  *
@@ -25,6 +27,7 @@ export default function SitterLayout({ children }: { children: React.ReactNode }
   return (
     <div data-surface="sitter" data-theme="flying-auto">
       {children}
+      <PwaShell />
     </div>
   );
 }
