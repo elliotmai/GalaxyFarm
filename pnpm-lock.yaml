@@ -98,6 +98,9 @@ importers:
       '@galaxy-farm/module-feed':
         specifier: workspace:*
         version: link:../../packages/modules/feed
+      '@galaxy-farm/module-garden':
+        specifier: workspace:*
+        version: link:../../packages/modules/garden
       '@galaxy-farm/module-horses':
         specifier: workspace:*
         version: link:../../packages/modules/horses
@@ -231,6 +234,9 @@ importers:
       '@galaxy-farm/module-feed':
         specifier: workspace:*
         version: link:../../modules/feed
+      '@galaxy-farm/module-garden':
+        specifier: workspace:*
+        version: link:../../modules/garden
       '@galaxy-farm/module-housesitting':
         specifier: workspace:*
         version: link:../../modules/housesitting
