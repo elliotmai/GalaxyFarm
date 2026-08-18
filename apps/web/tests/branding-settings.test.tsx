@@ -94,6 +94,13 @@ vi.mock("@/app/_components/sync-provider", () => ({
     stuck: 0,
     retryStuck: async () => {},
   }),
+  // The badge reads the status; everything else reads the store and the
+  // controls, which is the whole reason those are two contexts.
+  useSyncEngine: () => ({
+    store: undefined,
+    syncNow: async () => {},
+    retryStuck: async () => {},
+  }),
 }));
 
 const config = (farmName: string, id = "01ARZ3NDEKTSV4RRFFQ69G5FB1"): BrandingConfig =>

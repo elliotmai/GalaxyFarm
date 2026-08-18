@@ -63,6 +63,13 @@ vi.mock("@/app/_components/sync-provider", () => ({
     stuck: 0,
     retryStuck: async () => {},
   }),
+  // The badge reads the status; everything else reads the store and the
+  // controls, which is the whole reason those are two contexts.
+  useSyncEngine: () => ({
+    store: undefined,
+    syncNow: async () => {},
+    retryStuck: async () => {},
+  }),
 }));
 
 const { ToastProvider, ConfirmProvider } = await import("@galaxy-farm/ui");
@@ -164,6 +171,49 @@ describe("the place", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The property needs a name");
     expect(written.updated).toHaveLength(0);
+  });
+
+  it("edits the growing zone by hand, because the lookup is a suggestion", async () => {
+    // §5.5's acceptance criterion. Fort Worth reads ≈8b, and that is a fact
+    // about this address rather than a constant — a farm on a zone boundary,
+    // or one with a low spot that runs a half zone colder, has to be able to
+    // overrule what the geocoder decided.
+    const user = userEvent.setup();
+    view();
+
+    const field = screen.getByLabelText(/^Zone/);
+    await user.clear(field);
+    await user.type(field, "7B");
+    await user.click(screen.getByRole("button", { name: "Save zone" }));
+
+    await waitFor(() => expect(written.updated).toHaveLength(1));
+    // Lower-cased on the way in, so "7B" and "7b" are not two zones the frost
+    // table would answer for differently.
+    expect(written.updated[0]?.patch["growingZone"]).toBe("7b");
+  });
+
+  it("shows the season the zone implies, so a typo in it is visible", () => {
+    // 8b runs mid-March to late November — 250 days. Asserted on the day count
+    // rather than the formatted dates, which are rendered in whatever locale
+    // the reader's browser is set to.
+    stored.current = { properties: [property({ growingZone: "8b" })], zones: [] };
+    view();
+
+    expect(screen.getByText(/250 days/)).toBeInTheDocument();
+  });
+
+  it("lets the zone be cleared rather than demanding a guess", async () => {
+    // `frostDatesFor` answers nothing for a zone it does not know, and the
+    // garden then declines to invent a season instead of inventing one.
+    stored.current = { properties: [property({ growingZone: "8b" })], zones: [] };
+    const user = userEvent.setup();
+    view();
+
+    await user.clear(screen.getByLabelText(/^Zone/));
+    await user.click(screen.getByRole("button", { name: "Save zone" }));
+
+    await waitFor(() => expect(written.updated).toHaveLength(1));
+    expect(written.updated[0]?.patch["growingZone"]).toBeUndefined();
   });
 
   it("says so plainly when the property has not synced yet", () => {

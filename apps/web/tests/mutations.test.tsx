@@ -57,7 +57,9 @@ beforeEach(async () => {
 });
 
 async function ready(result: { current: unknown }) {
-  // The provider builds the store in an effect, so the first render has none.
+  // The provider builds the store during its first client render, but the
+  // database behind it opens asynchronously and the hook is rebuilt when it
+  // lands.
   await waitFor(() => expect(result.current).toBeDefined());
 }
 

@@ -55,6 +55,11 @@ const NAMED_DATE_FIELDS: ReadonlySet<string> = new Set([
   "accessFrom",
   "accessTo",
   "firstSeen",
+  // A planting window is a fortnight, so it is a pair of dates rather than a
+  // `*On` (§5.5). Named here rather than matched by a `*From`/`*To` suffix for
+  // the reason given below.
+  "windowFrom",
+  "windowTo",
 ]);
 
 export function isDateField(field: string): boolean {

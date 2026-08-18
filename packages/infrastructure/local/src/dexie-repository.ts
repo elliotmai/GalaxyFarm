@@ -33,6 +33,10 @@ export class DexieRepository<T extends BaseRecord> implements ObservableReposito
     const matched = await this.matching(query);
     const offset = query.offset ?? 0;
     const limit = query.limit ?? matched.length;
+    // The unpaged read is the one every screen makes, and it already owns the
+    // array `matching` just built — slicing it only to hand back the same
+    // rows copies the whole table on every keystroke and every sync write.
+    if (offset === 0 && limit >= matched.length) return matched;
     return matched.slice(offset, offset + limit);
   }
 
@@ -88,16 +92,47 @@ export class DexieRepository<T extends BaseRecord> implements ObservableReposito
     // than a compound index and far easier to keep correct.
     const rows = (await this.table().where("propertyId").equals(query.propertyId).toArray()) as T[];
     const search = query.search?.trim().toLowerCase();
+    const includeDeleted = query.includeDeleted ?? false;
+    const searching = search !== undefined && search !== "";
 
-    return rows
-      .filter((row) => (query.includeDeleted ?? false) || row.deletedAt === undefined)
-      .filter((row) => {
-        if (search === undefined || search === "") return true;
-        return this.searchableFields.some((field) => {
-          const value = row[field];
-          return typeof value === "string" && value.toLowerCase().includes(search);
-        });
-      })
-      .sort((left, right) => left.id.localeCompare(right.id));
+    // One pass rather than three. The old chain built two intermediate arrays
+    // per read, and a read happens on every keystroke in a search box and on
+    // every write a sync pull makes — so the garbage it produced was measured
+    // in copies of the whole table, not in copies of the result.
+    const matched: T[] = [];
+    for (const row of rows) {
+      if (!includeDeleted && row.deletedAt !== undefined) continue;
+      if (searching && !this.matchesSearch(row, search)) continue;
+      matched.push(row);
+    }
+
+    return matched.sort(byId);
   }
+
+  private matchesSearch(row: T, search: string): boolean {
+    for (const field of this.searchableFields) {
+      const value = row[field];
+      if (typeof value === "string" && value.toLowerCase().includes(search)) return true;
+    }
+    return false;
+  }
+}
+
+/**
+ * Order by id, byte for byte.
+ *
+ * Not `localeCompare`. That runs the full Unicode collation algorithm — on a
+ * herd-sized table it is the single most expensive thing in a read, and every
+ * read re-sorts, because a `liveQuery` re-runs the whole query whenever the
+ * table changes. Ids here are ULIDs: Crockford base32, uppercase, fixed
+ * length, so code-unit order and collation order are the same order.
+ *
+ * It also makes this implementation agree with the other two rather than
+ * disagree with them. `postgres-repository.ts` orders by `id collate "C"` —
+ * byte order — and the conformance suite runs the same cases against both, so
+ * the locale-aware comparator was the odd one out.
+ */
+function byId(left: BaseRecord, right: BaseRecord): number {
+  if (left.id === right.id) return 0;
+  return left.id < right.id ? -1 : 1;
 }

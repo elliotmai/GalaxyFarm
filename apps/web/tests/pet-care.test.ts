@@ -7,9 +7,7 @@ import type { FeedType } from "@galaxy-farm/module-feed";
 import {
   careRecordsFor,
   currentMedicinesFor,
-  describePlanLine,
   feedingLinesFor,
-  nameList,
   plansFeeding,
 } from "../lib/pet-care.js";
 
@@ -87,37 +85,6 @@ describe("careRecordsFor", () => {
 
   it("falls back to the kind when there is no product", () => {
     expect(careRecordsFor([health({ type: "exam" })])[0]?.label).toBe("exam");
-  });
-});
-
-describe("describePlanLine", () => {
-  it("says the ration the way somebody would say it out loud", () => {
-    expect(describePlanLine(line({}), feeds)).toBe(
-      "1 scoop of Purina Pro Plan, twice a day, morning",
-    );
-  });
-
-  it("pluralises the vessel", () => {
-    expect(describePlanLine(line({ amount: { amount: 2, unit: "scoop" } }), feeds)).toContain(
-      "2 scoops",
-    );
-  });
-
-  it("keeps the line's own note, which is usually the important half", () => {
-    expect(describePlanLine(line({ notes: "in the blue bowl" }), feeds)).toBe(
-      "1 scoop of Purina Pro Plan, twice a day, morning — in the blue bowl",
-    );
-  });
-
-  it("says 'feed' rather than nothing when the catalogue entry is gone", () => {
-    // A deleted feed must not make the whole line vanish off the guide.
-    expect(describePlanLine(line({}), [])).toContain("of feed");
-  });
-
-  it("reads a multi-word unit as words", () => {
-    expect(describePlanLine(line({ amount: { amount: 1, unit: "square_bale" } }), feeds)).toContain(
-      "1 square bale",
-    );
   });
 });
 
@@ -268,14 +235,5 @@ describe("a bowl two pets share", () => {
 
     expect(plansFeeding(RUSTY, [old])).toHaveLength(1);
     expect(feedingLinesFor(RUSTY, [old], feeds, pets)[0]).not.toContain("between");
-  });
-});
-
-describe("nameList", () => {
-  it("reads the way somebody would say it", () => {
-    expect(nameList([])).toBe("");
-    expect(nameList(["Rusty"])).toBe("Rusty");
-    expect(nameList(["Rusty", "Biscuit"])).toBe("Rusty and Biscuit");
-    expect(nameList(["Rusty", "Biscuit", "Tig"])).toBe("Rusty, Biscuit and Tig");
   });
 });

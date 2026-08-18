@@ -978,6 +978,211 @@ export const eggDispositions = pgTable(
   baseIndexes("egg_dispositions"),
 );
 
+/**
+ * The garden (§5.5).
+ *
+ * Ten tables for what is really three ideas: the ground, the seed, and what
+ * came off it. The one worth explaining is `crops.family` — rotation is
+ * checked on the botanical family rather than on the crop, because tomatoes
+ * following peppers is the mistake rotation exists to prevent and the two
+ * share nothing but a family.
+ *
+ * A bed is a child of a garden Zone rather than a Zone itself. §5.1's Zone is
+ * "the universal place", and forty raised beds promoted to zones would render
+ * on the Pen Board alongside the pens.
+ */
+export const beds = pgTable(
+  "beds",
+  {
+    ...baseColumns,
+    /** The garden Zone this sits in. */
+    zoneId: text("zone_id").notNull(),
+    name: text("name").notNull(),
+    type: text("type").notNull(),
+    lengthFt: doublePrecision("length_ft"),
+    widthFt: doublePrecision("width_ft"),
+    /**
+     * Where the layout designer put it.
+     *
+     * Screen space, unlike a Zone's polygon, which is geographic — a raised
+     * bed is drawn on a grid, not surveyed. Persisted here so the designer
+     * (#33) has its geometry waiting for it rather than a migration in front
+     * of it.
+     */
+    x: doublePrecision("x"),
+    y: doublePrecision("y"),
+    soilNotes: text("soil_notes"),
+    active: boolean("active").notNull(),
+  },
+  baseIndexes("beds"),
+);
+
+export const crops = pgTable(
+  "crops",
+  {
+    ...baseColumns,
+    name: text("name").notNull(),
+    /** Botanical family. The rotation guard runs on this, not on the name. */
+    family: text("family").notNull(),
+    notes: text("notes"),
+  },
+  baseIndexes("crops"),
+);
+
+export const varieties = pgTable(
+  "varieties",
+  {
+    ...baseColumns,
+    cropId: text("crop_id").notNull(),
+    name: text("name").notNull(),
+    daysToMaturity: integer("days_to_maturity"),
+    spacingInches: doublePrecision("spacing_inches"),
+    source: text("source"),
+    notes: text("notes"),
+  },
+  baseIndexes("varieties"),
+);
+
+/**
+ * What is in the seed box (§5.5).
+ *
+ * `quantity` is `double precision` rather than an integer because the unit is
+ * a column: three packets is a whole number and 2.5 grams is not, and one
+ * column cannot be both unless it is a float.
+ */
+export const seedInventory = pgTable(
+  "seed_inventory",
+  {
+    ...baseColumns,
+    varietyId: text("variety_id").notNull(),
+    quantity: doublePrecision("quantity").notNull(),
+    unit: text("unit").notNull(),
+    packedForYear: integer("packed_for_year"),
+    source: text("source"),
+    germinationNotes: text("germination_notes"),
+  },
+  baseIndexes("seed_inventory"),
+);
+
+/**
+ * Something in the ground (§5.5).
+ *
+ * No `expectedHarvestOn` column, deliberately: §2's "derive, don't duplicate".
+ * It falls out of the planting date and the variety's days to maturity, and a
+ * stored copy would be the one that stayed at the old date when somebody
+ * corrected when they actually planted.
+ */
+export const plantings = pgTable(
+  "plantings",
+  {
+    ...baseColumns,
+    bedId: text("bed_id").notNull(),
+    varietyId: text("variety_id").notNull(),
+    method: text("method").notNull(),
+    indoorStartedOn: timestamp("indoor_started_on", { withTimezone: true, mode: "date" }),
+    plantedOn: timestamp("planted_on", { withTimezone: true, mode: "date" }),
+    status: text("status").notNull(),
+    quantity: doublePrecision("quantity"),
+    notes: text("notes"),
+  },
+  baseIndexes("plantings"),
+);
+
+/** Watering, weeding, feeding and spraying — against a bed or a planting. */
+export const gardenCareLogs = pgTable(
+  "garden_care_logs",
+  {
+    ...baseColumns,
+    bedId: text("bed_id"),
+    plantingId: text("planting_id"),
+    action: text("action").notNull(),
+    performedOn: timestamp("performed_on", { withTimezone: true, mode: "date" }).notNull(),
+    product: text("product"),
+    notes: text("notes"),
+  },
+  baseIndexes("garden_care_logs"),
+);
+
+export const harvestLogs = pgTable(
+  "harvest_logs",
+  {
+    ...baseColumns,
+    plantingId: text("planting_id").notNull(),
+    harvestedOn: timestamp("harvested_on", { withTimezone: true, mode: "date" }).notNull(),
+    quantity: doublePrecision("quantity").notNull(),
+    unit: text("unit").notNull(),
+    notes: text("notes"),
+  },
+  baseIndexes("harvest_logs"),
+);
+
+/**
+ * The pantry (§5.5).
+ *
+ * `harvestLogId` is nullable, and that is not an oversight. Half of what gets
+ * put by never went through a harvest row — apples from a neighbour, a case of
+ * tomatoes off a truck — and a jar on a shelf is a fact about the pantry
+ * whether or not this farm grew what is in it.
+ */
+export const preservationLogs = pgTable(
+  "preservation_logs",
+  {
+    ...baseColumns,
+    harvestLogId: text("harvest_log_id"),
+    label: text("label").notNull(),
+    method: text("method").notNull(),
+    quantity: doublePrecision("quantity").notNull(),
+    unit: text("unit").notNull(),
+    preservedOn: timestamp("preserved_on", { withTimezone: true, mode: "date" }).notNull(),
+    storageLocation: text("storage_location"),
+    notes: text("notes"),
+  },
+  baseIndexes("preservation_logs"),
+);
+
+export const seasonPlans = pgTable(
+  "season_plans",
+  {
+    ...baseColumns,
+    name: text("name").notNull(),
+    year: integer("year").notNull(),
+    notes: text("notes"),
+    active: boolean("active").notNull(),
+  },
+  baseIndexes("season_plans"),
+);
+
+/**
+ * One line of the plan, and the only thing that raises a notification (§5.5).
+ *
+ * §5.5 is explicit that alerts fire for what is *in the plan* and not for the
+ * whole seed catalogue, which is why the window lives on this row rather than
+ * on the variety: a variety says when okra can go in, and this says that this
+ * farm means to put okra in this year.
+ *
+ * `realisedAs` points at the Planting it became — the same planned→actual
+ * shape as `planned_matings.realisedAs` (§5.2).
+ */
+export const plannedPlantings = pgTable(
+  "planned_plantings",
+  {
+    ...baseColumns,
+    seasonPlanId: text("season_plan_id").notNull(),
+    varietyId: text("variety_id").notNull(),
+    method: text("method").notNull(),
+    bedId: text("bed_id"),
+    windowFrom: timestamp("window_from", { withTimezone: true, mode: "date" }).notNull(),
+    windowTo: timestamp("window_to", { withTimezone: true, mode: "date" }).notNull(),
+    quantity: doublePrecision("quantity"),
+    planStatus: text("plan_status").notNull(),
+    realisedAs: text("realised_as"),
+    realisedAt: timestamp("realised_at", { withTimezone: true, mode: "date" }),
+    abandonedReason: text("abandoned_reason"),
+    notes: text("notes"),
+  },
+  baseIndexes("planned_plantings"),
+);
+
 export const contacts = pgTable(
   "contacts",
   {
@@ -1352,6 +1557,16 @@ export const allTables = {
   flockAdjustments,
   eggLogs,
   eggDispositions,
+  beds,
+  crops,
+  varieties,
+  seedInventory,
+  plantings,
+  gardenCareLogs,
+  harvestLogs,
+  preservationLogs,
+  seasonPlans,
+  plannedPlantings,
   contacts,
   attachments,
   careGuides,

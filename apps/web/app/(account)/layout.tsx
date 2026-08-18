@@ -1,3 +1,5 @@
+import { PwaShell } from "@/app/_components/pwa-shell";
+
 /**
  * account surface. Daylight, fixed — not `flying-auto` (spec §8 v0.9).
  *
@@ -10,6 +12,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   return (
     <div data-surface="account" data-theme="flying-day">
       {children}
+      <PwaShell />
     </div>
   );
 }

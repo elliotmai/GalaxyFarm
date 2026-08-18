@@ -40,8 +40,12 @@ export function KioskHome({
       />
 
       <div className="grid grid-cols-2 gap-density md:grid-cols-3">
+        {/* `prefetch` fetches each board whole rather than as far as its
+            loading boundary — see `next.config.ts`. Six tiles on a screen that
+            is powered on and then left alone, and the barn is the place most
+            likely to be out of signal by the time one of them is pressed. */}
         {KIOSK_BOARDS.map((board) => (
-          <Link key={board.slug} href={board.route} className="block">
+          <Link key={board.slug} href={board.route} prefetch className="block">
             <Card className="flex min-h-[8rem] items-center justify-center text-center">
               <h2>{board.label}</h2>
             </Card>

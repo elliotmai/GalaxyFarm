@@ -7,6 +7,7 @@ import { SitterChores } from "@/app/(sitter)/sitter/_components/sitter-chores";
 import {
   guideChores,
   guideEmergencyContacts,
+  guideFeedingPlans,
   guideVets,
   guideZonesFrom,
 } from "@/lib/guide-composition";
@@ -92,6 +93,9 @@ export function SitterScreen({
     : [];
   const vets = guideIncludes(guide, "vet") ? guideVets(view.contacts) : [];
   const routine = guideIncludes(guide, "chores") ? guideChores(view.templates, view.zones) : [];
+  const feeding = guideIncludes(guide, "cattle_feeding")
+    ? guideFeedingPlans(view.plans, view.feeds, view.animals, view.zones, view.assignments, now)
+    : [];
   const pets = guideIncludes(guide, "pets")
     ? petBriefings(
         petsOnFarm(view.animals).map((pet) => ({
@@ -213,6 +217,35 @@ export function SitterScreen({
                       </li>
                     ))}
                   </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {feeding.length === 0 ? null : (
+        <Section
+          title="Feeding the cattle"
+          description="What goes out and how much. Read the line under each heading before you scoop — some amounts are each, some are between them."
+        >
+          <div className="flex flex-col gap-density">
+            {feeding.map((plan) => (
+              <div key={plan.id} className="border-l-2 border-edge pl-4">
+                <h3 className="text-ink">
+                  {plan.who}
+                  <span className="font-body text-sm font-normal text-muted"> · {plan.name}</span>
+                </h3>
+                {plan.portion === undefined ? null : (
+                  <p className="text-sm text-muted">{plan.portion}</p>
+                )}
+                <ul className="mt-1 flex list-disc flex-col gap-1 pl-5 text-sm text-ink">
+                  {plan.lines.map((line, index) => (
+                    <li key={`${plan.id}-${index}`}>{line}</li>
+                  ))}
+                </ul>
+                {plan.notes === undefined ? null : (
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-ink">{plan.notes}</p>
                 )}
               </div>
             ))}

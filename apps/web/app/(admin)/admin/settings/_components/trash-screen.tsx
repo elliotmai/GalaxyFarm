@@ -15,7 +15,7 @@ import {
 } from "@galaxy-farm/ui";
 import { DEFAULT_RETENTION_DAYS, isPurgeable, type BaseRecord, type Ulid } from "@galaxy-farm/core";
 
-import { useSync } from "@/app/_components/sync-provider";
+import { useSyncEngine } from "@/app/_components/sync-provider";
 import { LOCAL_STORES, type LocalStoreName } from "@/lib/local/store";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -47,6 +47,16 @@ const LABELS: Partial<Record<LocalStoreName, string>> = {
   flockAdjustments: "Headcount entries",
   eggLogs: "Egg collections",
   eggDispositions: "Egg dispositions",
+  beds: "Beds",
+  crops: "Crops",
+  varieties: "Varieties",
+  seedInventory: "Seed",
+  plantings: "Plantings",
+  gardenCareLogs: "Garden care log",
+  harvestLogs: "Harvests",
+  preservationLogs: "Pantry",
+  seasonPlans: "Season plans",
+  plannedPlantings: "Planned plantings",
   equipment: "Equipment",
   meterReadings: "Meter readings",
   maintenanceRules: "Maintenance rules",
@@ -62,7 +72,16 @@ const LABELS: Partial<Record<LocalStoreName, string>> = {
 };
 
 interface TrashRow {
-  readonly record: BaseRecord & { readonly name?: string; readonly title?: string };
+  /**
+   * `label` is here for the pantry, whose records have no name and no title.
+   * A jar is identified by what is written on it, and "Untitled Pantry" is
+   * not a row anybody can decide whether to restore.
+   */
+  readonly record: BaseRecord & {
+    readonly name?: string;
+    readonly title?: string;
+    readonly label?: string;
+  };
   readonly store: LocalStoreName;
 }
 
@@ -74,7 +93,7 @@ export function TrashScreen({
   readonly canPurge: boolean;
 }) {
   const [store, setStore] = useState<LocalStoreName>("animals");
-  const { store: local } = useSync();
+  const { store: local } = useSyncEngine();
   const { records, loading } = useRecords<BaseRecord>(store, {
     propertyId,
     includeDeleted: true,
@@ -88,7 +107,7 @@ export function TrashScreen({
   const now = new Date();
 
   const nameOf = (record: TrashRow["record"]) =>
-    record.name ?? record.title ?? `Untitled ${LABELS[store] ?? store}`;
+    record.name ?? record.title ?? record.label ?? `Untitled ${LABELS[store] ?? store}`;
 
   async function restore(row: TrashRow) {
     if (local === undefined) return;

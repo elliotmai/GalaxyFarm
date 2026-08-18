@@ -10,6 +10,7 @@
  * whether or not a customer ever books.
  */
 
+export * from "./domain/calendar.js";
 export * from "./domain/rules.js";
 export * from "./domain/entities.js";
 export * from "./domain/schedule.js";

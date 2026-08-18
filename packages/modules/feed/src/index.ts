@@ -11,6 +11,7 @@
  * projection, and who the bill belongs to.
  */
 
+export * from "./domain/calendar.js";
 export * from "./domain/feed-type.js";
 export * from "./domain/grain-measures.js";
 export * from "./domain/inventory.js";

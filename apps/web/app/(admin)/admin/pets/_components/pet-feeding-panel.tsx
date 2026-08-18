@@ -37,7 +37,8 @@ import {
 } from "@galaxy-farm/core";
 import { FEED_UNITS, type FeedType } from "@galaxy-farm/module-feed";
 
-import { describePlanLine, nameList, plansFeeding } from "@/lib/pet-care";
+import { describePlanLine, nameList } from "@/lib/feed-lines";
+import { plansFeeding } from "@/lib/pet-care";
 import { useMutations } from "@/lib/local/mutations";
 
 /**

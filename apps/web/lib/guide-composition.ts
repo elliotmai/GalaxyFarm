@@ -1,19 +1,25 @@
 import {
+  animalsFedBy,
   displayName,
   emergencyContacts,
   isOnFarm,
+  isShared,
   occupantsOf,
   primaryPhone,
   type Animal,
   type ChoreTemplate,
   type Contact,
+  type FeedingPlan,
   type Ulid,
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
 import type { GuideZone } from "@galaxy-farm/module-housesitting";
+import type { FeedType } from "@galaxy-farm/module-feed";
+import { isPet } from "@galaxy-farm/module-pets";
 
 import { describeRecurrence, GENERATING_RECURRENCES } from "@/lib/chores";
+import { describePlanLine, nameList } from "@/lib/feed-lines";
 
 /**
  * Turning the farm's live records into what the guide composes from (§5.10).
@@ -68,6 +74,118 @@ export function guideZonesFrom(
       };
     })
     .filter((zone) => zone.occupants.length > 0 || zone.customInstructions !== undefined);
+}
+
+export interface GuideFeedingPlan {
+  readonly id: Ulid;
+  readonly name: string;
+  /** "The whole herd", "West Pen — 4 head", "Dolly and Rosie". */
+  readonly who: string;
+  /** Whether the amounts are each animal's or the lot's, said in words. */
+  readonly portion?: string | undefined;
+  readonly lines: readonly string[];
+  readonly notes?: string | undefined;
+}
+
+/**
+ * The rations, as their own section of the guide (§5.10's `cattle_feeding`).
+ *
+ * Separate from the pens because a plan and a pen are not the same shape: a
+ * group plan feeds the whole place, a zone plan feeds a pen, and an animal
+ * plan follows one cow between pens. Printed under whichever pen she is
+ * standing in this week, that last one moves every time she is shifted — and
+ * the group plan would print on every pen or on none.
+ *
+ * Everything not aimed at a dog or a cat lands here. Sorting by species would
+ * read better on a farm that only runs cattle and would silently drop a
+ * horse's grain on one that does not, and a ration nobody puts out is the
+ * failure this section exists to prevent. The pets keep their own section, so
+ * their bowls are the one thing filtered out: a cat fed twice because two
+ * sections both named her is the same error in the other direction.
+ *
+ * Plans switched off are left out entirely. Out of season is not "feed this",
+ * and a helper reading a retired ration has no way to know it is retired.
+ */
+export function guideFeedingPlans(
+  plans: readonly FeedingPlan[],
+  feeds: readonly FeedType[],
+  animals: readonly Animal[],
+  zones: readonly Zone[],
+  assignments: readonly ZoneAssignment[],
+  now: Date,
+): GuideFeedingPlan[] {
+  const byId = new Map(animals.map((animal) => [animal.id, animal]));
+  const fedBy = (plan: FeedingPlan): Animal[] =>
+    animalsFedBy(plan)
+      .map((animalId) => byId.get(animalId))
+      .filter((animal): animal is Animal => animal !== undefined && isOnFarm(animal));
+
+  const rank: Record<FeedingPlan["target"], number> = { group: 0, zone: 1, animal: 2 };
+
+  return (
+    plans
+      .filter((plan) => plan.active)
+      .filter((plan) => {
+        if (plan.target !== "animal") return true;
+        const fed = fedBy(plan);
+        // Sold, dead or unknown: a guide is not where somebody should find out
+        // an animal has gone, and putting feed out for her is worse still.
+        if (fed.length === 0) return false;
+        return !fed.every(isPet);
+      })
+      .map((plan) => {
+        const fed = plan.target === "animal" ? fedBy(plan) : [];
+        const heads =
+          plan.target === "zone"
+            ? occupantsOf(assignments, plan.targetId, now).filter((animalId) => {
+                const animal = byId.get(animalId);
+                return animal !== undefined && isOnFarm(animal);
+              }).length
+            : fed.length;
+
+        const who =
+          plan.target === "group"
+            ? "The whole herd"
+            : plan.target === "zone"
+              ? `${zones.find((zone) => zone.id === plan.targetId)?.name ?? "A pen"} — ${
+                  heads === 0 ? "empty at the moment" : `${heads} head`
+                }`
+              : nameList(fed.map(displayName));
+
+        /**
+         * Said only where it changes what goes in the bunk. One animal on a
+         * per-head plan needs no gloss; a pen of four does, and both ways round
+         * are a real error — four times the hay, or a quarter of it.
+         */
+        const portion = isShared(plan)
+          ? "The amounts below are for all of them between them, not each."
+          : plan.target === "group" || heads > 1
+            ? "The amounts below are what each one gets."
+            : undefined;
+
+        return {
+          target: plan.target,
+          composed: {
+            id: plan.id,
+            name: plan.name,
+            who,
+            portion,
+            // Not passed the animals sharing it: `who` has already named them,
+            // and repeating them on every line is a sentence nobody finishes.
+            lines: plan.lines.map((line) => describePlanLine(line, feeds)),
+            notes: plan.specialNotes,
+          },
+        };
+      })
+      // Widest first: the load that goes out to everything, then the pens, then
+      // the one cow on her own ration — which is the order somebody walks it.
+      .sort(
+        (left, right) =>
+          rank[left.target] - rank[right.target] ||
+          left.composed.who.localeCompare(right.composed.who),
+      )
+      .map((entry) => entry.composed)
+  );
 }
 
 export interface GuideChore {
