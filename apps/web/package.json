@@ -2,12 +2,12 @@
   "name": "@galaxy-farm/web",
   "version": "0.0.0",
   "private": true,
-  "description": "Next.js app \u2014 presentation and composition root",
+  "description": "Next.js app — presentation and composition root",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json",
     "db:seed": "tsx scripts/seed.mts",
     "db:user": "tsx scripts/user.mts"
   },
@@ -30,6 +30,7 @@
     "@galaxy-farm/module-poultry": "workspace:*",
     "@galaxy-farm/module-supplies": "workspace:*",
     "@galaxy-farm/ui": "workspace:*",
+    "@serwist/next": "9.5.12",
     "dexie": "^4.4.4",
     "drizzle-orm": "^0.38.4",
     "next": "^15.1.3",
@@ -45,6 +46,7 @@
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "fake-indexeddb": "^6.2.5",
+    "serwist": "9.5.12",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"

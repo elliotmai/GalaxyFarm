@@ -2,6 +2,7 @@ import type { Viewport } from "next";
 
 import { ConfirmProvider, ToastProvider } from "@galaxy-farm/ui";
 
+import { PwaShell } from "@/app/_components/pwa-shell";
 import { SyncProvider } from "@/app/_components/sync-provider";
 import { currentActor } from "@/lib/auth";
 
@@ -45,6 +46,7 @@ export default async function KioskLayout({ children }: { children: React.ReactN
     return (
       <div data-surface="kiosk" data-theme="flying-auto" data-density="kiosk">
         <main className="p-density">{children}</main>
+        <PwaShell unattended />
       </div>
     );
   }
@@ -63,6 +65,11 @@ export default async function KioskLayout({ children }: { children: React.ReactN
           </ConfirmProvider>
         </ToastProvider>
       </SyncProvider>
+      {/* `unattended`: a screen on a barn wall is never reloaded by hand, so it
+          applies a new build itself once it has sat untouched for a minute.
+          Both branches carry it — a screen waiting to be paired is on the same
+          wall and needs the same treatment. */}
+      <PwaShell unattended />
     </div>
   );
 }

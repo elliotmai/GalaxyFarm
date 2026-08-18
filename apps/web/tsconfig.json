@@ -17,5 +17,10 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.mts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", ".next", "e2e"]
+  // The service worker is typechecked by `tsconfig.sw.json` instead. It runs in
+  // a worker global scope, not a window, and `lib.dom` and `lib.webworker`
+  // cannot both be loaded into one program — they declare the same names with
+  // different shapes. So the app keeps the DOM and the worker gets its own
+  // pass; `pnpm typecheck` in this package runs both.
+  "exclude": ["node_modules", ".next", "e2e", "app/sw.ts", "public/sw.js"]
 }

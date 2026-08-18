@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+
+import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
 
 /**
@@ -66,4 +69,77 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * The offline fallback the service worker serves for an uncached document.
+ *
+ * The literal, not an import: Next loads this file before any path alias
+ * exists, so `@/lib/sw-contract` cannot be reached from here. `OFFLINE_ROUTE`
+ * there is the same string, and `apps/web/tests/pwa-wiring.test.ts` fails if the
+ * two ever stop agreeing — a fallback precached at a URL the worker does not
+ * serve from would be a page nobody ever sees.
+ */
+const OFFLINE_ROUTE = "/offline";
+
+/**
+ * A fresh revision every build, on purpose.
+ *
+ * The offline page is precached by URL, and the HTML behind that URL names this
+ * build's content-hashed chunks. Pinning the revision to something stable would
+ * leave a device holding a fallback page that asks for JavaScript three deploys
+ * old, which 404s at the exact moment there is no network to recover with. A
+ * new value per build means the page is refetched whenever anything ships, and
+ * the cost of that is one small HTML document.
+ */
+const buildRevision = randomUUID();
+
+/**
+ * Serwist (spec §3), which compiles `app/sw.ts` into `public/sw.js` and hands
+ * it the manifest of everything this build emitted.
+ *
+ * Off in development. The worker's job is to serve a build from cache, and a
+ * build that changes on every keystroke is the one thing that should not be
+ * cached — a stale chunk served to a hot-reloading page presents as an app that
+ * has quietly stopped responding to edits.
+ */
+const withSerwist = withSerwistInit({
+  swSrc: "app/sw.ts",
+  swDest: "public/sw.js",
+  disable: process.env.NODE_ENV === "development",
+
+  /**
+   * Registered by `app/_components/pwa-shell.tsx` instead.
+   *
+   * Serwist's own registration script is a fine default and takes the update
+   * decision out of our hands, which is the one part of this that issue #11
+   * asks to be deliberate: a barn screen has to end up on the new build without
+   * anybody walking out to reload it, and a phone must not reload under
+   * somebody's thumb. That policy needs a component, so registration lives with
+   * it.
+   */
+  register: false,
+
+  /**
+   * Add the offline page to the manifest the plugin builds.
+   *
+   * A transform rather than `additionalPrecacheEntries`, which *replaces* the
+   * plugin's scan of `public/` — passing the offline page there would silently
+   * drop the icons and the web app manifest out of the precache, and an
+   * installed app whose icon 404s offline is a subtle way to lose exactly what
+   * this work is for.
+   */
+  manifestTransforms: [
+    (entries) => ({
+      manifest: [
+        ...entries,
+        // `size` is what the plugin adds up to report how much it precached.
+        // The page has not been rendered at this point in the build, so there
+        // is no honest number to give it; zero understates the total by one
+        // small HTML document rather than inventing one.
+        { url: OFFLINE_ROUTE, revision: buildRevision, size: 0 },
+      ],
+      warnings: [],
+    }),
+  ],
+});
+
+export default withSerwist(nextConfig);
