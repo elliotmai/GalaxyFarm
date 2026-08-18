@@ -23,7 +23,7 @@ import {
   SitterAccess,
   type SitterRow,
 } from "@/app/(admin)/admin/housesitter/_components/sitter-access";
-import { guideZonesFrom } from "@/lib/guide-composition";
+import { guideFeedingPlans, guideZonesFrom } from "@/lib/guide-composition";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -85,6 +85,7 @@ export function HousesitterScreen({
 
   const now = new Date();
   const pens = guideZonesFrom(zones, assignments, animals, now);
+  const feeding = guideFeedingPlans(plans, feeds, animals, zones, assignments, now);
   const emergency = emergencyContacts(contacts);
   const open = sitters.filter((row) => {
     const to = row.user.accessTo;
@@ -153,6 +154,7 @@ export function HousesitterScreen({
               onChoose={setChosenId}
               counts={{
                 pens: pens.length,
+                cattle_feeding: feeding.length,
                 chores: templates.filter((template) => template.active).length,
                 emergency_contacts: emergency.length,
                 vet: contacts.filter((contact) => contact.tags.includes("vet")).length,

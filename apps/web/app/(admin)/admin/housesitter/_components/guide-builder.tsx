@@ -41,6 +41,7 @@ import { useMutations } from "@/lib/local/mutations";
 
 const KIND_LABELS: Readonly<Record<GuideSectionKind, string>> = {
   pens: "Pens, who is in them, and how to handle them",
+  cattle_feeding: "Cattle feeding plans — what goes out, and how much",
   chores: "The daily and weekly routine",
   emergency_contacts: "Who to ring",
   vet: "Vet",
@@ -51,6 +52,8 @@ const KIND_LABELS: Readonly<Record<GuideSectionKind, string>> = {
 
 const KIND_HINTS: Readonly<Record<GuideSectionKind, string>> = {
   pens: "Each pen leads with its effective safety level — the higher of the pen's own and its worst occupant.",
+  cattle_feeding:
+    "Every live plan that is not one of the pets' bowls, said as a ration: who eats it, how much, and how often. Separate from the pens, because a plan can cover the whole place or follow one cow between them.",
   chores:
     "The standing rule, not one day's list. Ticking a day off happens on the sitter's own screen.",
   emergency_contacts: "Everybody tagged Emergency in Contacts.",

@@ -17,7 +17,7 @@ import {
   type Ulid,
 } from "@galaxy-farm/core";
 
-import { useSync } from "@/app/_components/sync-provider";
+import { useSyncEngine } from "@/app/_components/sync-provider";
 import { deviceId, type LocalStoreName } from "@/lib/local/store";
 
 /**
@@ -64,7 +64,7 @@ export function useMutations<T extends BaseRecord>(
   propertyId: Ulid,
   actorId: Ulid,
 ): Mutations<T> {
-  const { store: local, syncNow } = useSync();
+  const { store: local, syncNow } = useSyncEngine();
 
   const commit = useCallback(
     async (before: T | undefined, after: T, operation: OutboxOperation): Promise<void> => {

@@ -29,6 +29,18 @@ import {
 
 export const GUIDE_SECTION_KINDS = [
   "pens",
+  /**
+   * The rations, as their own section rather than a paragraph under each pen.
+   *
+   * A pen section answers "what is in here and can it hurt me"; a feeding plan
+   * answers "what do I put out, how much, and when" — and the two do not line
+   * up one-to-one. A group plan covers the whole place, a pen plan covers a
+   * pen, and an animal plan covers one cow wherever she happens to be standing
+   * this week. Folded into pens, the first would print on every pen or none,
+   * and the last would move sections the day she was shifted. So it composes
+   * separately, and a guide may carry either, both, or neither.
+   */
+  "cattle_feeding",
   "chores",
   "emergency_contacts",
   "vet",

@@ -1,10 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 import type { BaseRecord, ListQuery, Ulid } from "@galaxy-farm/core";
 
-import { useSync } from "@/app/_components/sync-provider";
+import { useSyncEngine } from "@/app/_components/sync-provider";
+import {
+  NO_RECORD,
+  NO_RECORDS,
+  queryKey,
+  recordKey,
+  recordSnapshotFor,
+  snapshotFor,
+  subscribeRecord,
+  subscribeRecords,
+  type RecordState,
+  type RecordsState,
+} from "@/lib/local/live-records";
 import type { LocalStoreName } from "@/lib/local/store";
 
 /**
@@ -15,58 +27,78 @@ import type { LocalStoreName } from "@/lib/local/store";
  * or a sync pull writing a batch — which is the property the Pen Board depends
  * on: someone moves an animal from the house, and the kiosk in the barn
  * redraws without anybody touching it.
+ *
+ * `useSyncExternalStore` rather than `useState` in an effect, because the two
+ * differ exactly where it is felt. An effect cannot run until after the first
+ * paint, so a screen whose rows were already in hand still had to render once
+ * as a skeleton and once again with its data. This reads the shared cache
+ * during the render that mounts it, so a screen you have opened before draws
+ * its rows immediately — see `live-records.ts` for what is shared and for how
+ * long.
  */
 
-export interface RecordsState<T> {
-  readonly records: readonly T[];
-  /** True until the first result arrives. Not the same as "empty". */
-  readonly loading: boolean;
-}
+export type { RecordState, RecordsState };
 
 export function useRecords<T extends BaseRecord>(
   store: LocalStoreName,
   query: Omit<ListQuery, "propertyId"> & { readonly propertyId: Ulid },
 ): RecordsState<T> {
-  const { store: local } = useSync();
-  const [records, setRecords] = useState<readonly T[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { store: local } = useSyncEngine();
+  // The key *is* the query, canonically spelled, so everything below depends on
+  // one string rather than on an object literal that is new on every render.
+  const key = queryKey(store, query);
 
-  // Serialised so an object literal passed inline does not re-subscribe on
-  // every render — which would tear down and rebuild the liveQuery each time.
-  const key = JSON.stringify(query);
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (local === undefined) return () => {};
+      return subscribeRecords(local, key, onChange);
+    },
+    [local, key],
+  );
 
-  useEffect(() => {
-    if (local === undefined) return;
+  const snapshot = useCallback(() => snapshotFor(key), [key]);
 
-    const unsubscribe = local.repository<T>(store).observe(JSON.parse(key) as ListQuery, (next) => {
-      setRecords(next);
-      setLoading(false);
-    });
-
-    return unsubscribe;
-  }, [local, store, key]);
-
-  return { records, loading };
+  // The server has no IndexedDB, so it renders what a device with nothing
+  // cached renders: loading. React uses this for the hydrating pass too, which
+  // is what keeps a warm cache from tripping a hydration mismatch.
+  return useSyncExternalStore(subscribe, snapshot, loading) as RecordsState<T>;
 }
 
 export function useRecord<T extends BaseRecord>(
   store: LocalStoreName,
   id: Ulid | undefined,
-): { readonly record: T | undefined; readonly loading: boolean } {
-  const { store: local } = useSync();
-  const [record, setRecord] = useState<T | undefined>();
-  const [loading, setLoading] = useState(true);
+): RecordState<T> {
+  const { store: local } = useSyncEngine();
+  const key = id === undefined ? undefined : recordKey(store, id);
 
-  useEffect(() => {
-    if (local === undefined || id === undefined) return;
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (local === undefined || id === undefined || key === undefined) return () => {};
+      return subscribeRecord(local, store, id, key, onChange);
+    },
+    [local, store, id, key],
+  );
 
-    const unsubscribe = local.repository<T>(store).observeById(id, (next) => {
-      setRecord(next);
-      setLoading(false);
-    });
+  const snapshot = useCallback(
+    () => (key === undefined ? oneLoading() : recordSnapshotFor(key)),
+    [key],
+  );
 
-    return unsubscribe;
-  }, [local, store, id]);
+  return useSyncExternalStore(subscribe, snapshot, oneLoading) as RecordState<T>;
+}
 
-  return { record, loading };
+/**
+ * The same two singletons the cache hands out, not fresh objects.
+ *
+ * `useSyncExternalStore` re-renders whenever the snapshot is not the reference
+ * it saw last, and it asks for one more than once per render — a literal
+ * returned from here would loop, and a second copy of the empty state would
+ * make every hydration a re-render for nothing.
+ */
+function loading(): RecordsState<BaseRecord> {
+  return NO_RECORDS;
+}
+
+function oneLoading(): RecordState<BaseRecord> {
+  return NO_RECORD;
 }
