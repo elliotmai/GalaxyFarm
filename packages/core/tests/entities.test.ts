@@ -88,6 +88,21 @@ describe("BrandingConfig — spec §5.1", () => {
     );
   });
 
+  it("treats a blank variable as absent rather than as a name", () => {
+    // `.env.example` ships `NEXT_PUBLIC_BUSINESS_NAME=""`, which is how a file
+    // that must mention every variable says "no separate business name yet".
+    // `??` disagreed — it steps past null and undefined only, so the empty
+    // string counted as an answer and put a blank where the business is named
+    // on /book, /account, agreements, and invoices.
+    expect(resolveBusinessName({ farmName: "Home Place" }, { NEXT_PUBLIC_BUSINESS_NAME: "" })).toBe(
+      "Home Place",
+    );
+    expect(resolveFarmName(undefined, { NEXT_PUBLIC_FARM_NAME: "" })).toBe(FALLBACK_FARM_NAME);
+
+    // Whitespace is the same mistake with more characters.
+    expect(resolveFarmName(undefined, { NEXT_PUBLIC_FARM_NAME: "   " })).toBe(FALLBACK_FARM_NAME);
+  });
+
   describe("resolveBranding — one config per property", () => {
     const config = (id: string, farmName: string, updatedAt: string) =>
       ({ ...base(), id: id as Ulid, farmName, updatedAt: new Date(updatedAt) }) as BrandingConfig;
