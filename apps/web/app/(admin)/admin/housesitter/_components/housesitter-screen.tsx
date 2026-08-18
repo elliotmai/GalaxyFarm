@@ -23,6 +23,7 @@ import {
   SitterAccess,
   type SitterRow,
 } from "@/app/(admin)/admin/housesitter/_components/sitter-access";
+import { useFarmName } from "@/lib/branding";
 import { guideFeedingPlans, guideZonesFrom } from "@/lib/guide-composition";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -46,12 +47,15 @@ export function HousesitterScreen({
   sitters,
   mayManagePeople,
   unavailable,
+  farmName,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
   readonly sitters: readonly SitterRow[];
   readonly mayManagePeople: boolean;
   readonly unavailable?: string | undefined;
+  /** What the server rendered the farm as; the stored name supersedes it. */
+  readonly farmName: string;
 }) {
   const query = { propertyId };
   const { records: guides, loading } = useRecords<CareGuide>("careGuides", query);
@@ -66,6 +70,10 @@ export function HousesitterScreen({
   const { records: health } = useRecords<HealthRecord>("healthRecords", query);
 
   const [chosenId, setChosenId] = useState<Ulid | undefined>();
+
+  // Read here with everything else, so the printed guide's running head and
+  // the nav above it cannot disagree about what the place is called.
+  const name = useFarmName(propertyId, farmName);
 
   const live = guides.filter((guide) => guide.active);
   /**
@@ -180,6 +188,7 @@ export function HousesitterScreen({
               plans={plans}
               feeds={feeds}
               health={health}
+              farmName={name}
             />
           ) : (
             <SitterAccess

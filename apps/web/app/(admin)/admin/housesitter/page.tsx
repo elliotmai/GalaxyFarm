@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { can } from "@galaxy-farm/core";
+import { can, FALLBACK_FARM_NAME } from "@galaxy-farm/core";
 
 import { HousesitterScreen } from "@/app/(admin)/admin/housesitter/_components/housesitter-screen";
 import type { SitterRow } from "@/app/(admin)/admin/housesitter/_components/sitter-access";
@@ -53,6 +53,15 @@ export default async function AdminHousesitterPage() {
     <HousesitterScreen
       propertyId={actor.propertyId}
       actorId={actor.id}
+      /*
+       * The first paint's farm name, exactly as the admin layout does it: the
+       * stored value lives in IndexedDB, which a server component cannot read,
+       * and `HousesitterScreen` prefers it the moment the store answers. Every
+       * sheet of the printed guide carries this name, so a placeholder that
+       * flashed and then corrected itself would be a placeholder somebody
+       * eventually prints.
+       */
+      farmName={process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME}
       sitters={sitters}
       mayManagePeople={mayManagePeople}
       {...(unavailable === undefined ? {} : { unavailable })}

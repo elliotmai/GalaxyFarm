@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
+
 import { Button, EmptyState, SafetyBadge, Section } from "@galaxy-farm/ui";
 import type {
   Animal,
@@ -41,9 +44,44 @@ import { currentMedicinesFor, feedingLinesFor } from "@/lib/pet-care";
  * cached, and there is no "regenerate" button — that button existing at all
  * would mean the document could be out of date, which is the failure §5.10 is
  * written to prevent.
+ *
+ * Two things here exist only because of paper (issue #42). The document is
+ * split into a running head and a body, which the print stylesheet turns into
+ * a table header group so the farm name and the date repeat on every sheet;
+ * and the composition is re-dated at `beforeprint`, so the date on the paper
+ * is the moment the paper was made rather than the moment the tab was opened.
  */
 
 const includes = (guide: CareGuide, kind: GuideSectionKind) => guide.includes.includes(kind);
+
+/**
+ * The instant the document is dated, refreshed the moment somebody prints.
+ *
+ * A guide recomposes on every render, so a tab left open on the kitchen laptop
+ * overnight is already showing this morning's facts — but it was dated
+ * yesterday, and paper carries the date it was given. `beforeprint` fires for
+ * the browser's own Ctrl+P as well as for our button, which is why the button
+ * needs nothing: both routes go through here.
+ *
+ * `flushSync`, because this is a DOM event rather than a React one. An ordinary
+ * `setState` here schedules a render that lands after the browser has already
+ * taken its snapshot of the page, which is a date that is right on screen and
+ * a day stale on the sheet — the worst of the three possibilities.
+ */
+function usePrintedAt(): Date {
+  const [printedAt, setPrintedAt] = useState(() => new Date());
+
+  useEffect(() => {
+    const restamp = () => {
+      flushSync(() => setPrintedAt(new Date()));
+    };
+
+    globalThis.window?.addEventListener("beforeprint", restamp);
+    return () => globalThis.window?.removeEventListener("beforeprint", restamp);
+  }, []);
+
+  return printedAt;
+}
 
 export function GuidePreview({
   guide,
@@ -56,6 +94,7 @@ export function GuidePreview({
   plans,
   feeds,
   health,
+  farmName,
 }: {
   readonly guide: CareGuide | undefined;
   readonly sections: readonly GuideSection[];
@@ -67,7 +106,11 @@ export function GuidePreview({
   readonly plans: readonly FeedingPlan[];
   readonly feeds: readonly FeedType[];
   readonly health: readonly HealthRecord[];
+  /** What this place is called (§5.1). It goes at the head of every sheet. */
+  readonly farmName: string;
 }) {
+  const now = usePrintedAt();
+
   if (guide === undefined) {
     return (
       <EmptyState
@@ -77,7 +120,6 @@ export function GuidePreview({
     );
   }
 
-  const now = new Date();
   const composed = composeGuide(
     guide,
     includes(guide, "pens") ? guideZonesFrom(zones, assignments, animals, now) : [],
@@ -119,201 +161,306 @@ export function GuidePreview({
           </Button>
         }
       >
-        <article data-print="guide" className="flex flex-col gap-6 rounded-density bg-panel p-6">
-          <header className="flex flex-col gap-2 border-b border-edge pb-4">
-            <h2 className="text-ink">{composed.title}</h2>
-            <p className="text-sm text-muted">
-              Composed {printed}. Everything below is read from the farm&rsquo;s own records — if
-              something changed this morning, this says so.
-            </p>
-            {composed.intro === undefined ? null : (
-              <p className="whitespace-pre-wrap text-density text-ink">{composed.intro}</p>
-            )}
-          </header>
+        <article data-print="guide" className="rounded-density bg-panel p-6">
+          {/*
+            A table, and a real one.
 
-          {dangerous.length === 0 ? null : (
-            <section className="rounded-density border-2 border-danger p-4">
-              <h3 className="text-danger">Do not handle these alone</h3>
-              <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-density text-ink">
-                {dangerous.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            </section>
-          )}
+            The farm name and the date have to be on every sheet, and a table
+            head is the only thing browsers repeat across pages — `@page`
+            margin boxes are the specified way and nothing implements them.
+            Chromium was measured on both: a `<thead>` repeated on all ten
+            pages of a test document, and a `div` given
+            `display: table-header-group` appeared on page one and never again.
+            So the markup is the table rather than the stylesheet pretending to
+            be one.
 
-          {emergency.length === 0 ? null : (
-            <section>
-              <h3 className="text-ink">Who to ring</h3>
-              <ul className="mt-2 flex flex-col gap-1 text-density text-ink">
-                {emergency.map((person) => (
-                  <li key={person.id}>
-                    <strong>{person.name}</strong>
-                    {person.company === undefined ? null : (
-                      <span className="text-muted"> · {person.company}</span>
-                    )}{" "}
-                    — {person.phone ?? <span className="text-danger">no number on file</span>}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+            `role="presentation"` because this is a table of one cell holding a
+            document, not a table of data — nobody should be told they are in a
+            grid. On screen the print stylesheet has it and its rows back to
+            plain blocks, so the layout is exactly what it was.
+          */}
+          <table data-print-part="sheet" role="presentation">
+            <thead data-print-part="running">
+              <tr>
+                <td>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-edge pb-2 text-sm text-muted">
+                    <span>
+                      {farmName} &middot; {composed.title}
+                    </span>
+                    <span>Printed {printed}</span>
+                  </div>
+                </td>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {/*
+                  The cell carries no layout of its own. Screen and print
+                  disagree about what `display` a cell has, so the flex column
+                  the document is laid out in lives one element in, where
+                  neither stylesheet has an opinion about it.
+                */}
+                <td data-print-part="body">
+                  <div className="flex flex-col gap-6">
+                    <header className="flex flex-col gap-2 border-b border-edge pb-4">
+                      <h2 className="text-ink">{composed.title}</h2>
+                      <p className="text-sm text-muted">
+                        Composed {printed}. Everything below is read from the farm&rsquo;s own
+                        records — if something changed this morning, this says so.
+                      </p>
+                      {composed.intro === undefined ? null : (
+                        <p className="whitespace-pre-wrap text-density text-ink">
+                          {composed.intro}
+                        </p>
+                      )}
+                    </header>
 
-          {vets.length === 0 ? null : (
-            <section>
-              <h3 className="text-ink">Vet</h3>
-              <ul className="mt-2 flex flex-col gap-1 text-density text-ink">
-                {vets.map((person) => (
-                  <li key={person.id}>
-                    <strong>{person.name}</strong>
-                    {person.company === undefined ? null : (
-                      <span className="text-muted"> · {person.company}</span>
-                    )}{" "}
-                    — {person.phone ?? "no number on file"}
-                    {person.note === undefined ? null : (
-                      <span className="text-muted"> · {person.note}</span>
+                    {dangerous.length === 0 ? null : (
+                      <section className="rounded-density border-2 border-danger p-4">
+                        <h3 className="text-danger">Do not handle these alone</h3>
+                        <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-density text-ink">
+                          {dangerous.map((line) => (
+                            <li key={line}>{line}</li>
+                          ))}
+                        </ul>
+                      </section>
                     )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
 
-          {composed.pens.length === 0 ? null : (
-            <section className="flex flex-col gap-4">
-              <h3 className="text-ink">Pens</h3>
-              {composed.pens.map((pen) => (
-                <div key={pen.zoneId} className="flex flex-col gap-2 border-l-2 border-edge pl-4">
-                  <h4 className="flex flex-wrap items-center gap-2 text-ink">
-                    <SafetyBadge level={pen.effectiveLevel} showLabel size="compact" />
-                    {pen.zoneName}
-                  </h4>
+                    {emergency.length === 0 ? null : (
+                      <section>
+                        <h3 className="text-ink">Who to ring</h3>
+                        <ul className="mt-2 flex flex-col gap-1 text-density text-ink">
+                          {emergency.map((person) => (
+                            <li key={person.id}>
+                              <strong>{person.name}</strong>
+                              {person.company === undefined ? null : (
+                                <span className="text-muted"> · {person.company}</span>
+                              )}{" "}
+                              —{" "}
+                              {person.phone ?? (
+                                <span className="text-danger">no number on file</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
 
-                  {pen.animals.length === 0 ? (
-                    <p className="text-sm text-muted">Empty at the moment.</p>
-                  ) : (
-                    <ul className="flex flex-col gap-1 text-density text-ink">
-                      {pen.animals.map((animal) => (
-                        <li key={animal.id}>
-                          {animal.name}
-                          {animal.safetyNotes === undefined ? null : (
-                            <span className="text-muted"> — {animal.safetyNotes}</span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                    {vets.length === 0 ? null : (
+                      <section>
+                        <h3 className="text-ink">Vet</h3>
+                        <ul className="mt-2 flex flex-col gap-1 text-density text-ink">
+                          {vets.map((person) => (
+                            <li key={person.id}>
+                              <strong>{person.name}</strong>
+                              {person.company === undefined ? null : (
+                                <span className="text-muted"> · {person.company}</span>
+                              )}{" "}
+                              — {person.phone ?? "no number on file"}
+                              {person.note === undefined ? null : (
+                                <span className="text-muted"> · {person.note}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
 
-                  {pen.instructions.length === 0 ? null : (
-                    <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink">
-                      {pen.instructions.map((instruction, index) => (
-                        <li key={`${instruction.sourceId}-${index}`}>
-                          {instruction.text}{" "}
-                          <span className="text-muted">
-                            ({instruction.source === "zone" ? "this pen" : instruction.sourceName})
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
-            </section>
-          )}
+                    {composed.pens.length === 0 ? null : (
+                      <section className="flex flex-col gap-4">
+                        <h3 className="text-ink">Pens</h3>
+                        {/*
+                        Each pen is a table too, and for the reason the whole
+                        document is one: a pen with the herd in it is longer
+                        than a sheet of paper, and `break-inside: avoid` can
+                        only be honoured by a box that fits. When one spills,
+                        the head goes on the continuation page — so somebody
+                        who picks up sheet five reads "5 · Do not handle ·
+                        North Trap" above the names, instead of a list of
+                        animals with nothing to say how to approach them.
+                      */}
+                        {composed.pens.map((pen) => (
+                          <table key={pen.zoneId} data-print-part="sheet" role="presentation">
+                            <thead>
+                              <tr>
+                                {/*
+                                  The pen's left rule is drawn by what is in the
+                                  cells rather than by the table, because a
+                                  table's own border and padding answer to
+                                  `border-collapse` and go missing on paper.
+                                  Two stacked blocks sharing a left edge read as
+                                  one rule down the whole pen.
+                                */}
+                                <td>
+                                  <h4 className="flex flex-wrap items-center gap-2 border-l-2 border-edge pb-2 pl-4 text-ink">
+                                    <SafetyBadge
+                                      level={pen.effectiveLevel}
+                                      showLabel
+                                      size="compact"
+                                    />
+                                    {pen.zoneName}
+                                  </h4>
+                                </td>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td>
+                                  <div className="flex flex-col gap-2 border-l-2 border-edge pl-4">
+                                    {pen.animals.length === 0 ? (
+                                      <p className="text-sm text-muted">Empty at the moment.</p>
+                                    ) : (
+                                      <ul className="flex flex-col gap-1 text-density text-ink">
+                                        {pen.animals.map((animal) => (
+                                          <li key={animal.id}>
+                                            {animal.name}
+                                            {animal.safetyNotes === undefined ? null : (
+                                              <span className="text-muted">
+                                                {" "}
+                                                — {animal.safetyNotes}
+                                              </span>
+                                            )}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
 
-          {feeding.length === 0 ? null : (
-            <section className="flex flex-col gap-3">
-              <h3 className="text-ink">Feeding the cattle</h3>
-              {feeding.map((plan) => (
-                <div key={plan.id} className="flex flex-col gap-1 border-l-2 border-edge pl-4">
-                  <h4 className="text-ink">
-                    {plan.who}
-                    <span className="font-body text-sm font-normal text-muted"> · {plan.name}</span>
-                  </h4>
-                  {plan.portion === undefined ? null : (
-                    <p className="text-sm text-muted">{plan.portion}</p>
-                  )}
-                  <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink">
-                    {plan.lines.map((line, index) => (
-                      <li key={`${plan.id}-${index}`}>{line}</li>
+                                    {pen.instructions.length === 0 ? null : (
+                                      <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink">
+                                        {pen.instructions.map((instruction, index) => (
+                                          <li key={`${instruction.sourceId}-${index}`}>
+                                            {instruction.text}{" "}
+                                            <span className="text-muted">
+                                              (
+                                              {instruction.source === "zone"
+                                                ? "this pen"
+                                                : instruction.sourceName}
+                                              )
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        ))}
+                      </section>
+                    )}
+
+                    {feeding.length === 0 ? null : (
+                      <section className="flex flex-col gap-3">
+                        <h3 className="text-ink">Feeding the cattle</h3>
+                        {feeding.map((plan) => (
+                          <div
+                            key={plan.id}
+                            className="flex flex-col gap-1 border-l-2 border-edge pl-4"
+                          >
+                            <h4 className="text-ink">
+                              {plan.who}
+                              <span className="font-body text-sm font-normal text-muted">
+                                {" "}
+                                · {plan.name}
+                              </span>
+                            </h4>
+                            {plan.portion === undefined ? null : (
+                              <p className="text-sm text-muted">{plan.portion}</p>
+                            )}
+                            <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink">
+                              {plan.lines.map((line, index) => (
+                                <li key={`${plan.id}-${index}`}>{line}</li>
+                              ))}
+                            </ul>
+                            {plan.notes === undefined ? null : (
+                              <p className="whitespace-pre-wrap text-sm text-ink">{plan.notes}</p>
+                            )}
+                          </div>
+                        ))}
+                      </section>
+                    )}
+
+                    {pets.length === 0 ? null : (
+                      <section className="flex flex-col gap-3">
+                        <h3 className="text-ink">The dogs and cats</h3>
+                        {pets.map((pet) => (
+                          <div
+                            key={pet.animalId}
+                            className="flex flex-col gap-1 border-l-2 border-edge pl-4"
+                          >
+                            <h4 className="flex flex-wrap items-center gap-2 text-ink">
+                              <SafetyBadge level={pet.safetyLevel} showLabel size="compact" />
+                              {pet.name}
+                              <span className="font-body text-sm font-normal text-muted">
+                                {pet.species}
+                              </span>
+                            </h4>
+                            {pet.safetyNotes === undefined ? null : (
+                              <p className="text-sm text-ink">{pet.safetyNotes}</p>
+                            )}
+                            {pet.instructions === undefined ? null : (
+                              <p className="whitespace-pre-wrap text-sm text-ink">
+                                {pet.instructions}
+                              </p>
+                            )}
+                            {pet.feeding.length === 0 ? (
+                              <p className="text-sm text-danger">
+                                No ration written down — ask before feeding.
+                              </p>
+                            ) : (
+                              <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink">
+                                {pet.feeding.map((line) => (
+                                  <li key={line}>{line}</li>
+                                ))}
+                              </ul>
+                            )}
+                            {pet.medicines.length === 0 ? null : (
+                              <p className="text-sm text-ink">
+                                <strong>On now:</strong> {pet.medicines.join("; ")}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </section>
+                    )}
+
+                    {chores.length === 0 ? null : (
+                      <section>
+                        <h3 className="text-ink">The routine</h3>
+                        <ul className="mt-2 flex flex-col gap-1 text-density text-ink">
+                          {chores.map((chore) => (
+                            <li key={chore.id}>
+                              <strong>{chore.when}</strong> — {chore.title}
+                              {chore.zoneName === undefined ? null : (
+                                <span className="text-muted"> ({chore.zoneName})</span>
+                              )}
+                              {chore.detail === undefined ? null : (
+                                <span className="text-muted"> · {chore.detail}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+
+                    {composed.custom.map((section) => (
+                      <section key={section.id}>
+                        <h3 className="text-ink">{section.title}</h3>
+                        <p className="mt-2 whitespace-pre-wrap text-density text-ink">
+                          {section.bodyMarkdown}
+                        </p>
+                      </section>
                     ))}
-                  </ul>
-                  {plan.notes === undefined ? null : (
-                    <p className="whitespace-pre-wrap text-sm text-ink">{plan.notes}</p>
-                  )}
-                </div>
-              ))}
-            </section>
-          )}
 
-          {pets.length === 0 ? null : (
-            <section className="flex flex-col gap-3">
-              <h3 className="text-ink">The dogs and cats</h3>
-              {pets.map((pet) => (
-                <div key={pet.animalId} className="flex flex-col gap-1 border-l-2 border-edge pl-4">
-                  <h4 className="flex flex-wrap items-center gap-2 text-ink">
-                    <SafetyBadge level={pet.safetyLevel} showLabel size="compact" />
-                    {pet.name}
-                    <span className="font-body text-sm font-normal text-muted">{pet.species}</span>
-                  </h4>
-                  {pet.safetyNotes === undefined ? null : (
-                    <p className="text-sm text-ink">{pet.safetyNotes}</p>
-                  )}
-                  {pet.instructions === undefined ? null : (
-                    <p className="whitespace-pre-wrap text-sm text-ink">{pet.instructions}</p>
-                  )}
-                  {pet.feeding.length === 0 ? (
-                    <p className="text-sm text-danger">
-                      No ration written down — ask before feeding.
-                    </p>
-                  ) : (
-                    <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink">
-                      {pet.feeding.map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {pet.medicines.length === 0 ? null : (
-                    <p className="text-sm text-ink">
-                      <strong>On now:</strong> {pet.medicines.join("; ")}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </section>
-          )}
-
-          {chores.length === 0 ? null : (
-            <section>
-              <h3 className="text-ink">The routine</h3>
-              <ul className="mt-2 flex flex-col gap-1 text-density text-ink">
-                {chores.map((chore) => (
-                  <li key={chore.id}>
-                    <strong>{chore.when}</strong> — {chore.title}
-                    {chore.zoneName === undefined ? null : (
-                      <span className="text-muted"> ({chore.zoneName})</span>
-                    )}
-                    {chore.detail === undefined ? null : (
-                      <span className="text-muted"> · {chore.detail}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {composed.custom.map((section) => (
-            <section key={section.id}>
-              <h3 className="text-ink">{section.title}</h3>
-              <p className="mt-2 whitespace-pre-wrap text-density text-ink">
-                {section.bodyMarkdown}
-              </p>
-            </section>
-          ))}
-
-          <footer className="border-t border-edge pt-4 text-sm text-muted">
-            Anything not covered here, ring the numbers above rather than guessing.
-          </footer>
+                    <footer className="border-t border-edge pt-4 text-sm text-muted">
+                      Anything not covered here, ring the numbers above rather than guessing.
+                    </footer>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </article>
       </Section>
     </div>

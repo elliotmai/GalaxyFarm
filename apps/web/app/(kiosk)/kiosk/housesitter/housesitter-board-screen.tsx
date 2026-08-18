@@ -16,12 +16,14 @@ import {
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
+import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
 import type { CareGuide, GuideSection } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 
 import { GuidePreview } from "@/app/(admin)/admin/housesitter/_components/guide-preview";
 import { useSyncEngine } from "@/app/_components/sync-provider";
+import { useFarmName } from "@/lib/branding";
 import { guideForSitter } from "@/lib/care-guide-selection";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -46,6 +48,14 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
     [store.tasks, store.templates, now],
   );
   const progress = choreProgress(today);
+  /*
+   * The kiosk has no server-rendered name to fall back to — the board is
+   * client-side from its first paint — so the neutral default stands for the
+   * moment it takes Dexie to open. A barn screen is not printed from anyway;
+   * the name is here because the document is one document on all three
+   * surfaces, and one of them puts it at the head of every sheet.
+   */
+  const farmName = useFarmName(propertyId, FALLBACK_FARM_NAME);
 
   return (
     <PageBody>
@@ -80,6 +90,7 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
             plans={store.plans}
             feeds={store.feeds}
             health={store.health}
+            farmName={farmName}
           />
         </div>
       )}
