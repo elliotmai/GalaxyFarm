@@ -260,7 +260,12 @@ describe("beds as shapes", () => {
     const [drawn] = bedShapes([noted], [], VARIETIES, CROPS, ORIGIN, NOW);
 
     expect(drawn?.sublabel).toBe("8′ × 4′");
-    expect(drawn?.instructions).toBe("Heavy clay, amended twice.");
+    // An attributed line rather than a bare string, since #19 made the editor
+    // take instructions as lines that each name their source. A bed's note
+    // comes from the bed, so it is a list of one that still says so.
+    expect(drawn?.instructions).toEqual([
+      { from: "North bed", text: "Heavy clay, amended twice." },
+    ]);
     expect(drawn?.boundary).toHaveLength(4);
   });
 });
