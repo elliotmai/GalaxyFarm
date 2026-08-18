@@ -12,4 +12,5 @@ export * from "./primitives/index.js";
 export * from "./tokens/contrast.js";
 export * from "./safety/safety-badge.js";
 export * from "./halter/halter-swatch.js";
+export * from "./spatial-editor/index.js";
 export * from "./brand/logomark.js";

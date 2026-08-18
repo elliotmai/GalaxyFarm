@@ -188,7 +188,7 @@ The §4.5 guards are convention checks over source text, not type-level proofs. 
 ### Built
 
 - **`packages/core`** — the shared kernel. `Result`, ULIDs, value objects (safety levels, unit-tagged quantities, integer-cent money, date ranges), eleven entities each with a Zod schema, domain events, ports, and the §4.5 contracts. Plus `makeCrudUseCases`, so every entity gets its five operations from one tested implementation rather than a hand-rolled copy per module.
-- **`packages/ui`** — the confirmation primitive every destructive action routes through, in all three tiers. Nothing else of the design system yet.
+- **`packages/ui`** — the confirmation primitive every destructive action routes through, in all three tiers, and the **`SpatialEditor`**: one component with two palettes (§2), drawing rings of ground over a background that is Google's satellite layer online and an owned NAIP image offline. It knows nothing about pens or animals — a caller flattens what it has, the same pattern the pedigree chart uses.
 - **`packages/infrastructure/sync`** — field-level patches, last-write-wins per field with an audit trail, an outbox with capped exponential backoff, per-entity cursors, and the engine that drives push and pull against a transport port.
 - **`packages/infrastructure/local`** — the IndexedDB store, a device-persisted outbox that survives the app being killed, and live queries so a barn kiosk redraws when someone moves an animal from the house.
 - **`packages/infrastructure/db`** — the Drizzle schema and migrations, the Postgres repository, and the server side of sync. Verified against real PostgreSQL 18 in CI via PGlite. No extensions, integer cents, timezone-aware timestamps throughout.
@@ -209,7 +209,7 @@ One repository contract is shared by all three implementations — in-memory, In
 
 1. **The design system** (#3) — nothing can be looked at until the components that consume the §8 tokens exist.
 2. **Auth.js and roles** (#7), which is also what unblocks the two sync routes.
-3. **Property, Zones, and the SpatialEditor** (#8), against the real nine-zone layout in `docs/property-layout.md`.
+3. **Source the property's NAIP aerial** — the last piece of #8. The editor renders a cached georeferenced image and `/admin/settings` takes its key and extent; nobody has downloaded the tile from EarthExplorer, reprojected it, or put it in R2, so the map still needs the network.
 4. Then Phase 1 cattle — the cow is already bred, so that phase races a real due date.
 
 Raise the coverage thresholds in `vitest.config.ts` as the domain packages fill in. Never lower them to make a red build green.

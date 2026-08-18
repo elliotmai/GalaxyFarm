@@ -60,6 +60,18 @@ export const properties = pgTable(
     safetyLevelLabels: jsonb("safety_level_labels").$type<Record<string, string>>(),
     /** §6 thresholds, per-trigger opt-out and lead time. Merged over defaults. */
     watchSettings: jsonb("watch_settings").$type<Record<string, unknown>>(),
+    /**
+     * The ground the cached aerial covers — an image without one cannot be
+     * placed. Declared last because it was added last: the column order here
+     * mirrors the migrations, which is what a database three migrations behind
+     * reports its missing columns in.
+     */
+    offlineImageryBounds: jsonb("offline_imagery_bounds").$type<{
+      south: number;
+      west: number;
+      north: number;
+      east: number;
+    }>(),
   },
   baseIndexes("properties"),
 );

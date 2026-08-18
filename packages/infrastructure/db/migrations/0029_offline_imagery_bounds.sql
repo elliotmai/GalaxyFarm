@@ -1,0 +1,17 @@
+-- Where the cached aerial actually is.
+--
+-- `offline_imagery_key` has been on this table since the beginning with
+-- nothing behind it, and a key on its own turns out not to be enough to draw
+-- anything: an aerial photograph without its extent is a picture, not a map.
+-- Nothing in the pixels says which ground they cover, so the offline
+-- background — a USDA NAIP snapshot of the place, kept in R2 because Google's
+-- terms do not permit storing its tiles (§8) — needs the rectangle it spans
+-- stored beside it.
+--
+-- One jsonb column rather than four doubles. The four numbers are meaningless
+-- apart and always written together, and half a georeference is worse than
+-- none: it would place the image somewhere plausible-looking and wrong.
+--
+-- Nullable, and null is the ordinary state — a farm that has not sourced its
+-- imagery yet has a map that works online and says why it does not offline.
+ALTER TABLE "properties" ADD COLUMN "offline_imagery_bounds" jsonb;
