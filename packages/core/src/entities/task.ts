@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { addCalendarDays, dayKey, endOfDay, startOfDay } from "../value-objects/date-range.js";
 import { ulidSchema, type Ulid } from "../types/ids.js";
+import { projectedId, type CalendarEntry } from "./calendar-event.js";
 import { baseRecordSchema, type BaseRecord } from "./record.js";
 
 /**
@@ -290,4 +291,62 @@ export function choreProgress(entries: readonly ChoreEntry[]): ChoreProgress {
     overdue: entries.filter((entry) => entry.overdue).length,
     fraction: entries.length === 0 ? 0 : done / entries.length,
   };
+}
+
+/**
+ * Chores on the unified calendar (spec §6).
+ *
+ * §6 lists chores among the calendar's projected rows, and they are the one
+ * kind core contributes itself — `Task` and `ChoreTemplate` are declared in
+ * this file, so nothing about this crosses a module boundary.
+ *
+ * Built by walking `choreDaySheet` a day at a time rather than by projecting
+ * templates directly, so the calendar and the day sheet cannot disagree: a
+ * template occurrence that has been ticked shows as the stored row on both,
+ * and a template that fires on no day appears on neither.
+ *
+ * The dedupe is not defensive tidying. `choreDaySheet` deliberately carries an
+ * un-ticked written-down chore forward on to every day after its due date,
+ * which is right for a day sheet and wrong for a calendar — a fortnight-old
+ * chore would otherwise paint itself across the whole month. Keeping the first
+ * sighting puts it back on the day it was actually due.
+ */
+export function choreCalendarEntries(
+  input: ChoreDayInput,
+  from: Date,
+  days: number,
+  now: Date,
+): CalendarEntry[] {
+  const seen = new Map<string, CalendarEntry>();
+
+  for (let offset = 0; offset < days; offset++) {
+    const date = addCalendarDays(from, offset);
+
+    for (const entry of choreDaySheet(input, date, now)) {
+      const id =
+        entry.taskId === undefined
+          ? `${projectedId("chore", "choreTemplates", entry.templateId as Ulid)}:${dayKey(entry.dueAt)}`
+          : projectedId("chore", "tasks", entry.taskId);
+      if (seen.has(id)) continue;
+
+      seen.set(id, {
+        id,
+        kind: "chore",
+        module: "chores",
+        title: entry.title,
+        detail: entry.detail,
+        at: entry.dueAt,
+        // A template says which day, never which hour, and a written-down
+        // chore is due at the end of its day for the same reason. Rendering
+        // either at 11:59pm would file the morning round under bedtime.
+        allDay: true,
+        source:
+          entry.taskId === undefined
+            ? { entity: "choreTemplates", id: entry.templateId as Ulid }
+            : { entity: "tasks", id: entry.taskId },
+      });
+    }
+  }
+
+  return [...seen.values()];
 }
