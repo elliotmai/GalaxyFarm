@@ -302,6 +302,37 @@ export function descendantsOf(zones: readonly Zone[], parentId: Ulid): Zone[] {
 }
 
 /**
+ * The groups this zone sits in, nearest first.
+ *
+ * The other direction of `descendantsOf`, and the one anything *derived for an
+ * animal* needs: a cow standing in Pen 1 is also standing in North, and an
+ * instruction written on North is written about her. `parentZoneId` is the
+ * grouping (§5.1 v1.5) — a zone with none is its own group — so walking up it
+ * is what turns "the pen she is in" into "everything she is inside of".
+ *
+ * Guarded with a seen-set for the same reason the walk down is: nothing in
+ * `canContain` permits a loop, but a bad import or a hand-edited row is what
+ * this would land on, and a page that hangs is worse than a page that is
+ * wrong.
+ */
+export function ancestorsOf(zones: readonly Zone[], zoneId: Ulid): Zone[] {
+  const byId = new Map(zones.map((zone) => [zone.id, zone]));
+  const found: Zone[] = [];
+  const seen = new Set<Ulid>([zoneId]);
+
+  let next = byId.get(zoneId)?.parentZoneId;
+  while (next !== undefined && !seen.has(next)) {
+    seen.add(next);
+    const parent = byId.get(next);
+    if (parent === undefined) break;
+    found.push(parent);
+    next = parent.parentZoneId;
+  }
+
+  return found;
+}
+
+/**
  * The groups a zone could be put in.
  *
  * Filtered three ways, and each one is a mistake somebody would otherwise

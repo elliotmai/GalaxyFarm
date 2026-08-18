@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ancestorsOf,
   canContain,
   childrenOf,
   descendantsOf,
@@ -168,6 +169,38 @@ describe("childrenOf and descendantsOf", () => {
     const looped = [{ ...a, parentZoneId: b.id } as Zone, b];
 
     expect(descendantsOf(looped, looped[0]!.id).map((z) => z.name)).toEqual(["B"]);
+  });
+});
+
+describe("ancestorsOf", () => {
+  const north = zone("North", "area");
+  const barn = zone("Red Barn", "barn", north.id);
+  const stall = zone("Stall 1", "stall", barn.id);
+  const loose = zone("Randy's pasture", "pasture");
+  const zones = [north, barn, stall, loose];
+
+  it("walks up the whole way, nearest group first", () => {
+    // The order a helper reads down: the barn she is in before the end of the
+    // place the barn is on.
+    expect(ancestorsOf(zones, stall.id).map((z) => z.name)).toEqual(["Red Barn", "North"]);
+  });
+
+  it("says a zone with no parent is inside nothing, because it is its own group", () => {
+    expect(ancestorsOf(zones, loose.id)).toEqual([]);
+  });
+
+  it("stops where the chain does when a parent is not among the zones given", () => {
+    // A screen filtering off-site zones out is the ordinary way this happens.
+    // Half a chain is right; an exception in the middle of the Pen Board is not.
+    expect(ancestorsOf([stall, barn], stall.id).map((z) => z.name)).toEqual(["Red Barn"]);
+  });
+
+  it("terminates on a cycle rather than hanging", () => {
+    const a = zone("A", "area");
+    const b = zone("B", "barn", a.id);
+    const looped = [{ ...a, parentZoneId: b.id } as Zone, b];
+
+    expect(ancestorsOf(looped, b.id).map((z) => z.name)).toEqual(["A"]);
   });
 });
 

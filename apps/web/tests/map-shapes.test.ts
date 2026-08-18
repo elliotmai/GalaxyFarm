@@ -5,12 +5,17 @@ import type { Animal, GeoPoint, Ulid, Zone, ZoneAssignment } from "@galaxy-farm/
 import { animalChips, zoneShapes } from "@/lib/map-shapes";
 
 /**
- * The farm, flattened for the spatial editor (issue #8).
+ * The farm, flattened for the spatial editor (issues #8, #19).
  *
- * Three decisions are worth pinning down here, because each is invisible on
+ * Four decisions are worth pinning down here, because each is invisible on
  * screen when it goes wrong: which zone a cow is *drawn* in when she is in
- * two, whose safety level a pen's border carries, and which ground can be
- * dropped on at all.
+ * two, whose safety level a pen's border carries, which ground can be dropped
+ * on at all, and which instructions a helper is shown when they tap her.
+ *
+ * The last is the one to test hardest. §5.1's effective instructions are her
+ * own plus every pen she is in plus the groups above them, and a merge that
+ * drops a level is indistinguishable on screen from a level with nothing in
+ * it — the person reading is in a barn with no way to ask.
  */
 
 const NOW = new Date("2026-06-15T12:00:00Z");
@@ -229,7 +234,10 @@ describe("animalChips", () => {
     expect(chips.map((chip) => chip.label)).toEqual(["Ranger"]);
   });
 
-  it("carries her own safety level and her own words", () => {
+  it("carries her own safety level, and why she is that level", () => {
+    // The reason sits beside the level rather than in among the instructions:
+    // "kicks when cornered" is a warning, not a chore, and a warning read
+    // fourth is a warning read too late.
     const cow = animal({
       id: id(25),
       name: "Dolly",
@@ -243,6 +251,197 @@ describe("animalChips", () => {
 
     expect(chip?.label).toBe("Dolly (17)");
     expect(chip?.rank).toBe(4);
-    expect(chip?.instructions).toBe("Kicks when cornered.\n\nHand feed only.");
+    expect(chip?.rankNote).toBe("Kicks when cornered.");
+    expect(chip?.instructions).toEqual([{ from: "Dolly (17)", text: "Hand feed only." }]);
+  });
+});
+
+/**
+ * §5.1: "any animal's effective instructions = its own instructions + its
+ * current zone's instructions + any group instructions, displayed merged".
+ *
+ * The reason #19 asks for this at all is that a helper reading a pen needs one
+ * answer rather than three panels to reconcile. Every case below is a way of
+ * ending up with two.
+ */
+describe("merged care instructions", () => {
+  const NORTH = zone({ id: id(30), name: "North", type: "area" });
+  const PEN = zone({
+    id: id(31),
+    name: "Pen B",
+    parentZoneId: NORTH.id,
+    customInstructions: "Latch sticks. Lift, then pull.",
+  });
+  const STALL = zone({
+    id: id(32),
+    name: "Stall 3",
+    type: "stall",
+    indoor: true,
+    parentZoneId: NORTH.id,
+    customInstructions: "Fan on above 85.",
+  });
+
+  const lines = (chip: { instructions?: readonly { from: string; text: string }[] } | undefined) =>
+    (chip?.instructions ?? []).map((line) => `${line.from}: ${line.text}`);
+
+  const ANDROMEDA = animal({
+    id: id(33),
+    name: "Andromeda",
+    customInstructions: "No grain — she founders.",
+  });
+
+  it("merges her own, her pen's, and the group the pen sits in, in that order", () => {
+    // Most specific first, because her own note is the exception — and an
+    // exception under three paragraphs of pen routine is one nobody reads.
+    const north = { ...NORTH, customInstructions: "Road gate stays chained." } as Zone;
+    const [chip] = animalChips([north, PEN], [ANDROMEDA], [assignment(ANDROMEDA.id, PEN.id)], NOW);
+
+    expect(lines(chip)).toEqual([
+      "Andromeda: No grain — she founders.",
+      "Pen B: Latch sticks. Lift, then pull.",
+      "North: Road gate stays chained.",
+    ]);
+  });
+
+  it("reads both pens for a calf held inside and outside at once", () => {
+    // She is drawn on the ground she is on; she is read as being under both
+    // sets of rules, because she is. Half of them is worse than none.
+    const [chip] = animalChips(
+      [NORTH, PEN, STALL],
+      [ANDROMEDA],
+      [assignment(ANDROMEDA.id, STALL.id, { slot: "inside" }), assignment(ANDROMEDA.id, PEN.id)],
+      NOW,
+    );
+
+    expect(chip?.shapeId).toBe(PEN.id);
+    expect(lines(chip)).toEqual([
+      "Andromeda: No grain — she founders.",
+      "Pen B: Latch sticks. Lift, then pull.",
+      "Stall 3: Fan on above 85.",
+    ]);
+  });
+
+  it("states a group once when both her pens sit in it", () => {
+    const north = { ...NORTH, customInstructions: "Road gate stays chained." } as Zone;
+    const [chip] = animalChips(
+      [north, PEN, STALL],
+      [ANDROMEDA],
+      [assignment(ANDROMEDA.id, STALL.id, { slot: "inside" }), assignment(ANDROMEDA.id, PEN.id)],
+      NOW,
+    );
+
+    expect(lines(chip).filter((line) => line.startsWith("North:"))).toHaveLength(1);
+  });
+
+  it("walks the whole way up — a stall is in a barn, and the barn is in an area", () => {
+    const north = { ...NORTH, customInstructions: "Road gate stays chained." } as Zone;
+    const barn = zone({
+      id: id(34),
+      name: "Red Barn",
+      type: "barn",
+      indoor: true,
+      parentZoneId: north.id,
+      customInstructions: "Lights off at the door.",
+    });
+    const stall = { ...STALL, parentZoneId: barn.id } as Zone;
+
+    const [chip] = animalChips(
+      [north, barn, stall],
+      [ANDROMEDA],
+      [assignment(ANDROMEDA.id, stall.id, { slot: "inside" })],
+      NOW,
+    );
+
+    expect(lines(chip)).toEqual([
+      "Andromeda: No grain — she founders.",
+      "Stall 3: Fan on above 85.",
+      "Red Barn: Lights off at the door.",
+      "North: Road gate stays chained.",
+    ]);
+  });
+
+  it("says nothing at all when no level has anything to say", () => {
+    // An empty list, not an empty line: the editor says "no instructions
+    // recorded" rather than drawing a blank row somebody reads as missing.
+    const quiet = animal({ id: id(35), name: "Quiet" });
+    const [chip] = animalChips([NORTH, PEN], [quiet], [assignment(quiet.id, PEN.id)], NOW);
+
+    expect(lines(chip)).toEqual(["Pen B: Latch sticks. Lift, then pull."]);
+
+    const bare = zone({ id: id(36), name: "West Pen" });
+    const [alone] = animalChips([bare], [quiet], [assignment(quiet.id, bare.id)], NOW);
+    expect(alone?.instructions).toEqual([]);
+  });
+
+  it("keeps a blank instruction out rather than rendering it as an empty line", () => {
+    const blank = animal({ id: id(37), name: "Blank", customInstructions: "   " });
+    const [chip] = animalChips(
+      [zone({ id: id(38), name: "Pen 1", customInstructions: "" })],
+      [blank],
+      [],
+      NOW,
+    );
+
+    expect(chip?.instructions).toEqual([]);
+  });
+
+  it("gives a pen its own, its group's, and each animal standing in it", () => {
+    // Walking into a pen rather than up to one animal — the same three levels,
+    // read the other way round, which is what the housesitter guide composes.
+    const north = { ...NORTH, customInstructions: "Road gate stays chained." } as Zone;
+    const shapes = zoneShapes([north, PEN], [ANDROMEDA], [assignment(ANDROMEDA.id, PEN.id)], NOW);
+
+    const pen = shapes.find((shape) => shape.label === "Pen B");
+    expect(lines(pen)).toEqual([
+      "Pen B: Latch sticks. Lift, then pull.",
+      "North: Road gate stays chained.",
+      "Andromeda: No grain — she founders.",
+    ]);
+  });
+});
+
+/**
+ * The halter (spec §5.7, §8).
+ *
+ * "Every calf in the program has one, rendered as a colour swatch on the Pen
+ * Board chip … so anyone in the barn can match calf to halter at a glance."
+ * The name travels with the colour everywhere the colour goes: navy and black
+ * are the same swatch in a dark barn.
+ */
+describe("halter colours", () => {
+  const CALF = animal({ id: id(40), name: "Comet" });
+
+  it("puts the halter on the chip, named as well as coloured", () => {
+    const [chip] = animalChips([TRAP], [CALF], [], NOW, [
+      { animalId: CALF.id, halterColor: "#C62828", active: true },
+    ]);
+
+    expect(chip?.accent).toBe("#C62828");
+    expect(chip?.accentLabel).toBe("Red");
+  });
+
+  it("names a colour no show string stocks by what it is, rather than not at all", () => {
+    const [chip] = animalChips([TRAP], [CALF], [], NOW, [
+      { animalId: CALF.id, halterColor: "#7F5A2E", active: true },
+    ]);
+
+    expect(chip?.accentLabel).toBe("#7F5A2E");
+  });
+
+  it("leaves an unenrolled calf's chip plain rather than defaulting it to black", () => {
+    // Black is what an *enrolled* calf wears when nobody chose (§12 decision
+    // 15). A swatch on a calf that is not in the program would say she is.
+    const [chip] = animalChips([TRAP], [CALF], [], NOW, []);
+
+    expect(chip?.accent).toBeUndefined();
+    expect(chip?.accentLabel).toBeUndefined();
+  });
+
+  it("drops the swatch when the enrollment has ended", () => {
+    const [chip] = animalChips([TRAP], [CALF], [], NOW, [
+      { animalId: CALF.id, halterColor: "#C62828", active: false },
+    ]);
+
+    expect(chip?.accent).toBeUndefined();
   });
 });
