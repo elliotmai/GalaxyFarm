@@ -9,6 +9,14 @@ import { baseRecordSchema, type BaseRecord } from "./record.js";
  * is a query filter rather than a migration (spec §5).
  */
 
+/** The rectangle a cached aerial covers, in the coordinates pens are stored in. */
+export interface GeoImageryBounds {
+  readonly south: number;
+  readonly west: number;
+  readonly north: number;
+  readonly east: number;
+}
+
 export interface Property extends BaseRecord {
   readonly name: string;
   readonly address?: string | undefined;
@@ -19,6 +27,16 @@ export interface Property extends BaseRecord {
   readonly longitude?: number | undefined;
   /** R2 key for the cached NAIP aerial used offline and on kiosks (§8). */
   readonly offlineImageryKey?: string | undefined;
+  /**
+   * The ground that image covers.
+   *
+   * Stored beside the key because an aerial photograph without its extent is a
+   * picture, not a map: nothing in the pixels says which ground they show, and
+   * pens drawn over an image placed by guesswork would be worse than pens
+   * drawn over nothing. Both fields are set together or neither is — the key
+   * alone is an image the editor cannot place.
+   */
+  readonly offlineImageryBounds?: GeoImageryBounds | undefined;
   /**
    * Renamed safety levels (§5.1: "five levels with configurable labels").
    *
@@ -48,6 +66,22 @@ export const propertySchema = baseRecordSchema.extend({
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   offlineImageryKey: z.string().optional(),
+  offlineImageryBounds: z
+    .object({
+      south: z.number().min(-90).max(90),
+      west: z.number().min(-180).max(180),
+      north: z.number().min(-90).max(90),
+      east: z.number().min(-180).max(180),
+    })
+    // A rectangle with its corners the wrong way round places the image
+    // inside-out, and the pens land somewhere plausible-looking and wrong.
+    .refine((bounds) => bounds.north > bounds.south, {
+      message: "The north edge has to be north of the south edge",
+    })
+    .refine((bounds) => bounds.east > bounds.west, {
+      message: "The east edge has to be east of the west edge",
+    })
+    .optional(),
   safetyLevelLabels: safetyLabelOverridesSchema.optional(),
   watchSettings: watchSettingsSchema.optional(),
 }) as unknown as z.ZodType<Property>;

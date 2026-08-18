@@ -80,6 +80,8 @@ export function PropertyScreen({
 
       <GrowingZone property={property} api={api} />
 
+      <OfflineBackground property={property} api={api} />
+
       <GroundThatDidNotMove propertyId={propertyId} actorId={actorId} />
     </div>
   );
@@ -321,6 +323,127 @@ function Identity({
               </Button>
             )}
           </div>
+        </form>
+      </Card>
+    </Section>
+  );
+}
+
+/**
+ * The aerial the map falls back to with no signal (spec §8).
+ *
+ * Google's terms do not permit storing its tiles, so the background a barn
+ * kiosk draws pens over has to be one we own: a USDA NAIP image of the place,
+ * public domain, reprojected to Web Mercator and put in R2. Both halves are
+ * typed in here because neither can be worked out from the other — a key with
+ * no extent is a photograph nobody can place, and an extent with no key is a
+ * rectangle of nothing.
+ *
+ * Four numbers rather than a drawn rectangle, deliberately. The extent comes
+ * off the file that was downloaded — `gdalinfo` prints it — and typing what a
+ * tool already computed is more accurate than dragging a box over a map and
+ * hoping. Getting it wrong is not subtle either: the pens land somewhere on
+ * the picture that is visibly not the pens.
+ */
+function OfflineBackground({
+  property,
+  api,
+}: {
+  readonly property: Property;
+  readonly api: ReturnType<typeof useMutations<Property>>;
+}) {
+  const { show } = useToast();
+  const [draft, setDraft] = useState<Record<string, string> | undefined>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  const stored: Record<string, string> = {
+    key: property.offlineImageryKey ?? "",
+    south: property.offlineImageryBounds?.south?.toString() ?? "",
+    west: property.offlineImageryBounds?.west?.toString() ?? "",
+    north: property.offlineImageryBounds?.north?.toString() ?? "",
+    east: property.offlineImageryBounds?.east?.toString() ?? "",
+  };
+  const shown = draft ?? stored;
+
+  const edges = ["south", "west", "north", "east"] as const;
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    setError(undefined);
+
+    const numbers = edges.map((edge) => Number(shown[edge]));
+    const blank = edges.every((edge) => (shown[edge] ?? "") === "");
+
+    if (!blank && numbers.some((value) => Number.isNaN(value))) {
+      setError("Every edge needs a number, or leave all four empty.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await api.update(property.id, {
+        offlineImageryKey: (shown["key"] ?? "").trim() === "" ? undefined : shown["key"]?.trim(),
+        offlineImageryBounds: blank
+          ? undefined
+          : {
+              south: numbers[0] as number,
+              west: numbers[1] as number,
+              north: numbers[2] as number,
+              east: numbers[3] as number,
+            },
+      } as Partial<Property>);
+
+      if (!result.ok) {
+        setError(
+          result.error.kind === "validation"
+            ? (result.error.issues[0]?.message ?? "That is not valid.")
+            : "Could not save that.",
+        );
+        return;
+      }
+
+      setDraft(undefined);
+      show({ message: "Offline background saved", tone: "success" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section
+      title="Offline aerial"
+      description="What the map draws pens over when there is no signal. Google&rsquo;s imagery cannot be stored, so this one is ours."
+    >
+      <Card>
+        <form onSubmit={(event) => void save(event)} className="flex flex-col gap-density">
+          <TextInput
+            label="Image key in R2"
+            hint="The object&rsquo;s path in the bucket — property/naip-2024.jpg."
+            value={shown["key"] ?? ""}
+            onChange={(event) => setDraft({ ...shown, key: event.target.value })}
+            {...(error === undefined ? {} : { error })}
+          />
+
+          <div className="grid grid-cols-2 gap-density sm:grid-cols-4">
+            {edges.map((edge) => (
+              <TextInput
+                key={edge}
+                label={`${edge[0]?.toUpperCase()}${edge.slice(1)} edge`}
+                hint={edge === "south" || edge === "north" ? "Latitude" : "Longitude"}
+                numeric
+                inputMode="decimal"
+                value={shown[edge] ?? ""}
+                onChange={(event) => setDraft({ ...shown, [edge]: event.target.value })}
+              />
+            ))}
+          </div>
+
+          <Button type="submit" busy={busy} disabled={draft === undefined}>
+            {/* Named, not a bare "Save": this screen has three forms on it and
+                a column of identical buttons says nothing about which one. */}
+            Save offline aerial
+          </Button>
         </form>
       </Card>
     </Section>
