@@ -14,6 +14,13 @@ blob-report/
 
 # build output
 .next/
+# Compiled from apps/web/app/sw.ts by @serwist/next on every build, into the
+# public directory because a service worker may only control the paths below
+# the URL it is served from — /sw.js is what gives it the whole origin.
+/apps/web/public/sw.js
+/apps/web/public/sw.js.map
+/apps/web/public/swe-worker-*.js
+/apps/web/public/swe-worker-*.js.map
 /out/
 /build
 dist/

@@ -229,12 +229,26 @@ describe("one edit, all the way to Postgres and back", () => {
       });
     }
 
-    const outcome = await stack.engine.sync();
+    /*
+     * Synced in a loop rather than once, because the engine pushes 50 entries
+     * per call and the store list is longer than that. One `sync()` used to be
+     * enough and quietly stopped being so the moment the garden's ten entities
+     * landed — leaving nine in the queue with nothing rejected, which reads
+     * exactly like the bug this test is for. Draining to empty asks the
+     * question the test means to ask: is any entity *refused*, whatever the
+     * batch size happens to be.
+     */
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const outcome = await stack.engine.sync();
 
-    expect(
-      outcome.rejected,
-      `some entities were refused by the server: ${JSON.stringify(outcome)}`,
-    ).toBe(0);
+      expect(
+        outcome.rejected,
+        `some entities were refused by the server: ${JSON.stringify(outcome)}`,
+      ).toBe(0);
+
+      if ((await stack.outbox.pending()).length === 0) break;
+    }
+
     expect(await stack.outbox.pending()).toHaveLength(0);
   }, 60_000);
 

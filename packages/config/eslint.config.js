@@ -40,6 +40,10 @@ export default tseslint.config(
       "**/playwright-report/**",
       "**/test-results/**",
       "**/*.d.ts",
+      // The compiled service worker, written into the public directory by
+      // @serwist/next. Bundler output, and gitignored.
+      "**/public/sw.js",
+      "**/public/swe-worker-*.js",
     ],
   },
 

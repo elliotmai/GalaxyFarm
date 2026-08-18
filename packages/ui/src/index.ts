@@ -13,4 +13,5 @@ export * from "./tokens/contrast.js";
 export * from "./photos/index.js";
 export * from "./safety/safety-badge.js";
 export * from "./halter/halter-swatch.js";
+export * from "./spatial-editor/index.js";
 export * from "./brand/logomark.js";

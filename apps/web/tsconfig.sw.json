@@ -1,0 +1,17 @@
+{
+  // The service worker, typechecked on its own (see the note in tsconfig.json).
+  //
+  // Same strictness as the app — this is a second program, not a looser one —
+  // but with `WebWorker` in place of `DOM`, because `self` here is a
+  // `ServiceWorkerGlobalScope` and there is no `window` to be had.
+  "extends": "../../packages/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "WebWorker", "WebWorker.Iterable"],
+    "declaration": false,
+    "declarationMap": false,
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["app/sw.ts"]
+}

@@ -50,11 +50,11 @@ export const UPLOADS_INDEXES = "id, queuedAt, attempts";
  *
  * Declared here rather than folded into the version history above, because the
  * history is what upgrades a device in place: a browser holding unsynced work
- * at version 14 has to be told what changed at 15, and rewriting version 2 to
+ * at version 15 has to be told what changed at 16, and rewriting version 2 to
  * mention a table that did not exist then would describe a database nobody
  * ever had.
  */
-export const UPLOADS_SCHEMA_VERSION = 15;
+export const UPLOADS_SCHEMA_VERSION = 16;
 
 /**
  * The last version whose schema this file describes on its own.

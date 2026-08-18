@@ -199,6 +199,42 @@ function rootDevDependencies(): Record<string, string> {
   return (readJson("package.json")["devDependencies"] as Record<string, string> | undefined) ?? {};
 }
 
+/**
+ * §2: "everything spatial is one component" — the property map and the Phase 3
+ * garden layout designer are one editor with two palettes.
+ *
+ * The general rule above already keeps `packages/ui` clear of modules and
+ * infrastructure. This is tighter, and deliberately so: the editor is the one
+ * component in the design system with a domain obviously pulling at it. The
+ * moment it imports something that knows what an animal is, the garden
+ * designer becomes a second editor and #22 is a rewrite rather than a palette.
+ */
+describe("spec §2 — the spatial editor knows no domain", () => {
+  const EDITOR = "packages/ui/src/spatial-editor/";
+
+  it("is reading the editor's real imports", () => {
+    expect(graph.filter((e) => e.from.startsWith(EDITOR)).length).toBeGreaterThan(0);
+  });
+
+  it("imports only the kernel, the shared config, React, and itself", () => {
+    const allowed = ["@galaxy-farm/core", "@galaxy-farm/config/tailwind", "react"];
+
+    const offenders = graph
+      .filter((e) => e.from.startsWith(EDITOR))
+      .filter((e) => !e.specifier.startsWith("."))
+      .filter((e) => !allowed.includes(e.specifier))
+      .map((e) =>
+        violation(
+          e.from,
+          e.specifier,
+          "The editor takes shapes and chips as props. A caller flattens what it has (spec §2, §4.1).",
+        ),
+      );
+
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("spec §4.1 — composition root", () => {
   it("apps/web is the only place that composes infrastructure", () => {
     const composers = new Set(

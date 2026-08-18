@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  choreCalendarEntries,
   choreDaySheet,
   choreProgress,
   choreTemplateSchema,
@@ -16,6 +17,7 @@ import {
   type ChoreTemplate,
   type Task,
 } from "../src/entities/task.js";
+import { projectEvents } from "../src/entities/calendar-event.js";
 import { encodeUlid, type Ulid } from "../src/types/ids.js";
 
 let counter = 0;
@@ -313,5 +315,103 @@ describe("the chore day sheet", () => {
 
   it("reports an empty day as nothing to do rather than as NaN", () => {
     expect(choreProgress([])).toEqual({ total: 0, done: 0, open: 0, overdue: 0, fraction: 0 });
+  });
+});
+
+describe("chores on the unified calendar", () => {
+  const thursday = new Date(2026, 0, 15);
+  const morning = new Date(2026, 0, 15, 7, 30);
+  const template = (overrides: Partial<ChoreTemplate> = {}): ChoreTemplate => ({
+    ...base(),
+    title: "Feed the flock",
+    recurrence: "daily",
+    recurrenceDays: [],
+    active: true,
+    ...overrides,
+  });
+
+  it("projects one row per day a template fires", () => {
+    const weekly = template({
+      title: "Move the hot wire",
+      recurrence: "weekly",
+      recurrenceDays: [4],
+    });
+
+    const entries = choreCalendarEntries({ tasks: [], templates: [weekly] }, thursday, 14, morning);
+
+    expect(entries).toHaveLength(2);
+    expect(entries.every((entry) => entry.kind === "chore")).toBe(true);
+    expect(entries.every((entry) => entry.module === "chores")).toBe(true);
+    expect(entries[1]?.at.getDate()).toBe(22);
+  });
+
+  it("gives every row the same id the second time round", () => {
+    const input = {
+      tasks: [task({ dueAt: new Date(2026, 0, 16, 9, 0) })],
+      templates: [template()],
+    };
+
+    const first = choreCalendarEntries(input, thursday, 7, morning);
+    const second = choreCalendarEntries(input, thursday, 7, new Date(2026, 0, 15, 11, 0));
+
+    expect(second.map((entry) => entry.id)).toEqual(first.map((entry) => entry.id));
+    expect(new Set(first.map((entry) => entry.id)).size).toBe(first.length);
+  });
+
+  it("leaves an owed chore on the day it was due, not on every day after it", () => {
+    // `choreDaySheet` deliberately carries an un-ticked written-down chore
+    // forward, which is right for a day sheet and would paint a fortnight-old
+    // chore across the whole month here.
+    const missed = task({ title: "Fix the north gate", dueAt: new Date(2026, 0, 10, 9, 0) });
+
+    const entries = choreCalendarEntries({ tasks: [missed], templates: [] }, thursday, 14, morning);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.at).toEqual(missed.dueAt);
+    expect(entries[0]?.source).toEqual({ entity: "tasks", id: missed.id });
+  });
+
+  it("shows the stored row rather than the occurrence once a chore is ticked", () => {
+    const daily = template();
+    const ticked = task({
+      ...taskFromTemplate(daily, thursday),
+      completedAt: morning,
+    });
+
+    const entries = choreCalendarEntries(
+      { tasks: [ticked], templates: [daily] },
+      thursday,
+      1,
+      morning,
+    );
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.source).toEqual({ entity: "tasks", id: ticked.id });
+  });
+
+  it("moves the row when the template's day is corrected", () => {
+    const wrong = template({ recurrence: "weekly", recurrenceDays: [4] });
+    const fixed = { ...wrong, recurrenceDays: [5] };
+
+    const before = choreCalendarEntries({ tasks: [], templates: [wrong] }, thursday, 7, morning);
+    const after = choreCalendarEntries({ tasks: [], templates: [fixed] }, thursday, 7, morning);
+
+    expect(before[0]?.at.getDate()).toBe(15);
+    expect(after[0]?.at.getDate()).toBe(16);
+    // Nothing is stored, so the old day leaves no row behind to go stale.
+    expect(after).toHaveLength(1);
+  });
+
+  it("merges into the calendar under the chores filter", () => {
+    const entries = choreCalendarEntries(
+      { tasks: [], templates: [template()] },
+      thursday,
+      3,
+      morning,
+    );
+
+    const merged = projectEvents({ manual: [], projected: entries }, undefined, ["chores"]);
+    expect(merged).toHaveLength(3);
+    expect(projectEvents({ manual: [], projected: entries }, undefined, ["cattle"])).toEqual([]);
   });
 });

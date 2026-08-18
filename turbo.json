@@ -6,7 +6,11 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      // `public/sw.js` is a build output like everything under `.next`, but it
+      // lands outside it — a service worker only controls paths below its own
+      // URL, so it has to be served from the root. Without it listed here, a
+      // cache hit would restore the build and leave the app with no worker.
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "public/sw.js", "public/sw.js.map"]
     },
     "typecheck": {
       "dependsOn": ["^build"],

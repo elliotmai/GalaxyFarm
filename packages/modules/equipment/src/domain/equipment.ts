@@ -147,17 +147,57 @@ export const fuelLogSchema = baseRecordSchema.extend({
   notes: z.string().max(1000).optional(),
 }) as unknown as z.ZodType<FuelLog>;
 
+/**
+ * The latest reading of one meter, with the day it was taken.
+ *
+ * The date matters as much as the number to anything that has to put a
+ * meter-triggered rule on a calendar: "due at 250 hours" has no date of its
+ * own, and the reading that carried it past 250 is the only honest one to use.
+ */
+export function latestReading(
+  readings: readonly MeterReading[],
+  equipmentId: Ulid,
+  kind: MeterKind,
+): MeterReading | undefined {
+  return readings
+    .filter((reading) => reading.equipmentId === equipmentId && reading.kind === kind)
+    .sort((left, right) => right.readOn.getTime() - left.readOn.getTime())[0];
+}
+
 /** The latest reading of one meter. */
 export function currentMeter(
   readings: readonly MeterReading[],
   equipmentId: Ulid,
   kind: MeterKind,
 ): number | undefined {
-  const relevant = readings
-    .filter((reading) => reading.equipmentId === equipmentId && reading.kind === kind)
-    .sort((left, right) => right.readOn.getTime() - left.readOn.getTime());
+  return latestReading(readings, equipmentId, kind)?.value;
+}
 
-  return relevant[0]?.value;
+/** The most recent service logged against a rule. */
+export function lastService(
+  logs: readonly MaintenanceLog[],
+  ruleId: Ulid,
+): MaintenanceLog | undefined {
+  return logs
+    .filter((log) => log.ruleId === ruleId)
+    .sort((left, right) => right.performedOn.getTime() - left.performedOn.getTime())[0];
+}
+
+/**
+ * The date a months-triggered rule next comes due.
+ *
+ * Its own function because the calendar wants the date without the rest of the
+ * verdict: `maintenanceDue` reports whichever trigger comes up first, and for
+ * a rule with both hours and months that can be the one with no date on it at
+ * all — leaving the month it is due in unreachable from the outside.
+ */
+export function maintenanceDueOn(
+  rule: Pick<MaintenanceRule, "everyMonths" | "createdAt">,
+  lastPerformedOn: Date | undefined,
+): Date | undefined {
+  if (rule.everyMonths === undefined) return undefined;
+  // From the last service, or from when it was first recorded as due.
+  return addDays(lastPerformedOn ?? rule.createdAt, Math.round(rule.everyMonths * 30.4375));
 }
 
 export interface MaintenanceDue {
@@ -188,10 +228,7 @@ export function maintenanceDue(
   for (const rule of rules) {
     if (!rule.active) continue;
 
-    const history = logs
-      .filter((log) => log.ruleId === rule.id)
-      .sort((left, right) => right.performedOn.getTime() - left.performedOn.getTime());
-    const last = history[0];
+    const last = lastService(logs, rule.id);
 
     const hours = currentMeter(readings, rule.equipmentId, "hours");
     const miles = currentMeter(readings, rule.equipmentId, "miles");
@@ -206,10 +243,8 @@ export function maintenanceDue(
       const target = (last?.miles ?? 0) + rule.everyMiles;
       candidates.push({ rule, reason: "miles", dueAtMiles: target, overdue: miles >= target });
     }
-    if (rule.everyMonths !== undefined) {
-      // From the last service, or from when it was first recorded as due.
-      const from = last?.performedOn ?? rule.createdAt;
-      const target = addDays(from, Math.round(rule.everyMonths * 30.4375));
+    const target = maintenanceDueOn(rule, last?.performedOn);
+    if (target !== undefined) {
       candidates.push({ rule, reason: "months", dueAt: target, overdue: now >= target });
     }
 

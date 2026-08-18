@@ -63,6 +63,16 @@ export const LOCAL_STORES = [
   "flockAdjustments",
   "eggLogs",
   "eggDispositions",
+  "beds",
+  "crops",
+  "varieties",
+  "seedInventory",
+  "plantings",
+  "gardenCareLogs",
+  "harvestLogs",
+  "preservationLogs",
+  "seasonPlans",
+  "plannedPlantings",
   "equipment",
   "meterReadings",
   "maintenanceRules",
@@ -108,12 +118,14 @@ export type LocalStoreName = (typeof LOCAL_STORES)[number];
  * 13 — the Kit: the fleet with its meters, rules, service and fuel (§5.6), and
  *      the supply shelf with its purchases, usage and durables (§5.11).
  * 14 — the care guide and its hand-written sections (§5.10).
- * 15 — the photo queue: bytes waiting for signal, so a photograph taken at the
+ * 15 — the garden: beds, the seed box, what went in the ground, what came off
+ *      it, and the season plan the notifications read (§5.5).
+ * 16 — the photo queue: bytes waiting for signal, so a photograph taken at the
  *      chute survives the browser being killed (§4.2). Not an entity — it is
  *      device-local and never syncs — but it is a table, and a table only
  *      appears on a returning device when the version moves.
  */
-export const LOCAL_SCHEMA_VERSION = 15;
+export const LOCAL_SCHEMA_VERSION = 16;
 
 /**
  * Which fields each entity's search box looks at.
@@ -155,6 +167,16 @@ const SEARCHABLE: Readonly<Record<LocalStoreName, readonly string[]>> = {
   flockAdjustments: ["notes"],
   eggLogs: ["notes"],
   eggDispositions: ["notes"],
+  beds: ["name", "soilNotes"],
+  crops: ["name", "family", "notes"],
+  varieties: ["name", "source", "notes"],
+  seedInventory: ["source", "germinationNotes"],
+  plantings: ["notes"],
+  gardenCareLogs: ["product", "notes"],
+  harvestLogs: ["notes"],
+  preservationLogs: ["label", "storageLocation", "notes"],
+  seasonPlans: ["name", "notes"],
+  plannedPlantings: ["notes", "abandonedReason"],
   // A serial number is what somebody has in their hand at a parts counter, so
   // it is searchable alongside the name it is never remembered by.
   equipment: ["name", "make", "model", "vin", "notes"],
