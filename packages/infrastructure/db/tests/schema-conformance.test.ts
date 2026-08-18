@@ -57,6 +57,19 @@ import {
 import { careGuideSchema, guideSectionSchema } from "@galaxy-farm/module-housesitting";
 
 import {
+  bedSchema,
+  cropSchema,
+  gardenCareLogSchema,
+  harvestLogSchema,
+  plannedPlantingSchema,
+  plantingSchema,
+  preservationLogSchema,
+  seasonPlanSchema,
+  seedInventorySchema,
+  varietySchema,
+} from "@galaxy-farm/module-garden";
+
+import {
   eggDispositionSchema,
   eggLogSchema,
   flockAdjustmentSchema,
@@ -132,6 +145,16 @@ const SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   supplyPurchases: supplyPurchaseSchema,
   supplyUsage: supplyUsageSchema,
   durableAssignments: durableAssignmentSchema,
+  beds: bedSchema,
+  crops: cropSchema,
+  varieties: varietySchema,
+  seedInventory: seedInventorySchema,
+  plantings: plantingSchema,
+  gardenCareLogs: gardenCareLogSchema,
+  harvestLogs: harvestLogSchema,
+  preservationLogs: preservationLogSchema,
+  seasonPlans: seasonPlanSchema,
+  plannedPlantings: plannedPlantingSchema,
   contacts: contactSchema,
   attachments: attachmentSchema,
   careGuides: careGuideSchema,

@@ -24,6 +24,7 @@
     "@galaxy-farm/module-cattle": "workspace:*",
     "@galaxy-farm/module-equipment": "workspace:*",
     "@galaxy-farm/module-feed": "workspace:*",
+    "@galaxy-farm/module-garden": "workspace:*",
     "@galaxy-farm/module-horses": "workspace:*",
     "@galaxy-farm/module-housesitting": "workspace:*",
     "@galaxy-farm/module-pets": "workspace:*",
