@@ -60,6 +60,7 @@ import {
   WeightsTab,
 } from "@/app/(admin)/admin/cattle/[id]/_components/animal-tabs";
 import { GeneticsPanel } from "@/app/(admin)/admin/cattle/[id]/_components/genetics-panel";
+import { PhotoPanel, PhotoQuickCapture } from "@/app/_components/photo-panel";
 import { animalSlug, animalTitle, resolveAnimalSlug } from "@/lib/animal-slug";
 import { compositionLookup, compositionOfAnimal } from "@/lib/composition";
 import { useMutations } from "@/lib/local/mutations";
@@ -69,9 +70,9 @@ import { useRecords } from "@/lib/local/use-records";
  * One animal, everything about her (spec §7, §5.2).
  *
  * §7 lists the tabs: overview · pedigree · breeding · health · weights ·
- * feeding · finance · photos. Overview and pedigree are real here; the rest
- * name what they will hold rather than pretending to be finished, because a
- * tab that renders an empty card teaches nobody whether it is empty or broken.
+ * feeding · finance · photos. Most are real here; the ones that are not name
+ * what they will hold rather than pretending to be finished, because a tab
+ * that renders an empty card teaches nobody whether it is empty or broken.
  *
  * The URL is a slug, not an id — see `lib/animal-slug.ts`. The record is found
  * by walking the herd on the device rather than by a keyed lookup, which is
@@ -180,17 +181,33 @@ export function AnimalScreen({
         }
         title={animalTitle(animal)}
         actions={
-          // Two taps from her profile, which is what issue #13 asks for: this
-          // link, then Record. The dam arrives prefilled, so nothing about the
-          // cow has to be chosen again by somebody standing in a pen with her.
-          animal.sex === "female" && animal.status === "active" ? (
-            <Link
-              href={`/admin/cattle/calving?dam=${animal.id}`}
-              className="rounded-density border border-edge px-density py-2 text-sm font-medium text-ink hover:border-action"
-            >
-              Record a calving
-            </Link>
-          ) : undefined
+          <>
+            {/*
+              Tap the camera, take the photo. That is the whole of issue #9's
+              "adding a photo is ≤2 taps from the animal's profile", and it is
+              why the control is here rather than behind the Photos tab — a tab
+              would spend the first tap getting to it. The bytes queue on the
+              device and go up on the sync heartbeat, so it works in a pen.
+            */}
+            <PhotoQuickCapture
+              propertyId={propertyId}
+              actorId={actorId}
+              ownerEntity="Animal"
+              ownerId={animal.id}
+            />
+            {/* Two taps from her profile, which is what issue #13 asks for:
+                this link, then Record. The dam arrives prefilled, so nothing
+                about the cow has to be chosen again by somebody standing in a
+                pen with her. */}
+            {animal.sex === "female" && animal.status === "active" ? (
+              <Link
+                href={`/admin/cattle/calving?dam=${animal.id}`}
+                className="rounded-density border border-edge px-density py-2 text-sm font-medium text-ink hover:border-action"
+              >
+                Record a calving
+              </Link>
+            ) : null}
+          </>
         }
         subtitle={
           breeding.composition.length === 0
@@ -360,6 +377,17 @@ function AnimalTabs({
         if (active === "health") return <HealthTab animal={animal} propertyId={propertyId} />;
         if (active === "weights") return <WeightsTab animal={animal} propertyId={propertyId} />;
         if (active === "finance") return <FinanceTab animal={animal} propertyId={propertyId} />;
+        if (active === "photos") {
+          return (
+            <PhotoPanel
+              propertyId={propertyId}
+              actorId={actorId}
+              ownerEntity="Animal"
+              ownerId={animal.id}
+              recordName={animalTitle(animal)}
+            />
+          );
+        }
 
         const tab = TABS.find((entry) => entry.id === active);
         return <Pending what={tab?.label ?? "This"} />;
