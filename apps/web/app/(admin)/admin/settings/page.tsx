@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { can } from "@galaxy-farm/core";
+import { can, type NotificationSetting } from "@galaxy-farm/core";
 
 import { SettingsScreen } from "@/app/(admin)/admin/settings/_components/settings-screen";
 import type { PersonRow } from "@/app/(admin)/admin/settings/_components/people-screen";
@@ -8,6 +8,9 @@ import { currentActor } from "@/lib/auth";
 import { withDeadline } from "@/lib/deadline";
 import { listDevices, type KioskDevice } from "@/lib/device-store";
 import { hasKioskPin } from "@/lib/kiosk-pin-store";
+import { settingsFor } from "@/lib/notification-prefs";
+import { pushConfig } from "@/lib/notifier";
+import { listDevices as listPushDevices, type PushDevice } from "@/lib/push-store";
 import { listDeletedUsers, listUsers } from "@/lib/user-store";
 
 export const metadata = { title: "Settings" };
@@ -82,6 +85,31 @@ export default async function AdminSettingsPage() {
     }
   }
 
+  /**
+   * The push half of the notification settings.
+   *
+   * Read for everybody, not gated on a capability: these are a person's own
+   * devices and their own preferences, and a member has as much business
+   * turning notifications on for their phone as an owner does. `kiosk` never
+   * reaches this page — `/admin` is closed to it (§4.4) — and the actions
+   * refuse the role besides.
+   */
+  const push = pushConfig();
+  let pushDevices: readonly PushDevice[] = [];
+  let notificationSettings: readonly NotificationSetting[] = [];
+  let notificationsUnavailable: string | undefined;
+
+  try {
+    [pushDevices, notificationSettings] = await withDeadline(
+      Promise.all([listPushDevices(actor.id), settingsFor(actor.propertyId, actor.id)]),
+      "your notification settings",
+    );
+  } catch (error) {
+    console.error("[settings:notifications]", error);
+    notificationsUnavailable =
+      "Could not reach the database, so your notification settings are not here. Everything else on this page is read from this device and is unaffected.";
+  }
+
   return (
     <SettingsScreen
       propertyId={actor.propertyId}
@@ -93,8 +121,12 @@ export default async function AdminSettingsPage() {
       mayManageDevices={mayManageDevices}
       devices={devices}
       pinSet={pinSet}
+      pushDevices={pushDevices}
+      notificationSettings={notificationSettings}
+      {...(push.ok ? { vapidPublicKey: push.publicKey } : { pushUnavailable: push.reason })}
       {...(unavailable === undefined ? {} : { unavailable })}
       {...(devicesUnavailable === undefined ? {} : { devicesUnavailable })}
+      {...(notificationsUnavailable === undefined ? {} : { notificationsUnavailable })}
     />
   );
 }

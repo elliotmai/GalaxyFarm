@@ -16,7 +16,7 @@ import { invitationEmail, testEmailMessage } from "@galaxy-farm/infra-email";
 
 import { currentActor } from "@/lib/auth";
 import { farmName } from "@/lib/farm-name";
-import { emailConfig, notifier } from "@/lib/notifier";
+import { emailConfig, emailNotifier } from "@/lib/notifier";
 import {
   findUser,
   findUserByEmail,
@@ -125,7 +125,7 @@ async function emailInvitation(input: {
   readonly reissued: boolean;
 }): Promise<{ readonly ok: boolean; readonly detail: string }> {
   const config = emailConfig();
-  const send = notifier();
+  const send = emailNotifier();
   if (!config.ok || send === undefined) {
     return {
       ok: false,
@@ -366,7 +366,7 @@ export async function sendTestEmail(id: Ulid): Promise<ActionResult> {
   }
 
   const config = emailConfig();
-  const send = notifier();
+  const send = emailNotifier();
   if (!config.ok || send === undefined) {
     // The reason names the variable and where to set it. Not a field error:
     // there is no input on this screen that would fix it.

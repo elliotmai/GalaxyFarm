@@ -33,6 +33,9 @@ const EXPECTED_INFRASTRUCTURE = [
   "sync",
   "storage",
   "email",
+  // Web push: VAPID and RFC 8291 payload encryption, behind the same
+  // `Notifier` port `email` sits behind (§6).
+  "push",
   "weather",
   "geocoding",
   "auth",

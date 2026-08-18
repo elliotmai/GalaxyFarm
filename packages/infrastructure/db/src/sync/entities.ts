@@ -34,8 +34,8 @@ export const BOOKKEEPING_TABLES: readonly string[] = ["syncAudit", "syncFieldMet
  * Tables a migration creates that `allTables` never names — the SQL name, not
  * the camelCase key, because these are checked against `pg_tables` directly.
  *
- * `kiosk_pins` is the one so far (spec §4.3, §4.4). Every other table in this
- * schema is reachable as a `Repository` and carries the §5 base columns —
+ * Three of them (spec §4.3, §4.4, §6). Every other table in this schema is
+ * reachable as a `Repository` and carries the §5 base columns —
  * `id`, `propertyId`, the soft-delete trio — because every other table is a
  * record something on the farm did. This one is not: a single scrypt hash per
  * property, gating one Elevated-tier action. Giving it `id`/tombstone columns
@@ -46,8 +46,20 @@ export const BOOKKEEPING_TABLES: readonly string[] = ["syncAudit", "syncFieldMet
  * unlikely, at the cost of being invisible to the checks that assume every
  * live table is an entity — `tests/migrations.test.ts` names this list
  * explicitly rather than silently passing an empty one.
+ *
+ * `push_subscriptions` and `notification_settings` joined it with web push
+ * (§6). The first holds the keys a push payload is encrypted to, which is the
+ * same argument `kiosk_pins` makes and just as final: a subscription
+ * replicated to a barn screen is the owner's notifications readable from the
+ * barn. The second is not secret at all — it is simply read on the server at
+ * the moment something is sent, by a screen that sends nothing, so a copy on
+ * every device would be one person's preferences on everybody's phone.
  */
-export const UNTRACKED_TABLES: readonly string[] = ["kiosk_pins"];
+export const UNTRACKED_TABLES: readonly string[] = [
+  "kiosk_pins",
+  "push_subscriptions",
+  "notification_settings",
+];
 
 export const SYNCED_ENTITIES: readonly string[] = Object.keys(allTables).filter(
   (name) => !NOT_SYNCED.has(name),

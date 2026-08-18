@@ -27,7 +27,8 @@
     "db:migrate": "dotenv -e .env.local -- pnpm --filter @galaxy-farm/infra-db db:migrate",
     "db:migrate:deployed": "pnpm --filter @galaxy-farm/infra-db db:migrate",
     "db:seed": "dotenv -e .env.local -- pnpm --filter @galaxy-farm/web db:seed",
-    "db:user": "dotenv -e .env.local -- pnpm --filter @galaxy-farm/web db:user"
+    "db:user": "dotenv -e .env.local -- pnpm --filter @galaxy-farm/web db:user",
+    "vapid:keys": "pnpm --filter @galaxy-farm/infra-push vapid:keys"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4",

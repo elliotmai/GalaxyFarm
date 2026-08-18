@@ -8,6 +8,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
 
 // Extensionless on purpose: drizzle-kit loads this file through a CommonJS
@@ -1454,6 +1455,78 @@ export const kioskPins = pgTable("kiosk_pins", {
   pinHash: text("pin_hash"),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
 });
+
+/**
+ * One browser on one device, subscribed to push (spec §6).
+ *
+ * A subscription is a capability URL plus the two keys that decrypt what is
+ * sent to it, which puts it in the same class as `kioskDevices`' token hash and
+ * `kioskPins`' scrypt hash: **deliberately outside `allTables`**. Sync copies
+ * rows to every device on the property, and a barn screen holding the owner's
+ * subscription keys could read the owner's notifications. `apps/web/lib/push-store.ts`
+ * is its only reader and writer.
+ *
+ * One row per browser rather than per person — the endpoint is unique because
+ * the push service already guarantees it is, and a phone and a laptop are two
+ * rows, so unsubscribing one leaves the other alone. A §4.5 system-owned row:
+ * minted by a browser, revoked by a person, never edited, and deleted outright
+ * rather than tombstoned, because a tombstone exists to replicate a deletion
+ * and nothing here replicates.
+ */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: text("id").primaryKey(),
+    propertyId: text("property_id").notNull(),
+    /** Whose it is. Preferences and revocation are both per person. */
+    userId: text("user_id").notNull(),
+    endpoint: text("endpoint").notNull().unique(),
+    /** The browser's public key and auth secret, base64url, exactly as it gave them. */
+    p256dh: text("p256dh").notNull(),
+    authSecret: text("auth_secret").notNull(),
+    /** A human's word for which device this is — an endpoint is unrecognisable. */
+    deviceLabel: text("device_label").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
+    lastSentAt: timestamp("last_sent_at", { withTimezone: true, mode: "date" }),
+  },
+  (table) => [index("push_subscriptions_user_idx").on(table.userId)],
+);
+
+/**
+ * The §6 preference model — per trigger, per person (spec §6).
+ *
+ * Off `allTables` for a quieter reason than the table above it. Nothing here is
+ * secret; it is simply not a device's business. These rows are read on the
+ * server at the moment something is about to be sent, a kiosk sends nothing,
+ * and replicating them would put one person's choices on every screen in the
+ * household.
+ *
+ * `userId` null is the property-wide default that applies until somebody makes
+ * a choice of their own; `settingFor` in core resolves the two in that order.
+ * `NULLS NOT DISTINCT` on the uniqueness is what keeps that default single —
+ * without it Postgres treats every NULL as its own value, and the constraint
+ * would hold for everybody except the row it exists to protect.
+ */
+export const notificationSettings = pgTable(
+  "notification_settings",
+  {
+    id: text("id").primaryKey(),
+    propertyId: text("property_id").notNull(),
+    userId: text("user_id"),
+    trigger: text("trigger").notNull(),
+    channel: text("channel").notNull(),
+    leadDays: integer("lead_days").notNull(),
+    enabled: boolean("enabled").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (table) => [
+    unique("notification_settings_scope_unique")
+      .on(table.propertyId, table.userId, table.trigger)
+      .nullsNotDistinct(),
+  ],
+);
 
 /**
  * Who last wrote each field, and when (§4.2).

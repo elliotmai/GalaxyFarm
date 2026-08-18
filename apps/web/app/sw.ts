@@ -19,7 +19,7 @@ import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, RuntimeCaching, SerwistGlobalConfig } from "serwist";
 import { ExpirationPlugin, NetworkFirst, NetworkOnly, Serwist } from "serwist";
 
-import { OFFLINE_ROUTE } from "@/lib/sw-contract";
+import { OFFLINE_ROUTE, parsePushPayload } from "@/lib/sw-contract";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -137,3 +137,88 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+/**
+ * Web push (spec §6, issue #41).
+ *
+ * Deliberately below `addEventListeners()` and deliberately touching nothing
+ * above it: the caching and update policy is settled (#35) and load-bearing for
+ * the barn screens. These are two more listeners on the same worker, added the
+ * way any other listener would be, and Serwist neither knows nor cares.
+ *
+ * A worker is the only place a notification can be shown when the app is
+ * closed, which is the entire reason push exists here — a tank-freeze warning
+ * that waits for somebody to open the app is a warning that arrives after the
+ * freeze.
+ */
+
+/** The app's own icon, so a notification is recognisable on a lock screen. */
+const NOTIFICATION_ICON = "/icons/icon-192.png";
+
+self.addEventListener("push", (event) => {
+  // Read synchronously. `event.data` is not available once the handler has
+  // yielded, and a payload read after an await is a payload that is gone.
+  const payload = parsePushPayload(event.data?.text());
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: NOTIFICATION_ICON,
+      // Where the tap goes. Carried on the notification rather than in a
+      // closure, because `notificationclick` may fire in a worker that has
+      // since been killed and restarted — a variable would not survive that,
+      // and the notification does.
+      data: { url: payload.url },
+      /**
+       * Every notification stands on its own.
+       *
+       * A `tag` would let a second notification replace the first, which
+       * sounds tidy and is wrong here: "Andromeda is calving" and "Dolly is
+       * calving" are the same trigger about different cows, and collapsing
+       * them loses one of the two animals.
+       */
+    }),
+  );
+});
+
+/**
+ * A tap on a notification.
+ *
+ * The behaviour worth naming is the focus: a farm phone that already has the
+ * app open should come back to *that* window rather than get a second copy of
+ * an app whose whole state is a local database — two windows means two sync
+ * loops and a person wondering which one is real. So an existing window on
+ * this origin is focused and steered, and a new one is opened only when there
+ * is nothing to come back to.
+ */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const target = new URL(
+    (event.notification.data as { url?: string } | undefined)?.url ?? "/",
+    self.location.origin,
+  ).href;
+
+  event.waitUntil(
+    (async () => {
+      // `includeUncontrolled` because a window opened before this worker took
+      // over is still the window somebody is looking at.
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+
+      for (const client of windows) {
+        if (new URL(client.url).origin !== self.location.origin) continue;
+
+        await client.focus();
+        if (client.url !== target) {
+          // Not every browser allows a worker to navigate a client it does not
+          // control. Focusing already got somebody to the app, so a refused
+          // navigation is a worse landing rather than a failure.
+          await client.navigate(target).catch(() => undefined);
+        }
+        return;
+      }
+
+      await self.clients.openWindow(target);
+    })(),
+  );
+});
