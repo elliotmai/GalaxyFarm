@@ -39,7 +39,16 @@ export const CALENDAR_MODULES = [
 ] as const;
 export type CalendarModule = (typeof CALENDAR_MODULES)[number];
 
-/** Every projected kind §6 names, plus the manual one. */
+/**
+ * Every projected kind §6 names, plus the manual one.
+ *
+ * `feed_reorder` is the one addition to §6's list, and it is §5.3's sentence
+ * rather than a new idea: the notification fires at `runOutDate −
+ * reorderLeadDays`, which is a different day from the run-out and needs a row
+ * of its own to sit on. Sharing the run-out's kind would give the two rows the
+ * same `projectedId` — same kind, same feed type — and one would quietly
+ * overwrite the other.
+ */
 export const CALENDAR_EVENT_KINDS = [
   "breeding_protocol_step",
   "preg_check_due",
@@ -49,6 +58,7 @@ export const CALENDAR_EVENT_KINDS = [
   "booster_due",
   "med_expiration",
   "feed_run_out",
+  "feed_reorder",
   "maintenance_due",
   "rule_deadline",
   "drop_off",
@@ -72,6 +82,7 @@ export const EVENT_KIND_MODULE: Readonly<Record<CalendarEventKind, CalendarModul
   med_expiration: "cattle",
   candidate_sale_date: "cattle",
   feed_run_out: "feed",
+  feed_reorder: "feed",
   maintenance_due: "equipment",
   rule_deadline: "business",
   drop_off: "business",
@@ -158,7 +169,16 @@ export function projectedId(kind: CalendarEventKind, entity: string, id: Ulid): 
 
 export interface ProjectionInput {
   readonly manual: readonly CalendarEvent[];
-  /** Contributed by the modules; core computes none of them itself. */
+  /**
+   * Contributed by whoever owns the records behind the rows.
+   *
+   * That is the modules for nearly all of it — §4.1 keeps core from learning
+   * what a breeding record or a bale of hay is, so cattle projects its own
+   * dates and feed projects its own. The exception is the handful of entities
+   * core owns outright: chores are a `Task` and a `ChoreTemplate`, both
+   * declared here, so `choreCalendarEntries` lives beside them in `task.ts`
+   * rather than in a module that would have to import them anyway.
+   */
   readonly projected: readonly CalendarEntry[];
 }
 

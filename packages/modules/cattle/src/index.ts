@@ -14,6 +14,7 @@
 export * from "./domain/ancestors.js";
 export * from "./domain/breeding-record.js";
 export * from "./domain/breeds.js";
+export * from "./domain/calendar.js";
 export * from "./domain/calving-record.js";
 export * from "./domain/calving-watch.js";
 export * from "./domain/cattle-candidate.js";
