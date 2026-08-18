@@ -298,6 +298,61 @@ describe("chips", () => {
     });
   });
 
+  it("survives the tap being a real finger rather than a bare click", () => {
+    // A finger lands as pointerdown, pointerup and *then* click, and the first
+    // two reach the canvas underneath before the shape's own handler runs. The
+    // canvas treats a tap that moved nowhere as somebody dismissing the
+    // selection — which, on a tap aimed at a shape, would throw away the chip
+    // half a millisecond before the shape was told to receive it. Only bare
+    // ground clears it, so the barn's touchscreen moves the animal.
+    const onReassign = vi.fn();
+
+    render(
+      <SpatialEditor
+        palette={propertyPalette}
+        shapes={[NORTH_TRAP, PASTURE]}
+        chips={[DOLLY]}
+        view={VIEW}
+        onReassign={onReassign}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Dolly/ }));
+
+    const target = screen.getByRole("button", { name: "Move Dolly to Pasture" });
+    const at = middleOf(PASTURE);
+    fireEvent.pointerDown(target, { pointerId: 1, button: 0, clientX: at.x, clientY: at.y });
+    fireEvent.pointerUp(target, { pointerId: 1, clientX: at.x, clientY: at.y });
+    fireEvent.click(target);
+
+    expect(onReassign).toHaveBeenCalledWith({
+      chipId: "dolly",
+      fromShapeId: "north",
+      toShapeId: "pasture",
+    });
+  });
+
+  it("still lets a tap on bare ground dismiss what was chosen", () => {
+    render(
+      <SpatialEditor
+        palette={propertyPalette}
+        shapes={[NORTH_TRAP, PASTURE]}
+        chips={[DOLLY]}
+        view={VIEW}
+        onReassign={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Dolly/ }));
+    expect(screen.getByText(/Choose a zone to move Dolly there/)).toBeInTheDocument();
+
+    const canvas = screen.getByRole("application");
+    fireEvent.pointerDown(canvas, { pointerId: 1, button: 0, clientX: 10, clientY: 590 });
+    fireEvent.pointerUp(canvas, { pointerId: 1, clientX: 10, clientY: 590 });
+
+    expect(screen.queryByText(/Choose a zone to move Dolly there/)).not.toBeInTheDocument();
+  });
+
   it("collects the ones with nowhere on the map to stand", async () => {
     // A zone nobody has traced, or somewhere off the property entirely. An
     // animal missing from the map is indistinguishable from an animal missing.
@@ -464,6 +519,42 @@ describe("the garden palette", () => {
     // Snapping is on by default in a garden and off on a property, because a
     // bed is built to a tape measure and a fence is where the posts are.
     expect(screen.getByRole("button", { name: "Turn grid snap off" })).toBeInTheDocument();
+  });
+
+  it("calls the drawing a plan and a chip's colour a family", () => {
+    // The two words the garden needed that the palette could not yet say, and
+    // the reason it now can. "Not on the map" over a bed plan, and a botanical
+    // family read out as a halter, are the same kind of wrong as calling a bed
+    // a shape — correct about the component, and not about the job.
+    render(
+      <SpatialEditor
+        palette={gardenPalette}
+        shapes={[
+          { id: "bed-1", label: "Bed 1", boundary: square(FARM, 0.0002) },
+          { id: "bed-2", label: "Bed 2" },
+        ]}
+        chips={[
+          {
+            id: "okra",
+            label: "Okra",
+            shapeId: "bed-1",
+            accent: "#4E342E",
+            accentLabel: "Malvaceae",
+          },
+          { id: "kale", label: "Kale", shapeId: "bed-2" },
+        ]}
+        view={VIEW}
+      />,
+    );
+
+    expect(screen.getByText("Not on the plan (1):")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Okra, Malvaceae family" })).toBeInTheDocument();
+  });
+
+  it("says there is nowhere to open the plan, not the map", () => {
+    render(<SpatialEditor palette={gardenPalette} shapes={[{ id: "bed", label: "Bed 1" }]} />);
+
+    expect(screen.getByText(/nowhere to open the plan/)).toBeInTheDocument();
   });
 });
 
