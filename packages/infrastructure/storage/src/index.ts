@@ -6,3 +6,4 @@
  */
 
 export * from "./r2.js";
+export * from "./config.js";

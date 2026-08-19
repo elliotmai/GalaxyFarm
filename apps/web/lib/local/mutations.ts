@@ -4,21 +4,20 @@ import { useCallback } from "react";
 import type { z } from "zod";
 
 import {
-  diff,
   encodeUlid,
   restore,
   softDelete,
   validate,
   type BaseRecord,
   type CrudError,
-  type FieldValue,
   type OutboxOperation,
   type Result,
   type Ulid,
 } from "@galaxy-farm/core";
 
 import { useSyncEngine } from "@/app/_components/sync-provider";
-import { deviceId, type LocalStoreName } from "@/lib/local/store";
+import { commitRecord } from "@/lib/local/commit";
+import type { LocalStoreName } from "@/lib/local/store";
 
 /**
  * Writing, on device (spec §4.2, §4.5).
@@ -43,20 +42,6 @@ export interface Mutations<T extends BaseRecord> {
   restoreRecord(id: Ulid): Promise<Result<T, CrudError>>;
 }
 
-/** Fields the sync engine owns; a patch never carries them. */
-function changedFields<T extends BaseRecord>(
-  before: T | undefined,
-  after: T,
-  at: Date,
-  device: string,
-) {
-  return diff(
-    (before ?? {}) as unknown as Record<string, FieldValue>,
-    after as unknown as Record<string, FieldValue>,
-    { at, deviceId: device },
-  );
-}
-
 export function useMutations<T extends BaseRecord>(
   store: LocalStoreName,
   entity: string,
@@ -70,14 +55,10 @@ export function useMutations<T extends BaseRecord>(
     async (before: T | undefined, after: T, operation: OutboxOperation): Promise<void> => {
       if (local === undefined) throw new Error("The local store is not ready yet");
 
-      // Local first. The UI is already showing this by the time the engine
-      // hears about it.
-      await local.repository<T>(store).save(after);
-
-      const changes = changedFields(before, after, after.updatedAt, deviceId());
-      if (changes.length > 0) {
-        await local.engine.enqueue(operation, { entity, recordId: after.id, changes });
-      }
+      // Local first, then the outbox. The UI is already showing this by the
+      // time the engine hears about it — see `commit.ts`, which the photo
+      // uploader shares so a flipped attachment travels the same way.
+      await commitRecord(local, { store, entity, before, after, operation });
 
       // Fire and forget. A failed sync leaves the outbox intact and backs off;
       // awaiting it here would put the network back in front of the person.

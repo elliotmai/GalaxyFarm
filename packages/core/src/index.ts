@@ -16,6 +16,7 @@ export * from "./value-objects/index.js";
 export * from "./entities/index.js";
 export * from "./events/index.js";
 export * from "./ports/index.js";
+export * from "./photos/index.js";
 export * from "./crud/index.js";
 export * from "./auth/index.js";
 export * from "./sync/index.js";
