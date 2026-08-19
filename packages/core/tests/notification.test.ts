@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_LEAD_DAYS,
   NOTIFICATION_TRIGGERS,
+  deliveryChannels,
   dueNotifications,
   notificationSettingSchema,
   settingFor,
@@ -138,5 +139,56 @@ describe("notificationSettingSchema", () => {
 
   it("refuses a negative lead time", () => {
     expect(notificationSettingSchema.safeParse(setting({ leadDays: -1 })).success).toBe(false);
+  });
+});
+
+describe("deliveryChannels", () => {
+  it("uses every channel for a trigger nobody has configured", () => {
+    expect(deliveryChannels([], "calving_watch")).toEqual(["email", "push"]);
+  });
+
+  it("uses every channel for a message that is not one of §6's triggers", () => {
+    // An invitation. Nobody has a preference about it, so nothing suppresses it.
+    expect(deliveryChannels([setting({ channel: "none" })], undefined)).toEqual(["email", "push"]);
+  });
+
+  it("routes to exactly the channel the setting names", () => {
+    expect(deliveryChannels([setting({ channel: "email" })], "calving_window_opening")).toEqual([
+      "email",
+    ]);
+    expect(deliveryChannels([setting({ channel: "push" })], "calving_window_opening")).toEqual([
+      "push",
+    ]);
+    expect(deliveryChannels([setting({ channel: "both" })], "calving_window_opening")).toEqual([
+      "email",
+      "push",
+    ]);
+  });
+
+  it("delivers a switched-off trigger nowhere at all", () => {
+    // The §6 promise that push has to keep: something turned off must not
+    // arrive by the second route just because a second route now exists.
+    expect(deliveryChannels([setting({ channel: "none" })], "calving_window_opening")).toEqual([]);
+    expect(deliveryChannels([setting({ enabled: false })], "calving_window_opening")).toEqual([]);
+    expect(
+      deliveryChannels([setting({ enabled: false, channel: "push" })], "calving_window_opening"),
+    ).toEqual([]);
+  });
+
+  it("prefers a person's own setting over the property-wide one", () => {
+    const settings = [
+      setting({ channel: "none" }),
+      setting({ id: id(2), channel: "push", userId: id(8) }),
+    ];
+
+    expect(deliveryChannels(settings, "calving_window_opening", id(8))).toEqual(["push"]);
+    expect(deliveryChannels(settings, "calving_window_opening", id(9))).toEqual([]);
+  });
+
+  it("says nothing about a trigger the settings do not mention", () => {
+    expect(deliveryChannels([setting({ channel: "none" })], "frost_warning")).toEqual([
+      "email",
+      "push",
+    ]);
   });
 });

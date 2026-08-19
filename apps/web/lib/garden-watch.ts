@@ -2,6 +2,7 @@ import {
   dayKey,
   frostRisk,
   type DailyWeather,
+  type NotificationTrigger,
   type Ulid,
   type WatchSettings,
 } from "@galaxy-farm/core";
@@ -41,6 +42,15 @@ import { varietyLabel } from "@/lib/garden";
  */
 
 export interface GardenAlert {
+  /**
+   * Which of §6's triggers raised this.
+   *
+   * Carried on the alert rather than inferred by the caller because it decides
+   * who hears about it: the two triggers here have separate opt-outs, and a
+   * digest that merged them would make "stop telling me about frost" also stop
+   * the planting windows.
+   */
+  readonly trigger: NotificationTrigger;
   /**
    * A stable key derived from what the alert is *about*, never from when it
    * was computed.
@@ -109,6 +119,7 @@ export function plantingWindowAlerts(
         : "The plan already says which bed.";
 
     return {
+      trigger: "planting_window_opening",
       key: windowKey(window.planned.id),
       at: window.opensOn,
       title: window.open ? `${instruction} this week` : instruction,
@@ -149,6 +160,7 @@ export function frostAlerts(
       isInGrowingSeason(frostDatesFor(growingZone, risk.date.getUTCFullYear()), risk.date),
     )
     .map((risk) => ({
+      trigger: "frost_warning" as const,
       key: frostKey(risk.date),
       at: risk.date,
       title: risk.hardFreeze
@@ -169,21 +181,35 @@ export function frostKey(date: Date): string {
 }
 
 /**
- * One email for everything new, rather than one email per alert.
+ * One message per trigger for everything new, rather than one per alert.
  *
  * Three separate messages arriving in the same minute is how somebody learns
  * to filter the sender, and §6's per-trigger opt-out exists precisely because
- * an alert nobody reads is worse than no alert. Undefined when there is
- * nothing new, so the caller sends nothing at all rather than a mail saying so.
+ * an alert nobody reads is worse than no alert.
+ *
+ * **Grouped by trigger, and that is not an implementation detail.** A frost
+ * warning and a planting window have separate opt-outs, so a single digest
+ * carrying both could only be sent under one of the two preferences —
+ * switching frost off would take the season plan with it, or fail to switch
+ * frost off at all. Two triggers means at most two messages.
+ *
+ * Empty when there is nothing new, so the caller sends nothing at all rather
+ * than a message saying so.
  */
-export function gardenDigest(
+export function gardenDigests(
   alerts: readonly GardenAlert[],
-): { readonly subject: string; readonly body: string } | undefined {
-  if (alerts.length === 0) return undefined;
+): { readonly trigger: NotificationTrigger; readonly subject: string; readonly body: string }[] {
+  const byTrigger = new Map<NotificationTrigger, GardenAlert[]>();
+  for (const alert of alerts) {
+    byTrigger.set(alert.trigger, [...(byTrigger.get(alert.trigger) ?? []), alert]);
+  }
 
-  const first = alerts[0] as GardenAlert;
-  const subject = alerts.length === 1 ? first.subject : `Garden: ${alerts.length} things this week`;
-  const body = alerts.map((alert) => `${alert.subject}\n${alert.detail}`).join("\n\n");
-
-  return { subject, body };
+  return [...byTrigger].map(([trigger, group]) => {
+    const first = group[0] as GardenAlert;
+    return {
+      trigger,
+      subject: group.length === 1 ? first.subject : `Garden: ${group.length} things this week`,
+      body: group.map((alert) => `${alert.subject}\n${alert.detail}`).join("\n\n"),
+    };
+  });
 }

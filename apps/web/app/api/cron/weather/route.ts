@@ -23,11 +23,11 @@ import type { Crop, PlannedPlanting, Variety } from "@galaxy-farm/module-garden"
 import { database } from "@/lib/credential-store";
 import {
   frostAlerts,
-  gardenDigest,
+  gardenDigests,
   plantingWindowAlerts,
   type GardenAlert,
 } from "@/lib/garden-watch";
-import { notifier } from "@/lib/notifier";
+import { alertNotifier, noChannelReason } from "@/lib/notifier";
 import { listUsers } from "@/lib/user-store";
 import { weatherSnapshot } from "@/lib/weather-service";
 
@@ -41,9 +41,11 @@ import { weatherSnapshot } from "@/lib/weather-service";
  * notification that arrives while a person is moving cattle is a notification
  * they will never see again.
  *
- * The garden also sends mail, because a planting window is the one thing here
+ * The garden also notifies, because a planting window is the one thing here
  * that is useless found late — a calendar entry read on Sunday about a window
- * that opened on Tuesday is a fortnight of the season already gone.
+ * that opened on Tuesday is a fortnight of the season already gone. Whether
+ * that arrives as mail, as a push notification, or as both is the notifier's
+ * business and not this route's (§6).
  *
  * **Idempotent by construction.** The poll runs on a schedule nobody controls
  * to the minute and may run twice; each watch produces an event keyed to the
@@ -83,7 +85,8 @@ function watchEventId(card: CalvingWatchCard, day: string): string {
 /** What one property's garden produced this run. */
 interface GardenResult {
   readonly written: number;
-  readonly emailed: number;
+  /** Messages handed to the notifier — one per recipient per trigger. */
+  readonly notified: number;
   readonly note?: string;
 }
 
@@ -98,7 +101,7 @@ interface GardenResult {
  * frost half is skipped when there is none.
  *
  * Both reach the calendar, and anything the calendar has not seen before also
- * reaches an inbox. Keying the event on what the alert is *about* is what
+ * reaches whoever asked to hear about it. Keying the event on what the alert is *about* is what
  * makes that safe: on the second poll of the day the row already exists, so
  * nothing is new, so no second email goes out.
  *
@@ -148,7 +151,7 @@ async function runGardenWatch(
     ...(forecast === undefined ? [] : frostAlerts(forecast.daily, property.growingZone, settings)),
   ];
 
-  if (alerts.length === 0) return { written: 0, emailed: 0 };
+  if (alerts.length === 0) return { written: 0, notified: 0 };
 
   // Which of these the calendar has already seen. Asked before the upsert,
   // because after it the answer is always "all of them".
@@ -184,37 +187,51 @@ async function runGardenWatch(
       });
   }
 
-  const digest = gardenDigest(alerts.filter((alert) => !seen.has(alert.key)));
-  if (digest === undefined) return { written: alerts.length, emailed: 0 };
+  const digests = gardenDigests(alerts.filter((alert) => !seen.has(alert.key)));
+  if (digests.length === 0) return { written: alerts.length, notified: 0 };
 
-  const send = notifier();
+  const send = alertNotifier();
   if (send === undefined) {
     // §6 treats an unreachable third party as something to report and skip.
     // The calendar entries are written either way, which is the half that
     // syncs to every device.
-    return { written: alerts.length, emailed: 0, note: "Email is not configured" };
+    return {
+      written: alerts.length,
+      notified: 0,
+      note: noChannelReason() ?? "No notification channel is configured",
+    };
   }
 
-  // Owners and members. A housesitter is not being emailed about next
-  // February's tomatoes, and a customer never sees the garden at all (§4.3).
+  // Owners and members. A housesitter is not being told about next February's
+  // tomatoes, and a customer never sees the garden at all (§4.3).
   const recipients = (await listUsers(propertyId, now, db))
     .filter((managed) => managed.state === "active")
     .filter((managed) => managed.user.role === "owner" || managed.user.role === "member")
     .map((managed) => managed.user.email);
 
-  let emailed = 0;
+  let notified = 0;
   for (const to of recipients) {
-    try {
-      await send.send({ to, subject: digest.subject, body: digest.body });
-      emailed += 1;
-    } catch (error) {
-      // One bad address must not cost the others their mail, and it must not
-      // take the calving watch down with it either.
-      console.error("Garden digest failed", to, error);
+    for (const digest of digests) {
+      try {
+        // The trigger rides along so the notifier can honour §6's per-trigger
+        // preferences. Which channels that turns into is not this route's
+        // business — that is the whole point of the port.
+        await send.send({
+          to,
+          subject: digest.subject,
+          body: digest.body,
+          trigger: digest.trigger,
+        });
+        notified += 1;
+      } catch (error) {
+        // One bad address must not cost the others their mail, and it must not
+        // take the calving watch down with it either.
+        console.error("Garden digest failed", to, digest.trigger, error);
+      }
     }
   }
 
-  return { written: alerts.length, emailed };
+  return { written: alerts.length, notified };
 }
 
 export async function POST(request: Request) {

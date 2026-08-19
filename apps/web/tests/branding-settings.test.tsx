@@ -80,6 +80,16 @@ vi.mock("@/app/(admin)/admin/settings/_components/device-actions", () => ({
   clearKioskPinAction: async () => ({ ok: true, message: "" }),
 }));
 
+// And the Notifications tab, for the third time: its actions reach
+// `push_subscriptions` and `notification_settings` through the server.
+vi.mock("@/app/(admin)/admin/settings/_components/notification-actions", () => ({
+  subscribeDevice: async () => ({ ok: true, message: "" }),
+  unsubscribeDevice: async () => ({ ok: true, message: "" }),
+  identifyDevice: async () => undefined,
+  revokeDevice: async () => ({ ok: true, message: "" }),
+  setTriggerChannel: async () => ({ ok: true, message: "" }),
+}));
+
 const { ToastProvider, ConfirmProvider } = await import("@galaxy-farm/ui");
 const { SettingsScreen } =
   await import("../app/(admin)/admin/settings/_components/settings-screen.js");
@@ -126,6 +136,8 @@ function settings(mayManageBranding: boolean) {
           mayManageDevices={false}
           devices={[]}
           pinSet={false}
+          pushDevices={[]}
+          notificationSettings={[]}
         />
       </ConfirmProvider>
     </ToastProvider>,

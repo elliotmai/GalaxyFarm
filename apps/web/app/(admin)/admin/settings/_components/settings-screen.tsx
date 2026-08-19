@@ -1,10 +1,11 @@
 "use client";
 
-import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
-import type { Ulid } from "@galaxy-farm/core";
+import { Callout, PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
+import type { NotificationSetting, Ulid } from "@galaxy-farm/core";
 
 import { BrandingScreen } from "@/app/(admin)/admin/settings/_components/branding-screen";
 import { DevicesScreen } from "@/app/(admin)/admin/settings/_components/devices-screen";
+import { NotificationsScreen } from "@/app/(admin)/admin/settings/_components/notifications-screen";
 import {
   PeopleScreen,
   type PersonRow,
@@ -12,13 +13,14 @@ import {
 import { PropertyScreen } from "@/app/(admin)/admin/settings/_components/property-screen";
 import { WatchSettingsScreen } from "@/app/(admin)/admin/settings/_components/watch-settings-screen";
 import type { KioskDevice } from "@/lib/device-store";
+import type { PushDevice } from "@/lib/push-store";
 
 /**
  * Settings (spec §7).
  *
  * §7 gives this one route a long list — branding, users and roles, property
  * and zones, feed types, breeds, notification preferences, kiosk devices,
- * integrations — so it grows tabs rather than routes. Four of them exist so
+ * integrations — so it grows tabs rather than routes. Five of them exist so
  * far.
  *
  * The People and Branding tabs are absent rather than disabled for anyone
@@ -39,8 +41,13 @@ export function SettingsScreen({
   mayManageDevices,
   devices,
   pinSet,
+  pushDevices,
+  notificationSettings,
+  vapidPublicKey,
+  pushUnavailable,
   unavailable,
   devicesUnavailable,
+  notificationsUnavailable,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
@@ -53,10 +60,19 @@ export function SettingsScreen({
   readonly mayManageDevices: boolean;
   readonly devices: readonly KioskDevice[];
   readonly pinSet: boolean;
+  /** This person's own subscribed browsers, and their §6 preferences. */
+  readonly pushDevices: readonly PushDevice[];
+  readonly notificationSettings: readonly NotificationSetting[];
+  /** The VAPID public key, when push is configured for the farm. */
+  readonly vapidPublicKey?: string | undefined;
+  /** Why it is not, when it is not — the sentence names the variables to set. */
+  readonly pushUnavailable?: string | undefined;
   /** Why the people list is missing, when it is. */
   readonly unavailable?: string | undefined;
   /** Why the device list is missing, when it is. */
   readonly devicesUnavailable?: string | undefined;
+  /** Why the notification settings are missing, when they are. */
+  readonly notificationsUnavailable?: string | undefined;
 }) {
   const tabs = [
     ...(mayManageBranding ? [{ id: "branding", label: "Branding" }] : []),
@@ -83,6 +99,15 @@ export function SettingsScreen({
           },
         ]
       : []),
+    // Not gated: a person's own devices and their own §6 preferences. The
+    // adornment is their subscribed browsers, which is the number somebody
+    // actually wants to see at a glance — "am I still getting these on the
+    // phone I replaced?"
+    {
+      id: "notifications",
+      label: "Notifications",
+      adornment: notificationsUnavailable === undefined ? pushDevices.length : "!",
+    },
     { id: "watch", label: "Calving watch" },
   ];
 
@@ -115,6 +140,20 @@ export function SettingsScreen({
                 pinSet={pinSet}
                 {...(devicesUnavailable === undefined ? {} : { unavailable: devicesUnavailable })}
               />
+            ) : active === "notifications" ? (
+              notificationsUnavailable === undefined ? (
+                <NotificationsScreen
+                  actorId={actorId}
+                  devices={pushDevices}
+                  settings={notificationSettings}
+                  {...(vapidPublicKey === undefined ? {} : { publicKey: vapidPublicKey })}
+                  {...(pushUnavailable === undefined ? {} : { pushUnavailable })}
+                />
+              ) : (
+                <Callout title="Notification settings are unavailable">
+                  {notificationsUnavailable}
+                </Callout>
+              )
             ) : (
               <WatchSettingsScreen propertyId={propertyId} actorId={actorId} />
             )}

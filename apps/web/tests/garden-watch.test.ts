@@ -6,7 +6,7 @@ import type { Crop, PlannedPlanting, Variety } from "@galaxy-farm/module-garden"
 import {
   frostAlerts,
   frostKey,
-  gardenDigest,
+  gardenDigests,
   plantingWindowAlerts,
   windowKey,
 } from "../lib/garden-watch.js";
@@ -257,28 +257,45 @@ describe("frost warnings", () => {
   });
 });
 
-describe("the digest", () => {
+describe("the digests", () => {
   it("sends nothing at all when there is nothing new", () => {
-    expect(gardenDigest([])).toBeUndefined();
+    expect(gardenDigests([])).toEqual([]);
   });
 
   it("uses the alert's own subject when it is the only one", () => {
     const alerts = frostAlerts([day(on(2026, 4, 3), 33)], "8b", DEFAULT_WATCH_SETTINGS);
 
-    expect(gardenDigest(alerts)?.subject).toBe(alerts[0]?.subject);
+    expect(gardenDigests(alerts)[0]?.subject).toBe(alerts[0]?.subject);
   });
 
-  it("folds several into one mail rather than several", () => {
+  it("folds several of one trigger into one message rather than several", () => {
     // Three messages in the same minute is how somebody learns to filter the
     // sender — and the sender is also the one carrying the frost warning.
-    const alerts = [
+    const digests = gardenDigests(
+      frostAlerts([day(on(2026, 4, 3), 33), day(on(2026, 4, 4), 30)], "8b", DEFAULT_WATCH_SETTINGS),
+    );
+
+    expect(digests).toHaveLength(1);
+    expect(digests[0]?.subject).toBe("Garden: 2 things this week");
+    expect(digests[0]?.body).toContain("Frost");
+  });
+
+  it("keeps two triggers apart, because their opt-outs are separate (§6)", () => {
+    // The reason this is not one message: switching frost warnings off must
+    // not take the season plan's windows with it, and a merged message could
+    // only be sent under one of the two preferences.
+    const digests = gardenDigests([
       ...plantingWindowAlerts([plan({ id: id(70) })], varieties, crops, on(2026, 2, 3)),
       ...frostAlerts([day(on(2026, 4, 3), 33)], "8b", DEFAULT_WATCH_SETTINGS),
-    ];
-    const digest = gardenDigest(alerts);
+    ]);
 
-    expect(digest?.subject).toBe("Garden: 2 things this week");
-    expect(digest?.body).toContain("Start Cherokee Purple");
-    expect(digest?.body).toContain("Frost");
+    expect(digests.map((digest) => digest.trigger).sort()).toEqual([
+      "frost_warning",
+      "planting_window_opening",
+    ]);
+    expect(digests.find((d) => d.trigger === "planting_window_opening")?.body).toContain(
+      "Start Cherokee Purple",
+    );
+    expect(digests.find((d) => d.trigger === "frost_warning")?.body).toContain("Frost");
   });
 });

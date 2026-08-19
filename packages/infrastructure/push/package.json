@@ -1,0 +1,22 @@
+{
+  "name": "@galaxy-farm/infra-push",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Web push adapter \u2014 VAPID and RFC 8291 payload encryption",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "vapid:keys": "tsx scripts/vapid-keys.ts"
+  },
+  "dependencies": {
+    "@galaxy-farm/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

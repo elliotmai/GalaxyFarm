@@ -45,8 +45,21 @@ export const NOTIFICATION_TRIGGERS = [
 ] as const;
 export type NotificationTrigger = (typeof NOTIFICATION_TRIGGERS)[number];
 
-export const NOTIFICATION_CHANNELS = ["email", "push", "none"] as const;
+/**
+ * Where one trigger's notifications go.
+ *
+ * `both` exists because the composite notifier does: a calving watch that
+ * reaches a phone in the barn *and* an inbox to read later is the point of
+ * having two channels at all, and a model that could only pick one would make
+ * "turn push on" mean "turn email off". `none` is the opt-out §6 asks for, and
+ * is not a channel anything sends to — see `deliveryChannels`.
+ */
+export const NOTIFICATION_CHANNELS = ["email", "push", "both", "none"] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
+/** A channel something is actually delivered on. `none` and `both` are choices, not routes. */
+export const DELIVERY_CHANNELS = ["email", "push"] as const;
+export type DeliveryChannel = (typeof DELIVERY_CHANNELS)[number];
 
 /**
  * Default lead times, in days.
@@ -118,6 +131,52 @@ export function settingFor(
     settings.find((setting) => setting.trigger === trigger && setting.userId === userId) ??
     settings.find((setting) => setting.trigger === trigger && setting.userId === undefined)
   );
+}
+
+/**
+ * Which channels one trigger may be delivered on (spec §6).
+ *
+ * The routing half of "per-trigger opt-out": `dueNotifications` decides
+ * *whether* to say something, and this decides *where* it goes. They are
+ * separate because a farm has two kinds of silence — "never tell me about
+ * this" and "tell me, but not on my phone at 2am" — and a model with only the
+ * first turns the second into the first.
+ *
+ * Two defaults worth stating, because both go the permissive way:
+ *
+ * - **No setting at all means every channel.** A trigger nobody has configured
+ *   is one nobody has opted out of, and the same reasoning `dueNotifications`
+ *   gives applies: a trigger that silently defaulted to off is one nobody
+ *   knows they are missing.
+ * - **No trigger on the message means every channel.** An invitation or a test
+ *   send is not one of §6's twenty-two, so there is no preference to honour and
+ *   nothing to suppress it.
+ *
+ * Neither default is as loud as it sounds, because a channel only delivers
+ * where somebody has set it up: push reaches exactly the devices a person
+ * subscribed by hand, and reaches nothing at all before they do.
+ */
+export function deliveryChannels(
+  settings: readonly NotificationSetting[],
+  trigger: NotificationTrigger | undefined,
+  userId?: Ulid,
+): readonly DeliveryChannel[] {
+  if (trigger === undefined) return DELIVERY_CHANNELS;
+
+  const setting = settingFor(settings, trigger, userId);
+  if (setting === undefined) return DELIVERY_CHANNELS;
+  if (!setting.enabled) return [];
+
+  switch (setting.channel) {
+    case "none":
+      return [];
+    case "email":
+      return ["email"];
+    case "push":
+      return ["push"];
+    case "both":
+      return DELIVERY_CHANNELS;
+  }
 }
 
 /**

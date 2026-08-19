@@ -30,3 +30,70 @@ export const OFFLINE_ROUTE = "/offline";
  * two programs, so it is written down once rather than typed out at both ends.
  */
 export const SKIP_WAITING = "SKIP_WAITING";
+
+/**
+ * What a push notification carries, once the worker has opened it.
+ *
+ * The wire shape agreed with `@galaxy-farm/infra-push`, which writes it. It
+ * cannot be imported from there: this file is compiled into the worker, which
+ * has no `node:crypto` and no business linking an adapter — so the two halves
+ * are held together by `apps/web/tests/push-payload.test.ts` running the real
+ * encoder through the parser below.
+ */
+export interface PushPayload {
+  readonly title: string;
+  readonly body: string;
+  /** Where a tap lands, as a path on this origin. */
+  readonly url: string;
+}
+
+/**
+ * What a notification says when the payload is missing or unreadable.
+ *
+ * There has to be one. A `push` event that shows no notification is a "silent
+ * push", and browsers answer repeated silent pushes by showing their own
+ * "this site was updated in the background" notice or revoking the permission
+ * outright — so the failure mode of a truncated payload has to be a vague
+ * notification, never no notification.
+ */
+export const PUSH_FALLBACK: PushPayload = {
+  title: "Galaxy Farm",
+  body: "Something needs looking at. Open the app to see what.",
+  url: "/admin",
+};
+
+/**
+ * Read a payload defensively.
+ *
+ * Every field is checked rather than trusted, because this runs on data that
+ * arrived over a push service and is parsed inside a worker where a thrown
+ * error means the event handler dies and nothing is shown at all.
+ */
+export function parsePushPayload(raw: string | undefined): PushPayload {
+  if (raw === undefined || raw === "") return PUSH_FALLBACK;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    // A push service that delivered something we did not send, or a payload
+    // cut short. Neither is worth losing the notification over.
+    return PUSH_FALLBACK;
+  }
+
+  if (typeof parsed !== "object" || parsed === null) return PUSH_FALLBACK;
+  const fields = parsed as Record<string, unknown>;
+  const text = (key: string, fallback: string): string =>
+    typeof fields[key] === "string" && fields[key] !== "" ? (fields[key] as string) : fallback;
+
+  return {
+    title: text("title", PUSH_FALLBACK.title),
+    body: text("body", PUSH_FALLBACK.body),
+    // A relative path only. An absolute URL in a payload is somebody else's
+    // origin, and a notification that opens one is the app handing its own
+    // tap to a stranger.
+    url: text("url", PUSH_FALLBACK.url).startsWith("/")
+      ? text("url", PUSH_FALLBACK.url)
+      : PUSH_FALLBACK.url,
+  };
+}
