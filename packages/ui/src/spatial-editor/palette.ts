@@ -44,6 +44,26 @@ export interface SpatialPalette {
   readonly ranks: Readonly<Record<number, SpatialRank>>;
   readonly rankTitle: string;
   /**
+   * What the drawing itself is called.
+   *
+   * A "map" of a property and a "plan" of a garden, and the editor writes the
+   * word in three places somebody reads — the tray of chips it could not place,
+   * the message when there is nothing to open on, and the canvas's own name.
+   * "Not on the map (2)" over a bed plan is the same kind of wrong as calling a
+   * bed a shape: correct about the component, and not about the job.
+   */
+  readonly surfaceNoun: string;
+  /**
+   * What a chip's `accent` identifies, said out loud.
+   *
+   * The colour is drawn for everyone; the word is what a screen reader gets,
+   * and it is the only place a chip's accent is legible in a dark barn. It is
+   * a halter on a calf and a botanical family on a planting — the same dot,
+   * two different facts, which is a palette's business rather than the
+   * editor's.
+   */
+  readonly accentNoun: string;
+  /**
    * What is under the shapes.
    *
    * `aerial` means a photograph, and the photograph is the point: a pen filled
@@ -92,22 +112,29 @@ export const propertyPalette: SpatialPalette = {
   chipNoun: { one: "animal", many: "animals" },
   ranks: SAFETY_RANKS,
   rankTitle: "Safety level",
+  surfaceNoun: "map",
+  accentNoun: "halter",
   ground: "aerial",
   snapByDefault: false,
   restingLabel: "Resting",
 };
 
 /**
- * Beds on a plan, for the Phase 3 layout designer (#22).
+ * Beds on a plan — the garden layout designer (#33).
  *
- * Here now, unused, and deliberately so. A second palette is the only proof
- * that the API is a palette and not a fork: everything the property mode needs
- * that this one cannot express would otherwise be discovered in Phase 3, with
- * the editor already load-bearing and the cheapest fix a second component.
+ * Written before the designer existed, and unused until it did, which was the
+ * point: a second palette is the only proof that the API is a palette and not
+ * a fork. What the garden needed and this could not yet say turned out to be
+ * two words — `surfaceNoun` and `accentNoun` — and widening the palette by two
+ * strings is exactly the repair §2 asks for. A second component would have been
+ * the alternative, and it would have been discovered with the editor already
+ * load-bearing.
  *
  * The scale is the rotation guard (§5.5) rather than a hazard — a bed is not
  * dangerous, it is either clear to plant or it is not — which is exactly the
- * kind of difference a palette exists to hold.
+ * kind of difference a palette exists to hold. Step 2 covers everything inside
+ * the rotation window that is not last season, because "two seasons back" and
+ * "three seasons back" call for the same decision.
  */
 export const gardenPalette: SpatialPalette = {
   id: "garden",
@@ -119,6 +146,8 @@ export const gardenPalette: SpatialPalette = {
     3: { color: "#C62828", ink: "#FFFFFF", label: "3 — Same family last season" },
   },
   rankTitle: "Rotation",
+  surfaceNoun: "plan",
+  accentNoun: "family",
   ground: "plan",
   snapByDefault: true,
   restingLabel: "Fallow",

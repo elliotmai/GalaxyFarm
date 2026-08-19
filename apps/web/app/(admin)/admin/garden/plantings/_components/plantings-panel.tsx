@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 
 import {
   Button,
-  Callout,
   CardGrid,
   EmptyState,
   Modal,
@@ -19,7 +18,6 @@ import {
 } from "@galaxy-farm/ui";
 import type { CrudError, Ulid } from "@galaxy-farm/core";
 import {
-  DEFAULT_ROTATION_YEARS,
   expectedHarvestDate,
   gardenCareLogSchema,
   harvestLogSchema,
@@ -46,6 +44,7 @@ import {
   formatDate,
   quantityLabel,
 } from "@/app/(admin)/admin/garden/_components/labels";
+import { RotationCallout } from "@/app/(admin)/admin/garden/_components/rotation-callout";
 import { familyHistory, familyOf, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
@@ -461,18 +460,10 @@ export function PlantingsPanel({
               value of it is being seen before the bed is settled on.
             */}
             {warning === undefined ? null : (
-              <Callout tone="danger" title="Rotation warning">
-                <p>
-                  {warning.family} was last in {bedName(warning.bedId)} on{" "}
-                  {formatDate(warning.lastPlantedOn)} — {warning.yearsSince.toFixed(1)} years ago,
-                  inside the {DEFAULT_ROTATION_YEARS}-year rotation. Same family means the same
-                  soil-borne diseases and the same feeders.
-                </p>
-                <p className="mt-2 text-sm">
-                  This does not stop you. If you know why you are doing it, say so in the notes and
-                  save.
-                </p>
-              </Callout>
+              <RotationCallout warning={warning} bedName={bedName(warning.bedId)}>
+                This does not stop you. If you know why you are doing it, say so in the notes and
+                save.
+              </RotationCallout>
             )}
 
             <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
