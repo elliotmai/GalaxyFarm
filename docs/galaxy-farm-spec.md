@@ -379,6 +379,9 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /login
 /invite/[token]                 set a first password from a single-use invitation; public by
                                 necessity, since the account cannot be signed in to yet
+/offline                        what the service worker serves for a document this device has
+                                never loaded and cannot fetch (§3); precached, so it needs no
+                                session and no data
 
 /admin                          dashboard: today's chores, alerts, calving countdowns, run-outs
 /admin/map                      property map — draw pens/pastures over aerial photo,

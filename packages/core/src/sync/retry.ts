@@ -38,12 +38,16 @@ export function isStuck(entry: Pick<OutboxEntry, "attempts">): boolean {
  * and then filtering is head-of-line blocking: a few retired entries at the
  * front of the queue hide every fresh edit behind them, and the count on
  * screen climbs forever while nothing is ever sent.
+ *
+ * Generic over the entry, because the photo queue (§4.2) backs off on exactly
+ * the same terms as the outbox and there is no reason for two answers to
+ * "may this be tried again yet".
  */
-export function drainableNow(
-  entries: readonly OutboxEntry[],
+export function drainableNow<T extends Pick<OutboxEntry, "attempts">>(
+  entries: readonly T[],
   now: Date,
   lastAttemptAt?: Date,
-): OutboxEntry[] {
+): T[] {
   return entries.filter((entry) => {
     if (isStuck(entry)) return false;
     if (entry.attempts === 0 || lastAttemptAt === undefined) return true;

@@ -6,6 +6,7 @@ import { ConfirmProvider, ToastProvider } from "@galaxy-farm/ui";
 import { AdminNav } from "@/app/(admin)/_components/admin-nav";
 import { Refreshable } from "@/app/(admin)/_components/refreshable";
 import { SectionStrip } from "@/app/(admin)/_components/section-strip";
+import { PwaShell } from "@/app/_components/pwa-shell";
 import { SyncProvider } from "@/app/_components/sync-provider";
 import { currentActor } from "@/lib/auth";
 import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
@@ -92,6 +93,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </ConfirmProvider>
         </ToastProvider>
       </SyncProvider>
+      <PwaShell />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 
 import { loadCursors, saveCursors } from "@/lib/local/cursors";
 import { localStore, type LocalStore } from "@/lib/local/store";
+import { photoUploader } from "@/lib/photos/uploader";
 
 /**
  * Runs the sync loop for the tab (spec §4.2).
@@ -21,6 +22,13 @@ import { localStore, type LocalStore } from "@/lib/local/store";
  * reads, and this pushes and pulls behind that — so a page renders at the same
  * speed with no signal as with five bars, and Neon's cold start never lands in
  * front of someone standing in a pen.
+ *
+ * Photo bytes drain on the same heartbeat, which is the whole of "a photo
+ * taken in the barn with no signal uploads later, with the user doing
+ * nothing": there is no upload button anywhere in this app, and there is not
+ * meant to be. The counts below fold the photo queue in with the outbox, so
+ * the badge says what is actually still on the device rather than only the
+ * part of it that is text.
  */
 
 const EVERY = 60_000;
@@ -40,7 +48,13 @@ export interface SyncState {
    */
   readonly problem: string | undefined;
   readonly lastSyncedAt: Date | undefined;
-  /** Local edits not yet accepted by the server. */
+  /**
+   * Local work not yet accepted by the server — edits and photographs alike.
+   *
+   * One number rather than two, because the question somebody is asking when
+   * they look at it is "can I close the app yet", and "3 to send" beside a
+   * separate "and 2 photos" answers it twice.
+   */
   readonly pending: number;
   /**
    * Edits the server rejected often enough to be set aside.
@@ -147,6 +161,13 @@ export function SyncProvider({
   const [store] = useState<LocalStore | undefined>(() =>
     typeof indexedDB === "undefined" ? undefined : localStore(),
   );
+  /*
+   * One uploader per provider, built beside the store for the same reason.
+   *
+   * It holds the backoff clock for the photo queue, so a second one would let
+   * two drains run against the same entries and upload the same bytes twice.
+   */
+  const [uploads] = useState(() => (store === undefined ? undefined : photoUploader(store)));
   const [syncing, setSyncing] = useState(false);
   const [offline, setOffline] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
@@ -175,25 +196,36 @@ export function SyncProvider({
       const outcome = pushEnabled
         ? await store.engine.sync()
         : { pushed: 0, rejected: 0, audit: [], ...(await store.engine.pull()) };
-      setOffline(outcome.offline);
-      setProblem(outcome.problem);
+
+      // Photos go after the records, and only where pushing is allowed at all.
+      // A kiosk's outbox is empty by design (§4.4) and `/api/storage/presign`
+      // refuses it, so draining there would light the badge up as broken over
+      // a queue that is always empty.
+      const photos =
+        pushEnabled && uploads !== undefined
+          ? await uploads.drain()
+          : { uploaded: 0, refused: 0, offline: false, problem: undefined };
+
+      setOffline(outcome.offline || photos.offline);
+      setProblem(outcome.problem ?? photos.problem);
       if (!outcome.offline && outcome.problem === undefined) {
         setLastSyncedAt(new Date());
         saveCursors(store.engine.cursorState());
       }
-      setPending(await store.engine.pendingCount());
-      setStuck(await store.engine.stuckCount());
+      setPending((await store.engine.pendingCount()) + ((await uploads?.pendingCount()) ?? 0));
+      setStuck((await store.engine.stuckCount()) + ((await uploads?.stuckCount()) ?? 0));
     } finally {
       running.current = false;
       setSyncing(false);
     }
-  }, [store, pushEnabled]);
+  }, [store, pushEnabled, uploads]);
 
   const retryStuck = useCallback(async () => {
     if (store === undefined) return;
     await store.engine.retryStuck();
+    await uploads?.retryStuck();
     await syncNow();
-  }, [store, syncNow]);
+  }, [store, syncNow, uploads]);
 
   useEffect(() => {
     if (store === undefined) return;

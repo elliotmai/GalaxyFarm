@@ -74,6 +74,20 @@ export const SEARCHABLE_FIELDS = {
   supplyUsage: ["notes"],
   // Assignments are found through the item, the animal or the zone.
   durableAssignments: ["notes"],
+  beds: ["name", "soilNotes"],
+  crops: ["name", "family", "notes"],
+  varieties: ["name", "source", "notes"],
+  // Found through its variety. What is worth typing at is where the packet
+  // came from and what last year's germination test said.
+  seedInventory: ["source", "germinationNotes"],
+  plantings: ["notes"],
+  gardenCareLogs: ["product", "notes"],
+  harvestLogs: ["notes"],
+  // The label is the whole point of a pantry search: somebody is standing in
+  // front of a shelf reading jars.
+  preservationLogs: ["label", "storageLocation", "notes"],
+  seasonPlans: ["name", "notes"],
+  plannedPlantings: ["notes", "abandonedReason"],
   contacts: ["name", "company", "address", "notes"],
   attachments: ["filename", "caption"],
   careGuides: ["title", "intro"],

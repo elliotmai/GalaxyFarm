@@ -1,12 +1,20 @@
 import {
   DexieOutbox,
+  DexiePhotoQueue,
   DexieRepository,
   FarmDatabase,
   type StoredRecord,
 } from "@galaxy-farm/infra-local";
 import { SyncEngine } from "@galaxy-farm/infra-sync";
-import { encodeUlid, systemClock, type BaseRecord, type Repository } from "@galaxy-farm/core";
+import {
+  encodeUlid,
+  systemClock,
+  type BaseRecord,
+  type PhotoQueue,
+  type Repository,
+} from "@galaxy-farm/core";
 
+import { DEVICE_ID_STORAGE_KEY, deviceId } from "@/lib/local/device-id";
 import { resetLiveRecords } from "@/lib/local/live-records";
 import { httpTransport } from "@/lib/local/transport";
 
@@ -55,6 +63,16 @@ export const LOCAL_STORES = [
   "flockAdjustments",
   "eggLogs",
   "eggDispositions",
+  "beds",
+  "crops",
+  "varieties",
+  "seedInventory",
+  "plantings",
+  "gardenCareLogs",
+  "harvestLogs",
+  "preservationLogs",
+  "seasonPlans",
+  "plannedPlantings",
   "equipment",
   "meterReadings",
   "maintenanceRules",
@@ -100,8 +118,14 @@ export type LocalStoreName = (typeof LOCAL_STORES)[number];
  * 13 — the Kit: the fleet with its meters, rules, service and fuel (§5.6), and
  *      the supply shelf with its purchases, usage and durables (§5.11).
  * 14 — the care guide and its hand-written sections (§5.10).
+ * 15 — the garden: beds, the seed box, what went in the ground, what came off
+ *      it, and the season plan the notifications read (§5.5).
+ * 16 — the photo queue: bytes waiting for signal, so a photograph taken at the
+ *      chute survives the browser being killed (§4.2). Not an entity — it is
+ *      device-local and never syncs — but it is a table, and a table only
+ *      appears on a returning device when the version moves.
  */
-export const LOCAL_SCHEMA_VERSION = 14;
+export const LOCAL_SCHEMA_VERSION = 16;
 
 /**
  * Which fields each entity's search box looks at.
@@ -143,6 +167,16 @@ const SEARCHABLE: Readonly<Record<LocalStoreName, readonly string[]>> = {
   flockAdjustments: ["notes"],
   eggLogs: ["notes"],
   eggDispositions: ["notes"],
+  beds: ["name", "soilNotes"],
+  crops: ["name", "family", "notes"],
+  varieties: ["name", "source", "notes"],
+  seedInventory: ["source", "germinationNotes"],
+  plantings: ["notes"],
+  gardenCareLogs: ["product", "notes"],
+  harvestLogs: ["notes"],
+  preservationLogs: ["label", "storageLocation", "notes"],
+  seasonPlans: ["name", "notes"],
+  plannedPlantings: ["notes", "abandonedReason"],
   // A serial number is what somebody has in their hand at a parts counter, so
   // it is searchable alongside the name it is never remembered by.
   equipment: ["name", "make", "model", "vin", "notes"],
@@ -168,37 +202,29 @@ const SEARCHABLE: Readonly<Record<LocalStoreName, readonly string[]>> = {
 export interface LocalStore {
   readonly db: FarmDatabase;
   readonly engine: SyncEngine<StoredRecord>;
+  /**
+   * Photo bytes waiting for a connection (spec §4.2).
+   *
+   * Beside the outbox rather than in it: the outbox carries field patches, and
+   * a queue the engine reads end to end on every heartbeat is no place for
+   * megabytes. The `Attachment` record travels the ordinary way; only the
+   * bytes queue here.
+   */
+  readonly photoQueue: PhotoQueue;
   repository<T extends BaseRecord>(name: LocalStoreName): DexieRepository<T>;
 }
 
 let store: LocalStore | undefined;
 
 /**
- * Exported so the kiosk pairing flow can seed this before the local store is
- * ever built. A paired screen syncs under the `kioskDevices` row Postgres
- * already knows about, not a fresh id generated the first time IndexedDB is
- * touched — otherwise re-pairing, or clearing storage, forks its merge
- * history under a new device every time (spec §4.2).
- */
-export const DEVICE_ID_STORAGE_KEY = "galaxy-farm:device-id";
-
-/**
- * The device id.
+ * The device id, and the key it is kept under.
  *
- * Persisted, because it is what the merge uses to break a tie between two
- * writes with identical timestamps. A device that reintroduced itself under a
- * new name every reload would make that tie-break arbitrary in a way that
- * differs per device, and the whole point is that every device reaches the
- * same answer without talking to the others.
+ * Re-exported rather than declared here: `commit.ts` needs it and is imported
+ * by the photo uploader, which this file builds — so declaring it here would
+ * close a cycle between the three. It lives in `device-id.ts`, which imports
+ * nothing.
  */
-export function deviceId(): string {
-  const existing = globalThis.localStorage?.getItem(DEVICE_ID_STORAGE_KEY);
-  if (existing !== null && existing !== undefined && existing !== "") return existing;
-
-  const fresh = encodeUlid(Date.now());
-  globalThis.localStorage?.setItem(DEVICE_ID_STORAGE_KEY, fresh);
-  return fresh;
-}
+export { DEVICE_ID_STORAGE_KEY, deviceId };
 
 /**
  * Build the store once per tab.
@@ -253,6 +279,7 @@ export function localStore(): LocalStore {
   store = {
     db,
     engine,
+    photoQueue: new DexiePhotoQueue(db),
     repository: <T extends BaseRecord>(name: LocalStoreName) =>
       repositories.get(name) as unknown as DexieRepository<T>,
   };

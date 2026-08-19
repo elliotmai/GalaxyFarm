@@ -7,5 +7,6 @@
  * comparison view sorts and divides by.
  */
 
+export * from "./domain/calendar.js";
 export * from "./domain/equipment.js";
 export * from "./domain/equipment-candidate.js";

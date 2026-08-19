@@ -34,6 +34,29 @@ export const OUTBOX_STORE = "outbox";
 export const OUTBOX_INDEXES = "id, queuedAt, attempts";
 
 /**
+ * Photo bytes waiting for a connection, and the same argument again.
+ *
+ * Queued work rather than data, so it is indexed like the outbox rather than
+ * like a record, and it is created unconditionally for the same reason: a
+ * device that can take a photograph with no signal and has nowhere to put the
+ * bytes has lost them, which is the one failure this architecture exists to
+ * prevent (spec §4.2).
+ */
+export const UPLOADS_STORE = "photoUploads";
+export const UPLOADS_INDEXES = "id, queuedAt, attempts";
+
+/**
+ * The schema version that introduced the upload queue.
+ *
+ * Declared here rather than folded into the version history above, because the
+ * history is what upgrades a device in place: a browser holding unsynced work
+ * at version 15 has to be told what changed at 16, and rewriting version 2 to
+ * mention a table that did not exist then would describe a database nobody
+ * ever had.
+ */
+export const UPLOADS_SCHEMA_VERSION = 16;
+
+/**
  * The last version whose schema this file describes on its own.
  *
  * IndexedDB will not create an object store for a database it has already
@@ -90,7 +113,13 @@ export class FarmDatabase extends Dexie {
     // are in `records`, which is why the version has to move for a device that
     // has opened the database before to gain the new tables.
     const version = options.schemaVersion ?? BASE_SCHEMA_VERSION;
-    if (version > BASE_SCHEMA_VERSION) this.version(version).stores(withOutbox);
+    if (version > BASE_SCHEMA_VERSION) {
+      this.version(version).stores(
+        version >= UPLOADS_SCHEMA_VERSION
+          ? { ...withOutbox, [UPLOADS_STORE]: UPLOADS_INDEXES }
+          : withOutbox,
+      );
+    }
   }
 
   /**

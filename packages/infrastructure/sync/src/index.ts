@@ -40,3 +40,4 @@ export type {
 } from "@galaxy-farm/core";
 export * from "./outbox.js";
 export * from "./engine.js";
+export * from "./photo-uploader.js";

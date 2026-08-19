@@ -5,6 +5,7 @@ import type { ListQuery } from "../crud/contracts.js";
 export * from "./sync.js";
 export * from "./weather.js";
 export * from "./storage.js";
+export * from "./photo-queue.js";
 export * from "./invoicing.js";
 export * from "./geocoder.js";
 

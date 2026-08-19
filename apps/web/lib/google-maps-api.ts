@@ -1,67 +1,31 @@
-import type { LatLngLiteral, MapBounds } from "./map-geometry";
-
 /**
  * The slice of the Maps JavaScript API this app touches (spec §8).
  *
- * Declared here rather than taken from `@types/google.maps`, for the same
- * reason the Neo4j adapter is `fetch` and not a driver: the whole surface used
- * is a map, two shapes and a bounds object, and a package of ten thousand
- * lines of ambient declarations to describe five of them is a dependency that
- * earns nothing. Narrowing it also documents what a barn kiosk's offline
- * renderer would have to provide to stand in for Google — which is the point of
- * §8's two-backgrounds design.
+ * Declared here rather than taken from `@types/google.maps`: the whole surface
+ * used is a map and two setters, and a package of ten thousand lines of
+ * ambient declarations to describe them is a dependency that earns nothing.
+ * Narrowing it also documents what an offline renderer would have to provide
+ * to stand in for Google — which is the point of §8's two-background design.
  *
- * Everything here is what Google actually ships; nothing is invented. If a call
- * is added, its type goes here first.
+ * It used to be larger. Polygons, polylines, click listeners and a dash
+ * pattern all lived here while the map screen drew the pens itself through
+ * Google. The spatial editor draws them now, in SVG over lat/lng, so Google's
+ * only remaining job on this screen is to put photographs of the ground behind
+ * it — and the type shrank to say exactly that.
+ *
+ * Everything here is what Google actually ships; nothing is invented. If a
+ * call is added, its type goes here first.
  */
 
-export interface MapsEvent {
-  readonly latLng?: { lat(): number; lng(): number } | null;
-}
-
-export interface MapsPath {
-  getLength(): number;
-  getAt(index: number): { lat(): number; lng(): number };
-}
-
-export interface MapsPolygon {
-  setMap(map: MapsMap | null): void;
-  getPath(): MapsPath;
-  addListener(event: string, handler: () => void): void;
-}
-
-export interface MapsPolyline {
-  setMap(map: MapsMap | null): void;
+/** A coordinate in the shape Google takes. */
+export interface LatLngLiteral {
+  readonly lat: number;
+  readonly lng: number;
 }
 
 export interface MapsMap {
   setCenter(centre: LatLngLiteral): void;
   setZoom(zoom: number): void;
-  fitBounds(bounds: MapBounds, padding?: number): void;
-  addListener(event: string, handler: (event: MapsEvent) => void): void;
-}
-
-export interface PolygonOptions {
-  readonly paths?: readonly LatLngLiteral[];
-  readonly map?: MapsMap;
-  readonly strokeColor?: string;
-  readonly strokeOpacity?: number;
-  readonly strokeWeight?: number;
-  readonly fillColor?: string;
-  readonly fillOpacity?: number;
-  readonly editable?: boolean;
-  readonly clickable?: boolean;
-  readonly zIndex?: number;
-}
-
-export interface PolylineOptions {
-  readonly path?: readonly LatLngLiteral[];
-  readonly map?: MapsMap;
-  readonly strokeColor?: string;
-  readonly strokeOpacity?: number;
-  readonly strokeWeight?: number;
-  readonly icons?: readonly unknown[];
-  readonly zIndex?: number;
 }
 
 export interface MapOptions {
@@ -76,13 +40,12 @@ export interface MapOptions {
   readonly streetViewControl?: boolean;
   readonly rotateControl?: boolean;
   readonly gestureHandling?: string;
+  readonly keyboardShortcuts?: boolean;
+  readonly clickableIcons?: boolean;
 }
 
 export interface MapsNamespace {
   Map: new (host: HTMLElement, options: MapOptions) => MapsMap;
-  Polygon: new (options: PolygonOptions) => MapsPolygon;
-  Polyline: new (options: PolylineOptions) => MapsPolyline;
-  SymbolPath: { CIRCLE: unknown };
 }
 
 /**
@@ -96,21 +59,4 @@ export interface MapsNamespace {
 export function mapsNamespace(): MapsNamespace | undefined {
   if (typeof window === "undefined") return undefined;
   return (window as unknown as { google?: { maps?: MapsNamespace } }).google?.maps;
-}
-
-/**
- * A dashed line, in the only way the API draws one.
- *
- * Polylines have no dash option; a dash is a repeated symbol along the path.
- * Written once here so the fence-down convention cannot drift between the two
- * places that draw it.
- */
-export function dashPattern(): readonly unknown[] {
-  return [
-    {
-      icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: 3 },
-      offset: "0",
-      repeat: "12px",
-    },
-  ];
 }

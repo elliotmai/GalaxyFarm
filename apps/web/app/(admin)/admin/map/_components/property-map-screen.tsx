@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import {
   Button,
@@ -8,56 +8,55 @@ import {
   Card,
   DataTable,
   EmptyState,
+  Modal,
   PageBody,
   PageHeader,
   Pill,
   Section,
+  SpatialEditor,
+  propertyPalette,
   useToast,
   type Column,
+  type SpatialDraft,
+  type SpatialReassignment,
+  type SpatialView,
 } from "@galaxy-farm/ui";
 import {
   describeZoneExtent,
+  encodeUlid,
   isOnProperty,
+  moveToZone,
   standingDividers,
+  zoneAssignmentSchema,
   zoneSchema,
-  type GeoPoint,
   type Property,
   type Ulid,
   type Zone,
+  type ZoneAssignment,
+  type Animal,
 } from "@galaxy-farm/core";
 
-import {
-  dashPattern,
-  mapsNamespace,
-  type MapsMap,
-  type MapsPolygon,
-  type MapsPolyline,
-} from "@/lib/google-maps-api";
-import { loadGoogleMaps, mapsApiKey, mapsNotConfigured } from "@/lib/google-maps";
-import {
-  DEFAULT_ZOOM,
-  dividerPaint,
-  isTraceable,
-  openingView,
-  traceHint,
-  zonePaint,
-} from "@/lib/map-geometry";
+import { GoogleSatelliteLayer } from "@/app/(admin)/admin/map/_components/google-satellite-layer";
+import { mapsApiKey, mapsNotConfigured } from "@/lib/google-maps";
+import { animalChips, zoneShapes } from "@/lib/map-shapes";
+import { offlineImagery, offlineImageryGap } from "@/lib/offline-imagery";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
- * The property map (spec §7, §8).
+ * The property map (spec §7, §8) — the shared `SpatialEditor` in property mode.
  *
- * Pens traced over live aerial imagery, stored as real lat/lng. The storage
- * decision is the whole design: a boundary in latitudes renders over Google
- * online and over an owned NAIP snapshot on a kiosk with no signal, and neither
- * background knows about the other. A pen stored in screen coordinates would
- * have to be redrawn for the second one.
+ * This screen used to be the map: it loaded the Maps API, built Google
+ * polygons out of zone boundaries, and listened for clicks on Google's canvas.
+ * Everything about a pen therefore needed Google to be reachable, and the
+ * offline background §8 asks for could never have been the same code path — it
+ * would have been a second implementation of the same drawing.
  *
- * The map is the one screen here that needs the network, and it says so rather
- * than showing a grey rectangle — a blank map reads as a broken app, and the
- * two reasons it can be blank (no key, no coordinates) are fixed in completely
- * different places.
+ * So the editor draws the pens now, in SVG over lat/lng, and the background is
+ * a slot: Google's tiles online, an owned NAIP snapshot when there is no
+ * signal, neither knowing about the other. What is left here is composition —
+ * flattening zones and animals into shapes and chips, and turning a dragged
+ * chip into the two writes that move an animal.
  */
 
 export function PropertyMapScreen({
@@ -67,187 +66,164 @@ export function PropertyMapScreen({
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
 }) {
-  const api = useMutations<Zone>("zones", "zones", zoneSchema, propertyId, actorId);
   const { show } = useToast();
+  const query = useMemo(() => ({ propertyId }), [propertyId]);
 
-  const { records: allZones } = useRecords<Zone>("zones", { propertyId });
+  const { records: allZones } = useRecords<Zone>("zones", query);
+  const { records: animals } = useRecords<Animal>("animals", query);
+  const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
+  const { records: properties } = useRecords<Property>("properties", query);
+
   // Off-site zones have no ground here to draw, and prompting somebody to
   // trace a boundary for a collection facility two counties away is noise.
   const zones = useMemo(() => allZones.filter(isOnProperty), [allZones]);
-  const { records: properties } = useRecords<Property>("properties", { propertyId });
   const property = properties.find((entry) => entry.id === propertyId) ?? properties[0];
 
-  const host = useRef<HTMLDivElement | null>(null);
-  const map = useRef<MapsMap | undefined>(undefined);
-  /** Everything drawn, so a redraw can clear what it replaces. */
-  const drawn = useRef<(MapsPolygon | MapsPolyline)[]>([]);
+  const zoneApi = useMutations<Zone>("zones", "zones", zoneSchema, propertyId, actorId);
+  const placements = useMutations<ZoneAssignment>(
+    "zoneAssignments",
+    "zoneAssignments",
+    zoneAssignmentSchema,
+    propertyId,
+    actorId,
+  );
 
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | undefined>();
-
-  /** The zone being traced, and the corners clicked so far. */
-  const [tracing, setTracing] = useState<Ulid | undefined>();
-  const [path, setPath] = useState<GeoPoint[]>([]);
+  const [draft, setDraft] = useState<SpatialDraft | undefined>();
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  /** A move into resting ground, waiting to be confirmed. */
+  const [challenge, setChallenge] = useState<{ animal: Animal; zone: Zone } | undefined>();
 
-  // Read through a ref inside the map's click listener: the listener is
-  // attached once, and a closure over the state would go on appending to the
-  // empty array it captured on the first render.
-  const tracingRef = useRef<Ulid | undefined>(undefined);
-  tracingRef.current = tracing;
+  // Read once per mount. "Who is in this pen" is a question about now, and a
+  // fresh Date on every render would rebuild every shape on every keystroke.
+  const now = useMemo(() => new Date(), []);
 
-  const view = useMemo(() => openingView(zones, property ?? {}), [zones, property]);
+  const shapes = useMemo(
+    () => zoneShapes(zones, animals, assignments, now),
+    [zones, animals, assignments, now],
+  );
+  const chips = useMemo(
+    () => animalChips(zones, animals, assignments, now),
+    [zones, animals, assignments, now],
+  );
 
-  /** Load the API and put a map in the page. Once. */
-  useEffect(() => {
-    let cancelled = false;
+  const indoorZoneIds = useMemo(
+    () => new Set(zones.filter((zone) => zone.indoor).map((zone) => zone.id)),
+    [zones],
+  );
 
-    void (async () => {
-      try {
-        await loadGoogleMaps();
-        if (cancelled) return;
+  /**
+   * Which background is behind the pens.
+   *
+   * Google when it is configured and loading; ours when it is not. Never both
+   * — the owned image is drawn inside the editor's canvas and would cover the
+   * tiles, and paying for a map load nobody can see is the worst of both.
+   */
+  const googleAvailable = mapsApiKey() !== undefined && error === undefined;
+  const cached = useMemo(
+    () => (property === undefined ? undefined : offlineImagery(property)),
+    [property],
+  );
+  const imagery = googleAvailable ? undefined : cached;
 
-        const maps = mapsNamespace();
-        if (maps === undefined || host.current === null) return;
+  const onMapFailure = useCallback((reason: string) => setError(reason), []);
+  const backdrop = useMemo(
+    () =>
+      googleAvailable
+        ? (view: SpatialView) => <GoogleSatelliteLayer view={view} onFailure={onMapFailure} />
+        : undefined,
+    [googleAvailable, onMapFailure],
+  );
 
-        const centre = view?.centre ?? { lat: 0, lng: 0 };
-        const created = new maps.Map(host.current, {
-          center: centre,
-          zoom: DEFAULT_ZOOM,
-          // Hybrid rather than plain satellite: the road and the county-road
-          // label are how somebody orients themselves before the pens exist.
-          mapTypeId: "hybrid",
-          // Straight down. The 45° view is prettier and useless for tracing —
-          // a fence line at a tilt does not sit where it is clicked.
-          tilt: 0,
-          streetViewControl: false,
-          rotateControl: false,
-          gestureHandling: "greedy",
-        });
-
-        created.addListener("click", (event) => {
-          if (tracingRef.current === undefined) return;
-          const at = event.latLng;
-          if (at === undefined || at === null) return;
-          setPath((current) => [...current, { lat: at.lat(), lng: at.lng() }]);
-        });
-
-        map.current = created;
-        if (view?.bounds !== undefined) created.fitBounds(view.bounds, 48);
-        setReady(true);
-      } catch (caught) {
-        if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : "The map would not load.");
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // Deliberately once, with no dependencies: re-running would build a second
-    // map over the first and bill a second load. The opening view is only ever
-    // the opening view — where it moves to afterwards is the user's business.
-  }, []);
-
-  /** Redraw every shape whenever the records or the working path change. */
-  useEffect(() => {
-    const maps = mapsNamespace();
-    const canvas = map.current;
-    if (!ready || maps === undefined || canvas === undefined) return;
-
-    for (const shape of drawn.current) shape.setMap(null);
-    drawn.current = [];
-
-    for (const zone of zones) {
-      if (zone.boundary !== undefined && zone.boundary.length >= 3 && zone.id !== tracing) {
-        drawn.current.push(
-          new maps.Polygon({
-            paths: zone.boundary.map((point) => ({ lat: point.lat, lng: point.lng })),
-            map: canvas,
-            clickable: false,
-            ...zonePaint(zone),
-          }),
-        );
-      }
-
-      for (const divider of zone.dividers ?? []) {
-        const paint = dividerPaint(divider);
-        drawn.current.push(
-          new maps.Polyline({
-            path: divider.line.map((point) => ({ lat: point.lat, lng: point.lng })),
-            map: canvas,
-            strokeColor: paint.strokeColor,
-            // A dashed line is drawn as repeated symbols along an invisible
-            // stroke, so the stroke itself has to be hidden for it to read.
-            strokeOpacity: paint.dashed ? 0 : paint.strokeOpacity,
-            strokeWeight: paint.strokeWeight,
-            zIndex: 5,
-            ...(paint.dashed ? { icons: dashPattern() } : {}),
-          }),
-        );
-      }
-    }
-
-    // The trace in progress, drawn over the top so it is always visible.
-    if (path.length >= 2) {
-      drawn.current.push(
-        new maps.Polygon({
-          paths: path.map((point) => ({ lat: point.lat, lng: point.lng })),
-          map: canvas,
-          clickable: false,
-          strokeColor: "#FFFFFF",
-          strokeOpacity: 1,
-          strokeWeight: 3,
-          fillColor: "#FFFFFF",
-          fillOpacity: 0.2,
-          zIndex: 10,
-        }),
+  /**
+   * Move an animal, as two writes rather than one edit.
+   *
+   * The open assignment closes and a new one opens, which is what makes "where
+   * was she in March" answerable — and it is why they are separate patches: a
+   * device that syncs the close but not the open must not end up with the
+   * animal nowhere.
+   */
+  const performMove = useCallback(
+    async (animal: Animal, zone: Zone) => {
+      const at = new Date();
+      const { closed, opened } = moveToZone(
+        assignments,
+        {
+          id: encodeUlid(at.getTime()) as Ulid,
+          propertyId,
+          createdAt: at,
+          updatedAt: at,
+          animalId: animal.id,
+          zoneId: zone.id,
+          indoor: zone.indoor,
+          at,
+        },
+        indoorZoneIds,
       );
-    }
-  }, [ready, zones, path, tracing]);
 
-  const startTracing = useCallback((zoneId: Ulid) => {
-    setTracing(zoneId);
-    setPath([]);
-  }, []);
+      for (const entry of closed) {
+        await placements.update(entry.id, { periodTo: entry.periodTo });
+      }
 
-  const stopTracing = useCallback(() => {
-    setTracing(undefined);
-    setPath([]);
-  }, []);
+      if (opened === undefined) {
+        // Already there. Saying so is the honest answer to the gesture that
+        // was made; writing a second identical assignment was the old one.
+        show({ message: `${animal.name ?? "She"} is already in ${zone.name}`, tone: "info" });
+        return;
+      }
 
-  const undoPoint = useCallback(() => {
-    setPath((current) => current.slice(0, -1));
-  }, []);
+      const result = await placements.create(opened);
+      show(
+        result.ok
+          ? { message: `Moved to ${zone.name}`, tone: "success" }
+          : { message: "That move would not save.", tone: "danger" },
+      );
+    },
+    [assignments, indoorZoneIds, placements, propertyId, show],
+  );
+
+  const onReassign = useCallback(
+    (move: SpatialReassignment) => {
+      const animal = animals.find((candidate) => candidate.id === move.chipId);
+      const zone = zones.find((candidate) => candidate.id === move.toShapeId);
+      if (animal === undefined || zone === undefined) return;
+
+      // Resting ground is being kept empty on purpose (§5.1), and the person
+      // dragging is usually not the person who rested it. Challenged, not
+      // refused — sometimes you do need to put a cow on it.
+      if (zone.resting) {
+        setChallenge({ animal, zone });
+        return;
+      }
+
+      void performMove(animal, zone);
+    },
+    [animals, performMove, zones],
+  );
 
   const saveBoundary = useCallback(async () => {
-    if (tracing === undefined || !isTraceable(path)) return;
+    if (draft === undefined || draft.boundary.length < 3) return;
     setSaving(true);
 
     try {
-      const outcome = await api.update(tracing, { boundary: path });
+      // The editor deals in plain string ids — it has never heard of a ULID,
+      // and that is the boundary (§4.1). This is the seam where they become
+      // ours again; the id came out of a zone we handed it in the first place.
+      const outcome = await zoneApi.update(draft.shapeId as Ulid, { boundary: draft.boundary });
       if (outcome.ok) {
-        show({ tone: "success", message: `Boundary saved — ${path.length} corners.` });
-        stopTracing();
+        show({ tone: "success", message: `Boundary saved — ${draft.boundary.length} corners.` });
+        setDraft(undefined);
       } else {
         setError("That boundary would not save.");
       }
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That boundary would not save.");
     } finally {
       setSaving(false);
     }
-  }, [api, path, show, stopTracing, tracing]);
+  }, [draft, show, zoneApi]);
 
   const columns = useMemo<Column<Zone>[]>(
     () => [
-      {
-        key: "name",
-        header: "Zone",
-        primary: true,
-        render: (zone) => describeZoneExtent(zone),
-      },
+      { key: "name", header: "Zone", primary: true, render: (zone) => describeZoneExtent(zone) },
       { key: "type", header: "Kind", render: (zone) => zone.type.replace(/_/g, " ") },
       {
         key: "drawn",
@@ -276,72 +252,99 @@ export function PropertyMapScreen({
         key: "trace",
         header: "",
         render: (zone) =>
-          tracing === zone.id ? (
-            <Button variant="ghost" onClick={stopTracing}>
+          draft?.shapeId === zone.id ? (
+            <Button variant="ghost" onClick={() => setDraft(undefined)}>
               Cancel
             </Button>
           ) : (
-            <Button variant="secondary" onClick={() => startTracing(zone.id)} disabled={!ready}>
-              {zone.boundary === undefined ? "Draw" : "Redraw"}
+            <Button
+              variant="secondary"
+              onClick={() =>
+                // Adjusting starts from the corners that are already there;
+                // drawing starts empty. Redrawing a traced pen from scratch is
+                // "Start over" once the corners are on screen, where somebody
+                // can see what they are about to throw away.
+                setDraft({ shapeId: zone.id, boundary: zone.boundary ?? [] })
+              }
+            >
+              {zone.boundary === undefined ? "Draw" : "Adjust"}
             </Button>
           ),
       },
     ],
-    [ready, startTracing, stopTracing, tracing],
+    [draft],
   );
 
   const noKey = mapsApiKey() === undefined;
-  const noCoordinates = view === undefined;
+  const gap = property === undefined ? undefined : offlineImageryGap(property);
+  const drawnCount = zones.filter((zone) => (zone.boundary?.length ?? 0) >= 3).length;
 
   return (
     <PageBody>
       <PageHeader
         eyebrow="Today"
         title="Property map"
-        subtitle="Pens traced over aerial imagery. Boundaries are stored as real coordinates, so the same shapes render on a barn screen with no signal."
+        subtitle="Pens traced over aerial imagery, with everything standing in them. Boundaries are stored as real coordinates, so the same shapes render on a barn screen with no signal."
         meta={
           <Pill tone="neutral">
-            {zones.filter((zone) => (zone.boundary?.length ?? 0) >= 3).length} of {zones.length}{" "}
-            drawn
+            {drawnCount} of {zones.length} drawn
           </Pill>
         }
       />
 
       {noKey ? (
-        <Callout tone="danger" title="The aerial view is not connected">
+        <Callout tone="neutral" title="The aerial view is not connected">
           {mapsNotConfigured()}
         </Callout>
       ) : null}
 
       {error === undefined ? null : (
-        <Callout tone="danger" title="The map could not be shown">
-          {error}
+        <Callout tone="danger" title="The aerial view could not be shown">
+          {error} The pens are still drawn and still editable — they are stored as coordinates, not
+          as a picture.
         </Callout>
       )}
 
-      {noCoordinates && !noKey ? (
-        <Callout tone="neutral" title="Nothing to centre on yet">
-          This farm has no coordinates and no pens drawn, so there is nowhere to open the map. Look
-          the address up under Settings → Property first — it drops a pin on the house, and the map
-          opens there.
+      {imagery === undefined && gap !== undefined ? (
+        <Callout tone="neutral" title="No offline background yet">
+          {gap} Google&rsquo;s tiles cannot stand in for it: their terms do not permit storing them,
+          which is the whole reason for keeping our own.
         </Callout>
       ) : null}
 
       <Section
         title="Aerial view"
         description={
-          tracing === undefined ? "Pick a zone below to draw its boundary." : traceHint(path)
+          draft === undefined
+            ? "Tap a pen or an animal for its instructions. Drag an animal to move it."
+            : "Click each corner. Drag a corner to move it."
         }
         actions={
-          tracing === undefined ? undefined : (
-            <span className="flex gap-2">
-              <Button variant="ghost" onClick={undoPoint} disabled={path.length === 0 || saving}>
+          draft === undefined ? undefined : (
+            <span className="flex flex-wrap gap-2">
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  setDraft({ shapeId: draft.shapeId, boundary: draft.boundary.slice(0, -1) })
+                }
+                disabled={draft.boundary.length === 0 || saving}
+              >
                 Undo corner
               </Button>
-              <Button variant="ghost" onClick={stopTracing} disabled={saving}>
+              <Button
+                variant="ghost"
+                onClick={() => setDraft({ shapeId: draft.shapeId, boundary: [] })}
+                disabled={draft.boundary.length === 0 || saving}
+              >
+                Start over
+              </Button>
+              <Button variant="ghost" onClick={() => setDraft(undefined)} disabled={saving}>
                 Cancel
               </Button>
-              <Button onClick={() => void saveBoundary()} disabled={!isTraceable(path) || saving}>
+              <Button
+                onClick={() => void saveBoundary()}
+                disabled={draft.boundary.length < 3 || saving}
+              >
                 {saving ? "Saving…" : "Save boundary"}
               </Button>
             </span>
@@ -349,10 +352,19 @@ export function PropertyMapScreen({
         }
       >
         <Card>
-          <div
-            ref={host}
-            aria-label="Aerial view of the property"
-            className="h-[32rem] w-full rounded-density bg-raised"
+          <SpatialEditor
+            palette={propertyPalette}
+            shapes={shapes}
+            chips={chips}
+            {...(backdrop === undefined ? {} : { backdrop })}
+            {...(imagery === undefined ? {} : { imagery })}
+            {...(property?.latitude === undefined || property.longitude === undefined
+              ? {}
+              : { fallbackCentre: { lat: property.latitude, lng: property.longitude } })}
+            {...(draft === undefined ? {} : { draft })}
+            onDraftChange={setDraft}
+            onReassign={onReassign}
+            label="Aerial view of the property"
           />
         </Card>
       </Section>
@@ -372,6 +384,32 @@ export function PropertyMapScreen({
           />
         )}
       </Section>
+
+      {challenge === undefined ? null : (
+        <Modal
+          title={`Move ${challenge.animal.name ?? "her"} onto ${challenge.zone.name}?`}
+          onClose={() => setChallenge(undefined)}
+        >
+          <p className="text-density text-ink">
+            {challenge.zone.name} is resting — it is being kept empty on purpose to let the grass
+            come back. Moving stock onto it now undoes that.
+          </p>
+          <div className="mt-density flex gap-2">
+            <Button variant="ghost" onClick={() => setChallenge(undefined)}>
+              Leave her where she is
+            </Button>
+            <Button
+              onClick={() => {
+                const { animal, zone } = challenge;
+                setChallenge(undefined);
+                void performMove(animal, zone);
+              }}
+            >
+              Move her anyway
+            </Button>
+          </div>
+        </Modal>
+      )}
     </PageBody>
   );
 }
