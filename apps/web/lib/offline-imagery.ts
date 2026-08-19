@@ -7,10 +7,15 @@ import type { SpatialImagery } from "@galaxy-farm/ui";
  * Online, the editor traces over Google's satellite layer. Google's terms do
  * not permit storing those tiles, and that single sentence is the whole reason
  * this file exists: the background a barn kiosk uses is an owned one — a USDA
- * NAIP aerial of the property, public domain, roughly half-metre resolution,
- * downloaded once from EarthExplorer, reprojected to Web Mercator, and put in
- * R2. The pens over it are the same lat/lng rings drawn over Google, because
- * they were never stored in pixels.
+ * NAIP aerial of the property, public domain, 60 cm, cut to a few kilometres
+ * of ground, reprojected to Web Mercator, and put in R2 by
+ * `tools/naip-aerial.py`. The pens over it are the same lat/lng rings drawn
+ * over Google, because they were never stored in pixels.
+ *
+ * Web Mercator specifically, and not for tidiness: the editor places this
+ * image by its four lat/lng edges, which only lands on the right ground if the
+ * pixels are projected the way the map is. A UTM tile hung off the same four
+ * numbers is a picture stretched over the wrong shape of earth.
  *
  * ## Why a plain URL rather than a presigned one
  *
@@ -23,9 +28,18 @@ import type { SpatialImagery } from "@galaxy-farm/ui";
  * with no signal next February, and a cache entry keyed on a URL that stopped
  * working in December is a blank map on the one day it was needed.
  *
- * So the bucket serves this prefix over a public custom domain and the base
- * lives in `NEXT_PUBLIC_OFFLINE_IMAGERY_BASE_URL`. Nothing else in the app
- * reads it.
+ * So this image is served unsigned, and the base it hangs off lives in
+ * `NEXT_PUBLIC_OFFLINE_IMAGERY_BASE_URL`. Nothing else in the app reads it.
+ *
+ * **A second bucket, not a public prefix in the first.** R2 turns public
+ * access on per bucket, not per prefix, so "serve `public/` and keep the rest
+ * signed" is not a thing the storage can be asked for — the only ways to get
+ * it are a Worker in front of the bucket or a bucket that has nothing private
+ * in it. The imagery lives in the second one. `R2_BUCKET` stays the private
+ * bucket every photograph goes into and never becomes readable by anyone
+ * holding a guessed key; this variable is the only thing that knows where the
+ * public one is, which is also why it is the only R2 setting with a
+ * `NEXT_PUBLIC_` prefix.
  */
 
 export function offlineImageryBase(
