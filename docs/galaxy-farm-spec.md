@@ -228,7 +228,7 @@ Shared fields, identical across every domain: `roadmapItemId` (optional — the 
 
 **HeatRecord** — cow, observed datetime, intensity, notes; supports 21-day return predictions.
 
-**BreedingRecord** — dam, method (`AI | natural | ET`), sire/straw or bull, embryo details if ET, date, technician, linked protocol, **pregCheck** {date, result, method}, projected due date = breed-configurable gestation (default 283 days) → creates a *calving window* calendar event two weeks out with notification.
+**BreedingRecord** — dam, method (`AI | natural | ET`), the sire said any of four ways — a straw from the tank (which it decrements), a bull here, an ancestor on file, or his name typed in for semen the farm never held and services done elsewhere — embryo details if ET, date, technician, linked protocol, **pregCheck** {date, result, method}, projected due date = breed-configurable gestation (default 283 days) → creates a *calving window* calendar event two weeks out with notification.
 
 **CalvingRecord** — dam, date, birthWeight, calvingEase (1–5), vigor, notes, assist details; **creates the calf as a new Animal** with pedigree pre-wired to dam + service sire.
 

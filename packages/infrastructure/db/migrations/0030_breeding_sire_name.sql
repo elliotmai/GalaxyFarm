@@ -1,0 +1,19 @@
+-- The sire of a breeding, as he was written down.
+--
+-- A breeding record could name its sire three ways — a straw from the tank, a
+-- bull standing here, or an ancestor already on file — and an AI breeding was
+-- required to have one of them. The commonest AI on this farm has none: semen
+-- bought and thawed the same morning, or a cow bred at somebody else's place
+-- and phoned in afterwards. There is no straw in our tank, no bull of ours,
+-- and no reason to invent an ancestor row for a bull nobody here will own.
+--
+-- So the breeding could not be entered at all, which is the expensive
+-- direction of the mistake: an unrecorded service is a due date nobody is
+-- watching, a preg check nobody is reminded of, and a calving window that
+-- never opens. A name is thinner than a reference, and it is exactly what the
+-- calf's papers get filled in from.
+--
+-- Not a replacement for the references. When the sire *is* on file the record
+-- still points at him, and the name is written alongside so the breeding still
+-- says who the bull was if the straw is used up and purged years later.
+ALTER TABLE "breeding_records" ADD COLUMN "sire_name" text;

@@ -52,12 +52,22 @@ export interface PregCheck {
 export interface BreedingRecord extends BaseRecord {
   readonly damId: Ulid;
   readonly method: BreedingMethod;
-  /** An on-farm bull, for `natural`. */
+  /** The bull himself: a natural service, or the bull a straw was collected from. */
   readonly bullId?: Ulid | undefined;
   /** The straw drawn, for `AI`. Decrements semen inventory. */
   readonly semenInventoryId?: Ulid | undefined;
   /** Sire as an ExternalAnimal, when the semen is not from stock we track. */
   readonly sireExternalId?: Ulid | undefined;
+  /**
+   * The sire as he was written down, when nothing on file is him.
+   *
+   * A straw bought and thawed the same morning, or a breeding done at somebody
+   * else's place and phoned in: the bull has a name and the farm has no record
+   * of him, no straw of him, and no reason to invent an ancestor for him. The
+   * name is what the calf's papers will be filled in from, so it is worth more
+   * than the breeding going unrecorded because there was no row to point at.
+   */
+  readonly sireName?: string | undefined;
   /** Donor dam and embryo identifier, for `ET`. */
   readonly embryoDonorId?: Ulid | undefined;
   readonly embryoCode?: string | undefined;
@@ -69,6 +79,31 @@ export interface BreedingRecord extends BaseRecord {
   /** Overrides the property default; §12 decision 2 makes it configurable. */
   readonly gestationDays?: number | undefined;
   readonly notes?: string | undefined;
+}
+
+/**
+ * Is the sire answered for?
+ *
+ * Four ways to say who the bull was, and any one of them is enough: the straw
+ * drawn from the tank, a bull standing here, an ancestor already on file, or
+ * his name typed in.
+ *
+ * The name counts deliberately. Requiring a straw or a record on file made the
+ * commonest AI on this farm unrecordable — semen the farm never held, in a
+ * chute that was not ours — and a breeding that cannot be entered is not a
+ * cleaner pedigree, it is a due date nobody is watching. A name is thinner
+ * than a reference and it is what the papers are filled in from; the record
+ * can be pointed at a real ancestor later without losing the date.
+ */
+export function namesASire(
+  record: Pick<BreedingRecord, "bullId" | "semenInventoryId" | "sireExternalId" | "sireName">,
+): boolean {
+  return (
+    record.bullId !== undefined ||
+    record.semenInventoryId !== undefined ||
+    record.sireExternalId !== undefined ||
+    (record.sireName !== undefined && record.sireName.trim() !== "")
+  );
 }
 
 export const pregCheckSchema = z.object({
@@ -85,6 +120,7 @@ export const breedingRecordSchema = baseRecordSchema
     bullId: ulidSchema.optional(),
     semenInventoryId: ulidSchema.optional(),
     sireExternalId: ulidSchema.optional(),
+    sireName: z.string().min(1, "Name the sire, or leave it out").max(160).optional(),
     embryoDonorId: ulidSchema.optional(),
     embryoCode: z.string().max(80).optional(),
     date: z.coerce.date(),
@@ -94,19 +130,14 @@ export const breedingRecordSchema = baseRecordSchema
     gestationDays: z.number().int().min(240).max(320).optional(),
     notes: z.string().max(5000).optional(),
   })
-  .refine((record) => record.method !== "natural" || record.bullId !== undefined, {
-    message: "A natural service needs the bull",
+  .refine((record) => record.method !== "natural" || namesASire(record), {
+    message: "A natural service needs the bull — pick him, or type his name",
     path: ["bullId"],
   })
-  .refine(
-    (record) =>
-      record.method !== "AI" ||
-      record.semenInventoryId !== undefined ||
-      record.sireExternalId !== undefined,
-    // Either the straw from stock or, for semen bought and used the same day,
-    // the sire it came from. A breeding with neither cannot pedigree the calf.
-    { message: "An AI breeding needs a straw or a named sire", path: ["semenInventoryId"] },
-  )
+  .refine((record) => record.method !== "AI" || namesASire(record), {
+    message: "An AI breeding needs the sire — a straw, a bull on file, or his name",
+    path: ["semenInventoryId"],
+  })
   .refine((record) => record.pregCheck === undefined || record.pregCheck.date >= record.date, {
     message: "A pregnancy check cannot predate the breeding",
     path: ["pregCheck", "date"],

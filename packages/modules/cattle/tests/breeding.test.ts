@@ -9,6 +9,7 @@ import {
   calvingWindow,
   daysBred,
   isInCalvingWindow,
+  namesASire,
   pregCheckDue,
   projectedDueDate,
   serviceFor,
@@ -149,7 +150,7 @@ describe("breedingRecordSchema", () => {
     expect(breedingRecordSchema.safeParse(breeding()).success).toBe(true);
   });
 
-  it("refuses a natural service with no bull", () => {
+  it("refuses a natural service naming no bull at all", () => {
     const result = breedingRecordSchema.safeParse({
       ...breeding(),
       method: "natural",
@@ -158,13 +159,49 @@ describe("breedingRecordSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("refuses an AI breeding naming neither a straw nor a sire", () => {
-    // Without one of the two the calf cannot be pedigreed, which is the whole
-    // reason the breeding was recorded.
+  it("takes a natural service by a bull who is only named", () => {
+    // A leased bull, or the neighbour's over the fence. There is no record of
+    // him here and the cow is still bred.
+    const result = breedingRecordSchema.safeParse({
+      ...breeding(),
+      method: "natural",
+      sireExternalId: undefined,
+      sireName: "Nichols Legacy G151",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("refuses an AI breeding that says nothing about the sire", () => {
+    // Nothing at all, not even a name: the calf cannot be pedigreed and
+    // nobody can say later what it was out of.
     const result = breedingRecordSchema.safeParse({
       ...breeding(),
       sireExternalId: undefined,
       semenInventoryId: undefined,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("takes an AI breeding whose sire is only a name", () => {
+    // The commonest AI on this farm: semen bought and thawed the same morning,
+    // or a cow bred at somebody else's place and phoned in. Requiring a straw
+    // in our tank or an ancestor on file made those unrecordable, and an
+    // unrecorded service is a due date nobody is watching.
+    const result = breedingRecordSchema.safeParse({
+      ...breeding(),
+      sireExternalId: undefined,
+      semenInventoryId: undefined,
+      sireName: "ZNT Montego Bay",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("does not take a blank name as an answer", () => {
+    const result = breedingRecordSchema.safeParse({
+      ...breeding(),
+      sireExternalId: undefined,
+      semenInventoryId: undefined,
+      sireName: "   ",
     });
     expect(result.success).toBe(false);
   });
@@ -184,6 +221,20 @@ describe("breedingRecordSchema", () => {
       pregCheck: { date: new Date("2026-01-01"), result: "bred", method: "blood" },
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("namesASire", () => {
+  it("takes any one of the four ways of saying who he was", () => {
+    expect(namesASire({ bullId: id(4) })).toBe(true);
+    expect(namesASire({ semenInventoryId: id(9) })).toBe(true);
+    expect(namesASire({ sireExternalId: id(3) })).toBe(true);
+    expect(namesASire({ sireName: "ZNT Montego Bay" })).toBe(true);
+  });
+
+  it("is false when nothing names him", () => {
+    expect(namesASire({})).toBe(false);
+    expect(namesASire({ sireName: "" })).toBe(false);
   });
 });
 
