@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 
 import {
   Button,
@@ -11,6 +12,7 @@ import {
   PageHeader,
   Pill,
   RecordCard,
+  SearchSelect,
   Section,
   Select,
   Tabs,
@@ -19,9 +21,11 @@ import {
   useConfirmDelete,
   useToast,
 } from "@galaxy-farm/ui";
-import { fromDollars, type Ulid } from "@galaxy-farm/core";
+import { displayName, fromDollars, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
+  allRegistrations,
   expiringSoon,
+  inferAncestorSexes,
   isExpired,
   isLowSemenInventory,
   MED_CATEGORIES,
@@ -29,14 +33,18 @@ import {
   PROTOCOL_ACTIONS,
   semenInventorySchema,
   syncProtocolSchema,
+  type CattleProfile,
+  type ExternalAnimal,
   type MedCategory,
   type MedInventory,
   type SemenInventory,
   type SyncProtocol,
 } from "@galaxy-farm/module-cattle";
 
+import { animalHref } from "@/lib/animal-slug";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
+import { bullOptions, parseSire, strawSire, type SireLookup } from "@/lib/sires";
 
 /**
  * The tank, the fridge, and the protocols (spec §5.2, issue #20).
@@ -73,6 +81,23 @@ export function CattleSuppliesScreen({
   const { records: straws } = useRecords<SemenInventory>("semenInventory", query);
   const { records: meds } = useRecords<MedInventory>("medInventory", query);
   const { records: protocols } = useRecords<SyncProtocol>("syncProtocols", query);
+  const { records: animals } = useRecords<Animal>("animals", query);
+  const { records: outsiders } = useRecords<ExternalAnimal>("externalAnimals", query);
+  const { records: profiles } = useRecords<CattleProfile>("cattleProfiles", query);
+
+  /**
+   * Who a straw can be joined to: our bulls, and every ancestor on file.
+   *
+   * The sexes are worked out from where each ancestor sits in the pedigrees
+   * already here, because a certificate has a sire column and a dam column
+   * rather than a sex field — and a cow offered as a sire is a mistake that
+   * looks perfectly ordinary afterwards.
+   */
+  const sexes = useMemo(
+    () => inferAncestorSexes(outsiders, [...profiles, ...outsiders]),
+    [outsiders, profiles],
+  );
+  const lookup: SireLookup = useMemo(() => ({ animals, outsiders }), [animals, outsiders]);
 
   const now = new Date();
   const lowStraws = straws.filter((entry) => isLowSemenInventory(entry));
@@ -177,7 +202,13 @@ export function CattleSuppliesScreen({
         {(active) => (
           <div className="pt-density">
             {active === "semen" ? (
-              <SemenTab straws={straws} propertyId={propertyId} actorId={actorId} />
+              <SemenTab
+                straws={straws}
+                lookup={lookup}
+                sexes={sexes}
+                propertyId={propertyId}
+                actorId={actorId}
+              />
             ) : active === "meds" ? (
               <MedsTab meds={meds} now={now} propertyId={propertyId} actorId={actorId} />
             ) : (
@@ -192,10 +223,15 @@ export function CattleSuppliesScreen({
 
 function SemenTab({
   straws,
+  lookup,
+  sexes,
   propertyId,
   actorId,
 }: {
   readonly straws: readonly SemenInventory[];
+  /** Our bulls and the ancestors on file, to join a cane to one of them. */
+  readonly lookup: SireLookup;
+  readonly sexes: ReturnType<typeof inferAncestorSexes>;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
 }) {
@@ -211,6 +247,7 @@ function SemenTab({
 
   const [sire, setSire] = useState("");
   const [count, setCount] = useState("");
+
   const [tank, setTank] = useState("");
   const [canister, setCanister] = useState("");
   const [threshold, setThreshold] = useState("");
@@ -218,13 +255,26 @@ function SemenTab({
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
+  const sireChoices = useMemo(() => bullOptions(lookup, sexes), [lookup, sexes]);
+
   async function add(event: React.FormEvent) {
     event.preventDefault();
     setError(undefined);
     setBusy(true);
     try {
+      // Whichever way he was picked. A bull on file hands over his id as well
+      // as his name, and that reference is what the breeding drawn from this
+      // straw inherits — nobody is asked who the sire was a second time in the
+      // chute, and the calf is pedigreed from it at calving.
+      const chosen = parseSire(sire);
+      const named = chosen === undefined ? undefined : strawSire(chosen, lookup);
+      if (named === undefined) {
+        setError("Name the sire — a straw with no sire cannot pedigree a calf");
+        return;
+      }
+
       const result = await api.create({
-        sireName: sire.trim(),
+        ...named,
         strawsOnHand: Number(count || "0"),
         ...(tank.trim() === "" ? {} : { tank: tank.trim() }),
         ...(canister.trim() === "" ? {} : { canister: canister.trim() }),
@@ -281,14 +331,33 @@ function SemenTab({
 
   return (
     <div className="flex flex-col gap-density">
-      <Section title="Add a sire">
+      <Section
+        title="Add a sire"
+        description={
+          <>
+            A cane joined to a bull on file carries his pedigree into every breeding drawn from it.
+            A bull who is not here yet comes across from the{" "}
+            <Link className="text-action underline" href="/admin/cattle/catalog">
+              association catalog
+            </Link>{" "}
+            first — that is what the catalog is for.
+          </>
+        }
+      >
         <form onSubmit={(event) => void add(event)} className="flex flex-col gap-density">
           <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-            <TextInput
+            <SearchSelect
               label="Sire"
-              hint="As written on the cane."
+              hint="Our bulls and every ancestor on file. A bull who is neither can be typed in as written on the cane."
               value={sire}
-              onChange={(event) => setSire(event.target.value)}
+              placeholder="Choose a bull, or type the cane"
+              options={sireChoices}
+              // Picking one is what joins the cane to a pedigree. Typing is
+              // still a real answer — a cane from a bull nobody here will ever
+              // own — and it has to be chosen from the list, so nothing is
+              // recorded by typing and walking away.
+              allowCustom={(typed) => `Use "${typed}" — not on file`}
+              onChange={setSire}
               required
             />
             <TextInput
@@ -371,6 +440,8 @@ function SemenTab({
                   )
                 }
               >
+                <StrawSire entry={entry} lookup={lookup} sexes={sexes} api={api} />
+
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="ghost"
@@ -392,6 +463,117 @@ function SemenTab({
         )}
       </Section>
     </div>
+  );
+}
+
+/**
+ * Which bull this cane is, and joining it to one that is not yet said.
+ *
+ * A straw carrying only a name is a straw that can never pedigree a calf: the
+ * breeding drawn from it inherits the name and nothing else, and at calving
+ * the sire column comes up blank. Every cane already in the tank was entered
+ * that way, so the join has to be reachable from here rather than only on the
+ * form that adds a new one — otherwise the tank has to be deleted and typed in
+ * again to gain a pedigree, and nobody will.
+ */
+function StrawSire({
+  entry,
+  lookup,
+  sexes,
+  api,
+}: {
+  readonly entry: SemenInventory;
+  readonly lookup: SireLookup;
+  readonly sexes: ReturnType<typeof inferAncestorSexes>;
+  readonly api: ReturnType<typeof useMutations<SemenInventory>>;
+}) {
+  const { show } = useToast();
+  const [openForm, setOpenForm] = useState(false);
+  const [choice, setChoice] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const options = useMemo(() => bullOptions(lookup, sexes), [lookup, sexes]);
+
+  const bull =
+    entry.sireAnimalId === undefined
+      ? undefined
+      : lookup.animals.find((animal) => animal.id === entry.sireAnimalId);
+  const outsider =
+    entry.sireExternalId === undefined
+      ? undefined
+      : lookup.outsiders.find((record) => record.id === entry.sireExternalId);
+
+  async function join() {
+    const chosen = parseSire(choice);
+    if (chosen === undefined) return;
+
+    setBusy(true);
+    try {
+      const named = strawSire(chosen, lookup);
+      if (named === undefined) return;
+
+      // The name goes with the reference. A cane says a name on it whatever
+      // the app decides the bull is, and the two disagreeing is worse than
+      // either — so picking a bull renames the straw to what he is called.
+      await api.update(entry.id, named as Partial<SemenInventory>);
+      setOpenForm(false);
+      show({ message: `${named.sireName} joined to this cane` });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (bull !== undefined) {
+    return (
+      <p className="text-sm text-muted">
+        <Link className="text-action underline" href={animalHref(bull)}>
+          {displayName(bull)}
+        </Link>{" "}
+        — collected here.
+      </p>
+    );
+  }
+
+  if (outsider !== undefined) {
+    const papers = allRegistrations(outsider)
+      .map((registration) => `${registration.association} ${registration.regNumber}`)
+      .join(" · ");
+    return (
+      <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
+        <Pill tone="identity">on the papers</Pill>
+        <span>{papers === "" ? outsider.name : `${outsider.name} · ${papers}`}</span>
+      </p>
+    );
+  }
+
+  if (!openForm) {
+    return (
+      <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
+        <span>A name only — a calf out of this cane cannot be pedigreed from it.</span>
+        <Button variant="ghost" onClick={() => setOpenForm(true)}>
+          Join to a sire
+        </Button>
+      </p>
+    );
+  }
+
+  return (
+    <span className="flex flex-wrap items-end gap-2">
+      <SearchSelect
+        label="Sire"
+        hideLabel
+        value={choice}
+        placeholder={`Who is ${entry.sireName}?`}
+        options={options}
+        onChange={setChoice}
+      />
+      <Button onClick={() => void join()} busy={busy} disabled={choice === ""}>
+        Join
+      </Button>
+      <Button variant="ghost" onClick={() => setOpenForm(false)}>
+        Cancel
+      </Button>
+    </span>
   );
 }
 

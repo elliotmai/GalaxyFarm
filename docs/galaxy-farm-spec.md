@@ -222,7 +222,7 @@ Shared fields, identical across every domain: `roadmapItemId` (optional — the 
 
 **Pedigree** — sire/dam references resolving to either an on-farm Animal or an **ExternalAnimal** (name, regNumber, association, own sire/dam refs). External ancestors chain recursively, giving "all the way back" depth without requiring every ancestor to be a farm record. Pedigree view renders the standard 3/4/5-generation tree with drill-down.
 
-**SemenInventory** — sire (ExternalAnimal or own bull), strawsOnHand, tank/canister/cane location, source, pricePerStraw, purchase date. Decremented by AI breeding records.
+**SemenInventory** — sire (ExternalAnimal or own bull, picked from the ancestors on file — the catalog offers the tank as the last step of bringing a bull across), strawsOnHand, tank/canister/cane location, source, pricePerStraw, purchase date. Decremented by AI breeding records, which inherit the straw's sire so the calf is pedigreed from it at calving.
 
 **SyncProtocol** — named templates (e.g., 7-day CO-Synch + CIDR) as day-offset steps; applying one to a cow projects each step onto the calendar with notifications.
 

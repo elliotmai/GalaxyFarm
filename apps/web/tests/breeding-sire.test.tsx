@@ -89,9 +89,13 @@ const straw = (fields: Partial<SemenInventory> & Pick<SemenInventory, "id" | "si
     ...fields,
   }) as SemenInventory;
 
+const MONTEGO_EXTERNAL = "01ARZ3NDEKTSV4RRFFQ69G5E01" as Ulid;
+
+/** A cane joined to the ancestor the catalog import brought across. */
 const MONTEGO = straw({
   id: STRAW_ID,
   sireName: "ZNT Montego Bay",
+  sireExternalId: MONTEGO_EXTERNAL,
   strawsOnHand: 4,
   tank: "1",
   canister: "3",
@@ -190,6 +194,15 @@ describe("Recording an AI breeding", () => {
 
     expect(written[0]?.input).toMatchObject({ semenInventoryId: EMPTY_STRAW_ID });
     expect(saved.updated.filter((write) => write.store === "semenInventory")).toEqual([]);
+  });
+
+  it("carries the straw's own sire onto the record, unasked", async () => {
+    // The point of joining a cane to an ancestor in the tank: whoever filled
+    // it in did the work of saying who the bull was, and nobody is asked again
+    // in the chute. `sireOf` reads this at calving to pedigree the calf.
+    const written = await recordBreeding("Montego", /ZNT Montego Bay/);
+
+    expect(written[0]?.input).toMatchObject({ sireExternalId: MONTEGO_EXTERNAL });
   });
 
   it("keeps the whole sire question on one field", async () => {

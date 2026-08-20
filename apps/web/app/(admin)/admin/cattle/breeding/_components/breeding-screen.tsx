@@ -25,13 +25,11 @@ import {
   type Column,
   type SearchOption,
 } from "@galaxy-farm/ui";
-import { displayName, isUlid, type Animal, type Ulid } from "@galaxy-farm/core";
+import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
-  allRegistrations,
   BREEDING_METHODS,
   predictCalfColour,
   breedingRecordSchema,
-  canBe,
   DEFAULT_GESTATION_DAYS,
   inferAncestorSexes,
   calvingWindow,
@@ -43,7 +41,6 @@ import {
   pregCheckDue,
   projectedDueDate,
   semenInventorySchema,
-  tankLocation,
   type BreedingMethod,
   type BreedingRecord,
   type CattleProfile,
@@ -59,6 +56,14 @@ import { animalHref } from "@/lib/animal-slug";
 import { coatResolver } from "@/lib/coat";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
+import {
+  breedingSire,
+  bullOptions,
+  parseSire,
+  sireDisplay,
+  strawOptions,
+  type SireLookup,
+} from "@/lib/sires";
 
 /**
  * Breeding, and the dates that fall out of it (spec §5.2, issue #12).
@@ -377,170 +382,19 @@ export function BreedingScreen({
 }
 
 /**
- * Who the bull was, in one field.
+ * Every straw, bull and ancestor worth offering for this method.
  *
- * The picker offers rows from three different record types and accepts a name
- * that belongs to none of them, so the value it carries has to say which. The
- * prefix does that; anything without a recognised one is a name somebody
- * typed, which is exactly what an ad-hoc sire is.
+ * The tank belongs to AI and only to AI. A straw is not a natural service, and
+ * an embryo's sire is on its papers rather than in our canister — offering it
+ * there would draw a straw down for a breeding that used none.
  */
-type SireChoice =
-  | { readonly kind: "straw"; readonly id: Ulid }
-  | { readonly kind: "bull"; readonly id: Ulid }
-  | { readonly kind: "external"; readonly id: Ulid }
-  | { readonly kind: "name"; readonly name: string };
-
-export interface SireLookup {
-  readonly animals: readonly Animal[];
-  readonly outsiders: readonly ExternalAnimal[];
-  readonly straws: readonly SemenInventory[];
-}
-
-export function parseSire(value: string): SireChoice | undefined {
-  const typed = value.trim();
-  if (typed === "") return undefined;
-
-  const colon = typed.indexOf(":");
-  const prefix = colon === -1 ? "" : typed.slice(0, colon);
-  const rest = typed.slice(colon + 1);
-  // The id has to be a ULID as well as the prefix being one of ours, so a bull
-  // somebody genuinely named "bull: something" is still taken as a name.
-  if ((prefix === "straw" || prefix === "bull" || prefix === "external") && isUlid(rest)) {
-    return { kind: prefix, id: rest };
-  }
-  return { kind: "name", name: typed };
-}
-
-/** Every straw, bull and ancestor worth offering for this method. */
-export function sireOptions(
+function sireOptions(
   method: BreedingMethod,
   lookup: SireLookup,
   sexes: ReadonlyMap<Ulid, SexVerdict>,
 ): SearchOption[] {
-  // The tank belongs to AI and only to AI. A straw is not a natural service,
-  // and an embryo's sire is on its papers rather than in our canister —
-  // offering it there would draw a straw down for a breeding that used none.
-  const tank =
-    method !== "AI"
-      ? []
-      : [...lookup.straws]
-          .sort(
-            (left, right) =>
-              right.strawsOnHand - left.strawsOnHand || left.sireName.localeCompare(right.sireName),
-          )
-          .map((straw) => {
-            // Empty canes stay on the list. A breeding entered a fortnight
-            // late, with the last straw of that bull already drawn, is still
-            // that bull's breeding — it just leaves the count alone.
-            const count =
-              straw.strawsOnHand === 0
-                ? "none left"
-                : `${straw.strawsOnHand} straw${straw.strawsOnHand === 1 ? "" : "s"}`;
-            const detail = [count, tankLocation(straw)].filter((part) => part !== undefined);
-            return {
-              value: `straw:${straw.id}`,
-              label: straw.sireName,
-              detail: detail.join(" · "),
-              group: "In the tank",
-            };
-          });
-
-  const ours = lookup.animals
-    .filter(
-      (animal) =>
-        animal.species === "cattle" && animal.sex === "male" && animal.status === "active",
-    )
-    .map((animal) => ({
-      value: `bull:${animal.id}`,
-      label: displayName(animal),
-      ...(animal.tagNumber === undefined ? {} : { detail: animal.tagNumber }),
-      group: "Bulls here",
-    }));
-
-  const papers = [...lookup.outsiders]
-    .filter((entry) => canBe(sexes.get(entry.id), "male"))
-    .sort((left, right) => left.name.localeCompare(right.name))
-    .map((entry) => {
-      const registrations = allRegistrations(entry)
-        .map((registration) => `${registration.association} ${registration.regNumber}`)
-        .join(" · ");
-      return {
-        value: `external:${entry.id}`,
-        label: entry.name,
-        ...(registrations === "" ? {} : { detail: registrations }),
-        group: "On the papers",
-      };
-    });
-
-  return [...tank, ...ours, ...papers];
-}
-
-/**
- * What the record says about the sire, whichever way he was picked.
- *
- * The name is written every time, alongside whatever reference there is. A
- * straw gets used up and purged and a bull gets sold; the breeding still has
- * to be able to say who bred her years later, which is what the calf's papers
- * are filled in from.
- */
-export function sireFields(choice: SireChoice, lookup: SireLookup): Partial<BreedingRecord> {
-  if (choice.kind === "name") return { sireName: choice.name };
-
-  if (choice.kind === "bull") {
-    const bull = lookup.animals.find((animal) => animal.id === choice.id);
-    return {
-      bullId: choice.id,
-      ...(bull === undefined ? {} : { sireName: displayName(bull) }),
-    };
-  }
-
-  if (choice.kind === "external") {
-    const outsider = lookup.outsiders.find((entry) => entry.id === choice.id);
-    return {
-      sireExternalId: choice.id,
-      ...(outsider === undefined ? {} : { sireName: outsider.name }),
-    };
-  }
-
-  const straw = lookup.straws.find((entry) => entry.id === choice.id);
-  if (straw === undefined) return { semenInventoryId: choice.id };
-
-  // The straw's own sire travels onto the breeding, so the calving flow can
-  // pedigree the calf from the service without going back through the tank.
-  return {
-    semenInventoryId: straw.id,
-    ...(straw.sireAnimalId === undefined ? {} : { bullId: straw.sireAnimalId }),
-    ...(straw.sireExternalId === undefined ? {} : { sireExternalId: straw.sireExternalId }),
-    sireName: straw.sireName,
-  };
-}
-
-/** The sire of a breeding already on file, however he was recorded. */
-export function sireDisplay(record: BreedingRecord, lookup: SireLookup): string | undefined {
-  if (record.sireName !== undefined && record.sireName.trim() !== "") return record.sireName;
-
-  const bull =
-    record.bullId === undefined
-      ? undefined
-      : lookup.animals.find((animal) => animal.id === record.bullId);
-  if (bull !== undefined) return displayName(bull);
-
-  const outsider =
-    record.sireExternalId === undefined
-      ? undefined
-      : lookup.outsiders.find((entry) => entry.id === record.sireExternalId);
-  if (outsider !== undefined) return outsider.name;
-
-  const straw =
-    record.semenInventoryId === undefined
-      ? undefined
-      : lookup.straws.find((entry) => entry.id === record.semenInventoryId);
-  if (straw !== undefined) return straw.sireName;
-
-  // Records written before there was a field for him: this screen used to put
-  // the sire in the notes because there was nowhere else to put it.
-  const noted = /^Sire: (.+)$/m.exec(record.notes ?? "");
-  return noted?.[1]?.trim();
+  const tank = method === "AI" ? strawOptions(lookup.straws ?? []) : [];
+  return [...tank, ...bullOptions(lookup, sexes)];
 }
 
 type Api = ReturnType<typeof useMutations<BreedingRecord>>;
@@ -575,7 +429,9 @@ function AddBreeding({
   const options = useMemo(() => sireOptions(method, lookup, sexes), [method, lookup, sexes]);
   const choice = useMemo(() => parseSire(sire), [sire]);
   const chosenStraw =
-    choice?.kind === "straw" ? lookup.straws.find((entry) => entry.id === choice.id) : undefined;
+    choice?.kind === "straw"
+      ? (lookup.straws ?? []).find((entry) => entry.id === choice.id)
+      : undefined;
 
   /**
    * What colour the calf can be, before the breeding is even recorded.
@@ -597,7 +453,7 @@ function AddBreeding({
     const damCoat = resolve.of({ kind: "animal", id: damId as Ulid });
 
     const named =
-      choice.kind === "name" ? choice.name : (sireFields(choice, lookup).sireName ?? "the sire");
+      choice.kind === "name" ? choice.name : (breedingSire(choice, lookup).sireName ?? "the sire");
     const animalId =
       choice.kind === "bull"
         ? choice.id
@@ -693,7 +549,7 @@ function AddBreeding({
         damId: damId as Ulid,
         method,
         date: new Date(date),
-        ...(choice === undefined ? {} : sireFields(choice, lookup)),
+        ...(choice === undefined ? {} : breedingSire(choice, lookup)),
         ...(notes.trim() === "" ? {} : { notes: notes.trim() }),
         ...(gestation === "" ? {} : { gestationDays: Number(gestation) }),
       } as never);
