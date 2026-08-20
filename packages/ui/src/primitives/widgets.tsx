@@ -247,7 +247,7 @@ export function RecordCard({
           {subtitle === undefined ? null : <div className="text-sm text-muted">{subtitle}</div>}
         </div>
         {actions === undefined ? null : (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>
         )}
       </div>
       {meta === undefined ? null : <div className="flex flex-wrap gap-1.5">{meta}</div>}
@@ -309,7 +309,7 @@ export function Callout({ tone = "danger", title, children, actions }: CalloutPr
         {children === undefined ? null : <div className="text-sm opacity-90">{children}</div>}
       </div>
       {actions === undefined ? null : (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>
       )}
     </div>
   );
