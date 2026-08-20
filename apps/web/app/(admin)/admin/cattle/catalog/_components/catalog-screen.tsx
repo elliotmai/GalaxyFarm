@@ -30,10 +30,12 @@ import {
   READABLE_REGISTRIES,
   registrationUrl,
   reviveRegistryAnimal,
+  semenInventorySchema,
   type CataloguePlan,
   type CatalogueRow,
   type ExternalAnimal,
   type RegistryAnimal,
+  type SemenInventory,
 } from "@galaxy-farm/module-cattle";
 
 import { useMutations } from "@/lib/local/mutations";
@@ -105,6 +107,13 @@ export function CatalogScreen({
     propertyId,
     actorId,
   );
+  const tank = useMutations<SemenInventory>(
+    "semenInventory",
+    "semenInventory",
+    semenInventorySchema,
+    propertyId,
+    actorId,
+  );
   const { show } = useToast();
 
   const { records: onFile } = useRecords<ExternalAnimal>("externalAnimals", { propertyId });
@@ -127,6 +136,18 @@ export function CatalogScreen({
   const [bringing, setBringing] = useState(false);
   /** Which proposed merges have been agreed to. Certain ones are not asked. */
   const [merging, setMerging] = useState<ReadonlySet<string>>(new Set());
+  /**
+   * The bull just brought across, while the reason for bringing him is fresh.
+   *
+   * "Used at a desk, once, when a straw is being considered" is what this
+   * screen is for, and the straw was the point of the visit — so the tank is
+   * offered here rather than left as a second errand on another screen, where
+   * he would be typed in again by name and the pedigree just imported would go
+   * unused.
+   */
+  const [brought, setBrought] = useState<
+    { readonly id: Ulid; readonly name: string; readonly bull: boolean } | undefined
+  >();
 
   const runSearch = useCallback(async () => {
     setSearching(true);
@@ -256,6 +277,21 @@ export function CatalogScreen({
           `${merged === 0 ? "" : `${merged} already here, with the new number added. `}` +
           `${joined === 0 ? "Nothing to join up." : `${joined} joined to their parents.`}`,
       });
+
+      // The animal the search landed on is the first row, and the one somebody
+      // came here for. A cow is never offered to the tank; a bull whose sex the
+      // crawl never read is, because that is what a straw is.
+      const subject = opened.plan.rows[0];
+      const subjectId = subject === undefined ? undefined : ids.get(subject.key);
+      setBrought(
+        subjectId === undefined
+          ? undefined
+          : {
+              id: subjectId,
+              name: opened.animal.name,
+              bull: opened.animal.sex !== "female",
+            },
+      );
       setOpened(undefined);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Not everything could be saved.");
@@ -485,6 +521,33 @@ export function CatalogScreen({
         </Callout>
       ) : null}
 
+      {brought === undefined || !brought.bull ? null : (
+        <AddToTank
+          name={brought.name}
+          onDismiss={() => setBrought(undefined)}
+          onAdd={async (straws) => {
+            const result = await tank.create({
+              // The reference, not just the name. It is what makes the straw
+              // worth joining: the breeding drawn from it inherits the sire,
+              // and the calf is pedigreed from the tree just imported.
+              sireExternalId: brought.id,
+              sireName: brought.name,
+              strawsOnHand: straws,
+            } as never);
+
+            if (!result.ok) {
+              setError("That could not be added to the tank.");
+              return;
+            }
+            setBrought(undefined);
+            show({
+              tone: "success",
+              message: `${straws} straw${straws === 1 ? "" : "s"} of ${brought.name} in the tank`,
+            });
+          }}
+        />
+      )}
+
       {opened === undefined ? null : (
         <BringAcross
           opened={opened}
@@ -496,6 +559,59 @@ export function CatalogScreen({
         />
       )}
     </PageBody>
+  );
+}
+
+/**
+ * The straw this visit was about.
+ *
+ * Offered only after the pedigree is on file, so what goes in the tank is a
+ * reference rather than a name — the difference between a cane that pedigrees
+ * a calf at calving and one that leaves the sire column blank.
+ */
+function AddToTank({
+  name,
+  onAdd,
+  onDismiss,
+}: {
+  readonly name: string;
+  readonly onAdd: (straws: number) => Promise<void>;
+  readonly onDismiss: () => void;
+}) {
+  const [straws, setStraws] = useState("1");
+  const [busy, setBusy] = useState(false);
+
+  const count = Number(straws);
+  const valid = Number.isInteger(count) && count > 0;
+
+  return (
+    <Callout tone="identity" title={`${name} is on file. Straws of him in the tank?`}>
+      <p>
+        The tank is where a breeding finds him: pick the cane in the chute and the breeding record
+        keeps his pedigree without anybody typing his name again.
+      </p>
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <TextInput
+          label="Straws"
+          type="number"
+          inputMode="numeric"
+          value={straws}
+          onChange={(event) => setStraws(event.target.value)}
+        />
+        <Button
+          disabled={!valid || busy}
+          onClick={() => {
+            setBusy(true);
+            void onAdd(count).finally(() => setBusy(false));
+          }}
+        >
+          {busy ? "Adding…" : "Add to the tank"}
+        </Button>
+        <Button variant="ghost" onClick={onDismiss} disabled={busy}>
+          Not now
+        </Button>
+      </div>
+    </Callout>
   );
 }
 

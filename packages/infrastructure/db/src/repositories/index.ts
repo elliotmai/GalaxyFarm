@@ -31,7 +31,7 @@ export const SEARCHABLE_FIELDS = {
   animals: ["name", "tagNumber", "notes"],
   cattleProfiles: ["colour", "markings"],
   externalAnimals: ["name", "regNumber"],
-  breedingRecords: ["notes", "embryoCode"],
+  breedingRecords: ["sireName", "notes", "embryoCode"],
   calvingRecords: ["notes", "assistDetail"],
   healthRecords: ["product", "notes", "administeredBy"],
   // A heat is found through its cow and its date, never by typing.

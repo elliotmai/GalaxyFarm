@@ -27,6 +27,7 @@ import {
   type CalvingRecord,
   type CattleProfile,
   type ParentRef,
+  type SemenInventory,
   type WeightRecord,
 } from "@galaxy-farm/module-cattle";
 
@@ -83,16 +84,32 @@ export interface CalvingOutcome {
 /**
  * The sire of the calf, resolved from the service rather than asked for.
  *
- * Returns undefined when the breeding recorded the sire as free text, which is
- * what the breeding screen does until the semen tank (#20) and the
- * `ExternalAnimal` picker (#16) exist. An unresolvable sire is left off the
- * pedigree rather than guessed — a wrong sire on a registration application is
- * a real problem, and an absent one is only an incomplete tree.
+ * Three ways in, in order of how directly they name him: the bull on the
+ * record, the ancestor on the record, and the straw — the tank knows whose
+ * semen it is, so a breeding entered as "that cane in canister 3" still
+ * pedigrees the calf.
+ *
+ * Returns undefined when the service names its sire only by name, which is a
+ * real answer for semen this farm never held. An unresolvable sire is left off
+ * the pedigree rather than guessed — a wrong sire on a registration
+ * application is a real problem, and an absent one is only an incomplete tree.
+ * The name stays on the breeding record either way, so whoever fills in the
+ * application has it.
  */
-export function sireOf(service: BreedingRecord | undefined): ParentRef | undefined {
+export function sireOf(
+  service: BreedingRecord | undefined,
+  straws: readonly SemenInventory[] = [],
+): ParentRef | undefined {
   if (service === undefined) return undefined;
   if (service.bullId !== undefined) return { kind: "animal", id: service.bullId };
   if (service.sireExternalId !== undefined) return { kind: "external", id: service.sireExternalId };
+
+  const straw =
+    service.semenInventoryId === undefined
+      ? undefined
+      : straws.find((entry) => entry.id === service.semenInventoryId);
+  if (straw?.sireAnimalId !== undefined) return { kind: "animal", id: straw.sireAnimalId };
+  if (straw?.sireExternalId !== undefined) return { kind: "external", id: straw.sireExternalId };
   return undefined;
 }
 
@@ -130,6 +147,8 @@ export function useRecordCalving(
   );
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", { propertyId });
   const { records: zones } = useRecords<Zone>("zones", { propertyId });
+  // The tank, so a calf out of a straw still gets its sire (§5.2).
+  const { records: straws } = useRecords<SemenInventory>("semenInventory", { propertyId });
 
   const weights = useMutations<WeightRecord>(
     "weightRecords",
@@ -183,7 +202,7 @@ export function useRecordCalving(
         };
       }
 
-      const sire = sireOf(service);
+      const sire = sireOf(service, straws);
       const draft = calfFromCalving(
         calving,
         {
@@ -283,6 +302,6 @@ export function useRecordCalving(
           : { suggestedDamLevel: suggestedLevelAfterCalving(context.dam.safetyLevel) }),
       };
     },
-    [calvings, animals, profiles, weights, propertyId],
+    [calvings, animals, profiles, weights, propertyId, straws],
   );
 }
