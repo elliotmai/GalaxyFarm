@@ -35,9 +35,11 @@ import {
   CALVING_EASE,
   calvingInterval,
   calvingRecordSchema,
-  isInCalvingWindow,
   producedLiveCalf,
   projectedDueDate,
+  awaitingCalving,
+  describeGestation,
+  gestationLength,
   serviceFor,
   suggestedCalfTag,
   type BreedingRecord,
@@ -119,7 +121,7 @@ export function CalvingScreen({
       animal.species === "cattle" && animal.sex === "female" && animal.status === "active",
   );
 
-  const watching = breedings.filter((record) => isInCalvingWindow(record, now));
+  const watching = awaitingCalving(breedings, calvings, now);
   const live = calvings.filter((record) => producedLiveCalf(record));
 
   async function remove(record: CalvingRecord) {
@@ -227,6 +229,32 @@ export function CalvingScreen({
         ),
     },
     {
+      key: "service",
+      header: "Service",
+      // The breeding this calving answers, read back off `breedingRecordId`.
+      // It is what the calf's sire came from, so a calving that lost its
+      // service — or never had one — is worth seeing rather than guessing at.
+      render: (record) => {
+        const service =
+          record.breedingRecordId === undefined
+            ? undefined
+            : breedings.find((breeding) => breeding.id === record.breedingRecordId);
+        if (service === undefined) return <span className="text-muted">Not linked</span>;
+
+        const carried = gestationLength(service, record);
+        return (
+          <span className="flex flex-wrap items-baseline gap-2">
+            <span>
+              {service.method} {formatDate(service.date)}
+            </span>
+            {carried === undefined ? null : (
+              <span className="text-muted [font-variant-numeric:tabular-nums]">{carried} d</span>
+            )}
+          </span>
+        );
+      },
+    },
+    {
       key: "interval",
       header: "Interval",
       // Whether she is holding a yearly interval or slipping — the number that
@@ -318,6 +346,7 @@ export function CalvingScreen({
           dams={dams}
           existingTags={tagsInUse}
           breedings={breedings}
+          calvings={calvings}
           defaultDamId={params.get("dam") ?? ""}
           propertyId={propertyId}
           actorId={actorId}
@@ -368,6 +397,7 @@ function RecordCalving({
   dams,
   existingTags,
   breedings,
+  calvings,
   defaultDamId,
   propertyId,
   actorId,
@@ -377,6 +407,8 @@ function RecordCalving({
   /** Every tag on the property, so the next calf number skips the ones in use. */
   readonly existingTags: readonly (string | undefined)[];
   readonly breedings: readonly BreedingRecord[];
+  /** Already on file, so a service that produced a calf is not offered again. */
+  readonly calvings: readonly CalvingRecord[];
   readonly defaultDamId: string;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
@@ -402,7 +434,9 @@ function RecordCalving({
 
   const dam = dams.find((animal) => animal.id === damId);
   const service =
-    damId === "" ? undefined : serviceFor(breedings, damId as Ulid, new Date(`${date}T12:00:00`));
+    damId === ""
+      ? undefined
+      : serviceFor(breedings, damId as Ulid, new Date(`${date}T12:00:00`), calvings);
 
   // Prefilled, not imposed: the field follows the dam and the date until
   // somebody types in it, and then it stops moving under them.
@@ -444,7 +478,7 @@ function RecordCalving({
           ...(notes.trim() === "" ? {} : { notes: notes.trim() }),
           calfTag: calfTag.trim(),
         },
-        { dam, breedings },
+        { dam, breedings, calvings },
       );
 
       if (!result.ok) {
@@ -567,7 +601,8 @@ function RecordCalving({
             <p className="text-sm text-muted">
               {service === undefined
                 ? "No service on file — the calf's sire will be blank rather than guessed."
-                : `Sire from the ${service.method} service on ${formatDate(service.date)}.`}
+                : `Sire from the ${service.method} service on ${formatDate(service.date)}. ` +
+                  `${describeGestation(service, new Date(`${date}T12:00:00`))}`}
             </p>
           )}
         </div>

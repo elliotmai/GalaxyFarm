@@ -16,6 +16,7 @@ import {
   calvingWatch,
   describeWatch,
   type BreedingRecord,
+  type CalvingRecord,
   type CalvingWatchCard,
 } from "@galaxy-farm/module-cattle";
 import type { Crop, PlannedPlanting, Variety } from "@galaxy-farm/module-garden";
@@ -295,6 +296,19 @@ export async function POST(request: Request) {
         ),
       )) as unknown as BreedingRecord[];
 
+    // What has already happened. A cow that calved on Tuesday is not somebody
+    // to wake up for on Wednesday, and until this was read the alert went out
+    // anyway — every night until her window closed.
+    const calvings = (await db
+      .select()
+      .from(allTables.calvingRecords)
+      .where(
+        and(
+          eq(allTables.calvingRecords.propertyId, propertyId),
+          isNull(allTables.calvingRecords.deletedAt),
+        ),
+      )) as unknown as CalvingRecord[];
+
     const animals = (await db
       .select()
       .from(allTables.animals)
@@ -304,7 +318,7 @@ export async function POST(request: Request) {
 
     const byId = new Map(animals.map((animal) => [animal.id, animal]));
 
-    const cards = calvingWatch(breedings, snapshot.forecast, now, {
+    const cards = calvingWatch(breedings, calvings, snapshot.forecast, now, {
       defaultGestationDays: settings.gestationDays,
       windowDays: settings.calvingWindowDays,
       calfChillF: settings.calfChillF,

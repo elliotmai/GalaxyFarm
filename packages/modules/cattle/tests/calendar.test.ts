@@ -191,6 +191,32 @@ describe("what earns a row", () => {
     expect(entries.map((entry) => entry.kind)).toEqual([]);
   });
 
+  it("dates the window from the service that still stands", () => {
+    // She came back open and was bred again three weeks later. One due date,
+    // not two — projecting the February service as well would put a fortnight
+    // of watch dates on the calendar for a pregnancy that never happened.
+    const first = breeding({ id: id(1), date: new Date("2026-02-14T00:00:00Z") });
+    const again = breeding({ id: id(11), date: new Date("2026-04-06T00:00:00Z") });
+
+    const windows = cattleCalendarEntries({ breedings: [first, again] }).filter(
+      (entry) => entry.kind === "calving_window",
+    );
+
+    expect(windows).toHaveLength(1);
+    expect(windows[0]?.source?.id).toBe(id(11));
+  });
+
+  it("drops the window and the check once she has calved", () => {
+    const bred = breeding({ id: id(1), date: new Date("2026-02-14T00:00:00Z") });
+    const calved = [
+      { damId: bred.damId, breedingRecordId: bred.id, date: new Date("2026-11-22T00:00:00Z") },
+    ];
+
+    const entries = cattleCalendarEntries({ breedings: [bred], calvings: calved });
+
+    expect(entries.map((entry) => entry.kind)).toEqual([]);
+  });
+
   it("projects a withdrawal end and names the product", () => {
     const entries = cattleCalendarEntries({
       animals: [andromeda],

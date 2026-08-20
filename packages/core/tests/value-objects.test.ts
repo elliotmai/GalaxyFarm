@@ -30,6 +30,7 @@ import {
 import {
   addCalendarDays,
   addDays,
+  asDate,
   close,
   contains,
   dateRange,
@@ -244,5 +245,36 @@ describe("local days", () => {
 
     expect(new Set(keys).size).toBe(365);
     expect(keys.at(-1)).toBe("2026-12-31");
+  });
+});
+
+describe("asDate", () => {
+  /**
+   * The last line of defence for a date that arrived as something else.
+   *
+   * Timestamps inside a JSON column came off the wire as strings, and a screen
+   * formatting one threw mid-render — which React answers by unmounting the
+   * app, not the row. The reviving is fixed; this is what the screens printing
+   * those fields use, so a record written by an older build costs a missing
+   * date rather than a blank page.
+   */
+  it("passes a real Date through", () => {
+    const at = new Date("2026-05-01T00:00:00.000Z");
+    expect(asDate(at)).toBe(at);
+  });
+
+  it("reads one that arrived as a string or a number", () => {
+    expect(asDate("2026-05-01T00:00:00.000Z")?.getTime()).toBe(Date.parse("2026-05-01"));
+    expect(asDate(1_777_593_600_000)?.getTime()).toBe(1_777_593_600_000);
+  });
+
+  it("gives nothing back rather than an Invalid Date", () => {
+    // NaN compares false against everything and formats as "Invalid Date".
+    // Absent is a state every caller already handles.
+    expect(asDate("whenever")).toBeUndefined();
+    expect(asDate(new Date("whenever"))).toBeUndefined();
+    expect(asDate(undefined)).toBeUndefined();
+    expect(asDate(null)).toBeUndefined();
+    expect(asDate({ date: "2026-05-01" })).toBeUndefined();
   });
 });

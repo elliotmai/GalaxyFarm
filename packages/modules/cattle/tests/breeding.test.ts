@@ -8,11 +8,23 @@ import {
   breedingsFor,
   calvingWindow,
   daysBred,
+  awaitingCalving,
+  calvingFor,
+  groupOf,
+  isSuperseded,
+  needsRebreeding,
+  serviceGroups,
+  standingServices,
+  describeGestation,
+  gestationLength,
+  hasCalved,
   isInCalvingWindow,
+  namesASire,
   pregCheckDue,
   projectedDueDate,
   serviceFor,
   type BreedingRecord,
+  type ServiceGroup,
 } from "../src/domain/breeding-record.js";
 import {
   calfFromCalving,
@@ -149,7 +161,7 @@ describe("breedingRecordSchema", () => {
     expect(breedingRecordSchema.safeParse(breeding()).success).toBe(true);
   });
 
-  it("refuses a natural service with no bull", () => {
+  it("refuses a natural service naming no bull at all", () => {
     const result = breedingRecordSchema.safeParse({
       ...breeding(),
       method: "natural",
@@ -158,13 +170,49 @@ describe("breedingRecordSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("refuses an AI breeding naming neither a straw nor a sire", () => {
-    // Without one of the two the calf cannot be pedigreed, which is the whole
-    // reason the breeding was recorded.
+  it("takes a natural service by a bull who is only named", () => {
+    // A leased bull, or the neighbour's over the fence. There is no record of
+    // him here and the cow is still bred.
+    const result = breedingRecordSchema.safeParse({
+      ...breeding(),
+      method: "natural",
+      sireExternalId: undefined,
+      sireName: "Nichols Legacy G151",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("refuses an AI breeding that says nothing about the sire", () => {
+    // Nothing at all, not even a name: the calf cannot be pedigreed and
+    // nobody can say later what it was out of.
     const result = breedingRecordSchema.safeParse({
       ...breeding(),
       sireExternalId: undefined,
       semenInventoryId: undefined,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("takes an AI breeding whose sire is only a name", () => {
+    // The commonest AI on this farm: semen bought and thawed the same morning,
+    // or a cow bred at somebody else's place and phoned in. Requiring a straw
+    // in our tank or an ancestor on file made those unrecordable, and an
+    // unrecorded service is a due date nobody is watching.
+    const result = breedingRecordSchema.safeParse({
+      ...breeding(),
+      sireExternalId: undefined,
+      semenInventoryId: undefined,
+      sireName: "ZNT Montego Bay",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("does not take a blank name as an answer", () => {
+    const result = breedingRecordSchema.safeParse({
+      ...breeding(),
+      sireExternalId: undefined,
+      semenInventoryId: undefined,
+      sireName: "   ",
     });
     expect(result.success).toBe(false);
   });
@@ -184,6 +232,20 @@ describe("breedingRecordSchema", () => {
       pregCheck: { date: new Date("2026-01-01"), result: "bred", method: "blood" },
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("namesASire", () => {
+  it("takes any one of the four ways of saying who he was", () => {
+    expect(namesASire({ bullId: id(4) })).toBe(true);
+    expect(namesASire({ semenInventoryId: id(9) })).toBe(true);
+    expect(namesASire({ sireExternalId: id(3) })).toBe(true);
+    expect(namesASire({ sireName: "ZNT Montego Bay" })).toBe(true);
+  });
+
+  it("is false when nothing names him", () => {
+    expect(namesASire({})).toBe(false);
+    expect(namesASire({ sireName: "" })).toBe(false);
   });
 });
 
@@ -235,6 +297,183 @@ const calving = (over: Partial<CalvingRecord> = {}): CalvingRecord => ({
   birthWeightLb: 78,
   assisted: false,
   ...over,
+});
+
+describe("the link between a breeding and its calving", () => {
+  // Andromeda, bred 14 February, calved 22 November — day 281, two days early.
+  const her = calving();
+
+  it("finds the calving by the id the flow wrote", () => {
+    expect(calvingFor([her], breeding())?.id).toBe(id(20));
+    expect(hasCalved([her], breeding())).toBe(true);
+  });
+
+  it("matches an unlinked calving of the same cow inside a real gestation", () => {
+    // Recorded before the flow wrote the id, or entered on a device that never
+    // saw the breeding. The cow, the order and the length are all that is left
+    // to go on, and together they are enough.
+    const orphan = calving({ breedingRecordId: undefined });
+
+    expect(calvingFor([orphan], breeding())?.id).toBe(id(20));
+  });
+
+  it("will not claim a calving too far from the service to be its calf", () => {
+    // 200 days after the service is not that service's calf. Guessing that it
+    // is would close out a breeding the cow is still carrying.
+    const early = calving({ breedingRecordId: undefined, date: new Date("2026-09-02") });
+
+    expect(calvingFor([early], breeding())).toBeUndefined();
+  });
+
+  it("leaves a calving that already names another service alone", () => {
+    // Two breedings both claiming one calf is worse than one showing none.
+    const other = calving({ breedingRecordId: id(11) });
+
+    expect(calvingFor([other], breeding())).toBeUndefined();
+  });
+
+  it("takes a cow off the watch once she has calved", () => {
+    const inWindow = new Date("2026-11-23T06:00:00Z");
+
+    expect(isInCalvingWindow(breeding(), inWindow)).toBe(true);
+    expect(awaitingCalving([breeding()], [], inWindow)).toHaveLength(1);
+    // She calved yesterday. A card telling somebody to get up at 2am for a cow
+    // with a calf at side is the alert people learn to ignore.
+    expect(awaitingCalving([breeding()], [her], inWindow)).toEqual([]);
+  });
+});
+
+describe("serviceFor and the calvings already on file", () => {
+  it("passes over a service that has already produced a calf", () => {
+    // One service, one calf. Without this a second calving on a cow with one
+    // breeding on file is credited to the service that answered the first.
+    const answered = calving();
+    const later = new Date("2027-01-05");
+
+    expect(serviceFor([breeding()], id(2), later)?.id).toBe(id(1));
+    expect(serviceFor([breeding()], id(2), later, [answered])).toBeUndefined();
+  });
+});
+
+describe("serviceGroups", () => {
+  // She was bred on 14 February, came back open on 25 March, and was re-bred
+  // on 6 April — to a different bull, by a different method, which is the
+  // ordinary shape of it.
+  const first = breeding({
+    id: id(1),
+    date: BRED_ON,
+    pregCheck: { date: new Date("2026-03-25"), result: "open", method: "ultrasound" },
+  });
+  const second = breeding({
+    id: id(11),
+    date: new Date("2026-04-06"),
+    method: "natural",
+    sireExternalId: undefined,
+    bullId: id(4),
+  });
+
+  it("puts both services of one pregnancy under one attempt", () => {
+    const [group, ...rest] = serviceGroups([first, second]);
+
+    expect(rest).toEqual([]);
+    expect(group?.services.map((service) => service.id)).toEqual([id(1), id(11)]);
+  });
+
+  it("stands on the last service, whatever the first one said", () => {
+    // The re-breeding answers the first service. Two due dates three weeks
+    // apart on one cow is the thing this prevents.
+    expect(serviceGroups([first, second])[0]?.standing.id).toBe(id(11));
+    expect(isSuperseded(first, [first, second])).toBe(true);
+    expect(isSuperseded(second, [first, second])).toBe(false);
+    expect(standingServices([first, second]).map((record) => record.id)).toEqual([id(11)]);
+  });
+
+  it("does not care that the bull or the method changed", () => {
+    const [group] = serviceGroups([first, second]);
+
+    expect(group?.services.map((service) => service.method)).toEqual(["AI", "natural"]);
+  });
+
+  it("starts a new attempt after she calves", () => {
+    // Bred, calved, bred again: two attempts, not one long one.
+    const her = calving({ breedingRecordId: id(11), date: new Date("2027-01-12") });
+    const nextYear = breeding({ id: id(12), date: new Date("2027-03-20") });
+    const groups = serviceGroups([first, second, nextYear], [her]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups.map((group) => group.services.length)).toEqual([1, 2]);
+    expect(groupOf(groups, second)?.calving?.id).toBe(id(20));
+  });
+
+  it("starts a new attempt after a rest longer than a gestation", () => {
+    // No calving on file, and 400 days between services. Either she calved and
+    // nobody wrote it down or she was rested — she was not still chasing the
+    // February pregnancy.
+    const muchLater = breeding({ id: id(13), date: new Date("2027-05-20") });
+    const groups = serviceGroups([first, muchLater]);
+
+    expect(groups).toHaveLength(2);
+  });
+
+  it("keeps one cow's attempts off another's", () => {
+    const otherCow = breeding({ id: id(14), damId: id(5), date: new Date("2026-04-08") });
+    const groups = serviceGroups([first, second, otherCow]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups.find((group) => group.damId === id(5))?.services).toHaveLength(1);
+  });
+
+  it("names the cows waiting to be bred again", () => {
+    // Her last service came back open and nothing has been done about it.
+    expect(needsRebreeding(serviceGroups([first])[0] as ServiceGroup)).toBe(true);
+    // Re-bred: no longer on the list.
+    expect(needsRebreeding(serviceGroups([first, second])[0] as ServiceGroup)).toBe(false);
+  });
+
+  it("keeps a superseded service off the calving watch", () => {
+    // The February service projects 24 November all by itself. She is carrying
+    // to the April one, and the November window is for a pregnancy that never
+    // happened.
+    const inFirstWindow = new Date("2026-11-15T08:00:00Z");
+
+    expect(isInCalvingWindow(first, inFirstWindow)).toBe(false); // confirmed open
+    const noCheck = breeding({ id: id(1), date: BRED_ON });
+    expect(isInCalvingWindow(noCheck, inFirstWindow)).toBe(true);
+    // Even with no preg check recorded at all, the re-breeding is what says
+    // the first service failed.
+    expect(awaitingCalving([noCheck, second], [], inFirstWindow)).toEqual([]);
+  });
+});
+
+describe("gestationLength", () => {
+  it("says how long she actually carried", () => {
+    expect(gestationLength(breeding(), calving())).toBe(281);
+  });
+
+  it("refuses a calving dated before the service", () => {
+    expect(gestationLength(breeding(), calving({ date: new Date("2026-01-01") }))).toBeUndefined();
+  });
+});
+
+describe("describeGestation", () => {
+  it("says how far off the projection she is", () => {
+    expect(describeGestation(breeding(), new Date("2026-11-22T04:00:00Z"))).toBe(
+      "Day 281 — 2 days early.",
+    );
+    expect(describeGestation(breeding(), new Date("2026-11-25T04:00:00Z"))).toBe(
+      "Day 284 — 1 day late.",
+    );
+  });
+
+  it("says so when she calved on the day", () => {
+    expect(describeGestation(breeding(), new Date("2026-11-24T00:00:00Z"))).toBe(
+      "Day 283, exactly her projected date.",
+    );
+  });
+
+  it("does not report a negative gestation at a mistyped date", () => {
+    expect(describeGestation(breeding(), new Date("2026-01-01"))).toMatch(/before she was bred/);
+  });
 });
 
 describe("calvingRecordSchema", () => {

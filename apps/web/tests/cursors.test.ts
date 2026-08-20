@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { loadCursors, saveCursors } from "../lib/local/cursors.js";
+import { CURSOR_REVISION, loadCursors, saveCursors } from "../lib/local/cursors.js";
 
 /**
  * Cursors across restarts (spec §4.2).
@@ -10,7 +10,17 @@ import { loadCursors, saveCursors } from "../lib/local/cursors.js";
  * the difference between a sync that finishes and one that does not.
  */
 
+/**
+ * Storage on a device that has already read its copy through this build.
+ *
+ * The revision is stamped, because a mismatch is a deliberate one-off re-pull
+ * (see `CURSOR_REVISION`) and every test below is about the ordinary case.
+ */
 function fakeStorage(initial: Record<string, string> = {}): Storage {
+  return rawStorage({ "galaxy-farm:cursors:revision": CURSOR_REVISION, ...initial });
+}
+
+function rawStorage(initial: Record<string, string> = {}): Storage {
   const data = new Map(Object.entries(initial));
   return {
     getItem: (key) => data.get(key) ?? null,
@@ -96,5 +106,38 @@ describe("cursors", () => {
     // Server render, or a browser with storage disabled.
     expect(loadCursors(undefined)).toEqual({});
     expect(() => saveCursors(CURSORS, undefined)).not.toThrow();
+  });
+});
+
+describe("the cursor revision", () => {
+  it("throws away cursors written by an older build, once", () => {
+    // What makes a fixed pull able to fix anything. A record already on the
+    // device is never sent again — nothing about it changed — so a device
+    // holding the wrong shape would hold it forever.
+    const storage = rawStorage({
+      "galaxy-farm:cursors": JSON.stringify({
+        animals: { updatedAt: "2026-11-15T08:00:00.000Z", lastId: "x" },
+      }),
+    });
+
+    expect(loadCursors(storage)).toEqual({});
+    expect(storage.getItem("galaxy-farm:cursors")).toBeNull();
+    expect(storage.getItem("galaxy-farm:cursors:revision")).toBe(CURSOR_REVISION);
+
+    // And not again: the second open pulls from where the first left off.
+    saveCursors(CURSORS, storage);
+    expect(loadCursors(storage)["animals"]?.lastId).toBe(CURSORS.animals.lastId);
+  });
+
+  it("still opens when the revision cannot be written", () => {
+    const storage = {
+      ...rawStorage(),
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+    } as Storage;
+
+    expect(() => loadCursors(storage)).not.toThrow();
+    expect(loadCursors(storage)).toEqual({});
   });
 });

@@ -71,6 +71,50 @@ export function isDateField(field: string): boolean {
   return /(At|On|Date)$/.test(field) || NAMED_DATE_FIELDS.has(field);
 }
 
+/**
+ * The same rule, inside a JSON blob.
+ *
+ * Several entities keep a small object or a list in one column — a pregnancy
+ * check, a hair card, a registration — and the timestamps inside them are as
+ * real as the ones in columns of their own. Walking only the top level left
+ * them as strings, and a string is not a `Date`: the genetics panel called
+ * `toLocaleDateString` on a hair card's `testedOn` and took the whole app down
+ * with "a client-side exception has occurred". The same trap was one click
+ * away on a breeding's `pregCheck.date`.
+ *
+ * Strings are matched by the key that holds them, exactly as at the top level,
+ * so nothing new has to be listed here for a nested date to be revived. An
+ * element inside an array is judged by the key the array itself sits under, so
+ * a list of timestamps works and `photoKeys` is left alone.
+ *
+ * One difference from the top level, deliberately: a nested string that does
+ * not parse is *kept* rather than dropped. At the top level these are columns
+ * the schema says are timestamps, so an unparseable one is corrupt and NaN is
+ * worse than absent. In a blob the key is a convention rather than a promise —
+ * a `date` inside somebody's free-form settings could be the word "spring" —
+ * and deleting a value nobody asked us to interpret is the worse mistake.
+ */
+function reviveNested(value: unknown, field: string): unknown {
+  if (typeof value === "string") {
+    if (!isDateField(field)) return value;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date;
+  }
+
+  if (Array.isArray(value)) return value.map((entry) => reviveNested(entry, field));
+
+  if (typeof value === "object" && value !== null) {
+    const revived: Record<string, unknown> = {};
+    for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
+      if (inner === null) continue;
+      revived[key] = reviveNested(inner, key);
+    }
+    return revived;
+  }
+
+  return value;
+}
+
 export function reviveRecord<T extends BaseRecord>(raw: Record<string, unknown>): T {
   const record: Record<string, unknown> = {};
 
@@ -83,7 +127,7 @@ export function reviveRecord<T extends BaseRecord>(raw: Record<string, unknown>)
       continue;
     }
     // null becomes absent, matching what the repositories do on both sides.
-    if (value !== null) record[field] = value;
+    if (value !== null) record[field] = reviveNested(value, field);
   }
 
   return record as T;

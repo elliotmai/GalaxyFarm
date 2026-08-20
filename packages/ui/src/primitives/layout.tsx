@@ -105,7 +105,7 @@ export function PageHeader({ title, subtitle, eyebrow, actions, meta }: PageHead
           )}
         </div>
         {actions === undefined ? null : (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>
         )}
       </div>
       {meta === undefined ? null : <div className="flex flex-wrap items-center gap-2">{meta}</div>}

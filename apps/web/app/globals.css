@@ -121,6 +121,27 @@ body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
   padding-bottom: env(safe-area-inset-bottom);
+
+  /*
+   * A seatbelt, not a fix.
+   *
+   * One element wider than the phone makes the *whole page* scroll sideways,
+   * and that is not a cosmetic fault: the layout slides under a thumb that
+   * meant to scroll down, and the row you were reading leaves from under the
+   * heading that named it. It happened here — a header's actions row was
+   * marked `shrink-0`, so it kept its one-line width and pushed every screen
+   * it appeared on 137px past the edge of the phone.
+   *
+   * `clip` rather than `hidden` on purpose: `hidden` makes this a scroll
+   * container, which kills `position: sticky` on the header and the sidebar
+   * inside it. `clip` contains the stray element and changes nothing else.
+   *
+   * This is deliberately paired with `e2e/overflow*.spec.ts`, which assert
+   * that nothing overflows in the first place. Without those the clip would
+   * be a way of never finding out; with them it is what stops a fault
+   * reaching a barn while the test that catches it is still red.
+   */
+  overflow-x: clip;
 }
 
 /* Headings take the display face from theme.css, which sets it per density. */

@@ -17,12 +17,14 @@ import {
   type WatchSettings,
 } from "@galaxy-farm/core";
 import {
+  awaitingCalving,
   calvingWatch,
-  describeWatch,
-  isInCalvingWindow,
-  projectedDueDate,
   daysBred,
+  describeWatch,
+  hasCalved,
+  projectedDueDate,
   type BreedingRecord,
+  type CalvingRecord,
 } from "@galaxy-farm/module-cattle";
 
 import { useRecords } from "@/lib/local/use-records";
@@ -70,6 +72,8 @@ function reviveForecast(raw: unknown): Forecast | undefined {
 
 export function CalvingWatchCard({ propertyId }: { readonly propertyId: Ulid }) {
   const { records: breedings } = useRecords<BreedingRecord>("breedingRecords", { propertyId });
+  // The other half of the watch: a cow with a calf at side is off it.
+  const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", { propertyId });
   const { records: animals } = useRecords<Animal>("animals", { propertyId });
 
   const [snapshot, setSnapshot] = useState<Snapshot>({
@@ -117,12 +121,10 @@ export function CalvingWatchCard({ propertyId }: { readonly propertyId: Ulid }) 
   const settings = snapshot.settings;
   const byId = new Map(animals.map((animal) => [animal.id, animal]));
 
-  const watched = breedings.filter((record) =>
-    isInCalvingWindow(record, now, {
-      defaultGestationDays: settings.gestationDays,
-      windowDays: settings.calvingWindowDays,
-    }),
-  );
+  const watched = awaitingCalving(breedings, calvings, now, {
+    defaultGestationDays: settings.gestationDays,
+    windowDays: settings.calvingWindowDays,
+  });
 
   if (watched.length === 0) {
     // Nothing is due. Say what the next thing is rather than showing an empty
@@ -130,7 +132,12 @@ export function CalvingWatchCard({ propertyId }: { readonly propertyId: Ulid }) 
     // the other half.
     const next = breedings
       .map((record) => ({ record, due: projectedDueDate(record, settings.gestationDays) }))
-      .filter((entry) => entry.due >= now && entry.record.pregCheck?.result !== "open")
+      .filter(
+        (entry) =>
+          entry.due >= now &&
+          entry.record.pregCheck?.result !== "open" &&
+          !hasCalved(calvings, entry.record),
+      )
       .sort((left, right) => left.due.getTime() - right.due.getTime())[0];
 
     return (
@@ -166,7 +173,7 @@ export function CalvingWatchCard({ propertyId }: { readonly propertyId: Ulid }) 
           signals: [],
           urgent: false,
         }))
-      : calvingWatch(breedings, snapshot.forecast, now, {
+      : calvingWatch(breedings, calvings, snapshot.forecast, now, {
           defaultGestationDays: settings.gestationDays,
           windowDays: settings.calvingWindowDays,
           calfChillF: settings.calfChillF,

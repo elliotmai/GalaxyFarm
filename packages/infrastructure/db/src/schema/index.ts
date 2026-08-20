@@ -314,6 +314,8 @@ export const breedingRecords = pgTable(
     bullId: text("bull_id"),
     semenInventoryId: text("semen_inventory_id"),
     sireExternalId: text("sire_external_id"),
+    /** The sire as written, when nothing on file is him. See migration 0030. */
+    sireName: text("sire_name"),
     embryoDonorId: text("embryo_donor_id"),
     embryoCode: text("embryo_code"),
     date: timestamp("date", { withTimezone: true, mode: "date" }).notNull(),

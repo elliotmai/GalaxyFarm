@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { Callout, Card, Pill, Section, Select, TextInput, useToast } from "@galaxy-farm/ui";
-import type { Ulid } from "@galaxy-farm/core";
+import { asDate, type Ulid } from "@galaxy-farm/core";
 import {
   cattleProfileSchema,
   coatName,
@@ -237,6 +237,7 @@ export function GeneticsPanel({
               // ancestors are, and a recessive an animal does not have cannot
               // appear in it.
               const deduced = inherited.find((entry) => entry.defect === defect);
+              const tested = asDate(record?.testedOn);
               const shown = deduced?.inherited === true ? deduced.status : status;
 
               return (
@@ -258,9 +259,14 @@ export function GeneticsPanel({
                     </span>
                     <span className="text-sm text-muted">
                       {DEFECT_NAMES[defect]}
-                      {record?.testedOn === undefined
-                        ? ""
-                        : ` · tested ${record.testedOn.toLocaleDateString()}`}
+                      {/*
+                        Through `asDate` because a hair card written by a build
+                        before the sync transport revived timestamps inside JSON
+                        columns still holds a string, and formatting one threw
+                        where it stood — which React answers by unmounting the
+                        app. A card whose date cannot be read still shows.
+                      */}
+                      {tested === undefined ? "" : ` · tested ${tested.toLocaleDateString()}`}
                       {record?.lab === undefined ? "" : ` · ${record.lab}`}
                     </span>
                     {deduced?.inherited !== true ? null : (
