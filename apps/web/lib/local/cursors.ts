@@ -15,7 +15,40 @@ import type { CursorSet } from "@galaxy-farm/core";
 
 const KEY = "galaxy-farm:cursors";
 
+/**
+ * Bumped when a device's copy has to be re-read from the server.
+ *
+ * Cursors are what stop a device pulling the whole farm every time it opens,
+ * and that is exactly what makes a *fixed* pull unable to fix anything: a
+ * record already on the device is never sent again, because nothing about it
+ * changed. When the bug was in how records were read off the wire, every
+ * device is holding the wrong shape and no amount of syncing corrects it.
+ *
+ * So a revision that does not match drops the cursors, which costs one full
+ * pull — the same cost as clearing site data, which this file already calls
+ * recoverable — and the records come back through the current reviving code.
+ *
+ * 2: timestamps inside JSON blobs (a hair card's `testedOn`, a breeding's
+ * `pregCheck.date`) were left as strings by `reviveRecord`, and a screen that
+ * formatted one crashed the app.
+ */
+const REVISION_KEY = "galaxy-farm:cursors:revision";
+export const CURSOR_REVISION = "2";
+
 export function loadCursors(storage: Storage | undefined = globalThis.localStorage): CursorSet {
+  // Stamped here rather than on save, so a device that never manages a full
+  // sync still only re-pulls once per revision.
+  const revision = storage?.getItem(REVISION_KEY);
+  if (revision !== CURSOR_REVISION) {
+    try {
+      storage?.setItem(REVISION_KEY, CURSOR_REVISION);
+      storage?.removeItem(KEY);
+    } catch {
+      // Out of quota. One extra full pull next time is the whole cost.
+    }
+    return {};
+  }
+
   const raw = storage?.getItem(KEY);
   if (raw === null || raw === undefined || raw === "") return {};
 

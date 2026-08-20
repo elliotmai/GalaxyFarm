@@ -47,6 +47,30 @@ export function overlaps(left: DateRange, right: DateRange): boolean {
   return !leftEndsBefore && !rightEndsBefore;
 }
 
+/**
+ * A `Date`, whatever shape it arrived in.
+ *
+ * Every date in this app is a `Date` by the time a screen sees it — the sync
+ * transport revives them and the schemas coerce them. "Every" was not quite
+ * true: timestamps inside a JSON column (a hair card's `testedOn`, a
+ * breeding's `pregCheck.date`) came off the wire as strings, and a screen
+ * calling `toLocaleDateString` on one threw where it stood. React unmounts the
+ * tree on a render that throws, so a single stale hair card put "Application
+ * error: a client-side exception has occurred" over the whole app.
+ *
+ * The reviving is fixed and devices re-read what they hold, but a record
+ * written by an older build is still on somebody's phone. This is what the
+ * screens that print those fields use, so the worst such a record can do is
+ * show no date.
+ */
+export function asDate(value: unknown): Date | undefined {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? undefined : value;
+  if (typeof value !== "string" && typeof value !== "number") return undefined;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
 export const MS_PER_DAY = 86_400_000;
 
 /** Whole days covered, using `now` for an open range. */

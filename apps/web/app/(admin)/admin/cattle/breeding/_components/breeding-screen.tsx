@@ -25,7 +25,7 @@ import {
   type Column,
   type SearchOption,
 } from "@galaxy-farm/ui";
-import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
+import { asDate, displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
   BREEDING_METHODS,
   predictCalfColour,
@@ -79,10 +79,18 @@ import {
  * every downstream date at once instead of leaving four stale copies.
  */
 
+/**
+ * Through `asDate` because one of these is a date out of a JSON column.
+ *
+ * `pregCheck.date` came off the wire as a string on any device that pulled it
+ * before the transport revived nested timestamps, and formatting one threw
+ * mid-render — which takes the whole app down, not just the row.
+ */
 function formatDate(value: Date | undefined): string {
-  return value === undefined
+  const date = asDate(value);
+  return date === undefined
     ? "—"
-    : value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
 export function BreedingScreen({
