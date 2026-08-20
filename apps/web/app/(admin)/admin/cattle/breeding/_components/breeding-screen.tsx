@@ -61,6 +61,7 @@ import {
 import { PairingPlanner } from "@/app/(admin)/admin/cattle/breeding/_components/pairing-planner";
 import { animalHref } from "@/lib/animal-slug";
 import { coatResolver } from "@/lib/coat";
+import { fromDateInput, todayInput } from "@/lib/date-input";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 import {
@@ -585,12 +586,15 @@ function AddBreeding({
   const [damId, setDamId] = useState("");
   const [method, setMethod] = useState<BreedingMethod>("AI");
   const [sire, setSire] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayInput());
   const [gestation, setGestation] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
+  // Midday local, like every other date field on the farm: a bare `new Date`
+  // on `2026-02-14` is midnight UTC, which renders as the 13th here.
+  const bredOn = fromDateInput(date);
   const options = useMemo(() => sireOptions(method, lookup, sexes), [method, lookup, sexes]);
   const choice = useMemo(() => parseSire(sire), [sire]);
   const chosenStraw =
@@ -681,12 +685,20 @@ function AddBreeding({
   // Shown before saving, because the date is the whole point of the record and
   // a typo in the year is invisible until eleven months later.
   const preview =
-    date === ""
+    bredOn === undefined
       ? undefined
-      : projectedDueDate(
-          { date: new Date(date), gestationDays: gestation === "" ? undefined : Number(gestation) },
-          DEFAULT_GESTATION_DAYS,
-        );
+      : {
+          due: projectedDueDate(
+            { date: bredOn, gestationDays: gestation === "" ? undefined : Number(gestation) },
+            DEFAULT_GESTATION_DAYS,
+          ),
+          // Both dates off the one reading of the field, rather than parsing
+          // it again down in the markup where the guard above cannot reach.
+          opens: calvingWindow({
+            date: bredOn,
+            gestationDays: gestation === "" ? undefined : Number(gestation),
+          }).from,
+        };
 
   /**
    * Take the straw off the count (§5.2: "decremented by AI breeding records").
@@ -718,6 +730,10 @@ function AddBreeding({
       setError("Choose the cow");
       return;
     }
+    if (bredOn === undefined) {
+      setError("Say what day she was bred");
+      return;
+    }
     // ET is the one method that can be recorded without him: the pedigree the
     // calf gets is the embryo's, and the donor is what identifies it.
     if (choice === undefined && method !== "ET") {
@@ -730,7 +746,7 @@ function AddBreeding({
       const result = await api.create({
         damId: damId as Ulid,
         method,
-        date: new Date(date),
+        date: bredOn,
         ...(choice === undefined ? {} : breedingSire(choice, lookup)),
         ...(notes.trim() === "" ? {} : { notes: notes.trim() }),
         ...(gestation === "" ? {} : { gestationDays: Number(gestation) }),
@@ -856,13 +872,8 @@ function AddBreeding({
         </Button>
         {preview === undefined ? null : (
           <p className="text-sm text-muted">
-            Due <span className="font-medium text-ink">{formatDate(preview)}</span> · window opens{" "}
-            {formatDate(
-              calvingWindow({
-                date: new Date(date),
-                gestationDays: gestation === "" ? undefined : Number(gestation),
-              }).from,
-            )}
+            Due <span className="font-medium text-ink">{formatDate(preview.due)}</span> · window
+            opens {formatDate(preview.opens)}
           </p>
         )}
         {chosenStraw === undefined ? null : (
