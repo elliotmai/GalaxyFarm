@@ -305,9 +305,139 @@ export function awaitingCalving(
   now: Date,
   options: { defaultGestationDays?: number; windowDays?: number } = {},
 ): BreedingRecord[] {
-  return breedings.filter(
-    (record) => isInCalvingWindow(record, now, options) && !hasCalved(calvings, record),
-  );
+  return serviceGroups(breedings, calvings)
+    .filter((group) => group.calving === undefined)
+    .map((group) => group.standing)
+    .filter((record) => isInCalvingWindow(record, now, options));
+}
+
+/**
+ * The services that went into one pregnancy (spec §5.2).
+ *
+ * A breeding is not the unit anybody thinks in. A cow that comes back open is
+ * re-bred, maybe to a different bull and maybe by a different method — the
+ * question afterwards is never "what happened on 14 February", it is "what did
+ * it take to get her in calf". That is the attempt, and it is what this groups.
+ *
+ * Derived rather than stored (§2). A `breedingAttemptId` column would have to
+ * be chosen on a phone, in a chute, by somebody who has just re-bred a cow —
+ * and the one thing that reliably goes wrong there is picking last year's
+ * attempt from a list. Everything needed to work it out is already on the
+ * records: whose cow, what day, and whether a calf came of it.
+ */
+export interface ServiceGroup<T extends CalvingLike = CalvingLike> {
+  readonly damId: Ulid;
+  /** Every service of this attempt, earliest first. */
+  readonly services: readonly BreedingRecord[];
+  /**
+   * The one that still stands.
+   *
+   * The last service of the attempt: if she was bred again, the earlier one
+   * has been answered for by the re-breeding and is history. Only this one
+   * projects a due date, opens a calving window or asks for a preg check.
+   */
+  readonly standing: BreedingRecord;
+  /** The calving this attempt produced, when she has calved. */
+  readonly calving?: T | undefined;
+}
+
+/**
+ * Where one attempt ends and the next begins.
+ *
+ * Two things close an attempt, and nothing else does:
+ *
+ * 1. **A calving.** She got in calf and had it; anything after that is next
+ *    year's work.
+ * 2. **More than a full gestation since the last service.** A cow being
+ *    re-bred is being re-bred on her cycle — three weeks, or a few of them.
+ *    A service 400 days after the last one is not still chasing the same
+ *    pregnancy: either she calved and nobody recorded it, or she was rested.
+ *    Grouping those together would put two years of work under one heading
+ *    and report it as "five services to get her in calf".
+ */
+export function serviceGroups<T extends CalvingLike = CalvingLike>(
+  breedings: readonly BreedingRecord[],
+  calvings: readonly T[] = [],
+): ServiceGroup<T>[] {
+  const byDam = new Map<Ulid, BreedingRecord[]>();
+  for (const record of breedings) {
+    byDam.set(record.damId, [...(byDam.get(record.damId) ?? []), record]);
+  }
+
+  const groups: ServiceGroup<T>[] = [];
+
+  for (const [damId, records] of byDam) {
+    const ordered = [...records].sort((left, right) => left.date.getTime() - right.date.getTime());
+
+    let current: BreedingRecord[] = [];
+    const close = () => {
+      if (current.length === 0) return;
+      const services = current;
+      const standing = services[services.length - 1] as BreedingRecord;
+      // Whichever service the calving names — usually the standing one, but a
+      // calving linked to an earlier service still belongs to this attempt.
+      const calving = services.map((service) => calvingFor(calvings, service)).find(Boolean);
+      groups.push({ damId, services, standing, ...(calving === undefined ? {} : { calving }) });
+      current = [];
+    };
+
+    for (const record of ordered) {
+      const previous = current[current.length - 1];
+      if (previous !== undefined) {
+        const settled = current.some((service) => hasCalved(calvings, service));
+        const rested =
+          record.date.getTime() - previous.date.getTime() > MAX_GESTATION_DAYS * MS_PER_DAY;
+        if (settled || rested) close();
+      }
+      current.push(record);
+    }
+    close();
+  }
+
+  return groups.sort((left, right) => right.standing.date.getTime() - left.standing.date.getTime());
+}
+
+/** The attempt a service belongs to. */
+export function groupOf<T extends CalvingLike>(
+  groups: readonly ServiceGroup<T>[],
+  record: Pick<BreedingRecord, "id">,
+): ServiceGroup<T> | undefined {
+  return groups.find((group) => group.services.some((service) => service.id === record.id));
+}
+
+/**
+ * Was this service answered by breeding her again?
+ *
+ * A superseded service keeps its place in the history and loses its future: no
+ * due date, no calving window, no preg-check reminder. Leaving it projecting
+ * would put two due dates on one cow three weeks apart, and open a watch for
+ * the first of them while she is carrying to the second.
+ */
+export function isSuperseded(
+  record: Pick<BreedingRecord, "id" | "damId" | "date">,
+  breedings: readonly BreedingRecord[],
+  calvings: readonly CalvingLike[] = [],
+): boolean {
+  const group = groupOf(serviceGroups(breedings, calvings), record);
+  return group !== undefined && group.standing.id !== record.id;
+}
+
+/** One service per attempt: the one that still stands. */
+export function standingServices(
+  breedings: readonly BreedingRecord[],
+  calvings: readonly CalvingLike[] = [],
+): BreedingRecord[] {
+  return serviceGroups(breedings, calvings).map((group) => group.standing);
+}
+
+/**
+ * She came back open and has not been bred again.
+ *
+ * The list somebody works from: every cow whose last service failed, waiting
+ * on a decision about which bull to try next.
+ */
+export function needsRebreeding(group: ServiceGroup<CalvingLike>): boolean {
+  return group.calving === undefined && group.standing.pregCheck?.result === "open";
 }
 
 /**

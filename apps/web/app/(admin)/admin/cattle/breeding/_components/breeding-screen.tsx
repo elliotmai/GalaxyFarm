@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Badge,
@@ -36,9 +36,10 @@ import {
   daysBred,
   drawStraw,
   awaitingCalving,
-  calvingFor,
-  hasCalved,
+  groupOf,
   isInCalvingWindow,
+  needsRebreeding,
+  serviceGroups,
   producedLiveCalf,
   PREG_CHECK_METHODS,
   PREG_CHECK_RESULTS,
@@ -49,6 +50,7 @@ import {
   type BreedingRecord,
   type CalvingRecord,
   type CattleProfile,
+  type ServiceGroup,
   type ExternalAnimal,
   type PregCheckMethod,
   type PregCheckResult,
@@ -66,6 +68,7 @@ import {
   bullOptions,
   parseSire,
   sireDisplay,
+  sireValueOf,
   strawOptions,
   type SireLookup,
 } from "@/lib/sires";
@@ -96,6 +99,14 @@ function formatDate(value: Date | undefined): string {
   return date === undefined
     ? "—"
     : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** "1st", "2nd", "3rd" — how somebody says which try it was. */
+function ordinal(place: number): string {
+  const tens = place % 100;
+  if (tens >= 11 && tens <= 13) return `${place}th`;
+  const suffix = { 1: "st", 2: "nd", 3: "rd" }[place % 10] ?? "th";
+  return `${place}${suffix}`;
 }
 
 export function BreedingScreen({
@@ -132,6 +143,9 @@ export function BreedingScreen({
   );
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
+  // The service a re-breeding is answering, so the form can say what failed
+  // without assuming anything about what to try next.
+  const [rebreedFrom, setRebreedFrom] = useState<BreedingRecord | undefined>();
 
   const now = new Date();
   const byId = useMemo(() => new Map(animals.map((animal) => [animal.id, animal])), [animals]);
@@ -166,13 +180,29 @@ export function BreedingScreen({
     [animals, outsiders, straws],
   );
 
+  /**
+   * The attempts, which is what a breeding log is actually about.
+   *
+   * A cow that comes back open is bred again — maybe to another bull, maybe by
+   * another method — and the row that matters is not any one service but what
+   * it took to get her in calf. Everything below reads off these: which
+   * service still stands, which were answered by a re-breeding, and which cows
+   * are waiting on a decision.
+   */
+  const attempts = useMemo(() => serviceGroups(breedings, calvings), [breedings, calvings]);
+  const attemptOf = (record: BreedingRecord) => groupOf(attempts, record);
+
   const watched = awaitingCalving(breedings, calvings, now);
-  const openChecks = breedings.filter((record) => {
-    const due = pregCheckDue(record);
-    // A cow with a calf on the ground does not need scanning to see if she is
-    // in calf, which is what this tile was counting her for.
-    return due !== undefined && due <= now && !hasCalved(calvings, record);
-  });
+  const toRebreed = attempts.filter((attempt) => needsRebreeding(attempt));
+  const openChecks = attempts
+    .filter((attempt) => attempt.calving === undefined)
+    .map((attempt) => attempt.standing)
+    .filter((record) => {
+      const due = pregCheckDue(record);
+      // Only the service that still stands. A cow with a calf on the ground
+      // needs no scan, and neither does a service her re-breeding answered.
+      return due !== undefined && due <= now;
+    });
 
   async function remove(record: BreedingRecord) {
     const dam = damOf(record);
@@ -205,12 +235,12 @@ export function BreedingScreen({
         // Detached, not deleted, and said out loud: the calving stays and the
         // calf stays, but the calving stops knowing which service it answered
         // — which is where its sire came from.
-        ...(calvingFor(calvings, record) === undefined
+        ...(attemptOf(record)?.calving === undefined
           ? []
           : [
               {
                 entity: "Calving record",
-                label: `calved ${formatDate(calvingFor(calvings, record)?.date)} — keeps the calf, loses the sire`,
+                label: `calved ${formatDate(attemptOf(record)?.calving?.date)} — keeps the calf, loses the sire`,
                 effect: "detached" as const,
               },
             ]),
@@ -238,6 +268,24 @@ export function BreedingScreen({
           >
             {displayName(dam)}
           </Link>
+        );
+      },
+    },
+    {
+      key: "attempt",
+      header: "Service",
+      // Which try this was. Blank for a cow who took the first time, because
+      // "1st of 1" on every row of a log is a column of noise.
+      render: (record) => {
+        const attempt = attemptOf(record);
+        if (attempt === undefined || attempt.services.length === 1) {
+          return <span className="text-muted">—</span>;
+        }
+        const place = attempt.services.findIndex((service) => service.id === record.id) + 1;
+        return (
+          <span className="text-muted">
+            {ordinal(place)} of {attempt.services.length}
+          </span>
         );
       },
     },
@@ -283,12 +331,21 @@ export function BreedingScreen({
       key: "state",
       header: "State",
       render: (record) => {
+        const attempt = attemptOf(record);
+
         // Calved first, ahead of every projection: what happened outranks what
         // was expected to. A service she has answered is finished, and the
         // window, the preg check and the day count are all history.
-        const calving = calvingFor(calvings, record);
-        if (calving !== undefined) return <Badge tone="calm">Calved</Badge>;
-        if (record.pregCheck?.result === "open") return <Badge tone="neutral">Open</Badge>;
+        const calving = attempt?.calving;
+        if (calving !== undefined && attempt?.standing.id === record.id) {
+          return <Badge tone="calm">Calved</Badge>;
+        }
+        // Answered by breeding her again. It keeps its place in the history
+        // and loses its future: no due date, no window, no preg check.
+        if (attempt !== undefined && attempt.standing.id !== record.id) {
+          return <Badge tone="neutral">Re-bred</Badge>;
+        }
+        if (record.pregCheck?.result === "open") return <Badge tone="danger">Open</Badge>;
         if (isInCalvingWindow(record, now)) return <Badge tone="danger">Calving window</Badge>;
         if (record.pregCheck?.result === "bred") return <Badge tone="calm">Confirmed bred</Badge>;
         const due = pregCheckDue(record);
@@ -303,7 +360,15 @@ export function BreedingScreen({
       // "due" makes somebody open the calving screen to find out whether the
       // calf ever came.
       render: (record) => {
-        const calving = calvingFor(calvings, record);
+        const attempt = attemptOf(record);
+
+        // A service answered by a re-breeding points at the one that answered
+        // it, rather than showing the outcome of a pregnancy it never made.
+        if (attempt !== undefined && attempt.standing.id !== record.id) {
+          return <span className="text-muted">Bred again {formatDate(attempt.standing.date)}</span>;
+        }
+
+        const calving = attempt?.calving;
         if (calving === undefined) return <span className="text-muted">—</span>;
 
         const calf =
@@ -336,6 +401,19 @@ export function BreedingScreen({
       header: "",
       render: (record) => (
         <span className="flex gap-2">
+          {attemptOf(record)?.standing.id !== record.id ||
+          !needsRebreeding(attemptOf(record) as ServiceGroup<CalvingRecord>) ? null : (
+            <Button
+              onClick={() => {
+                setRebreedFrom(record);
+                // On a phone the form is below the log, so a button that only
+                // changed state under the fold would read as doing nothing.
+                document.getElementById("record-a-breeding")?.scrollIntoView({ block: "start" });
+              }}
+            >
+              Re-breed
+            </Button>
+          )}
           <PregCheckButton record={record} api={breedingsApi} />
           <Button variant="ghost" onClick={() => void remove(record)}>
             Delete
@@ -362,6 +440,12 @@ export function BreedingScreen({
           hint={watched.length > 0 ? "Watch these" : undefined}
         />
         <Tile label="Preg checks due" value={openChecks.length} />
+        <Tile
+          label="To re-breed"
+          value={toRebreed.length}
+          emphasis={toRebreed.length > 0}
+          hint={toRebreed.length > 0 ? "Came back open" : undefined}
+        />
         <Tile
           label="Next due"
           value={
@@ -414,16 +498,20 @@ export function BreedingScreen({
       */}
       <PairingPlanner animals={animals} propertyId={propertyId} />
 
-      <Section title="Record a breeding">
-        <AddBreeding
-          dams={dams}
-          sexes={sexes}
-          lookup={lookup}
-          api={breedingsApi}
-          strawsApi={strawsApi}
-          profiles={profiles}
-        />
-      </Section>
+      <div id="record-a-breeding">
+        <Section title="Record a breeding">
+          <AddBreeding
+            dams={dams}
+            sexes={sexes}
+            lookup={lookup}
+            api={breedingsApi}
+            strawsApi={strawsApi}
+            profiles={profiles}
+            rebreedFrom={rebreedFrom}
+            onDone={() => setRebreedFrom(undefined)}
+          />
+        </Section>
+      </div>
 
       <Section title="Every breeding">
         {loading ? (
@@ -433,9 +521,11 @@ export function BreedingScreen({
             <DataTable
               caption="Breeding records"
               columns={columns}
-              rows={[...breedings].sort(
-                (left, right) => right.date.getTime() - left.date.getTime(),
-              )}
+              // Grouped, not merely sorted: the services of one attempt sit
+              // together, earliest first, under the most recent attempt. A log
+              // sorted by date alone scatters a cow's three tries across
+              // eleven months of other people's rows.
+              rows={attempts.flatMap((attempt) => attempt.services)}
               rowKey={(record) => record.id}
               empty={
                 <EmptyState
@@ -476,6 +566,8 @@ function AddBreeding({
   api,
   strawsApi,
   profiles,
+  rebreedFrom,
+  onDone,
 }: {
   readonly dams: readonly Animal[];
   readonly sexes: ReadonlyMap<Ulid, SexVerdict>;
@@ -485,6 +577,9 @@ function AddBreeding({
   /** The tank, so drawing a straw takes it off the count (§5.2).  */
   readonly strawsApi: ReturnType<typeof useMutations<SemenInventory>>;
   readonly profiles: readonly CattleProfile[];
+  /** The service that came back open, when this form is answering one. */
+  readonly rebreedFrom?: BreedingRecord | undefined;
+  readonly onDone: () => void;
 }) {
   const { show } = useToast();
   const [damId, setDamId] = useState("");
@@ -566,6 +661,23 @@ function AddBreeding({
     return { prediction: predictCalfColour(sireCoat, damCoat), blocked };
   }, [damId, choice, chosenStraw, lookup, profiles]);
 
+  /**
+   * Answering a service that came back open.
+   *
+   * The cow is filled in, and the sire is deliberately *not*. She may go back
+   * to the same bull and she may go to a different one by a different method —
+   * that is the whole reason a second service exists — and a form that
+   * prefilled the bull that just failed would be one tap away from recording
+   * a breeding that never happened. The previous service is named instead,
+   * with a button for the case where it really is the same again.
+   */
+  useEffect(() => {
+    if (rebreedFrom === undefined) return;
+    setDamId(rebreedFrom.damId);
+    setSire("");
+    setMethod(rebreedFrom.method);
+  }, [rebreedFrom]);
+
   // Shown before saving, because the date is the whole point of the record and
   // a typo in the year is invisible until eleven months later.
   const preview =
@@ -637,14 +749,43 @@ function AddBreeding({
 
       setSire("");
       setNotes("");
+      onDone();
       show({ message: `Bred. Due ${formatDate(projectedDueDate(result.value))}${tank}` });
     } finally {
       setBusy(false);
     }
   }
 
+  const previousSire = rebreedFrom === undefined ? undefined : sireDisplay(rebreedFrom, lookup);
+
   return (
     <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
+      {rebreedFrom === undefined ? null : (
+        <Callout tone="action" title="Breeding her again">
+          <p>
+            Her {formatDate(rebreedFrom.date)} service ({rebreedFrom.method}
+            {previousSire === undefined ? "" : ` to ${previousSire}`}) came back open. Pick the bull
+            and the method for this one — they do not have to be the same.
+          </p>
+          <span className="mt-2 flex flex-wrap gap-2">
+            {previousSire === undefined ? null : (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setMethod(rebreedFrom.method);
+                  setSire(sireValueOf(rebreedFrom));
+                }}
+              >
+                Same bull and method
+              </Button>
+            )}
+            <Button variant="ghost" onClick={onDone}>
+              Not answering that service
+            </Button>
+          </span>
+        </Callout>
+      )}
+
       <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
         <SearchSelect
           label="Dam"

@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ConfirmProvider, ToastProvider } from "@galaxy-farm/ui";
@@ -183,5 +184,107 @@ describe("The calving log", () => {
 
     const log = screen.getByRole("table", { name: /Calving records/ });
     expect(within(log).getByText("Not linked")).toBeTruthy();
+  });
+});
+
+describe("A cow that came back open", () => {
+  /** Bred 14 February, scanned open on 25 March. */
+  const OPEN = {
+    ...BREEDING,
+    pregCheck: { date: new Date("2026-03-25"), result: "open", method: "ultrasound" },
+  } as BreedingRecord;
+
+  /** Bred again on 6 April — a different bull, by a different method. */
+  const AGAIN = {
+    ...base,
+    id: "01ARZ3NDEKTSV4RRFFQ69G5B02" as Ulid,
+    damId: ANDROMEDA.id,
+    method: "natural",
+    sireName: "Nichols Legacy G151",
+    date: new Date("2026-04-06"),
+  } as BreedingRecord;
+
+  beforeEach(() => {
+    vi.setSystemTime(new Date("2026-04-20T08:00:00Z"));
+  });
+
+  it("counts her as one to re-breed until she is", () => {
+    stored.current = { animals: [ANDROMEDA], breedingRecords: [OPEN], calvingRecords: [] };
+    view(<BreedingScreen propertyId={PROPERTY} actorId={ACTOR} />);
+
+    // Label, count and hint sit in one tile.
+    const tile = screen.getByText("To re-breed").parentElement?.parentElement as HTMLElement;
+    expect(flat(tile)).toBe("To re-breed1Came back open");
+  });
+
+  it("keeps both services under one attempt, in order", () => {
+    stored.current = {
+      animals: [ANDROMEDA],
+      breedingRecords: [OPEN, AGAIN],
+      calvingRecords: [],
+    };
+    view(<BreedingScreen propertyId={PROPERTY} actorId={ACTOR} />);
+
+    const log = screen.getByRole("table", { name: /Breeding records/ });
+    const rows = within(log).getAllByRole("row").slice(1);
+
+    // Earliest first inside the attempt, and each row says which try it was.
+    expect(flat(rows[0] as HTMLElement)).toContain("1st of 2");
+    expect(flat(rows[1] as HTMLElement)).toContain("2nd of 2");
+  });
+
+  it("retires the service the re-breeding answered", () => {
+    stored.current = {
+      animals: [ANDROMEDA],
+      breedingRecords: [OPEN, AGAIN],
+      calvingRecords: [],
+    };
+    view(<BreedingScreen propertyId={PROPERTY} actorId={ACTOR} />);
+
+    const log = screen.getByRole("table", { name: /Breeding records/ });
+    const first = within(log).getByText("1st of 2").closest("tr") as HTMLElement;
+
+    expect(within(first).getByText("Re-bred")).toBeTruthy();
+    // And it points at what answered it rather than at a pregnancy it never made.
+    expect(flat(first)).toContain(`Bred again ${shown(AGAIN.date)}`);
+  });
+
+  it("prefills the cow but never the bull that just failed", async () => {
+    // Real timers: nothing here depends on the date, and user-event's own
+    // waiting never resolves against a frozen clock.
+    vi.useRealTimers();
+    const user = userEvent.setup();
+    stored.current = { animals: [ANDROMEDA], breedingRecords: [OPEN], calvingRecords: [] };
+    view(<BreedingScreen propertyId={PROPERTY} actorId={ACTOR} />);
+
+    await user.click(screen.getAllByRole("button", { name: "Re-breed" })[0] as HTMLElement);
+
+    // The cow is filled in and the sire is deliberately empty: she may go back
+    // to the same bull and she may not, and one tap on a prefilled bull would
+    // record a service that never happened.
+    const dams = screen.getAllByRole("combobox", { name: /^Dam\b/ });
+    expect((dams[dams.length - 1] as HTMLInputElement).value).toContain("Andromeda");
+
+    const sires = screen.getAllByRole("combobox", { name: /^Sire\b/ });
+    expect((sires[sires.length - 1] as HTMLInputElement).value).toBe("");
+
+    // What failed is named, so nobody has to go and look it up. (The bull's
+    // name is also down in the log, hence the callout rather than the page.)
+    const callout = screen.getByText(/came back open/);
+    expect(flat(callout)).toContain("ZNT Montego Bay");
+    expect(flat(callout)).toContain(shown(OPEN.date));
+  });
+
+  it("offers the same bull as one tap, for when it is the same", async () => {
+    vi.useRealTimers();
+    const user = userEvent.setup();
+    stored.current = { animals: [ANDROMEDA], breedingRecords: [OPEN], calvingRecords: [] };
+    view(<BreedingScreen propertyId={PROPERTY} actorId={ACTOR} />);
+
+    await user.click(screen.getAllByRole("button", { name: "Re-breed" })[0] as HTMLElement);
+    await user.click(screen.getByRole("button", { name: "Same bull and method" }));
+
+    const sires = screen.getAllByRole("combobox", { name: /^Sire\b/ });
+    expect((sires[sires.length - 1] as HTMLInputElement).value).toBe("ZNT Montego Bay");
   });
 });

@@ -10,6 +10,11 @@ import {
   daysBred,
   awaitingCalving,
   calvingFor,
+  groupOf,
+  isSuperseded,
+  needsRebreeding,
+  serviceGroups,
+  standingServices,
   describeGestation,
   gestationLength,
   hasCalved,
@@ -19,6 +24,7 @@ import {
   projectedDueDate,
   serviceFor,
   type BreedingRecord,
+  type ServiceGroup,
 } from "../src/domain/breeding-record.js";
 import {
   calfFromCalving,
@@ -346,6 +352,96 @@ describe("serviceFor and the calvings already on file", () => {
 
     expect(serviceFor([breeding()], id(2), later)?.id).toBe(id(1));
     expect(serviceFor([breeding()], id(2), later, [answered])).toBeUndefined();
+  });
+});
+
+describe("serviceGroups", () => {
+  // She was bred on 14 February, came back open on 25 March, and was re-bred
+  // on 6 April — to a different bull, by a different method, which is the
+  // ordinary shape of it.
+  const first = breeding({
+    id: id(1),
+    date: BRED_ON,
+    pregCheck: { date: new Date("2026-03-25"), result: "open", method: "ultrasound" },
+  });
+  const second = breeding({
+    id: id(11),
+    date: new Date("2026-04-06"),
+    method: "natural",
+    sireExternalId: undefined,
+    bullId: id(4),
+  });
+
+  it("puts both services of one pregnancy under one attempt", () => {
+    const [group, ...rest] = serviceGroups([first, second]);
+
+    expect(rest).toEqual([]);
+    expect(group?.services.map((service) => service.id)).toEqual([id(1), id(11)]);
+  });
+
+  it("stands on the last service, whatever the first one said", () => {
+    // The re-breeding answers the first service. Two due dates three weeks
+    // apart on one cow is the thing this prevents.
+    expect(serviceGroups([first, second])[0]?.standing.id).toBe(id(11));
+    expect(isSuperseded(first, [first, second])).toBe(true);
+    expect(isSuperseded(second, [first, second])).toBe(false);
+    expect(standingServices([first, second]).map((record) => record.id)).toEqual([id(11)]);
+  });
+
+  it("does not care that the bull or the method changed", () => {
+    const [group] = serviceGroups([first, second]);
+
+    expect(group?.services.map((service) => service.method)).toEqual(["AI", "natural"]);
+  });
+
+  it("starts a new attempt after she calves", () => {
+    // Bred, calved, bred again: two attempts, not one long one.
+    const her = calving({ breedingRecordId: id(11), date: new Date("2027-01-12") });
+    const nextYear = breeding({ id: id(12), date: new Date("2027-03-20") });
+    const groups = serviceGroups([first, second, nextYear], [her]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups.map((group) => group.services.length)).toEqual([1, 2]);
+    expect(groupOf(groups, second)?.calving?.id).toBe(id(20));
+  });
+
+  it("starts a new attempt after a rest longer than a gestation", () => {
+    // No calving on file, and 400 days between services. Either she calved and
+    // nobody wrote it down or she was rested — she was not still chasing the
+    // February pregnancy.
+    const muchLater = breeding({ id: id(13), date: new Date("2027-05-20") });
+    const groups = serviceGroups([first, muchLater]);
+
+    expect(groups).toHaveLength(2);
+  });
+
+  it("keeps one cow's attempts off another's", () => {
+    const otherCow = breeding({ id: id(14), damId: id(5), date: new Date("2026-04-08") });
+    const groups = serviceGroups([first, second, otherCow]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups.find((group) => group.damId === id(5))?.services).toHaveLength(1);
+  });
+
+  it("names the cows waiting to be bred again", () => {
+    // Her last service came back open and nothing has been done about it.
+    expect(needsRebreeding(serviceGroups([first])[0] as ServiceGroup)).toBe(true);
+    // Re-bred: no longer on the list.
+    expect(needsRebreeding(serviceGroups([first, second])[0] as ServiceGroup)).toBe(false);
+  });
+
+  it("keeps a superseded service off the calving watch", () => {
+    // The February service projects 24 November all by itself. She is carrying
+    // to the April one, and the November window is for a pregnancy that never
+    // happened.
+    const inFirstWindow = new Date("2026-11-15T08:00:00Z");
+
+    expect(isInCalvingWindow(first, inFirstWindow)).toBe(false); // confirmed open
+    const noCheck = breeding({ id: id(1), date: BRED_ON });
+    expect(isInCalvingWindow(noCheck, inFirstWindow)).toBe(true);
+    // Even with no preg check recorded at all, the re-breeding is what says
+    // the first service failed.
+    expect(awaitingCalving([noCheck, second], [], inFirstWindow)).toEqual([]);
   });
 });
 
