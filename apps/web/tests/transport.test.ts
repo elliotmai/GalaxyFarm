@@ -80,6 +80,44 @@ describe("reviveRecord", () => {
     expect("notes" in record).toBe(false);
   });
 
+  it("revives a timestamp inside a JSON column", () => {
+    // A hair card lives in one jsonb column, so `testedOn` is not a column of
+    // its own and the top-level walk never saw it. The genetics panel called
+    // `toLocaleDateString` on the string and React unmounted the app.
+    const record = reviveRecord({
+      id: "x",
+      geneticTests: [{ defect: "TH", status: "free", testedOn: AT, lab: "Neogen" }],
+    }) as unknown as Record<string, { testedOn: unknown; lab: unknown }[]>;
+
+    expect(record["geneticTests"]?.[0]?.testedOn).toBeInstanceOf(Date);
+    expect(record["geneticTests"]?.[0]?.lab).toBe("Neogen");
+  });
+
+  it("revives one nested in an object rather than a list", () => {
+    // The same trap, one click away: a breeding's pregnancy check.
+    const record = reviveRecord({
+      id: "x",
+      pregCheck: { date: AT, result: "bred", method: "ultrasound" },
+    }) as unknown as Record<string, { date: unknown; result: unknown }>;
+
+    expect(record["pregCheck"]?.date).toBeInstanceOf(Date);
+    expect(record["pregCheck"]?.result).toBe("bred");
+  });
+
+  it("keeps a nested string that is not a timestamp, however it is spelled", () => {
+    // Inside a blob the key is a convention, not a schema promise: a `date` in
+    // somebody's free-form settings could be the word "spring". Unparseable is
+    // kept rather than dropped — the opposite of the top-level rule, where the
+    // column really is a timestamp and NaN is worse than absent.
+    const record = reviveRecord({
+      id: "x",
+      watchSettings: { date: "spring", label: AT },
+    }) as unknown as Record<string, { date: unknown; label: unknown }>;
+
+    expect(record["watchSettings"]?.date).toBe("spring");
+    expect(record["watchSettings"]?.label).toBe(AT);
+  });
+
   it("keeps arrays and objects as they came", () => {
     const record = reviveRecord({
       id: "x",
