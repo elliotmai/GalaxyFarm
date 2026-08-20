@@ -42,6 +42,17 @@ export const DEFAULT_GESTATION_DAYS = 283;
 /** §6: the watch opens a fortnight before the due date and closes a fortnight after. */
 export const DEFAULT_CALVING_WINDOW_DAYS = 14;
 
+/**
+ * The outside edges of a gestation, for a record and for a guess.
+ *
+ * These bound what somebody may type as an override, and they bound how far
+ * from a breeding a calving can be and still be *that* breeding's calving. A
+ * cow carrying 239 days did not carry to the service 239 days ago, and one at
+ * 321 days is either not hers or is a date somebody mistyped.
+ */
+export const MIN_GESTATION_DAYS = 240;
+export const MAX_GESTATION_DAYS = 320;
+
 export interface PregCheck {
   readonly date: Date;
   readonly result: PregCheckResult;
@@ -127,7 +138,7 @@ export const breedingRecordSchema = baseRecordSchema
     technicianId: ulidSchema.optional(),
     syncProtocolId: ulidSchema.optional(),
     pregCheck: pregCheckSchema.optional(),
-    gestationDays: z.number().int().min(240).max(320).optional(),
+    gestationDays: z.number().int().min(MIN_GESTATION_DAYS).max(MAX_GESTATION_DAYS).optional(),
     notes: z.string().max(5000).optional(),
   })
   .refine((record) => record.method !== "natural" || namesASire(record), {
@@ -217,6 +228,258 @@ export function pregCheckDue(
   return addDays(record.date, PREG_CHECK_EARLIEST_DAYS[method]);
 }
 
+/**
+ * A calving, as this file needs to see one.
+ *
+ * Structural rather than the real `CalvingRecord`, so breeding does not import
+ * calving and calving does not import breeding. `damsThatHaveCalved` in
+ * `cattle-class.ts` takes the same shape for the same reason.
+ */
+export interface CalvingLike {
+  readonly damId: Ulid;
+  readonly breedingRecordId?: Ulid | undefined;
+  readonly date: Date;
+}
+
+/**
+ * The calving that answers a breeding.
+ *
+ * The link is `breedingRecordId`, written by the calving flow, and that is
+ * what is trusted first. The fallback exists for the calvings that carry none
+ * — recorded before the flow set it, or entered on a device that never saw the
+ * breeding — and it is deliberately narrow: the same cow, a calving after the
+ * service, and inside the outside edges of a real gestation. A calving 200
+ * days after a service is not that service's calf, and guessing that it is
+ * would close out a breeding the cow is still carrying.
+ *
+ * Only unlinked calvings are matched that way. One that names a *different*
+ * breeding has already been answered for, and stealing it here would show two
+ * services both claiming one calf.
+ */
+export function calvingFor<T extends CalvingLike>(
+  calvings: readonly T[],
+  breeding: Pick<BreedingRecord, "id" | "damId" | "date">,
+): T | undefined {
+  const linked = calvings.find((record) => record.breedingRecordId === breeding.id);
+  if (linked !== undefined) return linked;
+
+  const earliest = addDays(breeding.date, MIN_GESTATION_DAYS);
+  const latest = addDays(breeding.date, MAX_GESTATION_DAYS);
+
+  return calvings
+    .filter(
+      (record) =>
+        record.breedingRecordId === undefined &&
+        record.damId === breeding.damId &&
+        record.date >= earliest &&
+        record.date <= latest,
+    )
+    .sort((left, right) => left.date.getTime() - right.date.getTime())[0];
+}
+
+/** Has she calved to this service? */
+export function hasCalved(
+  calvings: readonly CalvingLike[],
+  breeding: Pick<BreedingRecord, "id" | "damId" | "date">,
+): boolean {
+  return calvingFor(calvings, breeding) !== undefined;
+}
+
+/**
+ * The breedings still waiting on a calf.
+ *
+ * What every watch on this farm should be built from. A cow inside her window
+ * is only worth watching until she calves, and nothing was ending that watch:
+ * `isInCalvingWindow` can only see one breeding record, so a cow with a calf
+ * at side kept her card on the dashboard, her row in the calving screen and
+ * her line in the nightly weather alert for the rest of the fortnight.
+ *
+ * Which is the failure the card's own rule is about. A confirmed-open cow is
+ * dropped because "leaving her on the dashboard for a month teaches people to
+ * ignore the card", and a cow that has already calved is the same lesson
+ * taught with a calf standing next to her.
+ */
+export function awaitingCalving(
+  breedings: readonly BreedingRecord[],
+  calvings: readonly CalvingLike[],
+  now: Date,
+  options: { defaultGestationDays?: number; windowDays?: number } = {},
+): BreedingRecord[] {
+  return serviceGroups(breedings, calvings)
+    .filter((group) => group.calving === undefined)
+    .map((group) => group.standing)
+    .filter((record) => isInCalvingWindow(record, now, options));
+}
+
+/**
+ * The services that went into one pregnancy (spec §5.2).
+ *
+ * A breeding is not the unit anybody thinks in. A cow that comes back open is
+ * re-bred, maybe to a different bull and maybe by a different method — the
+ * question afterwards is never "what happened on 14 February", it is "what did
+ * it take to get her in calf". That is the attempt, and it is what this groups.
+ *
+ * Derived rather than stored (§2). A `breedingAttemptId` column would have to
+ * be chosen on a phone, in a chute, by somebody who has just re-bred a cow —
+ * and the one thing that reliably goes wrong there is picking last year's
+ * attempt from a list. Everything needed to work it out is already on the
+ * records: whose cow, what day, and whether a calf came of it.
+ */
+export interface ServiceGroup<T extends CalvingLike = CalvingLike> {
+  readonly damId: Ulid;
+  /** Every service of this attempt, earliest first. */
+  readonly services: readonly BreedingRecord[];
+  /**
+   * The one that still stands.
+   *
+   * The last service of the attempt: if she was bred again, the earlier one
+   * has been answered for by the re-breeding and is history. Only this one
+   * projects a due date, opens a calving window or asks for a preg check.
+   */
+  readonly standing: BreedingRecord;
+  /** The calving this attempt produced, when she has calved. */
+  readonly calving?: T | undefined;
+}
+
+/**
+ * Where one attempt ends and the next begins.
+ *
+ * Two things close an attempt, and nothing else does:
+ *
+ * 1. **A calving.** She got in calf and had it; anything after that is next
+ *    year's work.
+ * 2. **More than a full gestation since the last service.** A cow being
+ *    re-bred is being re-bred on her cycle — three weeks, or a few of them.
+ *    A service 400 days after the last one is not still chasing the same
+ *    pregnancy: either she calved and nobody recorded it, or she was rested.
+ *    Grouping those together would put two years of work under one heading
+ *    and report it as "five services to get her in calf".
+ */
+export function serviceGroups<T extends CalvingLike = CalvingLike>(
+  breedings: readonly BreedingRecord[],
+  calvings: readonly T[] = [],
+): ServiceGroup<T>[] {
+  const byDam = new Map<Ulid, BreedingRecord[]>();
+  for (const record of breedings) {
+    byDam.set(record.damId, [...(byDam.get(record.damId) ?? []), record]);
+  }
+
+  const groups: ServiceGroup<T>[] = [];
+
+  for (const [damId, records] of byDam) {
+    const ordered = [...records].sort((left, right) => left.date.getTime() - right.date.getTime());
+
+    let current: BreedingRecord[] = [];
+    const close = () => {
+      if (current.length === 0) return;
+      const services = current;
+      const standing = services[services.length - 1] as BreedingRecord;
+      // Whichever service the calving names — usually the standing one, but a
+      // calving linked to an earlier service still belongs to this attempt.
+      const calving = services.map((service) => calvingFor(calvings, service)).find(Boolean);
+      groups.push({ damId, services, standing, ...(calving === undefined ? {} : { calving }) });
+      current = [];
+    };
+
+    for (const record of ordered) {
+      const previous = current[current.length - 1];
+      if (previous !== undefined) {
+        const settled = current.some((service) => hasCalved(calvings, service));
+        const rested =
+          record.date.getTime() - previous.date.getTime() > MAX_GESTATION_DAYS * MS_PER_DAY;
+        if (settled || rested) close();
+      }
+      current.push(record);
+    }
+    close();
+  }
+
+  return groups.sort((left, right) => right.standing.date.getTime() - left.standing.date.getTime());
+}
+
+/** The attempt a service belongs to. */
+export function groupOf<T extends CalvingLike>(
+  groups: readonly ServiceGroup<T>[],
+  record: Pick<BreedingRecord, "id">,
+): ServiceGroup<T> | undefined {
+  return groups.find((group) => group.services.some((service) => service.id === record.id));
+}
+
+/**
+ * Was this service answered by breeding her again?
+ *
+ * A superseded service keeps its place in the history and loses its future: no
+ * due date, no calving window, no preg-check reminder. Leaving it projecting
+ * would put two due dates on one cow three weeks apart, and open a watch for
+ * the first of them while she is carrying to the second.
+ */
+export function isSuperseded(
+  record: Pick<BreedingRecord, "id" | "damId" | "date">,
+  breedings: readonly BreedingRecord[],
+  calvings: readonly CalvingLike[] = [],
+): boolean {
+  const group = groupOf(serviceGroups(breedings, calvings), record);
+  return group !== undefined && group.standing.id !== record.id;
+}
+
+/** One service per attempt: the one that still stands. */
+export function standingServices(
+  breedings: readonly BreedingRecord[],
+  calvings: readonly CalvingLike[] = [],
+): BreedingRecord[] {
+  return serviceGroups(breedings, calvings).map((group) => group.standing);
+}
+
+/**
+ * She came back open and has not been bred again.
+ *
+ * The list somebody works from: every cow whose last service failed, waiting
+ * on a decision about which bull to try next.
+ */
+export function needsRebreeding(group: ServiceGroup<CalvingLike>): boolean {
+  return group.calving === undefined && group.standing.pregCheck?.result === "open";
+}
+
+/**
+ * How long she actually carried.
+ *
+ * Undefined when the calving predates the service, which is a mistyped date
+ * rather than a very short pregnancy — and reporting "-40 days" as a gestation
+ * would put a number nobody can act on in front of somebody who needs to fix
+ * one of the two dates.
+ */
+export function gestationLength(
+  breeding: Pick<BreedingRecord, "date">,
+  calving: Pick<CalvingLike, "date">,
+): number | undefined {
+  const days = Math.round((calving.date.getTime() - breeding.date.getTime()) / MS_PER_DAY);
+  return days < 0 ? undefined : days;
+}
+
+/**
+ * Where a calving on `on` sits against what was projected.
+ *
+ * Said in days early or late rather than as a bare number, because that is the
+ * question being asked while the form is open: a cow at day 268 is calving
+ * early enough to be worth writing down, and one at day 291 has either gone
+ * long or was bred to a service nobody recorded.
+ */
+export function describeGestation(
+  breeding: Pick<BreedingRecord, "date" | "gestationDays">,
+  on: Date,
+  defaultGestationDays: number = DEFAULT_GESTATION_DAYS,
+): string {
+  const carried = gestationLength(breeding, { date: on });
+  if (carried === undefined) return "That is before she was bred — check the date.";
+
+  const projected = breeding.gestationDays ?? defaultGestationDays;
+  const off = carried - projected;
+  if (off === 0) return `Day ${carried}, exactly her projected date.`;
+
+  const size = Math.abs(off);
+  return `Day ${carried} — ${size} day${size === 1 ? "" : "s"} ${off < 0 ? "early" : "late"}.`;
+}
+
 /** The open breedings for one dam, most recent first. */
 export function breedingsFor(records: readonly BreedingRecord[], damId: Ulid): BreedingRecord[] {
   return records
@@ -231,11 +494,20 @@ export function breedingsFor(records: readonly BreedingRecord[], damId: Ulid): B
  * whose projection is closest, because a cow that calves three weeks early
  * still calved to the service that bred her, and picking by proximity would
  * credit a later service she never took to.
+ *
+ * Services already answered by a calving are passed over, which is the other
+ * half of the link: one service, one calf. Without it a second calving on a
+ * cow with one breeding on file would be credited to the service that already
+ * produced her last calf, and the breeding log would show one service with two
+ * calves under it.
  */
 export function serviceFor(
   records: readonly BreedingRecord[],
   damId: Ulid,
   bornOn: Date,
+  answered: readonly CalvingLike[] = [],
 ): BreedingRecord | undefined {
-  return breedingsFor(records, damId).find((record) => record.date < bornOn);
+  return breedingsFor(records, damId).find(
+    (record) => record.date < bornOn && !hasCalved(answered, record),
+  );
 }

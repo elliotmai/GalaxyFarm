@@ -12,7 +12,9 @@ import {
   calvingWindow,
   pregCheckDue,
   projectedDueDate,
+  serviceGroups,
   type BreedingRecord,
+  type CalvingLike,
   type PregCheckMethod,
 } from "./breeding-record.js";
 import type { CalvingWatchCard } from "./calving-watch.js";
@@ -51,6 +53,13 @@ export interface CattleCalendarInput {
   /** Only for the names on the rows — an unnamed animal still gets its dates. */
   readonly animals?: ReadonlyArray<Pick<Animal, "id" | "name" | "tagNumber">>;
   readonly breedings?: readonly BreedingRecord[];
+  /**
+   * What has already been answered.
+   *
+   * A calving closes the attempt it came of, and without them the calendar
+   * keeps a fortnight of watch dates for a cow with a calf at side.
+   */
+  readonly calvings?: readonly CalvingLike[];
   readonly protocols?: readonly SyncProtocol[];
   readonly health?: readonly HealthRecord[];
   readonly meds?: readonly MedInventory[];
@@ -81,7 +90,7 @@ export function cattleCalendarEntries(
   const name = (id: Ulid): string => names.get(id) ?? "Unnamed";
 
   return [
-    ...breedingEntries(input.breedings ?? [], name, options),
+    ...breedingEntries(input.breedings ?? [], input.calvings ?? [], name, options),
     ...protocolEntries(input.breedings ?? [], input.protocols ?? [], name),
     ...watchEntries(input.watch ?? [], name),
     ...healthEntries(input.health ?? [], name),
@@ -99,6 +108,12 @@ function animalNames(
 /**
  * The calving window and the pregnancy check.
  *
+ * Dated from the service that still stands, which is the whole of the rule
+ * here. Three services produce one due date, not three: a cow that came back
+ * open and was bred again is carrying to the last one, and projecting the
+ * earlier ones puts windows on the calendar for pregnancies that never
+ * happened. An attempt she has already calved to produces nothing at all.
+ *
  * A breeding that came back open produces neither: she is not carrying, so
  * there is no window to watch and no check left to do. §5.2's own
  * `pregCheckDue` already says so for the check; the window follows the same
@@ -107,12 +122,17 @@ function animalNames(
  */
 function breedingEntries(
   breedings: readonly BreedingRecord[],
+  calvings: readonly CalvingLike[],
   name: (id: Ulid) => string,
   options: CattleCalendarOptions,
 ): CalendarEntry[] {
   const entries: CalendarEntry[] = [];
 
-  for (const record of breedings) {
+  const standing = serviceGroups(breedings, calvings)
+    .filter((group) => group.calving === undefined)
+    .map((group) => group.standing);
+
+  for (const record of standing) {
     if (record.pregCheck?.result === "open") continue;
 
     const window = calvingWindow(record, options);

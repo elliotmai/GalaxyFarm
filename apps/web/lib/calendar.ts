@@ -14,6 +14,7 @@ import {
 import {
   cattleCalendarEntries,
   type BreedingRecord,
+  type CalvingRecord,
   type HealthRecord,
   type MedInventory,
   type SyncProtocol,
@@ -60,6 +61,8 @@ export interface CalendarSources {
   readonly propertyId: Ulid;
   readonly animals: readonly Animal[];
   readonly breedings: readonly BreedingRecord[];
+  /** So a cow with a calf at side loses her window, and next year's is hers. */
+  readonly calvings: readonly CalvingRecord[];
   readonly protocols: readonly SyncProtocol[];
   readonly health: readonly HealthRecord[];
   readonly meds: readonly MedInventory[];
@@ -100,6 +103,7 @@ export function projectedCalendarEntries(
     ...cattleCalendarEntries({
       animals: sources.animals,
       breedings: sources.breedings,
+      calvings: sources.calvings,
       protocols: sources.protocols,
       health: sources.health,
       meds: sources.meds,

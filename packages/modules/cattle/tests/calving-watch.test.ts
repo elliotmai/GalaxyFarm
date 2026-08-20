@@ -84,7 +84,7 @@ describe("calvingWatchSignals", () => {
 
 describe("calvingWatch", () => {
   it("raises a card for a cow inside her window", () => {
-    const cards = calvingWatch([breeding()], front, IN_WINDOW);
+    const cards = calvingWatch([breeding()], [], front, IN_WINDOW);
 
     expect(cards).toHaveLength(1);
     expect(cards[0]?.dayOfGestation).toBe(279);
@@ -92,7 +92,17 @@ describe("calvingWatch", () => {
   });
 
   it("raises nothing in August", () => {
-    expect(calvingWatch([breeding()], front, AT)).toEqual([]);
+    expect(calvingWatch([breeding()], [], front, AT)).toEqual([]);
+  });
+
+  it("drops a cow who has already calved", () => {
+    // The failure this is about: nothing ended the watch. A cow calved on the
+    // Tuesday kept her card — and her nightly weather alert — for the rest of
+    // the fortnight, which is how a watch card becomes one people scroll past.
+    const her = breeding();
+    const calved = [{ damId: her.damId, breedingRecordId: her.id, date: new Date("2026-11-22") }];
+
+    expect(calvingWatch([her], calved, front, IN_WINDOW)).toEqual([]);
   });
 
   it("drops a cow confirmed open", () => {
@@ -100,21 +110,21 @@ describe("calvingWatch", () => {
       pregCheck: { date: new Date("2026-04-01"), result: "open", method: "ultrasound" },
     });
 
-    expect(calvingWatch([open], front, IN_WINDOW)).toEqual([]);
+    expect(calvingWatch([open], [], front, IN_WINDOW)).toEqual([]);
   });
 
   it("is urgent for a front, and not for a full moon alone", () => {
     // A card that goes urgent once a month on the calendar and nothing else
     // would train people to ignore it.
-    expect(calvingWatch([breeding()], front, IN_WINDOW)[0]?.urgent).toBe(true);
+    expect(calvingWatch([breeding()], [], front, IN_WINDOW)[0]?.urgent).toBe(true);
 
     const full = fullMoonNear(new Date("2026-11-24T00:00:00Z"));
-    expect(calvingWatch([breeding()], calm, full)[0]?.urgent).toBe(false);
+    expect(calvingWatch([breeding()], [], calm, full)[0]?.urgent).toBe(false);
   });
 
   it("puts the cow closest to calving at the top", () => {
     const later = breeding({ id: id(4), damId: id(5), date: new Date("2026-02-24T00:00:00Z") });
-    const cards = calvingWatch([later, breeding()], front, IN_WINDOW);
+    const cards = calvingWatch([later, breeding()], [], front, IN_WINDOW);
 
     expect(cards.map((card) => card.damId)).toEqual([id(2), id(5)]);
   });
@@ -123,7 +133,7 @@ describe("calvingWatch", () => {
     // Five cows share one forecast. Recomputing per cow is five chances for
     // the same night to be described differently.
     const other = breeding({ id: id(6), damId: id(7) });
-    const cards = calvingWatch([breeding(), other], front, IN_WINDOW);
+    const cards = calvingWatch([breeding(), other], [], front, IN_WINDOW);
 
     expect(cards[0]?.signals).toBe(cards[1]?.signals);
   });
@@ -131,7 +141,7 @@ describe("calvingWatch", () => {
 
 describe("describeWatch", () => {
   it("reads like §6's own example", () => {
-    const [card] = calvingWatch([breeding()], front, IN_WINDOW);
+    const [card] = calvingWatch([breeding()], [], front, IN_WINDOW);
     const sentence = describeWatch(card as never, "Andromeda");
 
     expect(sentence).toMatch(/Andromeda is at day 279/);
@@ -140,7 +150,7 @@ describe("describeWatch", () => {
 
   it("still says where she is when the forecast is quiet", () => {
     const moonless = new Date("2026-11-16T12:00:00Z");
-    const [card] = calvingWatch([breeding()], calm, moonless);
+    const [card] = calvingWatch([breeding()], [], calm, moonless);
 
     expect(describeWatch(card as never, "Andromeda")).toMatch(/^Andromeda is at day \d+, due/);
   });

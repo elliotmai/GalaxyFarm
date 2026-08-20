@@ -19,6 +19,7 @@ import {
 } from "@galaxy-farm/core";
 import type {
   BreedingRecord,
+  CalvingRecord,
   HealthRecord,
   MedInventory,
   SyncProtocol,
@@ -136,6 +137,9 @@ function useCalendarStore(propertyId: Ulid) {
   const { records: events, loading } = useRecords<CalendarEvent>("calendarEvents", query);
   const { records: animals } = useRecords<Animal>("animals", query);
   const { records: breedings } = useRecords<BreedingRecord>("breedingRecords", query);
+  // A calving closes the attempt it came of: no window, no preg check, and
+  // next year's dates belong to next year's service.
+  const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", query);
   const { records: protocols } = useRecords<SyncProtocol>("syncProtocols", query);
   const { records: health } = useRecords<HealthRecord>("healthRecords", query);
   const { records: meds } = useRecords<MedInventory>("medInventory", query);
@@ -159,6 +163,7 @@ function useCalendarStore(propertyId: Ulid) {
         propertyId,
         animals,
         breedings,
+        calvings,
         protocols,
         health,
         meds,
@@ -181,6 +186,7 @@ function useCalendarStore(propertyId: Ulid) {
       propertyId,
       animals,
       breedings,
+      calvings,
       protocols,
       health,
       meds,

@@ -199,6 +199,23 @@ export function breedingSire(choice: SireChoice, lookup: SireLookup): Partial<Br
   };
 }
 
+/**
+ * A saved breeding's sire, as the picker's own value.
+ *
+ * The inverse of `breedingSire`, so "same bull again" puts the row itself back
+ * in the box rather than a name that merely looks like it.
+ *
+ * The straw is deliberately not reused. The one that bred her last time is one
+ * fewer in the tank now, and the next straw of the same bull is a different
+ * row — so a re-breeding falls back to the bull the straw came from, which is
+ * the part that is actually the same.
+ */
+export function sireValueOf(record: BreedingRecord): string {
+  if (record.bullId !== undefined) return sireValue("bull", record.bullId);
+  if (record.sireExternalId !== undefined) return sireValue("external", record.sireExternalId);
+  return record.sireName ?? "";
+}
+
 /** The sire of a breeding already on file, however he was recorded. */
 export function sireDisplay(record: BreedingRecord, lookup: SireLookup): string | undefined {
   if (record.sireName !== undefined && record.sireName.trim() !== "") return record.sireName;
