@@ -8,6 +8,11 @@ import {
   breedingsFor,
   calvingWindow,
   daysBred,
+  awaitingCalving,
+  calvingFor,
+  describeGestation,
+  gestationLength,
+  hasCalved,
   isInCalvingWindow,
   namesASire,
   pregCheckDue,
@@ -286,6 +291,93 @@ const calving = (over: Partial<CalvingRecord> = {}): CalvingRecord => ({
   birthWeightLb: 78,
   assisted: false,
   ...over,
+});
+
+describe("the link between a breeding and its calving", () => {
+  // Andromeda, bred 14 February, calved 22 November — day 281, two days early.
+  const her = calving();
+
+  it("finds the calving by the id the flow wrote", () => {
+    expect(calvingFor([her], breeding())?.id).toBe(id(20));
+    expect(hasCalved([her], breeding())).toBe(true);
+  });
+
+  it("matches an unlinked calving of the same cow inside a real gestation", () => {
+    // Recorded before the flow wrote the id, or entered on a device that never
+    // saw the breeding. The cow, the order and the length are all that is left
+    // to go on, and together they are enough.
+    const orphan = calving({ breedingRecordId: undefined });
+
+    expect(calvingFor([orphan], breeding())?.id).toBe(id(20));
+  });
+
+  it("will not claim a calving too far from the service to be its calf", () => {
+    // 200 days after the service is not that service's calf. Guessing that it
+    // is would close out a breeding the cow is still carrying.
+    const early = calving({ breedingRecordId: undefined, date: new Date("2026-09-02") });
+
+    expect(calvingFor([early], breeding())).toBeUndefined();
+  });
+
+  it("leaves a calving that already names another service alone", () => {
+    // Two breedings both claiming one calf is worse than one showing none.
+    const other = calving({ breedingRecordId: id(11) });
+
+    expect(calvingFor([other], breeding())).toBeUndefined();
+  });
+
+  it("takes a cow off the watch once she has calved", () => {
+    const inWindow = new Date("2026-11-23T06:00:00Z");
+
+    expect(isInCalvingWindow(breeding(), inWindow)).toBe(true);
+    expect(awaitingCalving([breeding()], [], inWindow)).toHaveLength(1);
+    // She calved yesterday. A card telling somebody to get up at 2am for a cow
+    // with a calf at side is the alert people learn to ignore.
+    expect(awaitingCalving([breeding()], [her], inWindow)).toEqual([]);
+  });
+});
+
+describe("serviceFor and the calvings already on file", () => {
+  it("passes over a service that has already produced a calf", () => {
+    // One service, one calf. Without this a second calving on a cow with one
+    // breeding on file is credited to the service that answered the first.
+    const answered = calving();
+    const later = new Date("2027-01-05");
+
+    expect(serviceFor([breeding()], id(2), later)?.id).toBe(id(1));
+    expect(serviceFor([breeding()], id(2), later, [answered])).toBeUndefined();
+  });
+});
+
+describe("gestationLength", () => {
+  it("says how long she actually carried", () => {
+    expect(gestationLength(breeding(), calving())).toBe(281);
+  });
+
+  it("refuses a calving dated before the service", () => {
+    expect(gestationLength(breeding(), calving({ date: new Date("2026-01-01") }))).toBeUndefined();
+  });
+});
+
+describe("describeGestation", () => {
+  it("says how far off the projection she is", () => {
+    expect(describeGestation(breeding(), new Date("2026-11-22T04:00:00Z"))).toBe(
+      "Day 281 — 2 days early.",
+    );
+    expect(describeGestation(breeding(), new Date("2026-11-25T04:00:00Z"))).toBe(
+      "Day 284 — 1 day late.",
+    );
+  });
+
+  it("says so when she calved on the day", () => {
+    expect(describeGestation(breeding(), new Date("2026-11-24T00:00:00Z"))).toBe(
+      "Day 283, exactly her projected date.",
+    );
+  });
+
+  it("does not report a negative gestation at a mistyped date", () => {
+    expect(describeGestation(breeding(), new Date("2026-01-01"))).toMatch(/before she was bred/);
+  });
 });
 
 describe("calvingRecordSchema", () => {

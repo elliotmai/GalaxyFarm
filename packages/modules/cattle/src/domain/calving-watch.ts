@@ -12,10 +12,11 @@ import {
 } from "@galaxy-farm/core";
 
 import {
+  awaitingCalving,
   daysBred,
-  isInCalvingWindow,
   projectedDueDate,
   type BreedingRecord,
+  type CalvingLike,
 } from "./breeding-record.js";
 
 /**
@@ -125,12 +126,19 @@ export function calvingWatchSignals(
 }
 
 /**
- * A watch card per cow currently inside her window.
+ * A watch card per cow still waiting to calve.
  *
  * Ordered by due date, so the cow closest to calving is the one at the top.
+ *
+ * The calvings are a required argument rather than an optional one, and
+ * deliberately: a caller that does not pass them is a caller that keeps
+ * telling somebody to get up at 2am for a cow with a calf already at side.
+ * Making it easy to forget is how that survived — pass an empty array only if
+ * nothing has calved.
  */
 export function calvingWatch(
   breedings: readonly BreedingRecord[],
+  calvings: readonly CalvingLike[],
   forecast: Pick<Forecast, "daily" | "hourly">,
   now: Date,
   options: CalvingWatchOptions = {},
@@ -139,8 +147,7 @@ export function calvingWatch(
   // A full moon on its own is a note, not a reason to be up at 2am.
   const urgent = signals.some((signal) => signal.signal !== "full_moon");
 
-  return breedings
-    .filter((record) => isInCalvingWindow(record, now, options))
+  return awaitingCalving(breedings, calvings, now, options)
     .map((record) => ({
       damId: record.damId,
       breedingRecordId: record.id,

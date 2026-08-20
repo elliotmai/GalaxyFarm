@@ -121,6 +121,8 @@ export function useRecordCalving(
   context: {
     readonly dam: Animal | undefined;
     readonly breedings: readonly BreedingRecord[];
+    /** What she has already calved, so one service cannot answer twice. */
+    readonly calvings?: readonly CalvingRecord[];
   },
 ) => Promise<CalvingOutcome> {
   const calvings = useMutations<CalvingRecord>(
@@ -160,7 +162,9 @@ export function useRecordCalving(
 
   return useCallback(
     async (input, context) => {
-      const service = serviceFor(context.breedings, input.damId, input.date);
+      // The calvings already on file are passed so a service that produced a
+      // calf is not credited with a second one: one service, one calf.
+      const service = serviceFor(context.breedings, input.damId, input.date, context.calvings);
 
       const created = await calvings.create({
         damId: input.damId,

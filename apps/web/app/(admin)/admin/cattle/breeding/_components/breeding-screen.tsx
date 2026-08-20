@@ -35,7 +35,11 @@ import {
   calvingWindow,
   daysBred,
   drawStraw,
+  awaitingCalving,
+  calvingFor,
+  hasCalved,
   isInCalvingWindow,
+  producedLiveCalf,
   PREG_CHECK_METHODS,
   PREG_CHECK_RESULTS,
   pregCheckDue,
@@ -43,6 +47,7 @@ import {
   semenInventorySchema,
   type BreedingMethod,
   type BreedingRecord,
+  type CalvingRecord,
   type CattleProfile,
   type ExternalAnimal,
   type PregCheckMethod,
@@ -107,6 +112,9 @@ export function BreedingScreen({
     propertyId,
   });
   const { records: straws } = useRecords<SemenInventory>("semenInventory", { propertyId });
+  // What became of each service. The link is `breedingRecordId`, written by
+  // the calving flow — this screen is where it is read back.
+  const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", { propertyId });
 
   const breedingsApi = useMutations<BreedingRecord>(
     "breedingRecords",
@@ -158,10 +166,12 @@ export function BreedingScreen({
     [animals, outsiders, straws],
   );
 
-  const watched = breedings.filter((record) => isInCalvingWindow(record, now));
+  const watched = awaitingCalving(breedings, calvings, now);
   const openChecks = breedings.filter((record) => {
     const due = pregCheckDue(record);
-    return due !== undefined && due <= now;
+    // A cow with a calf on the ground does not need scanning to see if she is
+    // in calf, which is what this tile was counting her for.
+    return due !== undefined && due <= now && !hasCalved(calvings, record);
   });
 
   async function remove(record: BreedingRecord) {
@@ -190,6 +200,18 @@ export function BreedingScreen({
                 entity: "Pregnancy check",
                 label: `${record.pregCheck.result} on ${formatDate(record.pregCheck.date)}`,
                 effect: "deleted" as const,
+              },
+            ]),
+        // Detached, not deleted, and said out loud: the calving stays and the
+        // calf stays, but the calving stops knowing which service it answered
+        // — which is where its sire came from.
+        ...(calvingFor(calvings, record) === undefined
+          ? []
+          : [
+              {
+                entity: "Calving record",
+                label: `calved ${formatDate(calvingFor(calvings, record)?.date)} — keeps the calf, loses the sire`,
+                effect: "detached" as const,
               },
             ]),
       ],
@@ -261,12 +283,52 @@ export function BreedingScreen({
       key: "state",
       header: "State",
       render: (record) => {
+        // Calved first, ahead of every projection: what happened outranks what
+        // was expected to. A service she has answered is finished, and the
+        // window, the preg check and the day count are all history.
+        const calving = calvingFor(calvings, record);
+        if (calving !== undefined) return <Badge tone="calm">Calved</Badge>;
         if (record.pregCheck?.result === "open") return <Badge tone="neutral">Open</Badge>;
         if (isInCalvingWindow(record, now)) return <Badge tone="danger">Calving window</Badge>;
         if (record.pregCheck?.result === "bred") return <Badge tone="calm">Confirmed bred</Badge>;
         const due = pregCheckDue(record);
         if (due !== undefined && due <= now) return <Badge tone="action">Preg check due</Badge>;
         return <Badge tone="neutral">Waiting</Badge>;
+      },
+    },
+    {
+      key: "outcome",
+      header: "Outcome",
+      // The end of the story the row starts. A breeding log that stops at
+      // "due" makes somebody open the calving screen to find out whether the
+      // calf ever came.
+      render: (record) => {
+        const calving = calvingFor(calvings, record);
+        if (calving === undefined) return <span className="text-muted">—</span>;
+
+        const calf =
+          calving.calfAnimalId === undefined ? undefined : byId.get(calving.calfAnimalId);
+        const when = formatDate(calving.date);
+
+        if (!producedLiveCalf(calving)) {
+          return <span className="text-muted">Stillborn · {when}</span>;
+        }
+
+        return (
+          <span className="flex flex-wrap items-center gap-2">
+            {calf === undefined ? (
+              <span>Calved</span>
+            ) : (
+              <Link
+                href={animalHref(calf)}
+                className="font-medium text-ink underline decoration-edge underline-offset-4 hover:decoration-action"
+              >
+                {displayName(calf)}
+              </Link>
+            )}
+            <span className="text-muted">{when}</span>
+          </span>
+        );
       },
     },
     {
