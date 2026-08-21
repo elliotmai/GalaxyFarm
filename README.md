@@ -54,6 +54,7 @@ Every relationship additionally declares its delete behavior — `restrict`, `ca
 | PWA / service worker | Serwist                                                                       |
 | Photos & documents   | Cloudflare R2 via presigned URLs (S3-compatible)                              |
 | Email                | Resend                                                                        |
+| Web push             | VAPID + RFC 8291, against `node:crypto` — no dependency                       |
 | UI                   | Tailwind + shadcn/ui on top of a custom design system package                 |
 | Charts               | Recharts                                                                      |
 | PDF                  | @react-pdf/renderer + print stylesheets                                       |
@@ -94,6 +95,7 @@ galaxy-farm/
 │   │   ├── sync/                   outbox, cursors, conflict resolution
 │   │   ├── storage/                Cloudflare R2 adapter
 │   │   ├── email/                  Resend adapter
+│   │   ├── push/                   web push — VAPID, RFC 8291 payload encryption
 │   │   ├── weather/                Open-Meteo + NWS adapters (frost, freeze, calving watch)
 │   │   ├── auth/                   Auth.js wiring against our own Postgres
 │   │   └── quickbooks/             port defined now, adapter in Phase 5
@@ -198,11 +200,12 @@ The §4.5 guards are convention checks over source text, not type-level proofs. 
 ### Built
 
 - **`packages/core`** — the shared kernel. `Result`, ULIDs, value objects (safety levels, unit-tagged quantities, integer-cent money, date ranges), eleven entities each with a Zod schema, domain events, ports, and the §4.5 contracts. Plus `makeCrudUseCases`, so every entity gets its five operations from one tested implementation rather than a hand-rolled copy per module.
-- **`packages/ui`** — the confirmation primitive every destructive action routes through, in all three tiers, and the **`SpatialEditor`**: one component with two palettes (§2), drawing rings of ground over a background that is Google's satellite layer online and an owned NAIP image offline. It knows nothing about pens or animals — a caller flattens what it has, the same pattern the pedigree chart uses.
+- **`packages/ui`** — the confirmation primitive every destructive action routes through, in all three tiers, and the **`SpatialEditor`**: one component with two palettes (§2), drawing rings of ground over a background that is Google's satellite layer online and an owned NAIP image offline. Both palettes have a screen now — pens over aerial imagery at `/admin/map`, beds on a plan at `/admin/garden/layout` — and neither is a fork. It knows nothing about pens, animals or crops; a caller flattens what it has, the same pattern the pedigree chart uses.
 - **`packages/infrastructure/sync`** — field-level patches, last-write-wins per field with an audit trail, an outbox with capped exponential backoff, per-entity cursors, and the engine that drives push and pull against a transport port.
 - **`packages/infrastructure/local`** — the IndexedDB store, a device-persisted outbox that survives the app being killed, and live queries so a barn kiosk redraws when someone moves an animal from the house.
 - **`packages/infrastructure/db`** — the Drizzle schema and migrations, the Postgres repository, and the server side of sync. Verified against real PostgreSQL 18 in CI via PGlite. No extensions, integer cents, timezone-aware timestamps throughout.
 - **The PWA shell** — a Serwist service worker, app-shell and asset precaching, an offline fallback at `/offline`, an install prompt, and an update path that gets a barn screen onto a new build without anybody driving out to reload it (#11).
+- **Web push** — `packages/infrastructure/push` behind the kernel's `Notifier` port, subscriptions per person and per device, and a `push` handler in the worker. See [Notifications](#notifications) below.
 - **The logomark** — **Flying Double M Connected**, in `packages/ui/src/brand/`, paired for both surface themes. No wordmark; the names are still open (#26).
 
 One repository contract is shared by all three implementations — in-memory, IndexedDB, and Postgres. A disagreement between the local store and the server store shows up as data appearing on one device and not another, which is the hardest class of bug to notice here, so the contract is written once and run three times rather than written three times.
@@ -267,11 +270,11 @@ build command so a deploy cannot publish without it.
 
 ### Environment
 
-Copy `.env.example` to `.env.local` and fill it in. It covers `DATABASE_URL` (Neon), the Auth.js secret, Cloudflare R2 credentials, the Resend API key and sender, the Google Maps browser key, and the `NEXT_PUBLIC_FARM_NAME` / business-name branding fallbacks. `.env.local` is gitignored and must stay that way — no real value belongs in `.env.example`.
+Copy `.env.example` to `.env.local` and fill it in. It covers `DATABASE_URL` (Neon), the Auth.js secret, Cloudflare R2 credentials, the Resend API key and sender, the VAPID keypair web push is signed with, the Google Maps browser key, and the `NEXT_PUBLIC_FARM_NAME` / business-name branding fallbacks. `.env.local` is gitignored and must stay that way — no real value belongs in `.env.example`.
 
 ### Email
 
-`RESEND_API_KEY` and `EMAIL_FROM` are the whole of it. Both are read in exactly one place — `apps/web/lib/notifier.ts`, the composition root — and everything else asks for the kernel's `Notifier` port, which is what makes §6's "web push later" a change to that one file.
+`RESEND_API_KEY` and `EMAIL_FROM` are the whole of it. Both are read in exactly one place — `apps/web/lib/notifier.ts`, the composition root — and everything else asks for the kernel's `Notifier` port. §6's "web push later" turned out to be exactly that: [a change to that one file](#notifications).
 
 **Invitations are emailed.** Adding somebody, and re-issuing a link for somebody who never accepted or has forgotten their password (§4.3 makes those one action), sends them the single-use link. The screen still shows that link once, because the email is the convenience and the shown link is the guarantee — Resend can be unreachable, a sender domain unverified, an address wrong by a letter, and in every one of those cases the account already exists and somebody still has to be able to get in. The box says which of the two happened, and turns red when the email did not go.
 
@@ -280,6 +283,24 @@ Copy `.env.example` to `.env.local` and fill it in. It covers `DATABASE_URL` (Ne
 **The sender needs a verified domain.** `flyingdoublemranch.com` is verified with Resend — DKIM plus SPF on the `send` subdomain, DNS at Cloudflare — so `EMAIL_FROM` is an address on it and mail goes to anybody. The mailbox itself need not exist; nothing replies to it.
 
 With `EMAIL_FROM` unset, sending falls back to Resend's shared `onboarding@resend.dev`, which accepts every message and delivers only to the address the Resend account was opened with. That is enough to prove the wiring and no use at all for alerting a housesitter — so the app says so in a box on the People screen rather than leaving somebody to work it out from an empty inbox. Any future domain follows the same path: add it at [resend.com/domains](https://resend.com/domains), publish the records it gives you, point `EMAIL_FROM` at it.
+
+### Notifications
+
+Two channels now, one port. §6's triggers — tank-freeze alerts, frost warnings, planting windows, feed run-out, med expiry, bull deadlines, low semen inventory — call `send` on a `Notifier` and learn nothing about where it goes. `apps/web/lib/notifier.ts` decides: email alone, push alone, or both, from what is configured.
+
+**Push is set up once.** `pnpm vapid:keys` mints the keypair that identifies this application server to every push service; the public half goes in `NEXT_PUBLIC_VAPID_PUBLIC_KEY` and reaches browsers, the private half in `VAPID_PRIVATE_KEY` stays a server secret, and `VAPID_SUBJECT` is the address a push service complains to. The pair cannot be rotated in place — every existing subscription is bound to the public key it was made with — so replacing it means asking everybody to subscribe again. Unset, push is off and the Notifications tab says so in a box naming the variables.
+
+**Subscriptions are per person and per device.** A phone and a laptop are two rows in `push_subscriptions`, so turning notifications off on one leaves the other alone. The table is deliberately outside the sync machinery, alongside `kiosk_pins`: it holds the keys a payload is encrypted to, and a barn screen holding those could read the owner's notifications. Delivery failures prune themselves — a 404 or 410 from a push service means the browser is gone for good, and the row goes with it rather than being retried on every alert forever.
+
+**Check it from the app.** The Notifications tab has a **Send a test** button once a device is subscribed, for the same reason the People screen has one for email: "push is configured" and "the phone buzzes" are different claims, and everything between them — a permission, a wrong key, an iPhone that was never added to the home screen — is invisible from the server. It reports the push service's own words on failure, and says plainly when no device of yours is subscribed rather than claiming a send that reached nothing.
+
+**Permission is asked for in context.** `/admin/settings` → Notifications has one button per device, and nothing prompts on load: a browser permission prompt that appears unbidden gets denied, and a denial cannot be taken back by the site.
+
+**A barn kiosk does not subscribe, on purpose.** A subscription belongs to a person and a wall screen has none; the boards it already shows carry the same alerts; and a screen that could subscribe would be one that kept notifying after it was revoked, which is the one thing §4.4 promises revocation ends.
+
+**The same tab carries §6's preference model** — per trigger, per person, one of email, push, both, or off. A trigger switched off reaches neither channel; that is what stops a second channel becoming a way around a preference, and it is the assertion `apps/web/tests/notification-prefs.test.ts` exists for.
+
+**No dependency.** The adapter speaks VAPID (RFC 8292) and the `aes128gcm` payload encryption (RFC 8291) against `node:crypto` directly, the same call `packages/infrastructure/email` makes about Resend's HTTP API: the surface needed is one signature and one encryption, and an injectable `fetch` is what lets every test run without a network. The encryption is held to a frozen vector that was checked against `http_ece`, the implementation the rest of the ecosystem uses.
 
 Set both in `.env.local` for a laptop **and** in the Netlify environment variables for the deployed site. A key set in only one of the two is the failure that looks like the button being broken.
 

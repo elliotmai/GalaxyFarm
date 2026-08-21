@@ -85,10 +85,16 @@ export function hasInstructions(context: InstructionContext): boolean {
  *
  * The zone's own instructions appear once, not once per occupant, and each
  * animal's own line is attributed to it by name.
+ *
+ * `groups` are the zones this one sits inside — an area, a barn — whose
+ * instructions apply to everything in them. Optional because most pens are
+ * their own group, and ordered between the pen and its occupants for the same
+ * reason the animal's own note leads there: most specific first.
  */
 export function resolveZoneInstructions(
   zone: InstructionSubject,
   occupants: readonly InstructionSubject[],
+  groups: readonly InstructionSubject[] = [],
 ): ResolvedInstruction[] {
   const lines: ResolvedInstruction[] = [];
 
@@ -98,6 +104,16 @@ export function resolveZoneInstructions(
       sourceName: zone.name,
       sourceId: zone.id,
       text: zone.customInstructions.trim(),
+    });
+  }
+
+  for (const group of groups) {
+    if (!meaningful(group.customInstructions)) continue;
+    lines.push({
+      source: "group",
+      sourceName: group.name,
+      sourceId: group.id,
+      text: group.customInstructions.trim(),
     });
   }
 

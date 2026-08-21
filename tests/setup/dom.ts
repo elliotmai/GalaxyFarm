@@ -29,6 +29,19 @@ if (typeof document !== "undefined") {
    * open/close state and the `close` event, which is the part components
    * actually branch on.
    */
+  /**
+   * jsdom gives every element a layout that never scrolls, and leaves
+   * `scrollIntoView` off `Element.prototype` entirely — so a component that
+   * scrolls to its own form after a tap does not fail to scroll, it throws.
+   *
+   * Stubbed here rather than per suite for the same reason as the dialog
+   * methods below: it is a gap in the environment, not a concern of any one
+   * test. Vitest reports the throw as an unhandled error and exits non-zero
+   * even when every test passed, which is enough on its own to hold the whole
+   * `pnpm verify` gate red.
+   */
+  Element.prototype.scrollIntoView ??= function scrollIntoView() {};
+
   if (typeof HTMLDialogElement !== "undefined") {
     HTMLDialogElement.prototype.showModal ??= function showModal(this: HTMLDialogElement) {
       this.open = true;

@@ -18,6 +18,7 @@
     "@galaxy-farm/infra-email": "workspace:*",
     "@galaxy-farm/infra-geocoding": "workspace:*",
     "@galaxy-farm/infra-local": "workspace:*",
+    "@galaxy-farm/infra-push": "workspace:*",
     "@galaxy-farm/infra-registry-graph": "workspace:*",
     "@galaxy-farm/infra-storage": "workspace:*",
     "@galaxy-farm/infra-sync": "workspace:*",

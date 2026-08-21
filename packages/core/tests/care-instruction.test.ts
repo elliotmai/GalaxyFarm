@@ -100,6 +100,31 @@ describe("resolveZoneInstructions", () => {
   it("says nothing for an empty pen with no notes", () => {
     expect(resolveZoneInstructions({ id: id(11), name: "West Pen" }, [])).toEqual([]);
   });
+
+  it("puts the group it sits in between the pen and the animals standing in it", () => {
+    // Most specific first, the same order as the animal's own merge: the pen
+    // latch before the rule that covers the whole north end, and both before
+    // whatever is true of one cow.
+    const north = {
+      id: id(12),
+      name: "North",
+      customInstructions: "Gate to the road stays chained.",
+    };
+    const lines = resolveZoneInstructions(penB, [andromeda], [north]);
+
+    expect(lines.map((line) => `${line.source}:${line.sourceName}`)).toEqual([
+      "zone:Pen B",
+      "group:North",
+      "animal:Andromeda",
+    ]);
+  });
+
+  it("leaves a group with nothing to say out rather than rendering an empty row", () => {
+    const quiet = { id: id(13), name: "South" };
+    const lines = resolveZoneInstructions(penB, [], [quiet]);
+
+    expect(lines.map((line) => line.sourceName)).toEqual(["Pen B"]);
+  });
 });
 
 describe("configurable safety labels (§5.1)", () => {

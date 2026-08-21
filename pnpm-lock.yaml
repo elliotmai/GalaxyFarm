@@ -80,6 +80,9 @@ importers:
       '@galaxy-farm/infra-local':
         specifier: workspace:*
         version: link:../../packages/infrastructure/local
+      '@galaxy-farm/infra-push':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure/push
       '@galaxy-farm/infra-registry-graph':
         specifier: workspace:*
         version: link:../../packages/infrastructure/registry-graph
@@ -294,6 +297,16 @@ importers:
       fake-indexeddb:
         specifier: ^6.0.0
         version: 6.2.5
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/infrastructure/push:
+    dependencies:
+      '@galaxy-farm/core':
+        specifier: workspace:*
+        version: link:../../core
+    devDependencies:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3

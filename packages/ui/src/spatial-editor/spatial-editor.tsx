@@ -50,8 +50,8 @@ import type {
  * Draw and adjust rings of ground over a background, put chips in them, drag a
  * chip from one to another, tap either for its instructions. In property mode
  * that is pens over aerial imagery with animals standing in them; in garden
- * mode it will be beds on a plan with plantings in them, and the difference
- * between the two is a `SpatialPalette` rather than a second component (§2).
+ * mode it is beds on a plan with plantings in them, and the difference between
+ * the two is a `SpatialPalette` rather than a second component (§2).
  *
  * ## What is deliberately not here
  *
@@ -315,6 +315,19 @@ export function SpatialEditor({
     [shapes],
   );
 
+  /**
+   * Is there any ground drawn under this point?
+   *
+   * Not the same question as `shapeUnder`, and deliberately a separate one: a
+   * retired pen is not somewhere a chip may be dropped, but a tap on it is
+   * still a tap on a shape rather than on bare ground.
+   */
+  const overShape = useCallback(
+    (point: GeoPoint): boolean =>
+      shapes.some((shape) => containsPoint(shape.boundary ?? [], point)),
+    [shapes],
+  );
+
   const reassign = useCallback(
     (chipId: string, toShapeId: string) => {
       const chip = chips.find((candidate) => candidate.id === chipId);
@@ -441,12 +454,17 @@ export function SpatialEditor({
             shapeId: draft.shapeId,
             boundary: [...draft.boundary, groundAt(at, viewport)],
           });
-        } else {
+        } else if (!overShape(unproject(at, viewport))) {
+          // Bare ground, and only bare ground. A tap that landed on a shape
+          // reaches that shape's own handler a moment later, and clearing the
+          // selection here first would throw away the chip it was about to be
+          // moved to — which is single-tap reassignment, the barn
+          // touchscreen's whole interaction.
           select(undefined);
         }
       }
     },
-    [draft, groundAt, onDraftChange, pointAt, reassign, select, shapeUnder, viewport],
+    [draft, groundAt, onDraftChange, overShape, pointAt, reassign, select, shapeUnder, viewport],
   );
 
   const onWheel = useCallback(
@@ -561,7 +579,7 @@ export function SpatialEditor({
         <svg
           className="absolute inset-0 h-full w-full"
           role="application"
-          aria-label={label ?? `Map of ${palette.shapeNoun.many}`}
+          aria-label={label ?? `The ${palette.shapeNoun.many} on the ${palette.surfaceNoun}`}
           onPointerDown={onCanvasPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -691,14 +709,14 @@ export function SpatialEditor({
 
         {viewport === undefined ? (
           <p className="absolute inset-0 flex items-center justify-center text-density text-muted">
-            Nothing is drawn yet, so there is nowhere to open the map.
+            {`Nothing is drawn yet, so there is nowhere to open the ${palette.surfaceNoun}.`}
           </p>
         ) : null}
       </div>
 
       {unplaced.length === 0 ? null : (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-density text-muted">{`Not on the map (${unplaced.length}):`}</span>
+          <span className="text-density text-muted">{`Not on the ${palette.surfaceNoun} (${unplaced.length}):`}</span>
           {unplaced.map((chip) => (
             <ChipButton
               key={chip.id}

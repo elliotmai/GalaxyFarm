@@ -59,6 +59,9 @@ vi.mock("next/navigation", () => ({
 const { BreedingScreen } =
   await import("../app/(admin)/admin/cattle/breeding/_components/breeding-screen.js");
 
+/** The day the form opens on, which is what an untouched date field stores. */
+const TODAY = new Date();
+
 const PROPERTY = "01ARZ3NDEKTSV4RRFFQ69G5FP1" as Ulid;
 const ACTOR = "01ARZ3NDEKTSV4RRFFQ69G5FU1" as Ulid;
 const STRAW_ID = "01ARZ3NDEKTSV4RRFFQ69G5S01" as Ulid;
@@ -158,6 +161,23 @@ describe("Recording an AI breeding", () => {
     expect(written).toHaveLength(1);
     expect(written[0]?.input).toMatchObject({ method: "AI", sireName: "ZNT Bandwagon" });
     expect(screen.queryByText(/needs the sire/)).toBeNull();
+  });
+
+  it("stores the day that was typed, not the day before it", async () => {
+    // Reported from the farm: breeding dates rolled back a day. The field
+    // hands over `2026-02-14` and `new Date` of that is midnight *UTC*, which
+    // renders as the 13th anywhere west of Greenwich — so the cow, her due
+    // date, her window and her preg check were all a day early.
+    //
+    // Asserted on the local parts, because the fix is that the zone stops
+    // mattering: midday local is the 14th wherever this runs.
+    const written = await recordBreeding("ZNT Bandwagon", /not on file/);
+    const stored = written[0]?.input["date"] as Date;
+
+    expect(stored.getFullYear()).toBe(TODAY.getFullYear());
+    expect(stored.getMonth()).toBe(TODAY.getMonth());
+    expect(stored.getDate()).toBe(TODAY.getDate());
+    expect(stored.getHours()).toBe(12);
   });
 
   it("offers the tank, with what is in it", async () => {

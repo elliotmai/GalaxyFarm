@@ -1,3 +1,4 @@
+import type { NotificationTrigger } from "../entities/notification.js";
 import type { BaseRecord } from "../entities/record.js";
 import type { Ulid } from "../types/ids.js";
 import type { ListQuery } from "../crud/contracts.js";
@@ -8,6 +9,7 @@ export * from "./storage.js";
 export * from "./photo-queue.js";
 export * from "./invoicing.js";
 export * from "./geocoder.js";
+export * from "./composite-notifier.js";
 
 /**
  * Ports the domain defines and infrastructure implements (spec §4.1).
@@ -75,6 +77,22 @@ export interface NotificationMessage {
   readonly html?: string | undefined;
   /** Where a reply should go, when that is not the sender. */
   readonly replyTo?: string | undefined;
+  /**
+   * Which of §6's triggers this is, when it is one of them.
+   *
+   * The one thing a message says about itself beyond its words, and it is here
+   * so that no *caller* has to know how many channels exist: §6 gives every
+   * trigger a per-user channel choice, something has to apply that choice, and
+   * the alternative to naming the trigger is asking each sender to pick the
+   * channels itself — which is the `if` in every call site this port exists to
+   * avoid. `compositeNotifier` reads it; the Resend and web-push adapters both
+   * ignore it.
+   *
+   * Optional because not every notification is one of the twenty-two. An
+   * invitation and a test send have no trigger, no preference governing them,
+   * and go out on whatever channel the caller asked for.
+   */
+  readonly trigger?: NotificationTrigger | undefined;
 }
 
 /**

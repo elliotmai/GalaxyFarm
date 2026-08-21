@@ -81,9 +81,9 @@ export function ChipButton({
   return (
     <button
       type="button"
-      aria-label={`${chip.label}${chip.accentLabel === undefined ? "" : `, ${chip.accentLabel} halter`}${
-        step === undefined ? "" : `, ${palette.rankTitle} ${step.label}`
-      }`}
+      aria-label={`${chip.label}${
+        chip.accentLabel === undefined ? "" : `, ${chip.accentLabel} ${palette.accentNoun}`
+      }${step === undefined ? "" : `, ${palette.rankTitle} ${step.label}`}`}
       aria-pressed={selected}
       onPointerDown={draggable ? (event) => onPointerDown(event, chip.id) : undefined}
       onPointerMove={draggable ? onPointerMove : undefined}

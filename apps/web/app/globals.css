@@ -147,31 +147,97 @@ body {
 /* Headings take the display face from theme.css, which sets it per density. */
 
 /*
- * Print (spec §5.10).
+ * The printed guide is marked up as a table, so that its head repeats on every
+ * sheet (see the print block below). On screen it is not a table at all: the
+ * rows are unwound back into plain blocks, and the running head — which only
+ * paper has pages to repeat — is not rendered.
+ *
+ * Here rather than as utilities on the elements, so the rules that undo the
+ * table sit beside the ones that ask for it.
+ */
+[data-print-part="sheet"],
+[data-print-part="sheet"] > thead,
+[data-print-part="sheet"] > tbody,
+[data-print-part="sheet"] > * > tr,
+[data-print-part="sheet"] > * > tr > td {
+  display: block;
+}
+
+/* Typed on the element, so it outranks the reset above rather than joining it. */
+thead[data-print-part="running"] {
+  display: none;
+}
+
+/*
+ * Print (spec §5.10, issue #42).
  *
  * The care guide is one composition with three outputs, and this is the one
  * that ends up folded on somebody's kitchen counter. "Print-perfect PDF" needs
  * no PDF library: the browser's own print dialog saves to PDF, and what makes
  * that output good is a stylesheet that takes the app off the page.
  *
- * Hiding by visibility rather than by naming the chrome. A rule that listed
- * the nav, the tab strip and the buttons would be a rule somebody has to
- * remember to extend every time a control is added — and the failure mode is
- * a sidebar printed down the left of a document nobody notices until it comes
- * out of the printer.
+ * Still hiding by asking a question about the document rather than by naming
+ * the chrome. A rule that listed the nav, the tab strip and the buttons would
+ * be a rule somebody has to remember to extend every time a control is added —
+ * and the failure mode is a sidebar printed down the left of a document nobody
+ * notices until it comes out of the printer.
+ *
+ * The question is now asked with `:has()` instead of with `visibility`, and
+ * the answer is `display: none`, because visibility was the cause of the two
+ * defects #42 was opened to find. Both were measured, not guessed — the
+ * audit is in the pull request:
+ *
+ * - **The document was cut short.** Hidden-but-present chrome still occupies
+ *   the page, so the guide had to be lifted out of the flow with
+ *   `position: absolute` to reach the top-left corner. Chromium does not
+ *   paginate an absolutely positioned box past the end of its overflow: a
+ *   seven-page guide printed six pages, losing the last chore, every
+ *   hand-written section and the closing line, with nothing on paper to say
+ *   anything was missing. Taking the chrome out of the layout instead means
+ *   the guide is simply the page's only content, in normal flow, and the
+ *   browser paginates it the way it paginates any long document.
+ * - **The safety levels printed grey.** See `print-color-adjust` below.
+ *
+ * A browser without `:has()` drops both of the rules that use it, and prints
+ * the guide with the app around it. That is the right way round: the document
+ * is whole and ugly rather than clipped and tidy.
  */
 @media print {
-  body * {
-    visibility: hidden;
+  /*
+   * Everything that is not the guide, does not contain it, and is not inside
+   * it leaves the page entirely.
+   *
+   * Scoped to a page that actually holds a guide, so printing any other screen
+   * is whatever the browser would do unaided. Unscoped this rule empties every
+   * page in the app, which is a sheet of blank paper out of the printer for
+   * anyone who hits Ctrl+P on the herd list.
+   */
+  body:has([data-print="guide"])
+    *:not(:has([data-print="guide"])):not([data-print="guide"], [data-print="guide"] *) {
+    display: none !important;
   }
 
-  [data-print="guide"],
-  [data-print="guide"] * {
-    visibility: visible;
+  /*
+   * The surviving chain from body down to the document is flattened.
+   *
+   * These elements are the app's layout — a flex row that made room for a
+   * sidebar, a main column with its gutters, a surface a full viewport tall.
+   * None of that means anything on paper, and all of it would push the
+   * document off the top-left corner of the sheet.
+   */
+  body:has([data-print="guide"]) :has([data-print="guide"]) {
+    display: block !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: none !important;
+    overflow: visible !important;
   }
 
   [data-print="guide"] {
-    /* Ink on paper, whichever theme the screen was in. Midnight Nebula costs
+    /* Ink on paper, whichever theme the screen was in. The night canvas costs
        a cartridge and reads worse than plain black on white. */
     --gf-canvas: #ffffff;
     --gf-panel: #ffffff;
@@ -180,8 +246,21 @@ body {
     --gf-muted: #444444;
     --gf-border: #999999;
 
-    position: absolute;
-    inset: 0 auto auto 0;
+    /*
+     * The safety scale is information, not decoration (§8).
+     *
+     * Browsers print backgrounds only when the reader ticks "Background
+     * graphics", which is off by default, and the chip's fill is a background.
+     * Worse than losing the colour: the fill is what the number is legible
+     * against, so a level 5 chip — white numeral, red ground — printed as
+     * Chromium's courtesy grey on white, measured at #ababab, about 2.2:1.
+     * "Do not handle" arriving as a grey smudge is the exact failure this
+     * feature cannot have, so the guide asks for its colours exactly. The
+     * property inherits, which is what carries it to every badge inside.
+     */
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+
     width: 100%;
     padding: 0;
     background: #ffffff;
@@ -189,19 +268,99 @@ body {
   }
 
   /*
+   * The document goes back to being a table, so the farm name and the date
+   * repeat on every sheet.
+   *
+   * `@page` margin boxes are the specified way to put a running head on a page
+   * and no browser implements them; a fixed-position element repeats in some
+   * engines and prints on page one only in others. A table head is the one
+   * mechanism every browser has repeated across pages for twenty years — and
+   * it has to be a real `<thead>`: Chromium repeated one on all ten pages of a
+   * test document and dropped a `div` given `display: table-header-group`
+   * after page one. Somebody who drops sheet three on the barn floor can still
+   * tell whose farm it belongs to and how old it is.
+   *
+   * Every selector below is a child chain, so this reaches only the tables the
+   * document is built from. A table of data added to the guide later keeps its
+   * own display on both media — and repeats its own head across pages without
+   * being told to, which is the browser default these rules are borrowing.
+   */
+  [data-print-part="sheet"] {
+    display: table;
+    width: 100%;
+    border-spacing: 0;
+  }
+
+  /*
+   * The same mechanism twice over. The document's own head carries the farm
+   * name and the date; a pen's head carries its safety level and its name onto
+   * whatever page the pen spills onto — a section too tall for a sheet cannot
+   * be kept whole, so the part that matters is repeated instead.
+   */
+  [data-print-part="sheet"] > thead {
+    display: table-header-group;
+  }
+
+  [data-print-part="sheet"] > tbody {
+    display: table-row-group;
+  }
+
+  [data-print-part="sheet"] > * > tr {
+    display: table-row;
+  }
+
+  [data-print-part="sheet"] > * > tr > td {
+    display: table-cell;
+    padding: 0;
+    /* A head is a line across the page, not a caption centred over a column. */
+    text-align: left;
+  }
+
+  /* The running head needs air under it before the document starts. */
+  [data-print-part="running"] td {
+    padding-bottom: 6pt;
+  }
+
+  /*
    * A pen's section must not break across a page. Half a safety warning at
    * the foot of sheet two is worse than none: the reader has no way to know
    * the rest of it exists.
+   *
+   * `li` is on the list because the sections that are longer than a page —
+   * the routine, the do-not-handle list on a bad week — cannot be kept whole,
+   * and a break has to fall somewhere. Between two entries is somewhere; the
+   * middle of "do not put yourself between her and" is not.
    */
   [data-print="guide"] section,
-  [data-print="guide"] > header,
-  [data-print="guide"] section > div {
+  [data-print="guide"] [data-print-part="body"] > header,
+  [data-print="guide"] section > div,
+  [data-print="guide"] section > table,
+  [data-print="guide"] li {
     break-inside: avoid;
   }
 
   [data-print="guide"] h3,
   [data-print="guide"] h4 {
     break-after: avoid;
+  }
+
+  /* A line stranded alone above or below a page break reads as a mistake. */
+  [data-print="guide"] p,
+  [data-print="guide"] li {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /*
+   * A printed hyperlink is a dead end, so it prints its destination.
+   *
+   * Only `http(s)`: a `tel:` or `mailto:` link already has the number or the
+   * address as its text, and would otherwise print it twice.
+   */
+  [data-print="guide"] a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    word-break: break-all;
   }
 
   @page {

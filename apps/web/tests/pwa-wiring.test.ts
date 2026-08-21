@@ -127,3 +127,32 @@ describe("the web app manifest still describes something installable", () => {
     }
   });
 });
+
+describe("the worker can receive a notification (§6, issue #41)", () => {
+  it("handles a push, and shows something for every one", () => {
+    // A `push` event that shows no notification is a "silent push", and
+    // browsers answer repeated silent pushes by showing their own notice or
+    // revoking the permission outright.
+    expect(WORKER).toMatch(/addEventListener\("push"/);
+    expect(WORKER).toContain("showNotification");
+    expect(WORKER).toContain("parsePushPayload");
+  });
+
+  it("focuses a window that is already open rather than opening a second app", () => {
+    // Two windows means two sync loops and somebody wondering which one is
+    // real. `openWindow` is the fallback, not the first move.
+    expect(WORKER).toMatch(/addEventListener\("notificationclick"/);
+    expect(WORKER).toContain("matchAll");
+    expect(WORKER).toContain("client.focus()");
+  });
+
+  it("leaves the caching and update policy alone", () => {
+    // #35 settled both and the barn screens depend on them. Push is two extra
+    // listeners on the same worker; a change here would be a change to what a
+    // screen with no signal can still open.
+    expect(WORKER).toContain("skipWaiting: false");
+    expect(WORKER).toContain("clientsClaim: true");
+    expect(WORKER).toMatch(/new NetworkOnly\(\)/);
+    expect(WORKER).toContain("app-shell");
+  });
+});

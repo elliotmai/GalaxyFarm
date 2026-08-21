@@ -1,22 +1,21 @@
-import { PagePlaceholder } from "../../../../_components/page-placeholder";
+import { redirect } from "next/navigation";
+
+import { GardenLayoutScreen } from "@/app/(admin)/admin/garden/layout/_components/garden-layout-screen";
+import { currentActor } from "@/lib/auth";
 
 export const metadata = { title: "Garden Layout" };
 
 /**
  * The layout designer (§5.5, §8, issue #33).
  *
- * Still a placeholder, and deliberately so: §2 says the property map and the
- * garden designer are one component with two skins, and that component — the
- * shared `SpatialEditor` — is being built under #8. A second SVG editor drawn
- * here to fill the page would be the exact duplication the principle exists to
- * prevent.
- *
- * The beds themselves are real and are managed under **Plantings → Beds**,
- * geometry columns and all. This page is the drawing of them, not the record
- * of them.
+ * The shared `SpatialEditor` in garden mode — §2's "one component, two
+ * palettes", now that both palettes have a caller. The beds themselves are
+ * records first and are managed under **Plantings → Beds**; this page is the
+ * drawing of them, and the only place their geometry is written.
  */
-export default function AdminGardenLayoutPage() {
-  return (
-    <PagePlaceholder title={"Garden Layout"} route={"/admin/garden/layout"} phase={"Phase 3"} />
-  );
+export default async function AdminGardenLayoutPage() {
+  const actor = await currentActor();
+  if (actor === undefined) redirect("/login?next=/admin/garden/layout");
+
+  return <GardenLayoutScreen propertyId={actor.propertyId} actorId={actor.id} />;
 }
