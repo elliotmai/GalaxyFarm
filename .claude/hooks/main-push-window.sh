@@ -87,6 +87,10 @@ segment_targets_protected() {
     fi
 
     case "$token" in
+    # Changes nothing on the remote, so the window does not apply — and it is
+    # the only way to check write access without spending the hour's one turn,
+    # which the first version of this file made impossible.
+    --dry-run | -n) return 1 ;;
     # Pushes every local branch, main included.
     --all | --mirror) return 0 ;;
     # Options that swallow the next word, so it is not mistaken for a refspec.
