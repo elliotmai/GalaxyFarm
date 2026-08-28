@@ -8,6 +8,7 @@ export * from "./animal.js";
 export * from "./zone-assignment.js";
 export * from "./care-instruction.js";
 export * from "./feeding-plan.js";
+export * from "./feeding-chore.js";
 export * from "./contact.js";
 export * from "./attachment.js";
 export * from "./task.js";
