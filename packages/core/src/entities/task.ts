@@ -26,6 +26,17 @@ export interface ChoreTemplate extends BaseRecord {
 
 export interface Task extends BaseRecord {
   readonly templateId?: Ulid | undefined;
+  /**
+   * The derived occurrence this row is the answer to.
+   *
+   * A chore template's instance is matched by `templateId` plus its day, which
+   * works because a template is a record with an id. A feeding chore has no
+   * such record behind it: it is the sum of however many plans happened to
+   * land on one trip, and that sum can change tomorrow without making today's
+   * tick wrong. So the row carries the occurrence's own derived id, and the
+   * day sheet drops any occurrence a stored row already claims.
+   */
+  readonly sourceKey?: string | undefined;
   readonly title: string;
   readonly detail?: string | undefined;
   readonly dueAt: Date;
@@ -48,6 +59,7 @@ export const choreTemplateSchema = baseRecordSchema.extend({
 
 export const taskSchema = baseRecordSchema.extend({
   templateId: ulidSchema.optional(),
+  sourceKey: z.string().max(200).optional(),
   title: z.string().min(1).max(120),
   detail: z.string().max(2000).optional(),
   dueAt: z.coerce.date(),
@@ -167,6 +179,15 @@ export interface ChoreEntry {
 export interface ChoreDayInput {
   readonly tasks: readonly Task[];
   readonly templates: readonly ChoreTemplate[];
+  /**
+   * Derived entries from somewhere other than a template — today, feeding.
+   *
+   * Built by the caller because working them out needs names from three
+   * entities and two modules, which §4.1 joins in the app. Merged here rather
+   * than concatenated by the screen so there is one sort and one dedupe rule,
+   * and so a feeding chore is late by the same arithmetic as every other one.
+   */
+  readonly derived?: readonly ChoreEntry[];
 }
 
 /** The derived id of an occurrence that has no stored row yet. */
@@ -242,6 +263,15 @@ export function choreDaySheet(input: ChoreDayInput, date: Date, now: Date): Chor
       .map((task) => occurrenceId(task.templateId as Ulid, task.dueAt)),
   );
 
+  // A derived occurrence somebody has ticked is a stored row now, matched by
+  // the key that row kept. Without this the sheet shows the tick and the
+  // untouched occurrence side by side, which reads as the chore coming back.
+  const claimed = new Set(
+    input.tasks.map((task) => task.sourceKey).filter((key): key is string => key !== undefined),
+  );
+
+  const derived = (input.derived ?? []).filter((entry) => !claimed.has(entry.id));
+
   const generated = input.templates
     .filter((template) => occursOn(template, date))
     .filter((template) => !materialised.has(occurrenceId(template.id, date)))
@@ -262,7 +292,7 @@ export function choreDaySheet(input: ChoreDayInput, date: Date, now: Date): Chor
 
   return [...owed, ...onDay]
     .map((task) => entryFromTask(task, dayStart, now))
-    .concat(generated)
+    .concat(generated, derived)
     .sort(
       (left, right) =>
         left.dueAt.getTime() - right.dueAt.getTime() ||

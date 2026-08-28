@@ -128,19 +128,35 @@ export async function toggleChore(
   { entry, template, date, at, actorId }: ChoreToggleInput,
 ): Promise<Result<Task, CrudError>> {
   if (entry.taskId === undefined) {
-    if (template === undefined) {
-      return {
-        ok: false,
-        error: {
-          kind: "not-found",
-          entity: "choreTemplates",
-          id: (entry.templateId ?? entry.id) as Ulid,
-        },
-      };
+    // An occurrence a template projected. The template is the record behind
+    // it, and the row it becomes is built from the template rather than from
+    // the entry so a title edited since this sheet rendered goes in right.
+    if (entry.templateId !== undefined) {
+      if (template === undefined) {
+        return {
+          ok: false,
+          error: { kind: "not-found", entity: "choreTemplates", id: entry.templateId },
+        };
+      }
+
+      return tasks.create({
+        ...taskFromTemplate(template, date),
+        completedAt: at,
+        completedBy: actorId,
+      });
     }
 
+    // An occurrence with no record behind it at all — a feeding trip, which is
+    // a sum over however many plans landed on it. There is nothing to look up,
+    // and nothing to look up *from*: the entry already is the row. `sourceKey`
+    // is what keeps the occurrence from reappearing beside the row it became.
     return tasks.create({
-      ...taskFromTemplate(template, date),
+      sourceKey: entry.id,
+      title: entry.title,
+      ...(entry.detail === undefined ? {} : { detail: entry.detail }),
+      dueAt: entry.dueAt,
+      ...(entry.zoneId === undefined ? {} : { zoneId: entry.zoneId }),
+      ...(entry.animalId === undefined ? {} : { animalId: entry.animalId }),
       completedAt: at,
       completedBy: actorId,
     });
