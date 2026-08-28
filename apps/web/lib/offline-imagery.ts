@@ -42,8 +42,29 @@ import type { SpatialImagery } from "@galaxy-farm/ui";
  * `NEXT_PUBLIC_` prefix.
  */
 
+/**
+ * The build-time value, written out as a literal member expression.
+ *
+ * **`process.env` cannot be passed around in code that reaches the browser.**
+ * There is no environment in a browser: Next replaces the exact text
+ * `process.env.NEXT_PUBLIC_…` with the value while bundling, and that is a
+ * find-and-replace over the source, not a lookup at runtime. Hand
+ * `process.env` to a parameter and index it through that variable and there is
+ * no such text to replace — every read comes back `undefined` on the client no
+ * matter what the deploy has set, and the screen reports an unset variable to
+ * somebody looking straight at it in the dashboard.
+ *
+ * So the default is spelled out here, once, and `env` stays injectable for the
+ * tests. Server-only modules beside this one (`storage`, `notifier`,
+ * `registry`) keep the `= process.env` default quite safely — they are never
+ * bundled for a browser and read the real thing.
+ */
+const INLINED: Record<string, string | undefined> = {
+  NEXT_PUBLIC_OFFLINE_IMAGERY_BASE_URL: process.env.NEXT_PUBLIC_OFFLINE_IMAGERY_BASE_URL,
+};
+
 export function offlineImageryBase(
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = INLINED,
 ): string | undefined {
   const base = env["NEXT_PUBLIC_OFFLINE_IMAGERY_BASE_URL"];
   if (base === undefined || base.trim() === "") return undefined;
@@ -62,7 +83,7 @@ export function offlineImageryBase(
  */
 export function offlineImagery(
   property: Pick<Property, "offlineImageryKey" | "offlineImageryBounds">,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = INLINED,
 ): SpatialImagery | undefined {
   const base = offlineImageryBase(env);
   const key = property.offlineImageryKey;
@@ -92,7 +113,7 @@ export function offlineImagery(
  */
 export function offlineImageryGap(
   property: Pick<Property, "offlineImageryKey" | "offlineImageryBounds">,
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = INLINED,
 ): string | undefined {
   const missing: string[] = [];
 
