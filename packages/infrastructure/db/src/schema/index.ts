@@ -1271,6 +1271,13 @@ export const tasks = pgTable(
   {
     ...baseColumns,
     templateId: text("template_id"),
+    /**
+     * The derived occurrence this row answers, for chores with no template
+     * behind them — feeding, today. Matched by value rather than by foreign
+     * key: the occurrence is a sum over whatever plans landed on one trip, and
+     * there is no row to point at.
+     */
+    sourceKey: text("source_key"),
     title: text("title").notNull(),
     detail: text("detail"),
     dueAt: timestamp("due_at", { withTimezone: true, mode: "date" }).notNull(),

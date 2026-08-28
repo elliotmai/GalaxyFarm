@@ -13,11 +13,15 @@ import {
   type Task,
   type Ulid,
   type Zone,
+  type FeedingPlan,
 } from "@galaxy-farm/core";
 
 import { DaySheet } from "@/app/(admin)/admin/chores/_components/day-sheet";
 import { TemplatesPanel } from "@/app/(admin)/admin/chores/_components/templates-panel";
 import { dayLabel } from "@/lib/chores";
+import type { FeedType } from "@galaxy-farm/module-feed";
+
+import { feedingChoreText, feedingChoresFor } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -52,6 +56,11 @@ export function ChoresScreen({
   const { records: templates } = useRecords<ChoreTemplate>("choreTemplates", query);
   const { records: zones } = useRecords<Zone>("zones", query);
   const { records: animals } = useRecords<Animal>("animals", query);
+  // Feeding is derived, never typed twice (§2). The plans say what goes out,
+  // to whom and when; the sheet reads them rather than asking somebody to
+  // write a chore template beside every ration.
+  const { records: plans } = useRecords<FeedingPlan>("feedingPlans", query);
+  const { records: feeds } = useRecords<FeedType>("feedTypes", query);
 
   /**
    * Which day is on screen, as an offset rather than a date.
@@ -66,7 +75,9 @@ export function ChoresScreen({
   const today = startOfDay(now);
   const date = addCalendarDays(today, offset);
 
-  const sheet = choreDaySheet({ tasks, templates }, date, now);
+  const text = feedingChoreText({ zones, animals, feeds, propertyId });
+  const derived = feedingChoresFor(plans, text, date, now);
+  const sheet = choreDaySheet({ tasks, templates, derived }, date, now);
   const progress = choreProgress(sheet);
   const day = dayLabel(date, today);
 

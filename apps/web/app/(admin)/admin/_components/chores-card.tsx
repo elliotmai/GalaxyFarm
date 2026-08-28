@@ -13,10 +13,16 @@ import {
   type ChoreTemplate,
   type Task,
   type Ulid,
+  type FeedingPlan,
+  type Zone,
+  type Animal,
 } from "@galaxy-farm/core";
 
 import { toggleChore } from "@/lib/chores";
 import { useMutations } from "@/lib/local/mutations";
+import type { FeedType } from "@galaxy-farm/module-feed";
+
+import { feedingChoreText, feedingChoresFor } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -43,6 +49,13 @@ export function ChoresCard({
   const query = { propertyId };
   const { records: tasks } = useRecords<Task>("tasks", query);
   const { records: templates } = useRecords<ChoreTemplate>("choreTemplates", query);
+  // The same three reads the chores screen makes, for the same reason: feeding
+  // is derived from the plans, and a card that left it out would disagree with
+  // the page it links to.
+  const { records: plans } = useRecords<FeedingPlan>("feedingPlans", query);
+  const { records: feeds } = useRecords<FeedType>("feedTypes", query);
+  const { records: zones } = useRecords<Zone>("zones", query);
+  const { records: animals } = useRecords<Animal>("animals", query);
 
   const api = useMutations<Task>("tasks", "tasks", taskSchema, propertyId, actorId);
   const { show } = useToast();
@@ -50,7 +63,13 @@ export function ChoresCard({
 
   const now = new Date();
   const today = startOfDay(now);
-  const sheet = choreDaySheet({ tasks, templates }, today, now);
+  const derived = feedingChoresFor(
+    plans,
+    feedingChoreText({ zones, animals, feeds, propertyId }),
+    today,
+    now,
+  );
+  const sheet = choreDaySheet({ tasks, templates, derived }, today, now);
   const progress = choreProgress(sheet);
 
   async function tick(entry: ChoreEntry) {
