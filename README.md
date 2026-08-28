@@ -215,7 +215,7 @@ One repository contract is shared by all three implementations — in-memory, In
 - **No screen is wired to the domain.** All 55 routes from spec §7 resolve and render `PagePlaceholder`.
 - **`/api/sync/push` and `/api/sync/pull` still answer 501.** The handlers behind them are built and tested — what is missing is auth. Both take the property from the caller's session, and until there is a session to take it from, publishing these routes would be an unauthenticated write endpoint into the farm's database. They stay 501 until #7 lands.
 - **The migrations have never run against Neon.** They are verified against real Postgres, but the managed database is unreachable from CI; see below.
-- **The property imagery is not cached for offline.** §8 has the Pen Board rendering over an owned NAIP snapshot where Google's tiles may not be stored, and `Property.offlineImageryKey` is on the entity waiting for it — but nothing writes or reads that key yet, so there is no imagery for the service worker to precache. It is a line in the worker's caching rules once #8 lands the imagery, not before.
+- **The property imagery is in R2 but is not being served yet.** §8 has the Pen Board rendering over an owned NAIP snapshot where Google's tiles may not be stored. The snapshot exists — `tools/naip-aerial.py` cut it and uploaded it — but R2's public access is per-bucket rather than per-prefix, so it sits in a second, imagery-only bucket that still has to be switched on and given `NEXT_PUBLIC_OFFLINE_IMAGERY_BASE_URL`. Until it is fetchable, `offlineImageryGap` says which of the three parts is missing and there is nothing for the service worker to precache. The worker's caching rule is the step after that, not before.
 - **No design system** beyond the confirmation dialog. The §8 tokens live in `packages/config/tailwind.preset.ts`; the components that consume them do not exist.
 - The kernel entities have no use cases yet, so they appear in the CRUD guard's "not started" list. That is deliberate — see [the note on the guards](#a-note-on-the-guards).
 
@@ -223,7 +223,7 @@ One repository contract is shared by all three implementations — in-memory, In
 
 1. **The design system** (#3) — nothing can be looked at until the components that consume the §8 tokens exist.
 2. **Auth.js and roles** (#7), which is also what unblocks the two sync routes.
-3. **Source the property's NAIP aerial** — the last piece of #8. The editor renders a cached georeferenced image and `/admin/settings` takes its key and extent; nobody has downloaded the tile from EarthExplorer, reprojected it, or put it in R2, so the map still needs the network.
+3. **Serve the property's NAIP aerial** — the last piece of #8. The image itself is done: `python3 tools/naip-aerial.py --lat 33.0512 --lon -97.4419 --upload` finds the quarter-quads covering the farm in Texas's open mirror of the federal NAIP delivery, reprojects them to Web Mercator, and puts a 3 km cut in R2, printing the key and the four edges to paste into `/admin/settings` → Property. What is left is turning on public access for the imagery bucket and setting `NEXT_PUBLIC_OFFLINE_IMAGERY_BASE_URL` to whatever hostname that gives — both of which are Cloudflare dashboard work, not code.
 4. Then Phase 1 cattle — the cow is already bred, so that phase races a real due date.
 
 Raise the coverage thresholds in `vitest.config.ts` as the domain packages fill in. Never lower them to make a red build green.

@@ -25,9 +25,25 @@
 /** The library the editor needs beyond the base map. */
 const LIBRARIES = ["geometry"] as const;
 
-export function mapsApiKey(
-  env: Record<string, string | undefined> = process.env,
-): string | undefined {
+/**
+ * The build-time value, written out as a literal member expression.
+ *
+ * **`process.env` cannot be passed around in code that reaches the browser.**
+ * Next replaces the exact text `process.env.NEXT_PUBLIC_…` with the value while
+ * bundling — a find-and-replace over the source, not a lookup at runtime. Give
+ * `process.env` to a parameter and read it through that variable and there is
+ * nothing to replace, so the key is `undefined` in every browser however
+ * carefully it was set on the deploy, and `mapsNotConfigured` below tells
+ * somebody to go and set a variable they set days ago.
+ *
+ * See the twin of this note in `offline-imagery.ts`; between them they are the
+ * only two client-reachable readers of the environment in the app.
+ */
+const INLINED: Record<string, string | undefined> = {
+  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+};
+
+export function mapsApiKey(env: Record<string, string | undefined> = INLINED): string | undefined {
   const key = env["NEXT_PUBLIC_GOOGLE_MAPS_API_KEY"];
   return key === undefined || key.trim() === "" ? undefined : key.trim();
 }
