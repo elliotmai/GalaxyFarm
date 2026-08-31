@@ -30,73 +30,21 @@ Rules that make it useful rather than decorative:
 - **Keep it under about 15 words.** It has to survive being summarised into
   the session's status line, which is where the dashboard actually reads it.
 
-## Branches: main takes one push an hour
+## Branches: push straight to main
 
-`main` accepts **at most one push per hour**. Between windows, commits collect
-on **`staging`**.
+`main` takes pushes whenever you have something to land. There is no rate
+limit, no window, and no queue.
 
-- Do your work on a feature branch, as before, and open a PR against `main`.
-- When something needs to land and the window is shut, merge it to `staging`
-  and push that. Nothing on `staging` is stranded — it is promoted for you.
-- Never push to `main` on the hour's second attempt by renaming the branch,
-  force-pushing, or pushing through another remote. If a change genuinely
-  cannot wait for the window, say so and ask.
+- Work on a feature branch and open a PR against `main` when a review is
+  useful.
+- When it isn't, commit and push to `main` directly.
+- `staging` is no longer a collection point. Nothing promotes it, and nothing
+  is waiting on it — treat it as an ordinary branch or delete it.
 
-### What enforces it
+### The one piece of friction left
 
-`.claude/hooks/main-push-window.sh`, wired up as a `PreToolUse` hook on `Bash`
-in `.claude/settings.json`. It reads the command about to run, works out
-whether it would move `main` on the remote — including a push at the tail of a
-chain, `HEAD:main`, `--all`, and a bare `git push` while standing on `main` —
-and denies it with the time the window reopens.
-
-Two things it is not:
-
-- **Not branch protection.** A hook only sees tool calls Claude makes. A person
-  at a terminal is unaffected. If the rule should bind everybody, add a GitHub
-  ruleset with the same period.
-- **Not a per-session limit.** It is one push an hour for the repository, and
-  every session in the project shares it.
-
-### How "when did main last move" is answered
-
-By asking the remote: the committer date of the tip of `origin/main`. Sessions
-here are ephemeral and isolated, each with its own container and its own fresh
-clone, so a timestamp on disk would be visible to exactly one of them — while
-the branch tip is state they all already share.
-
-**This is why promotions must be merge commits.** `git merge --no-ff staging`
-puts a commit authored _now_ at the tip of `main`, so the reading is the push
-time. A fast-forward would leave an older commit on the tip and the window
-would look like it had already reopened. The scheduled promotion below uses
-`--no-ff`; anything else moving `main` should too.
-
-## Promotion: staging → main, hourly
-
-A scheduled routine wakes every hour, and when `staging` is ahead of `main` and
-the window is open, merges and pushes:
-
-```bash
-git fetch origin main staging
-git checkout main && git merge --ff-only origin/main
-git merge --no-ff origin/staging -m "Promote staging to main"
-git push origin main
-```
-
-It does nothing — quietly — when `staging` has nothing new or the window is
-still shut. A merge conflict means something moved `main` outside this flow;
-the routine stops and leaves it alone rather than guessing.
-
-## Adjusting the rule
-
-The script reads three environment variables, so none of this needs editing to
-change:
-
-| Variable                      | Default   | Meaning                         |
-| ----------------------------- | --------- | ------------------------------- |
-| `GF_PROTECTED_BRANCH`         | `main`    | The branch that is rate limited |
-| `GF_STAGING_BRANCH`           | `staging` | Where commits collect meanwhile |
-| `GF_MAIN_PUSH_WINDOW_SECONDS` | `3600`    | The window, in seconds          |
-
-Set them under `env` in `.claude/settings.json` to change the policy for
-everyone, or in `.claude/settings.local.json` for one machine.
+`main` still carries classic branch protection requiring a pull request
+(Settings → Branches). Pushes from an account that can bypass it land anyway
+and print `Bypassed rule violations for refs/heads/main` — cosmetic, and the
+push succeeds. Turn the protection off there if the message is unwanted, or
+leave it as a speed bump for everyone who lacks bypass.
