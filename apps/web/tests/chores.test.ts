@@ -317,4 +317,24 @@ describe("groupChoresForBoard", () => {
       "Check the water",
     ]);
   });
+
+  it("sinks the finished ones to the bottom of their section, in their order", () => {
+    // What is left to do reads from the top; the ticked ones stay visible
+    // underneath as the record of the round.
+    const morning = new Date(2026, 0, 15, 11, 0, 59, 999);
+    const ticked = new Date(2026, 0, 15, 6, 30);
+    const sections = groupChoresForBoard([
+      entry({ dueAt: morning, title: "First, done", completedAt: ticked }),
+      entry({ dueAt: morning, title: "Second, open" }),
+      entry({ dueAt: morning, title: "Third, done", completedAt: ticked }),
+      entry({ dueAt: morning, title: "Fourth, open" }),
+    ]);
+
+    expect(sections[0]?.entries.map((item) => item.title)).toEqual([
+      "Second, open",
+      "Fourth, open",
+      "First, done",
+      "Third, done",
+    ]);
+  });
 });

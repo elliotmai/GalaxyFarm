@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { useToast } from "@galaxy-farm/ui";
 import {
@@ -20,19 +20,24 @@ import { groupChoresForBoard } from "@/lib/chores";
  * §5.10).
  *
  * Sectioned by the part of the day and flat within it — feeding trips and
- * template chores in one list, in due order. Who a chore is about rides the
- * row itself (the ration in a feed's title, the animal or pen as a small
- * tag), because on a one-screen board every heading costs a row.
+ * template chores in one list, in due order, the finished ones sinking to the
+ * bottom of their section. Who a chore is about rides the row itself (the
+ * ration in a feed's title, the animal or pen as a small tag), because on a
+ * one-screen board every heading costs a row.
  *
  * Built to fit one tablet screen. This is a kiosk on a post, glanced at with
  * an armful of feed, and a day that needs scrolling is a day whose evening
  * half gets forgotten. So the parts of the day sit side by side as columns,
- * and each chore is one row — the whole row is the tap target, which at kiosk
- * density is a bigger glove target than the buttons it replaces.
+ * and each chore is one row: the row ticks it, and a chore with more to say
+ * than its line can hold gets a separate expander that opens the detail
+ * without ticking anything.
  *
  * The tick goes through the same server action as the Today's Chores board —
- * same capability check, same attribution to the screen — and the local store
- * re-syncs afterwards so both boards and the admin app agree.
+ * same capability check, same attribution to the screen. Unlike that board it
+ * does not make the finger wait for the round trip: the row moves the moment
+ * it is tapped, the write happens behind it, and the tick is put back with an
+ * error if the farm refuses it. The overrides that carry that are dropped as
+ * soon as the synced store agrees, so the server stays the authority.
  */
 
 function dayString(date: Date): string {
@@ -52,11 +57,44 @@ export function HousesitterChores({
 }) {
   const { syncNow } = useSyncEngine();
   const { show } = useToast();
-  const [pending, startTransition] = useTransition();
-  const [busyId, setBusyId] = useState<string | undefined>();
+  const [, startTransition] = useTransition();
+  /** In-flight rows, so a double tap cannot write the same chore twice. */
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  /** What each tapped row shows until the store catches up. */
+  const [overrides, setOverrides] = useState<ReadonlyMap<string, Date | undefined>>(new Map());
+  /** Rows whose detail somebody opened. Opening one ticks nothing. */
+  const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
 
-  const sections = groupChoresForBoard(entries);
-  const progress = choreProgress(entries);
+  /*
+   * Drop an override once the store agrees with it — from there the synced
+   * record (and any other device's edits) is the authority again. An id the
+   * sheet no longer produces is dropped too: a ticked feeding occurrence
+   * comes back from the store as a stored row under a new id.
+   */
+  useEffect(() => {
+    setOverrides((current) => {
+      if (current.size === 0) return current;
+
+      const byId = new Map(entries.map((entry) => [entry.id, entry]));
+      const next = new Map(current);
+      for (const [id, completedAt] of current) {
+        const entry = byId.get(id);
+        if (
+          entry === undefined ||
+          (entry.completedAt !== undefined) === (completedAt !== undefined)
+        ) {
+          next.delete(id);
+        }
+      }
+      return next.size === current.size ? current : next;
+    });
+  }, [entries]);
+
+  const shown = entries.map((entry) =>
+    overrides.has(entry.id) ? { ...entry, completedAt: overrides.get(entry.id) } : entry,
+  );
+  const sections = groupChoresForBoard(shown);
+  const progress = choreProgress(shown);
 
   const whereLabel = (entry: ChoreEntry): string | undefined => {
     if (entry.animalId !== undefined) {
@@ -68,7 +106,15 @@ export function HousesitterChores({
   };
 
   function toggle(entry: ChoreEntry) {
-    setBusyId(entry.id);
+    if (busy.has(entry.id)) return;
+    const done = entry.completedAt === undefined;
+
+    // The row moves now; the write follows. Waiting for the round trip and
+    // the sync pull is a visible pause between the tap and anything happening,
+    // and a button that hesitates gets tapped again.
+    setBusy((current) => new Set(current).add(entry.id));
+    setOverrides((current) => new Map(current).set(entry.id, done ? new Date() : undefined));
+
     startTransition(async () => {
       const result = await setKioskChoreDone({
         ...(entry.taskId === undefined ? {} : { taskId: entry.taskId }),
@@ -79,15 +125,38 @@ export function HousesitterChores({
           ? { sourceKey: entry.id }
           : {}),
         day: dayString(day),
-        done: entry.completedAt === undefined,
+        done,
       });
 
-      setBusyId(undefined);
+      setBusy((current) => {
+        const next = new Set(current);
+        next.delete(entry.id);
+        return next;
+      });
+
       if (!result.ok) {
+        // Put the tick back the way it was, and say why.
+        setOverrides((current) => {
+          const next = new Map(current);
+          next.delete(entry.id);
+          return next;
+        });
         show({ message: result.error, tone: "danger" });
         return;
       }
       await syncNow();
+    });
+  }
+
+  function toggleDetail(id: string) {
+    setOpened((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
     });
   }
 
@@ -102,43 +171,70 @@ export function HousesitterChores({
   const row = (entry: ChoreEntry) => {
     const finished = entry.completedAt !== undefined;
     const where = whereLabel(entry);
+    const open = opened.has(entry.id);
 
     return (
-      <button
+      <div
         key={entry.id}
-        type="button"
-        onClick={() => toggle(entry)}
-        disabled={pending && busyId === entry.id}
-        aria-pressed={finished}
-        className={`flex min-h-11 w-full items-center gap-1.5 border px-2 text-left disabled:opacity-40 ${
-          finished
-            ? "border-edge opacity-60"
-            : entry.overdue
-              ? "border-danger hover:border-danger"
-              : "border-edge hover:border-action"
+        className={`border ${
+          finished ? "border-edge opacity-60" : entry.overdue ? "border-danger" : "border-edge"
         }`}
       >
-        <span
-          aria-hidden
-          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border border-edge text-xs ${
-            finished ? "text-muted" : "text-transparent"
-          }`}
-        >
-          ✓
-        </span>
-        <span className="min-w-0 flex-1 truncate text-sm">
-          <span className={finished ? "text-muted line-through" : "text-ink"}>{entry.title}</span>
-          {entry.detail === undefined || finished ? null : (
-            <span className="text-muted"> — {entry.detail}</span>
+        <div className="flex items-stretch">
+          <button
+            type="button"
+            onClick={() => toggle(entry)}
+            disabled={busy.has(entry.id)}
+            aria-pressed={finished}
+            className="flex min-h-11 min-w-0 flex-1 items-center gap-1.5 px-2 text-left hover:bg-raised disabled:opacity-40"
+          >
+            <span
+              aria-hidden
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border border-edge text-xs ${
+                finished ? "text-muted" : "text-transparent"
+              }`}
+            >
+              ✓
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm">
+              <span className={finished ? "text-muted line-through" : "text-ink"}>
+                {entry.title}
+              </span>
+              {entry.detail === undefined || finished || open ? null : (
+                <span className="text-muted"> — {entry.detail}</span>
+              )}
+            </span>
+            {where === undefined || finished ? null : (
+              <span className="max-w-20 shrink-0 truncate text-xs text-muted">{where}</span>
+            )}
+            {entry.overdue && !finished ? (
+              <span className="shrink-0 text-xs font-medium text-danger">late</span>
+            ) : null}
+          </button>
+
+          {entry.detail === undefined ? null : (
+            // Its own target, beside the tick rather than inside it: reading
+            // the full instruction must never count as doing the chore.
+            <button
+              type="button"
+              onClick={() => toggleDetail(entry.id)}
+              aria-expanded={open}
+              aria-label={open ? "Hide the detail" : "Show the whole detail"}
+              className="flex w-10 shrink-0 items-center justify-center border-l border-edge text-muted hover:bg-raised"
+            >
+              <span aria-hidden className={`transition-transform ${open ? "rotate-90" : ""}`}>
+                ›
+              </span>
+            </button>
           )}
-        </span>
-        {where === undefined || finished ? null : (
-          <span className="max-w-20 shrink-0 truncate text-xs text-muted">{where}</span>
-        )}
-        {entry.overdue && !finished ? (
-          <span className="shrink-0 text-xs font-medium text-danger">late</span>
+        </div>
+
+        {open && entry.detail !== undefined ? (
+          <p className="whitespace-pre-wrap border-t border-edge px-2 py-1.5 text-sm text-muted">
+            {entry.detail}
+          </p>
         ) : null}
-      </button>
+      </div>
     );
   };
 

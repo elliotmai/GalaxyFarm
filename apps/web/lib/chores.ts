@@ -132,7 +132,10 @@ export function describeTimeOfDay(timeOfDay: TimeOfDay): string {
  *
  * Flat within a section, deliberately: on a one-screen kiosk board every
  * heading costs a row, and who a chore is about already reads off the chore
- * itself — the ration in a feed's title, the animal or pen on its line.
+ * itself — the ration in a feed's title, the animal or pen on its line. The
+ * finished ones sink to the bottom of their section, keeping due order on
+ * either side of the line — what is left to do reads from the top, and the
+ * ticked ones stay visible as the record of the round.
  */
 export interface ChoreBoardSection {
   readonly label: string;
@@ -166,10 +169,16 @@ export function groupChoresForBoard(entries: readonly ChoreEntry[]): ChoreBoardS
     sections.set(section, list);
   }
 
-  return BOARD_SECTIONS.filter((label) => sections.has(label)).map((label) => ({
-    label,
-    entries: sections.get(label) as ChoreEntry[],
-  }));
+  return BOARD_SECTIONS.filter((label) => sections.has(label)).map((label) => {
+    const list = sections.get(label) as ChoreEntry[];
+    return {
+      label,
+      entries: [
+        ...list.filter((entry) => entry.completedAt === undefined),
+        ...list.filter((entry) => entry.completedAt !== undefined),
+      ],
+    };
+  });
 }
 
 export interface ChoreToggleInput {

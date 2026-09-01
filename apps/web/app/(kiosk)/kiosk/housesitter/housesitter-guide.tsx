@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { SafetyBadge } from "@galaxy-farm/ui";
 import type {
@@ -55,14 +55,26 @@ const includes = (guide: CareGuide, kind: GuideSectionKind) => guide.includes.in
 function Fold({
   title,
   hint,
+  defaultOpen = false,
   children,
 }: {
   readonly title: string;
   readonly hint: string;
+  /** Starts open, and stays whatever somebody last set it to. */
+  readonly defaultOpen?: boolean;
   readonly children: ReactNode;
 }) {
+  // Held in state rather than written as a bare `open` attribute: the board
+  // re-renders on every sync, and a constant attribute would argue with
+  // whatever somebody had just folded shut.
+  const [open, setOpen] = useState(defaultOpen);
+
   return (
-    <details className="group border border-edge bg-panel">
+    <details
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      className="group border border-edge bg-panel"
+    >
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-sm font-medium text-ink [&::-webkit-details-marker]:hidden">
         <span className="flex-1">{title}</span>
         <span className="text-xs font-normal text-muted">{hint}</span>
@@ -160,7 +172,9 @@ export function HousesitterGuide({
       )}
 
       {people.length === 0 ? null : (
-        <Fold title="Who to ring" hint={`${people.length}`}>
+        // Open by default: the numbers have to be on screen the moment
+        // something is wrong, not behind the one tap panic forgets to make.
+        <Fold title="Who to ring" hint={`${people.length}`} defaultOpen>
           <ul className="flex flex-col gap-1">
             {people.map((person) => (
               <li key={`${person.id}-${person.name}`}>
