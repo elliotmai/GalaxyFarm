@@ -5,7 +5,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import type { Animal, ChoreTemplate, Contact, Task, Ulid } from "@galaxy-farm/core";
+import { feedingChoreId } from "@galaxy-farm/core";
+import type { Animal, ChoreTemplate, Contact, FeedingPlan, Task, Ulid } from "@galaxy-farm/core";
 import { repositoryFor, type Database } from "@galaxy-farm/infra-db";
 import type { CareGuide, GuideSection } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
@@ -463,5 +464,104 @@ describe("ticking a chore", () => {
     );
 
     expect(again).toEqual({ ok: true, taskId: first.taskId });
+  });
+});
+
+describe("ticking a feeding trip", () => {
+  const FED = id(61);
+
+  const savePlan = (overrides: Partial<FeedingPlan> = {}) =>
+    repositoryFor<FeedingPlan>(db, "feedingPlans").save({
+      ...base(id(60)),
+      name: "Senior ration",
+      target: "animal",
+      targetId: FED,
+      alsoFeeds: [],
+      lines: [
+        {
+          feedTypeId: id(62),
+          amount: { amount: 2, unit: "scoop" },
+          frequency: "once_daily",
+          timeOfDay: "morning",
+        },
+      ],
+      portion: "per_head",
+      active: true,
+      ...overrides,
+    } as FeedingPlan);
+
+  const KEY = () => feedingChoreId({ target: "animal", targetId: FED, timeOfDay: "morning" }, NOW);
+
+  it("writes the row already complete, carrying the occurrence's own key", async () => {
+    // The key is what keeps the occurrence from reappearing beside the row it
+    // became, on every device's day sheet.
+    await savePlan();
+    const result = await tickChore(
+      { propertyId: PROPERTY, actorId: SITTER, sourceKey: KEY(), date: NOW, at: NOW, done: true },
+      db,
+    );
+
+    expect(result.ok).toBe(true);
+    const saved = await repositoryFor<Task>(db, "tasks").list({ propertyId: PROPERTY });
+    expect(saved).toHaveLength(1);
+    expect(saved[0]?.sourceKey).toBe(KEY());
+    expect(saved[0]?.title).toBe("Morning feed · Senior ration");
+    expect(saved[0]?.animalId).toBe(FED);
+    expect(saved[0]?.completedAt).toEqual(NOW);
+    expect(saved[0]?.completedBy).toBe(SITTER);
+  });
+
+  it("refuses a trip the plans do not produce on that day", async () => {
+    // The browser names the occurrence; the farm rebuilds it. A key the plans
+    // do not derive is not a chore, however well-formed it looks.
+    await savePlan({ active: false });
+    const result = await tickChore(
+      { propertyId: PROPERTY, actorId: SITTER, sourceKey: KEY(), date: NOW, at: NOW, done: true },
+      db,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(await repositoryFor<Task>(db, "tasks").list({ propertyId: PROPERTY })).toHaveLength(0);
+  });
+
+  it("flips the row another screen already wrote, rather than writing a second", async () => {
+    await savePlan();
+    const first = await tickChore(
+      { propertyId: PROPERTY, actorId: SITTER, sourceKey: KEY(), date: NOW, at: NOW, done: true },
+      db,
+    );
+    if (!first.ok) throw new Error("setup failed");
+
+    // A stale screen still holds the occurrence, not the row — un-ticking by
+    // key has to land on the row the first tick became. A minute later,
+    // because a write at the very same instant loses the per-field merge.
+    const later = new Date(NOW.getTime() + 60_000);
+    const undone = await tickChore(
+      {
+        propertyId: PROPERTY,
+        actorId: SITTER,
+        sourceKey: KEY(),
+        date: NOW,
+        at: later,
+        done: false,
+      },
+      db,
+    );
+
+    expect(undone).toEqual({ ok: true, taskId: first.taskId });
+    const saved = await repositoryFor<Task>(db, "tasks").list({ propertyId: PROPERTY });
+    expect(saved).toHaveLength(1);
+    expect(saved[0]?.completedAt).toBeUndefined();
+  });
+
+  it("says so rather than writing a row when asked to un-tick an untouched trip", async () => {
+    await savePlan();
+    const result = await tickChore(
+      { propertyId: PROPERTY, actorId: SITTER, sourceKey: KEY(), date: NOW, at: NOW, done: false },
+      db,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(await repositoryFor<Task>(db, "tasks").list({ propertyId: PROPERTY })).toHaveLength(0);
   });
 });

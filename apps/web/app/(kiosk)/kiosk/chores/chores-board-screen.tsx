@@ -9,13 +9,16 @@ import {
   choreProgress,
   type ChoreEntry,
   type ChoreTemplate,
+  type FeedingPlan,
   type Task,
   type Ulid,
   type Zone,
 } from "@galaxy-farm/core";
+import type { FeedType } from "@galaxy-farm/module-feed";
 
 import { setKioskChoreDone } from "@/app/(kiosk)/kiosk/_actions";
 import { useSyncEngine } from "@/app/_components/sync-provider";
+import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -43,12 +46,21 @@ export function ChoresBoardScreen({ propertyId }: { readonly propertyId: Ulid })
   const { records: tasks, loading } = useRecords<Task>("tasks", query);
   const { records: templates } = useRecords<ChoreTemplate>("choreTemplates", query);
   const { records: zones } = useRecords<Zone>("zones", query);
+  // Feeding is derived from the plans (§2), here as on every other surface —
+  // a barn board missing the feeding rounds would disagree with the admin app.
+  const { records: plans } = useRecords<FeedingPlan>("feedingPlans", query);
+  const { records: feeds } = useRecords<FeedType>("feedTypes", query);
 
   const today = useMemo(() => new Date(), []);
-  const entries = useMemo(
-    () => choreDaySheet({ tasks, templates }, today, today),
-    [tasks, templates, today],
-  );
+  const entries = useMemo(() => {
+    const derived = feedingChoresFor(
+      plans,
+      feedingChoreText({ zones, feeds, propertyId }),
+      today,
+      today,
+    );
+    return choreDaySheet({ tasks, templates, derived }, today, today);
+  }, [tasks, templates, plans, zones, feeds, propertyId, today]);
 
   const zoneName = (id: Ulid | undefined) =>
     id === undefined ? undefined : zones.find((zone) => zone.id === id)?.name;
@@ -63,6 +75,11 @@ export function ChoresBoardScreen({ propertyId }: { readonly propertyId: Ulid })
       const result = await setKioskChoreDone({
         ...(entry.taskId === undefined ? {} : { taskId: entry.taskId }),
         ...(entry.templateId === undefined ? {} : { templateId: entry.templateId }),
+        // A derived feeding trip has neither a row nor a template — its own
+        // id is the key the server re-derives it by.
+        ...(entry.taskId === undefined && entry.templateId === undefined
+          ? { sourceKey: entry.id }
+          : {}),
         day: dayString(today),
         done: entry.completedAt === undefined,
       });
