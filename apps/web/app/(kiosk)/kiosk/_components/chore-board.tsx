@@ -16,8 +16,11 @@ import { useSyncEngine } from "@/app/_components/sync-provider";
 import { groupChoresForBoard } from "@/lib/chores";
 
 /**
- * The day's work on the housesitter board, checkable in place (spec §4.4,
- * §5.10).
+ * A day's chores on a kiosk board, checkable in place (spec §4.4, §5.1, §5.10).
+ *
+ * One component behind both boards that show the day — Today's Chores and the
+ * housesitter board — because they are the same list of the same day, and two
+ * copies of the tick would be two chances to write the un-tick wrongly.
  *
  * Sectioned by the part of the day and flat within it — feeding trips and
  * template chores in one list, in due order, the finished ones sinking to the
@@ -25,26 +28,26 @@ import { groupChoresForBoard } from "@/lib/chores";
  * ration in a feed's title, the animal or pen as a small tag), because on a
  * one-screen board every heading costs a row.
  *
- * Built to fit one tablet screen. This is a kiosk on a post, glanced at with
- * an armful of feed, and a day that needs scrolling is a day whose evening
- * half gets forgotten. So the parts of the day sit side by side as columns,
- * and each chore is one row: the row ticks it, and a chore with more to say
- * than its line can hold gets a separate expander that opens the detail
- * without ticking anything.
+ * Built to fit one screen. This is a kiosk on a post, glanced at with an
+ * armful of feed, and a day that needs scrolling is a day whose evening half
+ * gets forgotten. So the parts of the day sit side by side as columns, and
+ * each chore is one row: the row ticks it, and a chore with more to say than
+ * its line can hold gets a separate expander that opens the detail without
+ * ticking anything.
  *
- * The tick goes through the same server action as the Today's Chores board —
- * same capability check, same attribution to the screen. Unlike that board it
- * does not make the finger wait for the round trip: the row moves the moment
- * it is tapped, the write happens behind it, and the tick is put back with an
- * error if the farm refuses it. The overrides that carry that are dropped as
- * soon as the synced store agrees, so the server stays the authority.
+ * The tick goes through `setKioskChoreDone` — the kiosk's own server action,
+ * with its capability check and its attribution to the screen. It does not
+ * make the finger wait for the round trip: the row moves the moment it is
+ * tapped, the write happens behind it, and the tick is put back with an error
+ * if the farm refuses it. The overrides that carry that are dropped as soon as
+ * the synced store agrees, so the server stays the authority.
  */
 
 function dayString(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-export function HousesitterChores({
+export function ChoreBoard({
   entries,
   animals,
   zones,
@@ -83,6 +86,7 @@ export function HousesitterChores({
           entry === undefined ||
           (entry.completedAt !== undefined) === (completedAt !== undefined)
         ) {
+          // crud-guard: allow-unconfirmed — drops a render-local override, nothing persisted
           next.delete(id);
         }
       }
@@ -130,6 +134,7 @@ export function HousesitterChores({
 
       setBusy((current) => {
         const next = new Set(current);
+        // crud-guard: allow-unconfirmed — clears an in-flight row id, nothing persisted
         next.delete(entry.id);
         return next;
       });
@@ -138,6 +143,7 @@ export function HousesitterChores({
         // Put the tick back the way it was, and say why.
         setOverrides((current) => {
           const next = new Map(current);
+          // crud-guard: allow-unconfirmed — puts a render-local tick back, nothing persisted
           next.delete(entry.id);
           return next;
         });
@@ -152,6 +158,7 @@ export function HousesitterChores({
     setOpened((current) => {
       const next = new Set(current);
       if (next.has(id)) {
+        // crud-guard: allow-unconfirmed — closes an expander, nothing persisted
         next.delete(id);
       } else {
         next.add(id);
@@ -162,11 +169,12 @@ export function HousesitterChores({
 
   /*
    * Deliberately tighter than the kiosk density tokens. The tokens size a
-   * board for a big screen on a post; this one lives on a small tablet, and
-   * at 64px rows and 20px gaps half the day scrolls off it. Rows hold the
-   * 44px the platform guidelines ask of a touch target — smaller than a
-   * kiosk button, still honest to a glove — and everything a chore has to
-   * say fits one line: title, amounts, where, and whether it is late.
+   * board for a big screen on a post, and at 64px rows and 20px gaps half the
+   * day scrolls off a tablet — and scrolls off the post-mounted screen too,
+   * once the feeding trips are on the sheet beside the chores. Rows hold the
+   * 44px the platform guidelines ask of a touch target — smaller than a kiosk
+   * button, still honest to a glove — and everything a chore has to say fits
+   * one line: title, amounts, where, and whether it is late.
    */
   const row = (entry: ChoreEntry) => {
     const finished = entry.completedAt !== undefined;
