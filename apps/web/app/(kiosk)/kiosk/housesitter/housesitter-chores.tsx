@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-import { Meter, useToast } from "@galaxy-farm/ui";
+import { useToast } from "@galaxy-farm/ui";
 import {
   choreProgress,
   displayName,
@@ -91,6 +91,14 @@ export function HousesitterChores({
     });
   }
 
+  /*
+   * Deliberately tighter than the kiosk density tokens. The tokens size a
+   * board for a big screen on a post; this one lives on a small tablet, and
+   * at 64px rows and 20px gaps half the day scrolls off it. Rows hold the
+   * 44px the platform guidelines ask of a touch target — smaller than a
+   * kiosk button, still honest to a glove — and everything a chore has to
+   * say fits one line: title, amounts, where, and whether it is late.
+   */
   const row = (entry: ChoreEntry) => {
     const finished = entry.completedAt !== undefined;
     const where = whereLabel(entry);
@@ -102,7 +110,7 @@ export function HousesitterChores({
         onClick={() => toggle(entry)}
         disabled={pending && busyId === entry.id}
         aria-pressed={finished}
-        className={`flex min-h-target w-full items-center gap-2 rounded-density border px-3 py-1 text-left disabled:opacity-40 ${
+        className={`flex min-h-11 w-full items-center gap-1.5 border px-2 text-left disabled:opacity-40 ${
           finished
             ? "border-edge opacity-60"
             : entry.overdue
@@ -112,27 +120,23 @@ export function HousesitterChores({
       >
         <span
           aria-hidden
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-sm ${
-            finished ? "border-edge text-muted" : "border-edge text-transparent"
+          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border border-edge text-xs ${
+            finished ? "text-muted" : "text-transparent"
           }`}
         >
           ✓
         </span>
-        <span className="min-w-0 flex-1">
-          <span
-            className={`block truncate text-density ${finished ? "text-muted line-through" : "text-ink"}`}
-          >
-            {entry.title}
-          </span>
+        <span className="min-w-0 flex-1 truncate text-sm">
+          <span className={finished ? "text-muted line-through" : "text-ink"}>{entry.title}</span>
           {entry.detail === undefined || finished ? null : (
-            <span className="block truncate text-sm text-muted">{entry.detail}</span>
+            <span className="text-muted"> — {entry.detail}</span>
           )}
         </span>
         {where === undefined || finished ? null : (
-          <span className="max-w-24 shrink-0 truncate text-sm text-muted">{where}</span>
+          <span className="max-w-20 shrink-0 truncate text-xs text-muted">{where}</span>
         )}
         {entry.overdue && !finished ? (
-          <span className="shrink-0 text-sm font-medium text-danger">late</span>
+          <span className="shrink-0 text-xs font-medium text-danger">late</span>
         ) : null}
       </button>
     );
@@ -143,27 +147,30 @@ export function HousesitterChores({
   }
 
   return (
-    <div className="flex flex-col gap-density">
-      <Meter
-        value={progress.fraction}
-        tone={progress.overdue > 0 ? "danger" : progress.open === 0 ? "calm" : "action"}
-        label="Today"
-        detail={`${progress.done} of ${progress.total} done`}
-      />
+    <div className="flex flex-col gap-2">
+      {/* One line of progress; a meter would spend a row saying the same. */}
+      <p className="text-sm text-muted">
+        {progress.done} of {progress.total} done
+        {progress.overdue > 0 ? (
+          <span className="text-danger"> · {progress.overdue} late</span>
+        ) : null}
+      </p>
 
       {/* The parts of the day side by side, so the whole day is one glance. */}
-      <div className="grid grid-cols-1 items-start gap-density sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {sections.map((section) => {
           const left = section.entries.filter((entry) => entry.completedAt === undefined).length;
 
           return (
             <section
               key={section.label}
-              className="flex flex-col gap-1 rounded-density border border-edge bg-panel p-density"
+              className="flex flex-col gap-1 border border-edge bg-panel p-2"
             >
-              <header className="flex items-baseline justify-between gap-2 pb-1">
-                <h3 className="text-density font-medium text-ink">{section.label}</h3>
-                <span className="text-sm text-muted">{left === 0 ? "done" : `${left} to do`}</span>
+              <header className="flex items-baseline justify-between gap-2">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-ink">
+                  {section.label}
+                </h3>
+                <span className="text-xs text-muted">{left === 0 ? "done" : `${left} to do`}</span>
               </header>
 
               {section.entries.map(row)}
