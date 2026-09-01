@@ -19,7 +19,7 @@ import type { CareGuide, GuideSection } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 
-import { HousesitterChores } from "@/app/(kiosk)/kiosk/housesitter/housesitter-chores";
+import { ChoreBoard } from "@/app/(kiosk)/kiosk/_components/chore-board";
 import { HousesitterGuide } from "@/app/(kiosk)/kiosk/housesitter/housesitter-guide";
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { guideForSitter } from "@/lib/care-guide-selection";
@@ -71,12 +71,7 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
         <p className="text-muted">Loading…</p>
       ) : (
         <div className="flex flex-col gap-density">
-          <HousesitterChores
-            entries={today}
-            animals={store.animals}
-            zones={store.zones}
-            day={now}
-          />
+          <ChoreBoard entries={today} animals={store.animals} zones={store.zones} day={now} />
 
           <HousesitterGuide
             guide={guide}
