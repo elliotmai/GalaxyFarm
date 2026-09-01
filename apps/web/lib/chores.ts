@@ -2,12 +2,15 @@ import {
   addCalendarDays,
   isSameDay,
   taskFromTemplate,
+  TIME_OF_DAY_DEADLINES,
+  TIME_OF_DAY_LABELS,
   type ChoreEntry,
   type ChoreTemplate,
   type CrudError,
   type Recurrence,
   type Result,
   type Task,
+  type TimeOfDay,
   type Ulid,
 } from "@galaxy-farm/core";
 
@@ -97,6 +100,24 @@ export function describeRecurrence(
     case "seasonal":
       return "Seasonal — not generated yet";
   }
+}
+
+/**
+ * What choosing a part of the day means, deadline included.
+ *
+ * The deadline is said out loud because it is the surprising half: "morning"
+ * reads as a preference until the form says the chore counts late after
+ * eleven. Night's deadline is the end of the day, which is what no time at
+ * all already means — so it says so rather than inventing "11:59 pm".
+ */
+export function describeTimeOfDay(timeOfDay: TimeOfDay): string {
+  const { hour, minute } = TIME_OF_DAY_DEADLINES[timeOfDay];
+  const label = TIME_OF_DAY_LABELS[timeOfDay];
+  if (hour === 23) return `${label} — due by the end of the day`;
+
+  const onTwelveHourClock = ((hour + 11) % 12) + 1;
+  const minutes = minute === 0 ? "" : `:${String(minute).padStart(2, "0")}`;
+  return `${label} — late after ${onTwelveHourClock}${minutes} ${hour < 12 ? "am" : "pm"}`;
 }
 
 export interface ChoreToggleInput {

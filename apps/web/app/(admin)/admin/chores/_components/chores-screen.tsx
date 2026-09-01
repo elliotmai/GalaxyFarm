@@ -75,7 +75,7 @@ export function ChoresScreen({
   const today = startOfDay(now);
   const date = addCalendarDays(today, offset);
 
-  const text = feedingChoreText({ zones, animals, feeds, propertyId });
+  const text = feedingChoreText({ zones, feeds, propertyId });
   const derived = feedingChoresFor(plans, text, date, now);
   const sheet = choreDaySheet({ tasks, templates, derived }, date, now);
   const progress = choreProgress(sheet);

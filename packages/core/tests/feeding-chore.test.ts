@@ -168,6 +168,52 @@ describe("the entry it becomes", () => {
     expect(entry?.animalId).toBeUndefined();
   });
 
+  it("titles an animal trip by its ration, never by one animal's name", () => {
+    // One plan can feed several animals eating from the same bowl
+    // (`alsoFeeds`), so a title carrying one animal's name would read as
+    // feeding only that one. The ration's name covers everybody on it.
+    const [entry] = feedingOccurrences(
+      [
+        plan({
+          target: "animal",
+          targetId: ANDROMEDA,
+          name: "Show calf mix",
+          lines: [line()],
+        }),
+      ],
+      NAMES,
+      DATE,
+      NOW,
+    );
+
+    expect(entry?.title).toBe("Morning feed · Show calf mix");
+  });
+
+  it("names every ration on the trip, and each of them once", () => {
+    const [entry] = feedingOccurrences(
+      [
+        plan({
+          target: "animal",
+          targetId: ANDROMEDA,
+          name: "Show calf mix",
+          // Two lines of one plan are one ration, said once.
+          lines: [line(), line({ feedTypeId: GRAIN, amount: { amount: 12, unit: "lb" } })],
+        }),
+        plan({
+          target: "animal",
+          targetId: ANDROMEDA,
+          name: "Joint supplement",
+          lines: [line()],
+        }),
+      ],
+      NAMES,
+      DATE,
+      NOW,
+    );
+
+    expect(entry?.title).toBe("Morning feed · Show calf mix · Joint supplement");
+  });
+
   it("carries the animal instead, on a plan aimed at one", () => {
     const [entry] = feedingOccurrences(
       [plan({ target: "animal", targetId: ANDROMEDA, lines: [line()] })],

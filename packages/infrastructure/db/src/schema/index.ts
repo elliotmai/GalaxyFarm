@@ -1259,6 +1259,7 @@ export const choreTemplates = pgTable(
     detail: text("detail"),
     recurrence: text("recurrence").notNull(),
     recurrenceDays: integer("recurrence_days").array().notNull().default([]),
+    timeOfDay: text("time_of_day"),
     zoneId: text("zone_id"),
     animalId: text("animal_id"),
     active: boolean("active").notNull(),

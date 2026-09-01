@@ -15,7 +15,6 @@ import {
   type Ulid,
   type FeedingPlan,
   type Zone,
-  type Animal,
 } from "@galaxy-farm/core";
 
 import { toggleChore } from "@/lib/chores";
@@ -49,13 +48,12 @@ export function ChoresCard({
   const query = { propertyId };
   const { records: tasks } = useRecords<Task>("tasks", query);
   const { records: templates } = useRecords<ChoreTemplate>("choreTemplates", query);
-  // The same three reads the chores screen makes, for the same reason: feeding
-  // is derived from the plans, and a card that left it out would disagree with
+  // The same reads the chores screen makes, for the same reason: feeding is
+  // derived from the plans, and a card that left it out would disagree with
   // the page it links to.
   const { records: plans } = useRecords<FeedingPlan>("feedingPlans", query);
   const { records: feeds } = useRecords<FeedType>("feedTypes", query);
   const { records: zones } = useRecords<Zone>("zones", query);
-  const { records: animals } = useRecords<Animal>("animals", query);
 
   const api = useMutations<Task>("tasks", "tasks", taskSchema, propertyId, actorId);
   const { show } = useToast();
@@ -65,7 +63,7 @@ export function ChoresCard({
   const today = startOfDay(now);
   const derived = feedingChoresFor(
     plans,
-    feedingChoreText({ zones, animals, feeds, propertyId }),
+    feedingChoreText({ zones, feeds, propertyId }),
     today,
     now,
   );
