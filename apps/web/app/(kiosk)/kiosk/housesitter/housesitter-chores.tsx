@@ -8,7 +8,6 @@ import {
   displayName,
   type Animal,
   type ChoreEntry,
-  type Ulid,
   type Zone,
 } from "@galaxy-farm/core";
 
@@ -20,10 +19,10 @@ import { groupChoresForBoard } from "@/lib/chores";
  * The day's work on the housesitter board, checkable in place (spec §4.4,
  * §5.10).
  *
- * Grouped by the part of the day and, within it, by animal — because that is
- * how a sitter actually moves: out in the morning, animal by animal, back in
- * the evening. Feeding trips and template chores sit in the same groups, so
- * "everything Comet needs this morning" is one heading rather than a search.
+ * Sectioned by the part of the day and flat within it — feeding trips and
+ * template chores in one list, in due order. Who a chore is about rides the
+ * row itself (the ration in a feed's title, the animal or pen as a small
+ * tag), because on a one-screen board every heading costs a row.
  *
  * Built to fit one tablet screen. This is a kiosk on a post, glanced at with
  * an armful of feed, and a day that needs scrolling is a day whose evening
@@ -56,14 +55,17 @@ export function HousesitterChores({
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | undefined>();
 
-  const sections = groupChoresForBoard(entries, {
-    animal: (id: Ulid) => {
-      const animal = animals.find((candidate) => candidate.id === id);
-      return animal === undefined ? undefined : displayName(animal);
-    },
-    zone: (id: Ulid) => zones.find((zone) => zone.id === id)?.name,
-  });
+  const sections = groupChoresForBoard(entries);
   const progress = choreProgress(entries);
+
+  const whereLabel = (entry: ChoreEntry): string | undefined => {
+    if (entry.animalId !== undefined) {
+      const animal = animals.find((candidate) => candidate.id === entry.animalId);
+      return animal === undefined ? undefined : displayName(animal);
+    }
+    if (entry.zoneId !== undefined) return zones.find((zone) => zone.id === entry.zoneId)?.name;
+    return undefined;
+  };
 
   function toggle(entry: ChoreEntry) {
     setBusyId(entry.id);
@@ -91,6 +93,7 @@ export function HousesitterChores({
 
   const row = (entry: ChoreEntry) => {
     const finished = entry.completedAt !== undefined;
+    const where = whereLabel(entry);
 
     return (
       <button
@@ -125,6 +128,9 @@ export function HousesitterChores({
             <span className="block truncate text-sm text-muted">{entry.detail}</span>
           )}
         </span>
+        {where === undefined || finished ? null : (
+          <span className="max-w-24 shrink-0 truncate text-sm text-muted">{where}</span>
+        )}
         {entry.overdue && !finished ? (
           <span className="shrink-0 text-sm font-medium text-danger">late</span>
         ) : null}
@@ -148,28 +154,19 @@ export function HousesitterChores({
       {/* The parts of the day side by side, so the whole day is one glance. */}
       <div className="grid grid-cols-1 items-start gap-density sm:grid-cols-2 lg:grid-cols-3">
         {sections.map((section) => {
-          const left = section.groups
-            .flatMap((group) => group.entries)
-            .filter((entry) => entry.completedAt === undefined).length;
+          const left = section.entries.filter((entry) => entry.completedAt === undefined).length;
 
           return (
             <section
               key={section.label}
-              className="flex flex-col gap-2 rounded-density border border-edge bg-panel p-density"
+              className="flex flex-col gap-1 rounded-density border border-edge bg-panel p-density"
             >
-              <header className="flex items-baseline justify-between gap-2">
+              <header className="flex items-baseline justify-between gap-2 pb-1">
                 <h3 className="text-density font-medium text-ink">{section.label}</h3>
                 <span className="text-sm text-muted">{left === 0 ? "done" : `${left} to do`}</span>
               </header>
 
-              {section.groups.map((group) => (
-                <div key={group.label} className="flex flex-col gap-1">
-                  <p className="text-sm font-medium uppercase tracking-wide text-muted">
-                    {group.label}
-                  </p>
-                  {group.entries.map(row)}
-                </div>
-              ))}
+              {section.entries.map(row)}
             </section>
           );
         })}

@@ -256,10 +256,6 @@ describe("describeTimeOfDay", () => {
 });
 
 describe("groupChoresForBoard", () => {
-  const COMET = "01ARZ3NDEKTSV4RRFFQ69G5FA1" as Ulid;
-  const BELLA = "01ARZ3NDEKTSV4RRFFQ69G5FA2" as Ulid;
-  const NORTH = "01ARZ3NDEKTSV4RRFFQ69G5FZ1" as Ulid;
-
   let counter = 0;
   const entry = (overrides: Partial<ChoreEntry>): ChoreEntry => ({
     id: `entry-${++counter}`,
@@ -270,20 +266,12 @@ describe("groupChoresForBoard", () => {
     ...overrides,
   });
 
-  const names = {
-    animal: (id: Ulid) => (id === COMET ? "Comet" : id === BELLA ? "Bella" : undefined),
-    zone: (id: Ulid) => (id === NORTH ? "North Trap" : undefined),
-  };
-
   it("sections the day the way it is worked, and only the parts that have work", () => {
-    const sections = groupChoresForBoard(
-      [
-        entry({ dueAt: new Date(2026, 0, 15, 20, 0, 59, 999) }),
-        entry({ dueAt: new Date(2026, 0, 15, 11, 0, 59, 999) }),
-        entry({ dueAt: new Date(2026, 0, 15, 23, 59, 59, 999) }),
-      ],
-      names,
-    );
+    const sections = groupChoresForBoard([
+      entry({ dueAt: new Date(2026, 0, 15, 20, 0, 59, 999) }),
+      entry({ dueAt: new Date(2026, 0, 15, 11, 0, 59, 999) }),
+      entry({ dueAt: new Date(2026, 0, 15, 23, 59, 59, 999) }),
+    ]);
 
     // No midday work, no midday heading — an empty section reads as broken.
     expect(sections.map((section) => section.label)).toEqual([
@@ -294,13 +282,10 @@ describe("groupChoresForBoard", () => {
   });
 
   it("puts what is owed from earlier first, because it is already late", () => {
-    const sections = groupChoresForBoard(
-      [
-        entry({ dueAt: new Date(2026, 0, 15, 11, 0, 59, 999) }),
-        entry({ dueAt: new Date(2026, 0, 12, 9, 0), carriedOver: true, overdue: true }),
-      ],
-      names,
-    );
+    const sections = groupChoresForBoard([
+      entry({ dueAt: new Date(2026, 0, 15, 11, 0, 59, 999) }),
+      entry({ dueAt: new Date(2026, 0, 12, 9, 0), carriedOver: true, overdue: true }),
+    ]);
 
     expect(sections[0]?.label).toBe("Owed from earlier");
   });
@@ -309,55 +294,27 @@ describe("groupChoresForBoard", () => {
     // Night's deadline is the end of the day — the same moment every untimed
     // chore is due — so the two share a heading rather than pretending the
     // arithmetic can tell them apart.
-    const sections = groupChoresForBoard(
-      [entry({ dueAt: new Date(2026, 0, 15, 14, 0, 59, 999) }), entry({})],
-      names,
-    );
+    const sections = groupChoresForBoard([
+      entry({ dueAt: new Date(2026, 0, 15, 14, 0, 59, 999) }),
+      entry({}),
+    ]);
 
     expect(sections.map((section) => section.label)).toEqual(["Midday", "Night & any time"]);
   });
 
-  it("groups by animal first, then pen, then the rest under one plain heading", () => {
+  it("keeps a section's entries flat and in the order they arrived", () => {
+    // The day sheet already sorted them by when they are due; a board that
+    // reshuffled inside a section would disagree with every other surface.
     const morning = new Date(2026, 0, 15, 11, 0, 59, 999);
-    const sections = groupChoresForBoard(
-      [
-        entry({ dueAt: morning }),
-        entry({ dueAt: morning, zoneId: NORTH }),
-        entry({ dueAt: morning, animalId: COMET }),
-        entry({ dueAt: morning, animalId: BELLA }),
-      ],
-      names,
-    );
-
-    expect(sections[0]?.groups.map((group) => group.label)).toEqual([
-      "Bella",
-      "Comet",
-      "North Trap",
-      "Around the place",
+    const sections = groupChoresForBoard([
+      entry({ dueAt: morning, title: "Morning feed · Senior ration" }),
+      entry({ dueAt: morning, title: "Check the water" }),
     ]);
-  });
 
-  it("keeps everything one animal needs under one heading", () => {
-    const morning = new Date(2026, 0, 15, 11, 0, 59, 999);
-    const sections = groupChoresForBoard(
-      [
-        entry({ dueAt: morning, animalId: COMET, title: "Morning feed · Senior ration" }),
-        entry({ dueAt: morning, animalId: COMET, title: "Check his water" }),
-      ],
-      names,
-    );
-
-    expect(sections[0]?.groups).toHaveLength(1);
-    expect(sections[0]?.groups[0]?.entries.map((item) => item.title)).toEqual([
+    expect(sections).toHaveLength(1);
+    expect(sections[0]?.entries.map((item) => item.title)).toEqual([
       "Morning feed · Senior ration",
-      "Check his water",
+      "Check the water",
     ]);
-  });
-
-  it("says something rather than crashing on an animal nobody can name", () => {
-    const gone = "01ARZ3NDEKTSV4RRFFQ69G5FA9" as Ulid;
-    const sections = groupChoresForBoard([entry({ animalId: gone })], names);
-
-    expect(sections[0]?.groups[0]?.label).toBe("An animal");
   });
 });

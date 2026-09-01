@@ -123,27 +123,20 @@ export function describeTimeOfDay(timeOfDay: TimeOfDay): string {
 /**
  * A day's chores arranged for a board somebody works through (spec §4.4).
  *
- * Two levels, both from the entries themselves. The sections are the parts of
- * the day, read off `dueAt` — the deadlines land at 11, 14 and 20, so the
- * boundaries sit just past them. Night's deadline *is* the end of the day, the
- * same moment every untimed chore is due, so the two share the last section
- * honestly rather than pretending to tell them apart. Anything owed from an
- * earlier day leads, because it is already late.
+ * The sections are the parts of the day, read off `dueAt` — the deadlines
+ * land at 11, 14 and 20, so the boundaries sit just past them. Night's
+ * deadline *is* the end of the day, the same moment every untimed chore is
+ * due, so the two share the last section honestly rather than pretending to
+ * tell them apart. Anything owed from an earlier day leads, because it is
+ * already late.
  *
- * Within a section the entries group by who they are about: the animal when
- * one is named (a feeding trip's ration carries its animal, and a template
- * can), the pen when only a pen is, and the rest under one plain heading. A
- * housesitter stands in front of one animal at a time; a list ordered that way
- * is walked once.
+ * Flat within a section, deliberately: on a one-screen kiosk board every
+ * heading costs a row, and who a chore is about already reads off the chore
+ * itself — the ration in a feed's title, the animal or pen on its line.
  */
-export interface ChoreBoardGroup {
-  readonly label: string;
-  readonly entries: readonly ChoreEntry[];
-}
-
 export interface ChoreBoardSection {
   readonly label: string;
-  readonly groups: readonly ChoreBoardGroup[];
+  readonly entries: readonly ChoreEntry[];
 }
 
 const BOARD_SECTIONS = [
@@ -163,40 +156,19 @@ function boardSectionOf(entry: ChoreEntry): (typeof BOARD_SECTIONS)[number] {
   return "Night & any time";
 }
 
-export function groupChoresForBoard(
-  entries: readonly ChoreEntry[],
-  name: {
-    readonly animal: (id: Ulid) => string | undefined;
-    readonly zone: (id: Ulid) => string | undefined;
-  },
-): ChoreBoardSection[] {
-  const sections = new Map<string, Map<string, { rank: number; entries: ChoreEntry[] }>>();
+export function groupChoresForBoard(entries: readonly ChoreEntry[]): ChoreBoardSection[] {
+  const sections = new Map<string, ChoreEntry[]>();
 
   for (const entry of entries) {
     const section = boardSectionOf(entry);
-    const { rank, label } =
-      entry.animalId !== undefined
-        ? { rank: 0, label: name.animal(entry.animalId) ?? "An animal" }
-        : entry.zoneId !== undefined
-          ? { rank: 1, label: name.zone(entry.zoneId) ?? "A pen" }
-          : { rank: 2, label: "Around the place" };
-
-    const groups =
-      sections.get(section) ?? new Map<string, { rank: number; entries: ChoreEntry[] }>();
-    const group = groups.get(label) ?? { rank, entries: [] };
-    group.entries.push(entry);
-    groups.set(label, group);
-    sections.set(section, groups);
+    const list = sections.get(section) ?? [];
+    list.push(entry);
+    sections.set(section, list);
   }
 
   return BOARD_SECTIONS.filter((label) => sections.has(label)).map((label) => ({
     label,
-    groups: [...(sections.get(label) as Map<string, { rank: number; entries: ChoreEntry[] }>)]
-      .sort(
-        ([leftLabel, left], [rightLabel, right]) =>
-          left.rank - right.rank || leftLabel.localeCompare(rightLabel),
-      )
-      .map(([groupLabel, group]) => ({ label: groupLabel, entries: group.entries })),
+    entries: sections.get(label) as ChoreEntry[],
   }));
 }
 
