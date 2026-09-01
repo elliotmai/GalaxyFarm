@@ -15,15 +15,13 @@ import {
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
-import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
 import type { CareGuide, GuideSection } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 
-import { GuidePreview } from "@/app/(admin)/admin/housesitter/_components/guide-preview";
 import { HousesitterChores } from "@/app/(kiosk)/kiosk/housesitter/housesitter-chores";
+import { HousesitterGuide } from "@/app/(kiosk)/kiosk/housesitter/housesitter-guide";
 import { useSyncEngine } from "@/app/_components/sync-provider";
-import { useFarmName } from "@/lib/branding";
 import { guideForSitter } from "@/lib/care-guide-selection";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
@@ -31,18 +29,18 @@ import { useRecords } from "@/lib/local/use-records";
 /**
  * Housesitter Mode (spec §4.4, §5.10).
  *
- * The same composed guide the PDF and `/sitter` render — `GuidePreview`'s own
- * doc comment names this board as its third output. Unlike `/sitter`, this
- * device already holds every table the guide draws from (a kiosk gets
- * `records.read`, not the narrow `care.read` a housesitter's phone is scoped
- * to), so it is read entirely from the local store rather than a server round
- * trip.
+ * The same composed guide the PDF and `/sitter` render, in this surface's own
+ * dress — `HousesitterGuide` folds it into tappable rows rather than showing
+ * the admin's print preview. Unlike `/sitter`, this device already holds
+ * every table the guide draws from (a kiosk gets `records.read`, not the
+ * narrow `care.read` a housesitter's phone is scoped to), so it is read
+ * entirely from the local store rather than a server round trip.
  *
  * The day's chores are checkable right here rather than a link away: a sitter
  * standing at this screen is standing at the one place the whole day is laid
  * out, and sending them to a second board to tick what this one just described
- * is a tap that gets skipped. Feeding is derived from the plans (§2), grouped
- * with everything else by animal and part of the day.
+ * is a tap that gets skipped. Feeding is derived from the plans (§2), merged
+ * with everything else by part of the day.
  */
 export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
   const { store, loading } = useHousesitterData(propertyId);
@@ -60,14 +58,6 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
     );
     return choreDaySheet({ tasks: store.tasks, templates: store.templates, derived }, now, now);
   }, [store.tasks, store.templates, store.plans, store.zones, store.feeds, propertyId, now]);
-  /*
-   * The kiosk has no server-rendered name to fall back to — the board is
-   * client-side from its first paint — so the neutral default stands for the
-   * moment it takes Dexie to open. A barn screen is not printed from anyway;
-   * the name is here because the document is one document on all three
-   * surfaces, and one of them puts it at the head of every sheet.
-   */
-  const farmName = useFarmName(propertyId, FALLBACK_FARM_NAME);
 
   return (
     <PageBody>
@@ -88,7 +78,7 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
             day={now}
           />
 
-          <GuidePreview
+          <HousesitterGuide
             guide={guide}
             sections={store.sections}
             zones={store.zones}
@@ -99,7 +89,7 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
             plans={store.plans}
             feeds={store.feeds}
             health={store.health}
-            farmName={farmName}
+            now={now}
           />
         </div>
       )}

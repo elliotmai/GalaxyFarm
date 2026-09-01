@@ -36,9 +36,10 @@ import { currentMedicinesFor, feedingLinesFor } from "@/lib/pet-care";
  * The guide as somebody will read it (spec §5.10).
  *
  * One composition, three outputs — the PDF, `/sitter`, and kiosk Housesitter
- * Mode. This is the first of them, and it is the printed one: the print
- * stylesheet in `globals.css` drops the app's chrome and lays the document out
- * on paper, so "save as PDF" in the browser's print dialog is the PDF.
+ * Mode, each rendering the shared composition in its own dress. This is the
+ * printed one: the print stylesheet in `globals.css` drops the app's chrome
+ * and lays the document out on paper, so "save as PDF" in the browser's print
+ * dialog is the PDF.
  *
  * Everything below is recomputed on render. Nothing is stored, nothing is
  * cached, and there is no "regenerate" button — that button existing at all
