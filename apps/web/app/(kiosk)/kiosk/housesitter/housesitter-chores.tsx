@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-import { Button, Meter, Pill, RecordCard, Section, useToast } from "@galaxy-farm/ui";
+import { Meter, useToast } from "@galaxy-farm/ui";
 import {
   choreProgress,
   displayName,
@@ -25,6 +25,12 @@ import { groupChoresForBoard } from "@/lib/chores";
  * the evening. Feeding trips and template chores sit in the same groups, so
  * "everything Comet needs this morning" is one heading rather than a search.
  *
+ * Built to fit one tablet screen. This is a kiosk on a post, glanced at with
+ * an armful of feed, and a day that needs scrolling is a day whose evening
+ * half gets forgotten. So the parts of the day sit side by side as columns,
+ * and each chore is one row — the whole row is the tap target, which at kiosk
+ * density is a bigger glove target than the buttons it replaces.
+ *
  * The tick goes through the same server action as the Today's Chores board —
  * same capability check, same attribution to the screen — and the local store
  * re-syncs afterwards so both boards and the admin app agree.
@@ -32,10 +38,6 @@ import { groupChoresForBoard } from "@/lib/chores";
 
 function dayString(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function timeLabel(date: Date): string {
-  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 export function HousesitterChores({
@@ -87,33 +89,46 @@ export function HousesitterChores({
     });
   }
 
-  const card = (entry: ChoreEntry) => {
+  const row = (entry: ChoreEntry) => {
     const finished = entry.completedAt !== undefined;
 
     return (
-      <RecordCard
+      <button
         key={entry.id}
-        tone={finished ? "calm" : entry.overdue ? "danger" : "neutral"}
-        title={
-          <span className={finished ? "text-muted line-through" : undefined}>{entry.title}</span>
-        }
-        subtitle={entry.detail}
-        meta={
-          <>
-            {entry.overdue && !finished ? <Pill tone="danger">Overdue</Pill> : null}
-            {finished ? <Pill tone="calm">done {timeLabel(entry.completedAt as Date)}</Pill> : null}
-          </>
-        }
+        type="button"
+        onClick={() => toggle(entry)}
+        disabled={pending && busyId === entry.id}
+        aria-pressed={finished}
+        className={`flex min-h-target w-full items-center gap-2 rounded-density border px-3 py-1 text-left disabled:opacity-40 ${
+          finished
+            ? "border-edge opacity-60"
+            : entry.overdue
+              ? "border-danger hover:border-danger"
+              : "border-edge hover:border-action"
+        }`}
       >
-        <Button
-          variant={finished ? "secondary" : "primary"}
-          busy={pending && busyId === entry.id}
-          onClick={() => toggle(entry)}
-          className="w-full"
+        <span
+          aria-hidden
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-sm ${
+            finished ? "border-edge text-muted" : "border-edge text-transparent"
+          }`}
         >
-          {finished ? "Put it back" : "Done"}
-        </Button>
-      </RecordCard>
+          ✓
+        </span>
+        <span className="min-w-0 flex-1">
+          <span
+            className={`block truncate text-density ${finished ? "text-muted line-through" : "text-ink"}`}
+          >
+            {entry.title}
+          </span>
+          {entry.detail === undefined || finished ? null : (
+            <span className="block truncate text-sm text-muted">{entry.detail}</span>
+          )}
+        </span>
+        {entry.overdue && !finished ? (
+          <span className="shrink-0 text-sm font-medium text-danger">late</span>
+        ) : null}
+      </button>
     );
   };
 
@@ -130,20 +145,35 @@ export function HousesitterChores({
         detail={`${progress.done} of ${progress.total} done`}
       />
 
-      {sections.map((section) => (
-        <Section key={section.label} title={section.label}>
-          <div className="flex flex-col gap-density">
-            {section.groups.map((group) => (
-              <div key={group.label} className="flex flex-col gap-2">
-                <p className="text-sm font-medium uppercase tracking-wide text-muted">
-                  {group.label}
-                </p>
-                {group.entries.map(card)}
-              </div>
-            ))}
-          </div>
-        </Section>
-      ))}
+      {/* The parts of the day side by side, so the whole day is one glance. */}
+      <div className="grid grid-cols-1 items-start gap-density sm:grid-cols-2 lg:grid-cols-3">
+        {sections.map((section) => {
+          const left = section.groups
+            .flatMap((group) => group.entries)
+            .filter((entry) => entry.completedAt === undefined).length;
+
+          return (
+            <section
+              key={section.label}
+              className="flex flex-col gap-2 rounded-density border border-edge bg-panel p-density"
+            >
+              <header className="flex items-baseline justify-between gap-2">
+                <h3 className="text-density font-medium text-ink">{section.label}</h3>
+                <span className="text-sm text-muted">{left === 0 ? "done" : `${left} to do`}</span>
+              </header>
+
+              {section.groups.map((group) => (
+                <div key={group.label} className="flex flex-col gap-1">
+                  <p className="text-sm font-medium uppercase tracking-wide text-muted">
+                    {group.label}
+                  </p>
+                  {group.entries.map(row)}
+                </div>
+              ))}
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }
