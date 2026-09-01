@@ -10,7 +10,13 @@ import {
   type Ulid,
 } from "@galaxy-farm/core";
 
-import { dayLabel, describeRecurrence, parseMonthDays, toggleChore } from "../lib/chores.js";
+import {
+  dayLabel,
+  describeRecurrence,
+  describeTimeOfDay,
+  parseMonthDays,
+  toggleChore,
+} from "../lib/chores.js";
 import type { Mutations } from "../lib/local/mutations.js";
 
 /**
@@ -233,5 +239,17 @@ describe("describeRecurrence", () => {
     expect(describeRecurrence({ recurrence: "seasonal", recurrenceDays: [] })).toContain(
       "not generated yet",
     );
+  });
+});
+
+describe("describeTimeOfDay", () => {
+  it("says the deadline out loud, because that is the surprising half", () => {
+    expect(describeTimeOfDay("morning")).toBe("Morning — late after 11 am");
+    expect(describeTimeOfDay("midday")).toBe("Midday — late after 2 pm");
+    expect(describeTimeOfDay("evening")).toBe("Evening — late after 8 pm");
+  });
+
+  it("does not invent 11:59 pm for night, which is just the end of the day", () => {
+    expect(describeTimeOfDay("night")).toBe("Night — due by the end of the day");
   });
 });

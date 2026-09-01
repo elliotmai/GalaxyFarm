@@ -3,6 +3,7 @@ import { z } from "zod";
 import { addCalendarDays, dayKey, endOfDay, startOfDay } from "../value-objects/date-range.js";
 import { ulidSchema, type Ulid } from "../types/ids.js";
 import { projectedId, type CalendarEntry } from "./calendar-event.js";
+import { TIMES_OF_DAY, type TimeOfDay } from "./feeding-plan.js";
 import { baseRecordSchema, type BaseRecord } from "./record.js";
 
 /**
@@ -13,12 +14,52 @@ import { baseRecordSchema, type BaseRecord } from "./record.js";
 export const RECURRENCES = ["once", "daily", "weekly", "monthly", "seasonal"] as const;
 export type Recurrence = (typeof RECURRENCES)[number];
 
+/**
+ * When a part of the day stops being on time.
+ *
+ * Shared by every chore that names a part of the day — a feeding line always
+ * does, a template may. Generous rather than exact: these are the hours by
+ * which it should have happened, not the hours it happens at, and an animal
+ * that has not been fed by eleven is a thing to know about at eleven.
+ */
+export const TIME_OF_DAY_DEADLINES: Readonly<
+  Record<TimeOfDay, { readonly hour: number; readonly minute: number }>
+> = {
+  morning: { hour: 11, minute: 0 },
+  midday: { hour: 14, minute: 0 },
+  evening: { hour: 20, minute: 0 },
+  night: { hour: 23, minute: 59 },
+};
+
+export const TIME_OF_DAY_LABELS: Readonly<Record<TimeOfDay, string>> = {
+  morning: "Morning",
+  midday: "Midday",
+  evening: "Evening",
+  night: "Night",
+};
+
+export function timeOfDayDeadline(date: Date, timeOfDay: TimeOfDay): Date {
+  const { hour, minute } = TIME_OF_DAY_DEADLINES[timeOfDay];
+  const at = startOfDay(date);
+  at.setHours(hour, minute, 59, 999);
+  return at;
+}
+
 export interface ChoreTemplate extends BaseRecord {
   readonly title: string;
   readonly detail?: string | undefined;
   readonly recurrence: Recurrence;
   /** For weekly: 0 = Sunday. For monthly: day of month. */
   readonly recurrenceDays: readonly number[];
+  /**
+   * The part of the day it belongs to, when it has one.
+   *
+   * Absent means the whole day: the instance is due at the end of it, which is
+   * what every template meant before this field existed. Named, the instance
+   * is due by that part's deadline instead — the morning stall check turns
+   * late at eleven, not at midnight, the same arithmetic a feeding line uses.
+   */
+  readonly timeOfDay?: TimeOfDay | undefined;
   readonly zoneId?: Ulid | undefined;
   readonly animalId?: Ulid | undefined;
   readonly active: boolean;
@@ -52,6 +93,7 @@ export const choreTemplateSchema = baseRecordSchema.extend({
   detail: z.string().max(2000).optional(),
   recurrence: z.enum(RECURRENCES),
   recurrenceDays: z.array(z.number().int().min(0).max(31)),
+  timeOfDay: z.enum(TIMES_OF_DAY).optional(),
   zoneId: ulidSchema.optional(),
   animalId: ulidSchema.optional(),
   active: z.boolean(),
@@ -196,14 +238,25 @@ export function occurrenceId(templateId: Ulid, date: Date): string {
 }
 
 /**
+ * When a template's occurrence on `date` is due.
+ *
+ * The end of the day, unless the template names a part of it — then that
+ * part's deadline, so the morning round turns overdue at eleven rather than
+ * hiding among everything else until midnight. One function, used both by the
+ * projection and by the write, so the sheet and the row it becomes agree.
+ */
+export function templateDueAt(template: Pick<ChoreTemplate, "timeOfDay">, date: Date): Date {
+  return template.timeOfDay === undefined
+    ? endOfDay(date)
+    : timeOfDayDeadline(date, template.timeOfDay);
+}
+
+/**
  * The fields a template's occurrence becomes when it is written down.
  *
  * Called at the moment somebody ticks one, not by a job that writes rows ahead
  * of time. The store then holds the chores that actually happened rather than
  * a year of empty checkboxes.
- *
- * Due at the end of the day because a template says which day, never which
- * hour — so the chore turns overdue when the day is over and not at breakfast.
  */
 export function taskFromTemplate(
   template: ChoreTemplate,
@@ -213,7 +266,7 @@ export function taskFromTemplate(
     templateId: template.id,
     title: template.title,
     detail: template.detail,
-    dueAt: endOfDay(date),
+    dueAt: templateDueAt(template, date),
     zoneId: template.zoneId,
     animalId: template.animalId,
   };
@@ -276,7 +329,7 @@ export function choreDaySheet(input: ChoreDayInput, date: Date, now: Date): Chor
     .filter((template) => occursOn(template, date))
     .filter((template) => !materialised.has(occurrenceId(template.id, date)))
     .map((template): ChoreEntry => {
-      const dueAt = endOfDay(date);
+      const dueAt = templateDueAt(template, date);
       return {
         id: occurrenceId(template.id, date),
         title: template.title,
@@ -366,9 +419,9 @@ export function choreCalendarEntries(
         title: entry.title,
         detail: entry.detail,
         at: entry.dueAt,
-        // A template says which day, never which hour, and a written-down
-        // chore is due at the end of its day for the same reason. Rendering
-        // either at 11:59pm would file the morning round under bedtime.
+        // A chore is due *by* a moment, not *at* one — the end of its day,
+        // or its part of the day's deadline. Rendering it at 11:59pm would
+        // file the evening round under bedtime, so it stays all-day.
         allDay: true,
         source:
           entry.taskId === undefined

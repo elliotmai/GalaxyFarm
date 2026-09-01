@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   choreDaySheet,
-  type Animal,
   type ChoreEntry,
   type FeedingPlan,
   type FeedingPlanLine,
@@ -37,7 +36,6 @@ const DATE = new Date("2026-09-02T09:00:00");
 const NOW = new Date("2026-09-02T09:00:00");
 
 const ZONES = [{ id: NORTH, name: "North Trap" }] as unknown as Zone[];
-const ANIMALS = [{ id: COMET, name: "Comet", species: "horse" }] as unknown as Animal[];
 const FEEDS = [
   { id: HAY, name: "Coastal hay" },
   { id: PELLETS, name: "Senior pellets" },
@@ -45,7 +43,6 @@ const FEEDS = [
 
 const TEXT = feedingChoreText({
   zones: ZONES,
-  animals: ANIMALS,
   feeds: FEEDS,
   propertyId: PROPERTY,
 });
@@ -93,17 +90,25 @@ describe("wording a trip", () => {
     expect(entry?.detail).toBe("40 lb Coastal hay · 3 scoop Senior pellets");
   });
 
-  it("names an animal of any species, not just cattle", () => {
-    // The whole point of asking "for all different animals": a zone plan feeds
-    // whatever stands in the zone, and an animal plan feeds that animal.
+  it("names an animal trip by its ration, whatever species eats it", () => {
+    // Not the animal's name: one plan can feed several animals sharing a bowl
+    // (`alsoFeeds`), and "Morning feed · Comet" would read as feeding only
+    // Comet. The ration's name covers everybody on it.
     const [entry] = feedingChoresFor(
-      [plan({ target: "animal", targetId: COMET, lines: [line()] })],
+      [
+        plan({
+          target: "animal",
+          targetId: COMET,
+          name: "Senior horse ration",
+          lines: [line()],
+        }),
+      ],
       TEXT,
       DATE,
       NOW,
     );
 
-    expect(entry?.title).toBe("Morning feed · Comet");
+    expect(entry?.title).toBe("Morning feed · Senior horse ration");
   });
 
   it("says so when an amount is shared rather than per head", () => {

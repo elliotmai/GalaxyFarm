@@ -1,10 +1,8 @@
 "use client";
 
 import {
-  displayName,
   feedingOccurrences,
   isShared,
-  type Animal,
   type ChoreEntry,
   type FeedingPlan,
   type FeedingPlanLine,
@@ -19,13 +17,17 @@ import type { FeedType } from "@galaxy-farm/module-feed";
  * Wording a feeding trip (spec §4.1, §5.3).
  *
  * The kernel groups the plans into trips and decides which days they land on;
- * it cannot name any of them. A zone's name, an animal's name and a feed's
- * name live in three entities, one of them in another module, and §4.1 has the
- * composition root be the place those meet. So this is the app's half: the
- * sentence somebody reads on the day sheet.
+ * it cannot name a zone or a feed. Those live in other entities, one in
+ * another module, and §4.1 has the composition root be the place they meet.
+ * So this is the app's half: the sentence somebody reads on the day sheet.
+ *
+ * An animal trip needs nothing from here — the kernel titles it by its
+ * ration, the plan's own name, because one plan can feed several animals
+ * sharing a bowl and a single animal's name would read as feeding only that
+ * one.
  *
  * Every species, deliberately. A zone plan feeds whatever is standing in the
- * zone and an animal plan feeds that animal whatever it is — the flock and the
+ * zone and an animal plan feeds whoever shares the ration — the flock and the
  * barn cats are fed by the same walk out of the house.
  */
 
@@ -52,26 +54,19 @@ function amountOf(line: FeedingPlanLine): string {
 
 export function feedingChoreText({
   zones,
-  animals,
   feeds,
   propertyId,
 }: {
   readonly zones: readonly Zone[];
-  readonly animals: readonly Animal[];
   readonly feeds: readonly FeedType[];
   readonly propertyId: Ulid;
 }): FeedingChoreText {
   const zoneById = new Map(zones.map((zone) => [zone.id, zone]));
-  const animalById = new Map(animals.map((animal) => [animal.id, animal]));
   const feedById = new Map(feeds.map((feed) => [feed.id, feed]));
 
   return {
-    target: (target: FeedingTarget, targetId: Ulid) => {
+    target: (target: Exclude<FeedingTarget, "animal">, targetId: Ulid) => {
       if (target === "zone") return zoneById.get(targetId)?.name ?? "a pen";
-      if (target === "animal") {
-        const animal = animalById.get(targetId);
-        return animal === undefined ? "an animal" : displayName(animal);
-      }
       // The group plan targets the property, which is the group every animal
       // on the place belongs to — the same resolution `herdDemand` makes.
       return targetId === propertyId ? "everybody" : "the group";

@@ -98,6 +98,20 @@ describe("ChoreTemplate recurrence", () => {
     ).toBe(true);
   });
 
+  it("accepts a part of the day, and rejects a word that is not one", () => {
+    const timed = {
+      ...base(),
+      title: "Check the stalls",
+      recurrence: "daily",
+      recurrenceDays: [],
+      timeOfDay: "morning",
+      active: true,
+    };
+
+    expect(choreTemplateSchema.safeParse(timed).success).toBe(true);
+    expect(choreTemplateSchema.safeParse({ ...timed, timeOfDay: "dawn" }).success).toBe(false);
+  });
+
   it("never fires an inactive template", () => {
     expect(occursOn(template("daily", [], false), thursday)).toBe(false);
   });
@@ -233,6 +247,20 @@ describe("the chore day sheet", () => {
     expect(choreDaySheet(input, thursday, new Date(2026, 0, 16, 0, 1))[0]?.overdue).toBe(true);
   });
 
+  it("turns a timed template's chore late when its part of the day passes", () => {
+    // A template that names a part of the day keeps the same clock a feeding
+    // round does: the morning check unfinished at noon is late at noon, not
+    // hidden among everything else until midnight.
+    const input = { tasks: [], templates: [template({ timeOfDay: "morning" })] };
+    const noon = new Date(2026, 0, 15, 12, 0);
+
+    expect(choreDaySheet(input, thursday, morning)[0]?.overdue).toBe(false);
+    expect(choreDaySheet(input, thursday, noon)[0]?.overdue).toBe(true);
+    expect(choreDaySheet(input, thursday, noon)[0]?.dueAt).toEqual(
+      new Date(2026, 0, 15, 11, 0, 59, 999),
+    );
+  });
+
   it("reads a past day as that day, not as now", () => {
     // Stepping back must not mark yesterday's evening chores as still in hand,
     // and stepping forward must not mark tomorrow's as late.
@@ -285,6 +313,14 @@ describe("the chore day sheet", () => {
     // End of day, so the row lands on the day it was generated for and the
     // occurrence it replaces stops being generated.
     expect(fields.dueAt).toEqual(new Date(2026, 0, 15, 23, 59, 59, 999));
+  });
+
+  it("writes a timed template's chore down with the same deadline it showed", () => {
+    // The projection and the row it becomes must agree, or ticking a chore
+    // moves the moment it would have counted late.
+    const fields = taskFromTemplate(template({ timeOfDay: "evening" }), thursday);
+
+    expect(fields.dueAt).toEqual(new Date(2026, 0, 15, 20, 0, 59, 999));
   });
 
   it("counts the day in one line", () => {

@@ -7,7 +7,7 @@ import {
   type FeedingTarget,
   type TimeOfDay,
 } from "./feeding-plan.js";
-import type { ChoreEntry } from "./task.js";
+import { TIME_OF_DAY_LABELS, timeOfDayDeadline, type ChoreEntry } from "./task.js";
 
 /**
  * Feeding, as work rather than as a ration (spec §2, §5.1, §5.3).
@@ -44,40 +44,6 @@ export const FEEDING_TIME_ORDER: Readonly<Record<TimeOfDay, number>> = {
   evening: 2,
   night: 3,
 };
-
-/**
- * When a feed stops being on time.
- *
- * A chore template says which *day* and nothing finer, so its instance is due
- * at the end of it. A feeding line says which part of the day, and throwing
- * that away would put the morning feed and the evening feed at the same
- * moment — which reads as an arbitrary order on the sheet and calls nothing
- * late until midnight. An animal that has not been fed by eleven is a thing to
- * know about at eleven.
- *
- * Generous rather than exact: these are the hours by which it should have
- * happened, not the hours it happens at.
- */
-const TIME_DEADLINE: Readonly<Record<TimeOfDay, { hour: number; minute: number }>> = {
-  morning: { hour: 11, minute: 0 },
-  midday: { hour: 14, minute: 0 },
-  evening: { hour: 20, minute: 0 },
-  night: { hour: 23, minute: 59 },
-};
-
-const TIME_LABEL: Readonly<Record<TimeOfDay, string>> = {
-  morning: "Morning",
-  midday: "Midday",
-  evening: "Evening",
-  night: "Night",
-};
-
-function deadline(date: Date, timeOfDay: TimeOfDay): Date {
-  const { hour, minute } = TIME_DEADLINE[timeOfDay];
-  const at = startOfDay(date);
-  at.setHours(hour, minute, 59, 999);
-  return at;
-}
 
 /**
  * Does this line go out on this date?
@@ -162,14 +128,30 @@ export function feedingTripsForDay(plans: readonly FeedingPlan[], date: Date): F
 /**
  * How to say what a trip is and what it carries.
  *
- * Injected rather than worked out here. A zone's name, an animal's name and a
- * feed's name live in three places — two of them in other modules — and §4.1
- * has the composition root join them. The kernel groups and schedules; the app
- * words it.
+ * Injected rather than worked out here. A zone's name and a feed's name live
+ * in other entities — one in another module — and §4.1 has the composition
+ * root join them. The kernel groups and schedules; the app words it.
+ *
+ * An animal trip is the exception, named here rather than injected: it is
+ * titled by its *ration* — the plan's own name, which the kernel already
+ * holds. One plan can feed several animals eating from the same bowl
+ * (`alsoFeeds`), and a title carrying one animal's name would read as feeding
+ * only that one. The ration's name covers everybody it feeds, so `target` is
+ * only ever asked about a zone or the group.
  */
 export interface FeedingChoreText {
-  readonly target: (target: FeedingTarget, targetId: Ulid) => string;
+  readonly target: (target: Exclude<FeedingTarget, "animal">, targetId: Ulid) => string;
   readonly line: (line: FeedingPlanLine, plan: FeedingPlan) => string;
+}
+
+/**
+ * What an animal trip is called: the rations it carries.
+ *
+ * Deduplicated because two lines of one plan are one ration, and joined
+ * because two plans landing on one animal's morning are still one walk.
+ */
+function rationNames(trip: Pick<FeedingTrip, "lines">): string {
+  return [...new Set(trip.lines.map(({ plan }) => plan.name))].join(" · ");
 }
 
 /** A day's feeding, as chore entries the sheet can merge with everything else. */
@@ -180,12 +162,14 @@ export function feedingOccurrences(
   now: Date,
 ): ChoreEntry[] {
   return feedingTripsForDay(plans, date).map((trip): ChoreEntry => {
-    const dueAt = deadline(date, trip.timeOfDay);
+    const dueAt = timeOfDayDeadline(date, trip.timeOfDay);
     const detail = trip.lines.map(({ line, plan }) => text.line(line, plan)).join(" · ");
+    const where =
+      trip.target === "animal" ? rationNames(trip) : text.target(trip.target, trip.targetId);
 
     return {
       id: feedingChoreId(trip, date),
-      title: `${TIME_LABEL[trip.timeOfDay]} feed · ${text.target(trip.target, trip.targetId)}`,
+      title: `${TIME_OF_DAY_LABELS[trip.timeOfDay]} feed · ${where}`,
       ...(detail === "" ? {} : { detail }),
       dueAt,
       ...(trip.target === "zone" ? { zoneId: trip.targetId } : {}),

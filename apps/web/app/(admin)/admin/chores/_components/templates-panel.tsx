@@ -24,15 +24,19 @@ import {
   occurrencesInWindow,
   RECURRENCES,
   startOfDay,
+  TIME_OF_DAY_LABELS,
+  TIMES_OF_DAY,
   type Animal,
   type ChoreTemplate,
   type Recurrence,
+  type TimeOfDay,
   type Ulid,
   type Zone,
 } from "@galaxy-farm/core";
 
 import {
   describeRecurrence,
+  describeTimeOfDay,
   GENERATING_RECURRENCES,
   parseMonthDays,
   WEEKDAY_NAMES,
@@ -68,6 +72,8 @@ interface Draft {
   readonly recurrence: Recurrence;
   readonly weekdays: readonly number[];
   readonly monthDays: string;
+  /** `""` means the whole day, the same as the field being absent. */
+  readonly timeOfDay: string;
   readonly zoneId: string;
   readonly animalId: string;
   readonly active: boolean;
@@ -79,6 +85,7 @@ const BLANK: Draft = {
   recurrence: "daily",
   weekdays: [],
   monthDays: "",
+  timeOfDay: "",
   zoneId: "",
   animalId: "",
   active: true,
@@ -125,6 +132,7 @@ export function TemplatesPanel({
       recurrence: template.recurrence,
       weekdays: template.recurrence === "weekly" ? template.recurrenceDays : [],
       monthDays: template.recurrence === "monthly" ? template.recurrenceDays.join(", ") : "",
+      timeOfDay: template.timeOfDay ?? "",
       zoneId: template.zoneId ?? "",
       animalId: template.animalId ?? "",
       active: template.active,
@@ -155,6 +163,9 @@ export function TemplatesPanel({
       recurrence: draft.recurrence,
       recurrenceDays: draftDays,
       active: draft.active,
+      // Explicit rather than omitted when blank, so editing a template back
+      // to "any time" actually clears the field in the patch that travels.
+      timeOfDay: draft.timeOfDay === "" ? undefined : (draft.timeOfDay as TimeOfDay),
       ...(draft.detail.trim() === "" ? {} : { detail: draft.detail.trim() }),
       ...(draft.zoneId === "" ? {} : { zoneId: draft.zoneId as Ulid }),
       ...(draft.animalId === "" ? {} : { animalId: draft.animalId as Ulid }),
@@ -231,9 +242,16 @@ export function TemplatesPanel({
       header: "When",
       render: (template) => (
         <span className="flex flex-col gap-1">
-          <Badge tone={GENERATING_RECURRENCES.includes(template.recurrence) ? "neutral" : "danger"}>
-            {describeRecurrence(template)}
-          </Badge>
+          <span className="flex flex-wrap gap-1">
+            <Badge
+              tone={GENERATING_RECURRENCES.includes(template.recurrence) ? "neutral" : "danger"}
+            >
+              {describeRecurrence(template)}
+            </Badge>
+            {template.timeOfDay === undefined ? null : (
+              <Badge>{TIME_OF_DAY_LABELS[template.timeOfDay]}</Badge>
+            )}
+          </span>
           <span className="text-sm text-muted">
             {/* What it means in practice, which is easier to check than the
                 rule that produced it. */}
@@ -390,6 +408,21 @@ export function TemplatesPanel({
                 onChange={(event) => setDraft({ ...draft, monthDays: event.target.value })}
               />
             ) : null}
+
+            <Select
+              label="Time of day"
+              value={draft.timeOfDay}
+              error={errors["timeOfDay"]}
+              hint="Named, the chore counts late once that part of the day has passed — the same clock the feeding rounds keep."
+              options={[
+                { value: "", label: "Any time — due by the end of the day" },
+                ...TIMES_OF_DAY.map((timeOfDay) => ({
+                  value: timeOfDay,
+                  label: describeTimeOfDay(timeOfDay),
+                })),
+              ]}
+              onChange={(event) => setDraft({ ...draft, timeOfDay: event.target.value })}
+            />
 
             <Select
               label="Zone"

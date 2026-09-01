@@ -236,6 +236,14 @@ export function DaySheet({
               </Pill>
             ) : null}
             {entry.overdue && !entry.carriedOver ? <Pill tone="danger">Overdue</Pill> : null}
+            {/*
+              A due time worth saying is one finer than "the end of the day" —
+              a feeding round, or a template that names a part of the day. The
+              23rd hour is the end-of-day deadline every chore has anyway.
+            */}
+            {entry.carriedOver || entry.dueAt.getHours() === 23 ? null : (
+              <Pill>By {timeLabel(entry.dueAt)}</Pill>
+            )}
             {entry.templateId === undefined ? <Pill>One-off</Pill> : <Pill>Repeating</Pill>}
             {entry.taskId === undefined ? <Pill tone="neutral">Not started</Pill> : null}
             {where.map((label) => (
