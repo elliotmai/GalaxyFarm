@@ -23,6 +23,7 @@ import { isPet } from "@galaxy-farm/module-pets";
 
 import { guideForSitter, guideIncludes, visibleToSitter } from "@/lib/care-guide-selection";
 import { database } from "@/lib/credential-store";
+import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 
 export { guideForSitter, guideIncludes, visibleToSitter };
 
@@ -144,6 +145,14 @@ export interface TickInput {
    * chose. The row is read here and checked against the property.
    */
   readonly templateId?: Ulid | undefined;
+  /**
+   * The derived occurrence's own id, for a chore with no record of any kind
+   * behind it — a feeding trip, which is a sum over however many plans landed
+   * on it. An id rather than the entry for the same reason `templateId` is an
+   * id: the occurrence is re-derived from the plans here, so the title, the
+   * amounts and the day are the farm's answer rather than the browser's.
+   */
+  readonly sourceKey?: string | undefined;
   /** The day being ticked, which is not always today. */
   readonly date: Date;
   readonly at: Date;
@@ -188,6 +197,9 @@ export async function tickChore(input: TickInput, db: Database = database()): Pr
    * exists and was never done.
    */
   if (input.taskId === undefined) {
+    if (input.sourceKey !== undefined) {
+      return tickFeedingOccurrence(input, input.sourceKey, db);
+    }
     if (input.templateId === undefined) {
       return { ok: false, reason: "That chore is not on today's list any more." };
     }
@@ -282,5 +294,90 @@ export async function tickChore(input: TickInput, db: Database = database()): Pr
 
   return result.rejected.length === 0
     ? { ok: true, taskId: input.taskId }
+    : { ok: false, reason: result.rejected[0]?.reason ?? "The farm refused that change." };
+}
+
+/**
+ * Ticking a feeding trip off (spec §2, §5.1).
+ *
+ * A feeding chore is derived, so there is no template to look up — the plans
+ * are the record behind it. The occurrence is rebuilt here from the property's
+ * own plans and matched by its derived id, which is what checks the day and
+ * the trip at once: an id the plans do not produce on that date names nothing,
+ * exactly as a template that does not fire on the day does.
+ *
+ * The row is written *already complete*, with `sourceKey` carrying the
+ * occurrence's id so every device's day sheet drops the occurrence beside it.
+ * If another screen got there first, the occurrence already has a row — this
+ * tick belongs on that row, which also lets a stale screen un-tick it.
+ */
+async function tickFeedingOccurrence(
+  input: TickInput,
+  sourceKey: string,
+  db: Database,
+): Promise<TickOutcome> {
+  const { propertyId, actorId, date, at, done } = input;
+  const deviceId = input.deviceId ?? `sitter:${actorId}`;
+
+  const tasks = await repositoryFor<Task>(db, "tasks").list({ propertyId });
+  const claimed = tasks.find((task) => task.sourceKey === sourceKey);
+  if (claimed !== undefined) {
+    return tickChore({ ...input, taskId: claimed.id }, db);
+  }
+
+  if (!done) {
+    // Nothing to un-tick: an occurrence with no row was never finished.
+    return { ok: false, reason: "That chore had not been ticked." };
+  }
+
+  const [plans, zones, feeds] = await Promise.all([
+    repositoryFor<FeedingPlan>(db, "feedingPlans").list({ propertyId }),
+    repositoryFor<Zone>(db, "zones").list({ propertyId }),
+    repositoryFor<FeedType>(db, "feedTypes").list({ propertyId }),
+  ]);
+
+  const entry = feedingChoresFor(
+    plans,
+    feedingChoreText({ zones, feeds, propertyId }),
+    date,
+    at,
+  ).find((occurrence) => occurrence.id === sourceKey);
+  if (entry === undefined) {
+    return { ok: false, reason: "That feeding trip is not on that day's list." };
+  }
+
+  const record: Task = {
+    id: encodeUlid(at.getTime()),
+    propertyId,
+    createdAt: at,
+    updatedAt: at,
+    sourceKey: entry.id,
+    title: entry.title,
+    ...(entry.detail === undefined ? {} : { detail: entry.detail }),
+    dueAt: entry.dueAt,
+    ...(entry.zoneId === undefined ? {} : { zoneId: entry.zoneId }),
+    ...(entry.animalId === undefined ? {} : { animalId: entry.animalId }),
+    completedAt: at,
+    completedBy: actorId,
+  };
+
+  const changes = diff({}, record as unknown as Record<string, FieldValue>, { at, deviceId });
+  const result = await applyPush(
+    db,
+    [
+      {
+        id: encodeUlid(at.getTime()),
+        operation: "create",
+        patch: { entity: "tasks", recordId: record.id, changes },
+        queuedAt: at,
+        deviceId,
+        attempts: 0,
+      },
+    ],
+    { propertyId, clock: systemClock(), ids: { next: () => encodeUlid(at.getTime()) } },
+  );
+
+  return result.rejected.length === 0
+    ? { ok: true, taskId: record.id }
     : { ok: false, reason: result.rejected[0]?.reason ?? "The farm refused that change." };
 }

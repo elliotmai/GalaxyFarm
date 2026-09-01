@@ -42,6 +42,8 @@ const asUlid = (value: string | undefined): Ulid | undefined =>
 export async function setKioskChoreDone(input: {
   readonly taskId?: string | undefined;
   readonly templateId?: string | undefined;
+  /** A derived feeding trip's own id — re-derived and checked in `tickChore`. */
+  readonly sourceKey?: string | undefined;
   readonly day: string;
   readonly done: boolean;
 }): Promise<KioskResult> {
@@ -59,7 +61,15 @@ export async function setKioskChoreDone(input: {
 
   const taskId = asUlid(input.taskId);
   const templateId = asUlid(input.templateId);
-  if (taskId === undefined && templateId === undefined) {
+  // Length-checked only: the key is an opaque derived id whose real
+  // validation is `tickChore` rebuilding the occurrence from the plans.
+  const sourceKey =
+    typeof input.sourceKey === "string" &&
+    input.sourceKey.length > 0 &&
+    input.sourceKey.length <= 200
+      ? input.sourceKey
+      : undefined;
+  if (taskId === undefined && templateId === undefined && sourceKey === undefined) {
     return { ok: false, error: "That chore is not on the list any more." };
   }
 
@@ -71,6 +81,7 @@ export async function setKioskChoreDone(input: {
     actorId: actor.id,
     ...(taskId === undefined ? {} : { taskId }),
     ...(templateId === undefined ? {} : { templateId }),
+    ...(sourceKey === undefined ? {} : { sourceKey }),
     date,
     at: now,
     done: input.done,

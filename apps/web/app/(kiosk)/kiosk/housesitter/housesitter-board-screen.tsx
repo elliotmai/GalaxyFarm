@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useMemo } from "react";
 
-import { Button, Card, PageBody, PageHeader } from "@galaxy-farm/ui";
+import { PageBody, PageHeader } from "@galaxy-farm/ui";
 import {
   choreDaySheet,
-  choreProgress,
   type Animal,
   type ChoreTemplate,
   type Contact,
@@ -22,9 +21,11 @@ import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 
 import { GuidePreview } from "@/app/(admin)/admin/housesitter/_components/guide-preview";
+import { HousesitterChores } from "@/app/(kiosk)/kiosk/housesitter/housesitter-chores";
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { useFarmName } from "@/lib/branding";
 import { guideForSitter } from "@/lib/care-guide-selection";
+import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -35,19 +36,30 @@ import { useRecords } from "@/lib/local/use-records";
  * device already holds every table the guide draws from (a kiosk gets
  * `records.read`, not the narrow `care.read` a housesitter's phone is scoped
  * to), so it is read entirely from the local store rather than a server round
- * trip. Ticking chores off is a separate board (§4.4 lists them apart) — this
- * links to it rather than duplicating its interactive list.
+ * trip.
+ *
+ * The day's chores are checkable right here rather than a link away: a sitter
+ * standing at this screen is standing at the one place the whole day is laid
+ * out, and sending them to a second board to tick what this one just described
+ * is a tap that gets skipped. Feeding is derived from the plans (§2), grouped
+ * with everything else by animal and part of the day.
  */
 export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
   const { store, loading } = useHousesitterData(propertyId);
 
   const guide = guideForSitter(store.guides);
   const now = useMemo(() => new Date(), []);
-  const today = useMemo(
-    () => choreDaySheet({ tasks: store.tasks, templates: store.templates }, now, now),
-    [store.tasks, store.templates, now],
-  );
-  const progress = choreProgress(today);
+  const today = useMemo(() => {
+    // Feeding rides the plans rather than a template written beside them —
+    // the same derivation the admin day sheet makes, so the two agree.
+    const derived = feedingChoresFor(
+      store.plans,
+      feedingChoreText({ zones: store.zones, feeds: store.feeds, propertyId }),
+      now,
+      now,
+    );
+    return choreDaySheet({ tasks: store.tasks, templates: store.templates, derived }, now, now);
+  }, [store.tasks, store.templates, store.plans, store.zones, store.feeds, propertyId, now]);
   /*
    * The kiosk has no server-rendered name to fall back to — the board is
    * client-side from its first paint — so the neutral default stands for the
@@ -69,15 +81,12 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
         <p className="text-muted">Loading…</p>
       ) : (
         <div className="flex flex-col gap-density">
-          <Card className="flex flex-row flex-wrap items-center justify-between gap-density">
-            <span className="text-density text-ink">
-              Today's chores: {progress.done} of {progress.total} done
-              {progress.overdue > 0 ? `, ${progress.overdue} overdue` : ""}
-            </span>
-            <Link href="/kiosk/chores">
-              <Button variant="primary">Open Today's Chores</Button>
-            </Link>
-          </Card>
+          <HousesitterChores
+            entries={today}
+            animals={store.animals}
+            zones={store.zones}
+            day={now}
+          />
 
           <GuidePreview
             guide={guide}
