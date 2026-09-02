@@ -36,12 +36,13 @@ export const viewport: Viewport = {
 export default async function KioskLayout({ children }: { children: React.ReactNode }) {
   const actor = await currentActor();
 
-  // Not `redirect("/login")` here the way the other surfaces do it: this
-  // layout wraps `/kiosk/pair` too, and `middleware.ts` carries the one
-  // exception that lets a signed-out screen reach it — pairing is how it gets
-  // a session. Rendering the bare shell rather than a login wall is what
-  // makes that exception actually usable, and a real session past this point
-  // is guaranteed for every other route the middleware already gates.
+  // No redirect here the way the other surfaces do it: this layout wraps
+  // `/kiosk/pair` too, and `middleware.ts` carries the one exception that lets
+  // a signed-out screen reach it — pairing, and resuming from the token a
+  // paired screen holds, are how it gets a session at all. Rendering the bare
+  // shell rather than a wall is what makes that exception usable, and a real
+  // session past this point is guaranteed for every other route the
+  // middleware already gates.
   if (actor === undefined) {
     return (
       <div data-surface="kiosk" data-theme="flying-auto" data-density="kiosk">

@@ -7,7 +7,7 @@ export const metadata = { title: "Today's Chores" };
 
 export default async function KioskChoresPage() {
   const actor = await currentActor();
-  if (actor === undefined) redirect("/login?next=/kiosk/chores");
+  if (actor === undefined) redirect("/kiosk/pair?next=/kiosk/chores");
 
   return <ChoresBoardScreen propertyId={actor.propertyId} />;
 }

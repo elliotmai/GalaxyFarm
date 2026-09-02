@@ -7,7 +7,7 @@ export const metadata = { title: "Housesitter Mode" };
 
 export default async function KioskHousesitterPage() {
   const actor = await currentActor();
-  if (actor === undefined) redirect("/login?next=/kiosk/housesitter");
+  if (actor === undefined) redirect("/kiosk/pair?next=/kiosk/housesitter");
 
   return <HousesitterBoardScreen propertyId={actor.propertyId} />;
 }

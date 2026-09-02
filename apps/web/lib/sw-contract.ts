@@ -97,3 +97,36 @@ export function parsePushPayload(raw: string | undefined): PushPayload {
       : PUSH_FALLBACK.url,
   };
 }
+
+/**
+ * Whether a navigation's response may be written to the app-shell cache.
+ *
+ * Shared with `app/sw.ts` for the same reason as everything else in this file:
+ * the worker is a separate program, and this is a rule about its behaviour
+ * that is worth being able to test without one.
+ *
+ * The rule is that only a page may be stored, and only under the URL it was
+ * actually asked for. What it exists to keep out is a **redirect**, and the
+ * redirects a barn screen hits are the ones that ask it to sign in or pair: a
+ * session lapses, `middleware.ts` turns the screen away, and the reply to that
+ * redirect would otherwise be cached under the board's own URL. From then on
+ * every navigation that falls back to the cache — four slow seconds is enough,
+ * and Neon's cold start alone can spend them — renders a sign-in page at a
+ * screen whose session is fine. It would never age out, either: the app-shell
+ * cache measures age from last use, so being served is what keeps it fresh.
+ *
+ * A navigation request is issued with `redirect: "manual"`, so a redirect
+ * arrives as an opaque one with status 0, and the status check alone would
+ * catch it. Both other clauses are still written out: `redirected` catches a
+ * response that followed one, and the `type` check says outright what this is
+ * for rather than leaving it to a reader to work out from `0`.
+ */
+export function mayCacheDocument(response: {
+  readonly status: number;
+  readonly redirected?: boolean | undefined;
+  readonly type?: string | undefined;
+}): boolean {
+  return (
+    response.status === 200 && response.redirected !== true && response.type !== "opaqueredirect"
+  );
+}

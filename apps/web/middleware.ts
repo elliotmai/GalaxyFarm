@@ -33,11 +33,19 @@ export default auth((request) => {
   const actor = request.auth?.actor;
 
   if (actor === undefined) {
-    // Carry where they were going, so signing in lands them there rather than
-    // on a dashboard they then navigate away from.
-    const login = new URL("/login", request.nextUrl);
-    login.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(login);
+    // A barn screen is never sent to `/login`. There is no account behind it
+    // and nobody standing at it: a login form on a wall-mounted tablet is a
+    // dead end that costs somebody a walk out with a fresh pairing code. It
+    // goes to `/kiosk/pair` instead, which signs it straight back in from the
+    // device token it holds (spec §4.4) and only asks for a code if that
+    // token is genuinely no good any more.
+    const destination = surface === "kiosk" ? "/kiosk/pair" : "/login";
+
+    // Carry where they were going, so getting a session lands them there
+    // rather than on a dashboard they then navigate away from.
+    const away = new URL(destination, request.nextUrl);
+    away.searchParams.set("next", request.nextUrl.pathname);
+    return NextResponse.redirect(away);
   }
 
   if (!mayReachSurface(actor.role, surface)) {

@@ -155,4 +155,16 @@ describe("the worker can receive a notification (§6, issue #41)", () => {
     expect(WORKER).toMatch(/new NetworkOnly\(\)/);
     expect(WORKER).toContain("app-shell");
   });
+
+  it("keeps a sign-in redirect out of the app-shell cache", () => {
+    // The rule and its reasoning are `mayCacheDocument` in `lib/sw-contract.ts`,
+    // and `sw-cacheability.test.ts` proves the rule itself. What is asserted
+    // here is that the worker actually asks it: a `NetworkFirst` with no
+    // `cacheWillUpdate` falls back to Workbox's default, which caches an opaque
+    // redirect happily — and the entry it writes under a board's URL is a page
+    // asking the screen to sign in, served from then on every time a
+    // navigation times out (spec §4.4).
+    expect(WORKER).toContain("cacheWillUpdate");
+    expect(WORKER).toContain("mayCacheDocument");
+  });
 });

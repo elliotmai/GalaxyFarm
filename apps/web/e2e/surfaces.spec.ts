@@ -136,10 +136,27 @@ test.describe("pairing a barn screen", () => {
     await expect(page.getByRole("button", { name: /pair this screen/i })).toBeVisible();
   });
 
-  test("every other kiosk board still sends a signed-out visitor to /login", async ({ page }) => {
+  test("every other kiosk board sends a signed-out screen to pairing, never to /login", async ({
+    page,
+  }) => {
     await page.goto("/kiosk/pen-board");
 
-    await expect(page).toHaveURL(/\/login\?next=%2Fkiosk%2Fpen-board/);
+    // `/login` is a dead end on a barn screen: there is no account behind it
+    // and nobody standing at it, so a lapsed session used to mean somebody
+    // walking out with a fresh code. It goes here instead, where a paired
+    // screen signs itself back in from the device token it holds (spec §4.4).
+    await expect(page).toHaveURL(/\/kiosk\/pair\?next=%2Fkiosk%2Fpen-board/);
+  });
+
+  test("a screen with no token held is asked for a code rather than reconnecting", async ({
+    page,
+  }) => {
+    // This browser holds nothing, which is what a screen that has never been
+    // paired looks like. The resume path needs a token to spend, so the only
+    // honest thing to show is the form.
+    await page.goto("/kiosk/pen-board");
+
+    await expect(page.getByRole("button", { name: /pair this screen/i })).toBeVisible();
   });
 });
 

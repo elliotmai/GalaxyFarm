@@ -7,7 +7,7 @@ export const metadata = { title: "Calendar" };
 
 export default async function KioskCalendarPage() {
   const actor = await currentActor();
-  if (actor === undefined) redirect("/login?next=/kiosk/calendar");
+  if (actor === undefined) redirect("/kiosk/pair?next=/kiosk/calendar");
 
   return <CalendarBoardScreen propertyId={actor.propertyId} />;
 }
