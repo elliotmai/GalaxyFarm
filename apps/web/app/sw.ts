@@ -19,7 +19,7 @@ import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, RuntimeCaching, SerwistGlobalConfig } from "serwist";
 import { ExpirationPlugin, NetworkFirst, NetworkOnly, Serwist } from "serwist";
 
-import { OFFLINE_ROUTE, parsePushPayload } from "@/lib/sw-contract";
+import { OFFLINE_ROUTE, mayCacheDocument, parsePushPayload } from "@/lib/sw-contract";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -31,6 +31,37 @@ declare const self: ServiceWorkerGlobalScope;
 
 /** A month. Long enough that a screen left in a barn over a bad-signal winter still boots. */
 const APP_SHELL_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+
+/**
+ * The app-shell cache's name, and why it carries a version.
+ *
+ * Bumping it makes every device drop what it is holding and start again. That
+ * matters because of what `onlyPlainDocuments` below now refuses to store: a
+ * screen that already has a sign-in page cached under a board's URL would keep
+ * being handed it every time a navigation timed out, and a rule that only
+ * governs future writes cannot reach a poisoned entry that is already there.
+ * `maxAgeFrom: "last-used"` means it would never age out on its own either —
+ * being served is what keeps it fresh.
+ */
+const APP_SHELL_CACHE = "app-shell-v2";
+
+/**
+ * What may be written to the app-shell cache: a page, and nothing else.
+ *
+ * The rule itself is `mayCacheDocument` in `lib/sw-contract.ts`, where it can
+ * be tested without a worker, and where the reasoning lives. In short: a
+ * sign-in or pairing redirect must never be stored under a board's own URL,
+ * or a screen whose session is fine renders a sign-in page every time a
+ * navigation falls back to the cache.
+ *
+ * Defining `cacheWillUpdate` at all replaces `NetworkFirst`'s default
+ * (`cacheOkAndOpaquePlugin`, which allows both 200 and opaque status 0), which
+ * is why the 200 is asserted there rather than assumed here.
+ */
+const onlyPlainDocuments = {
+  cacheWillUpdate: async ({ response }: { response: Response }): Promise<Response | null> =>
+    mayCacheDocument(response) ? response : null,
+};
 
 /**
  * Caching rules, matched in order — the first one that matches answers.
@@ -81,9 +112,10 @@ const runtimeCaching: RuntimeCaching[] = [
      */
     matcher: ({ request, sameOrigin }) => sameOrigin && request.mode === "navigate",
     handler: new NetworkFirst({
-      cacheName: "app-shell",
+      cacheName: APP_SHELL_CACHE,
       networkTimeoutSeconds: 4,
       plugins: [
+        onlyPlainDocuments,
         new ExpirationPlugin({
           maxEntries: 64,
           maxAgeSeconds: APP_SHELL_MAX_AGE_SECONDS,

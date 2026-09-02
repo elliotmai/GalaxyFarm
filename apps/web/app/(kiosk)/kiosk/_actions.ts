@@ -6,6 +6,7 @@ import { can, isUlid, type Ulid } from "@galaxy-farm/core";
 
 import { currentActor, signOut } from "@/lib/auth";
 import { isDeviceLive, revokeDevice } from "@/lib/device-store";
+import { forgetDeviceToken } from "@/lib/kiosk-session";
 import { logEggsForKiosk, moveAnimalForKiosk, type LogEggsInput } from "@/lib/kiosk-store";
 import { verifyKioskPin } from "@/lib/kiosk-pin-store";
 import { tickChore } from "@/lib/sitter-store";
@@ -159,6 +160,11 @@ export async function unpairThisDevice(): Promise<KioskResult> {
   // when one is set, kiosk-home.tsx's UnpairButton already ran before this.
   // crud-guard: allow-unconfirmed — confirmed client-side before this runs
   await revokeDevice(actor.deviceId as Ulid, new Date());
+  // Both halves of being signed in, not just the session: a screen that kept
+  // its device token would sit at `/kiosk/pair` trying to resume with a token
+  // that is now revoked, and "unpair" has to mean the screen stops rather than
+  // fails repeatedly.
+  await forgetDeviceToken();
   await signOut({ redirect: false });
   return { ok: true };
 }

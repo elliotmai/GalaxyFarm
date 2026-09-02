@@ -7,7 +7,7 @@ export const metadata = { title: "Pen Board" };
 
 export default async function KioskPenBoardPage() {
   const actor = await currentActor();
-  if (actor === undefined) redirect("/login?next=/kiosk/pen-board");
+  if (actor === undefined) redirect("/kiosk/pair?next=/kiosk/pen-board");
 
   return <PenBoardScreen propertyId={actor.propertyId} />;
 }

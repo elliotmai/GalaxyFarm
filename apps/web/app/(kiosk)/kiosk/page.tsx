@@ -22,7 +22,7 @@ export const metadata = { title: "Kiosk" };
  */
 export default async function KioskPage() {
   const actor = await currentActor();
-  if (actor === undefined) redirect("/login?next=/kiosk");
+  if (actor === undefined) redirect("/kiosk/pair?next=/kiosk");
 
   let deviceName: string | undefined;
 
