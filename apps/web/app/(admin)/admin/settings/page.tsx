@@ -6,7 +6,7 @@ import { SettingsScreen } from "@/app/(admin)/admin/settings/_components/setting
 import type { PersonRow } from "@/app/(admin)/admin/settings/_components/people-screen";
 import { currentActor } from "@/lib/auth";
 import { withDeadline } from "@/lib/deadline";
-import { listDevices, type KioskDevice } from "@/lib/device-store";
+import { listDeletedDevices, listDevices, type KioskDevice } from "@/lib/device-store";
 import { hasKioskPin } from "@/lib/kiosk-pin-store";
 import { settingsFor } from "@/lib/notification-prefs";
 import { pushConfig } from "@/lib/notifier";
@@ -69,13 +69,18 @@ export default async function AdminSettingsPage() {
   }
 
   let devices: readonly KioskDevice[] = [];
+  let deletedDevices: readonly KioskDevice[] = [];
   let pinSet = false;
   let devicesUnavailable: string | undefined;
 
   if (mayManageDevices) {
     try {
-      [devices, pinSet] = await withDeadline(
-        Promise.all([listDevices(actor.propertyId), hasKioskPin(actor.propertyId)]),
+      [devices, deletedDevices, pinSet] = await withDeadline(
+        Promise.all([
+          listDevices(actor.propertyId),
+          listDeletedDevices(actor.propertyId),
+          hasKioskPin(actor.propertyId),
+        ]),
         "the kiosk device list",
       );
     } catch (error) {
@@ -120,6 +125,7 @@ export default async function AdminSettingsPage() {
       mayManageBranding={mayManageBranding}
       mayManageDevices={mayManageDevices}
       devices={devices}
+      deletedDevices={deletedDevices}
       pinSet={pinSet}
       pushDevices={pushDevices}
       notificationSettings={notificationSettings}

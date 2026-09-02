@@ -135,6 +135,7 @@ function settings(mayManageBranding: boolean) {
           mayManageBranding={mayManageBranding}
           mayManageDevices={false}
           devices={[]}
+          deletedDevices={[]}
           pinSet={false}
           pushDevices={[]}
           notificationSettings={[]}
