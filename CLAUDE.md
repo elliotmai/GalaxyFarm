@@ -35,9 +35,11 @@ Rules that make it useful rather than decorative:
 `main` takes pushes whenever you have something to land. There is no rate
 limit, no window, and no queue.
 
-- Work on a feature branch and open a PR against `main` when a review is
-  useful.
-- When it isn't, commit and push to `main` directly.
+- **Push directly to `main` by default.** Commit and push as soon as the work
+  stands on its own — no feature branch, no pull request, no waiting on a
+  review.
+- **Unless the request says otherwise.** Asked for a branch, a PR, or a review
+  first? Do that instead — an explicit instruction beats this default.
 - `staging` is no longer a collection point. Nothing promotes it, and nothing
   is waiting on it — treat it as an ordinary branch or delete it.
 
