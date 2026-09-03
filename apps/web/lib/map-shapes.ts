@@ -24,6 +24,7 @@ import {
   type SpatialInstruction,
   type SpatialShape,
 } from "@galaxy-farm/ui";
+import { isPet, penAssignments } from "@galaxy-farm/module-pets";
 
 /**
  * The farm, flattened into the shapes the spatial editor draws (spec §2).
@@ -107,13 +108,16 @@ export function zoneShapes(
 ): SpatialShape[] {
   const onFarm = animals.filter(isOnFarm);
   const animalById = new Map(onFarm.map((animal) => [animal.id, animal]));
+  // A dog dragged into a pen must not be able to raise the pen's border to
+  // his handling level, or write himself into what a helper reads there.
+  const placements = penAssignments(assignments, animals);
 
   return zones
     .filter(isOnProperty)
     .slice()
     .sort((left, right) => Number(isGroupingType(right.type)) - Number(isGroupingType(left.type)))
     .map((zone) => {
-      const occupants = occupantsOf(assignments, zone.id, at)
+      const occupants = occupantsOf(placements, zone.id, at)
         .map((id) => animalById.get(id))
         .filter((animal): animal is Animal => animal !== undefined);
 
@@ -174,6 +178,13 @@ export function zoneShapes(
  *
  * Sold, dead and departed animals are left out entirely. They need no pen, and
  * a pen board carrying them is one nobody walks out with.
+ *
+ * **So are the dogs and the cats.** A pet has no pen (§5.8) — it goes in the
+ * guide's own pet section, not under a pasture — so a chip for one is a chip
+ * with nowhere to be, and the tray under the canvas is where a chip with
+ * nowhere to be lands. That put the house dog in a list of stock a drag
+ * away from the North Trap, which is the slip this is written for: the map
+ * offers the move, and the record it writes is one nobody meant.
  */
 export function animalChips(
   zones: readonly Zone[],
@@ -190,7 +201,7 @@ export function animalChips(
   );
 
   return animals
-    .filter(isOnFarm)
+    .filter((animal) => isOnFarm(animal) && !isPet(animal))
     .map((animal) => {
       const open = assignments.filter(
         (assignment) =>

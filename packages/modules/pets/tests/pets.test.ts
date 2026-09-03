@@ -5,6 +5,7 @@ import type { Animal, Ulid } from "@galaxy-farm/core";
 import {
   isPet,
   outstandingPetCare,
+  penAssignments,
   petBriefing,
   petBriefings,
   petsOnFarm,
@@ -45,6 +46,34 @@ describe("what counts as a pet", () => {
     expect(PET_SPECIES).toEqual(["dog", "cat"]);
     expect(isPet({ species: "cat" })).toBe(true);
     expect(isPet({ species: "cattle" })).toBe(false);
+  });
+
+  it("keeps a pet out of the placements a pen is worked out from", () => {
+    // Reported: a dog was dragged into a pen on the property map, which the
+    // map was perfectly willing to write. The row exists; what has to stop is
+    // it counting — as an occupant, as a head against capacity, and as a
+    // handling level the pen inherits from whoever is standing in it.
+    const rusty = animal({ id: id(1), name: "Rusty" });
+    const cow = animal({ id: id(2), name: "Andromeda", species: "cattle" });
+
+    const kept = penAssignments(
+      [
+        { animalId: rusty.id, zoneId: id(9) },
+        { animalId: cow.id, zoneId: id(9) },
+      ],
+      [rusty, cow],
+    );
+
+    expect(kept).toEqual([{ animalId: cow.id, zoneId: id(9) }]);
+  });
+
+  it("leaves a placement alone when it cannot see the animal behind it", () => {
+    // A device part-way through a sync holds assignments whose animals have
+    // not landed yet. Dropping those would empty every pen on the board for as
+    // long as the gap lasts, which is a worse lie than the one being fixed.
+    const stranger = { animalId: id(7), zoneId: id(9) };
+
+    expect(penAssignments([stranger], [])).toEqual([stranger]);
   });
 
   it("lists the ones still living here, by name", () => {

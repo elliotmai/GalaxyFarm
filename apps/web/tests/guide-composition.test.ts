@@ -138,6 +138,28 @@ describe("guideZonesFrom", () => {
     expect(zones[0]?.occupants.map((occupant) => occupant.name)).toEqual(["Dolly"]);
   });
 
+  it("does not list a pet under a pen as well as in its own section", () => {
+    // §5.8 gives the pets their own part of the guide, which is where a helper
+    // is told about the dog. Printed under a pasture too — off the back of a
+    // placement somebody wrote by mis-dragging him on the map — he is a second
+    // animal to go and check on, and the pen reads as holding a dog.
+    const RUSTY = id(11);
+    const zones = guideZonesFrom(
+      [zone({ id: NORTH, name: "North Trap" })],
+      [
+        assignment({ id: id(20), animalId: DOLLY, zoneId: NORTH }),
+        assignment({ id: id(22), animalId: RUSTY, zoneId: NORTH }),
+      ],
+      [
+        animal({ id: DOLLY, name: "Dolly" }),
+        animal({ id: RUSTY, name: "Rusty", species: "dog", safetyLevel: 4 }),
+      ],
+      NOW,
+    );
+
+    expect(zones[0]?.occupants.map((occupant) => occupant.name)).toEqual(["Dolly"]);
+  });
+
   it("does not list her in the pen she left", () => {
     // The assignment that closed is still on file, because where she was in
     // March is worth keeping. It is not where she is.

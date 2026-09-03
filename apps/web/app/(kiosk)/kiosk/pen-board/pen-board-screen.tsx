@@ -14,6 +14,8 @@ import {
   type ZoneAssignment,
 } from "@galaxy-farm/core";
 
+import { penAssignments } from "@galaxy-farm/module-pets";
+
 import { moveKioskAnimal } from "@/app/(kiosk)/kiosk/_actions";
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { useRecords } from "@/lib/local/use-records";
@@ -48,8 +50,13 @@ export function PenBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
     [zones],
   );
 
+  // Pens hold stock, not pets (§5.8). A dog with a placement behind him — from
+  // a mis-drag on the map, or an older build — is not somebody the board
+  // offers to move, and not somebody whose level a pen inherits.
+  const placements = useMemo(() => penAssignments(assignments, animals), [assignments, animals]);
+
   function occupantsFor(zone: Zone): Animal[] {
-    return occupantsOf(assignments, zone.id, now)
+    return occupantsOf(placements, zone.id, now)
       .map((id) => animalsById.get(id))
       .filter((a): a is Animal => a !== undefined && isOnFarm(a));
   }

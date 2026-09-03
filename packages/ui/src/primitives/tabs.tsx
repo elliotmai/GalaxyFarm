@@ -15,7 +15,18 @@ import type { KeyboardEvent, ReactNode } from "react";
 export interface TabDefinition {
   readonly id: string;
   readonly label: string;
-  /** A count, a warning dot — anything that belongs beside the label. */
+  /**
+   * A count beside the label — open jobs, people, paired screens — or a short
+   * marker like `!` for when the number could not be read.
+   *
+   * **The strip draws the chrome, and that is the point.** Handed straight
+   * into the button, as this used to be, a bare number lands in the label's
+   * own size and weight with nothing but a gap in front of it, and stops
+   * reading as a count at all: "People 5" and "Notifications 2" read as tabs
+   * somebody named badly, and get asked about as names. Wrapping it here is
+   * what makes that unsayable — there is no way to pass a count and have it
+   * come out welded to the name.
+   */
   readonly adornment?: ReactNode;
 }
 
@@ -99,7 +110,17 @@ export function Tabs({ tabs, children, defaultTab, activeTab, onTabChange, label
               ].join(" ")}
             >
               {tab.label}
-              {tab.adornment}
+              {tab.adornment === undefined ? null : (
+                <span
+                  className={[
+                    "gf-numeric inline-flex min-w-[1.5em] items-center justify-center",
+                    "rounded-full border px-1.5 text-xs leading-5",
+                    selected ? "border-action text-action" : "border-edge text-muted",
+                  ].join(" ")}
+                >
+                  {tab.adornment}
+                </span>
+              )}
             </button>
           );
         })}

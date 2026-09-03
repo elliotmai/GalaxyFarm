@@ -17,7 +17,7 @@ import {
 } from "@galaxy-farm/core";
 import type { GuideZone } from "@galaxy-farm/module-housesitting";
 import type { FeedType } from "@galaxy-farm/module-feed";
-import { isPet } from "@galaxy-farm/module-pets";
+import { isPet, penAssignments } from "@galaxy-farm/module-pets";
 
 import { describeRecurrence, GENERATING_RECURRENCES } from "@/lib/chores";
 import { describePlanLine, nameList } from "@/lib/feed-lines";
@@ -51,11 +51,14 @@ export function guideZonesFrom(
   now: Date,
 ): GuideZone[] {
   const byId = new Map(animals.map((animal) => [animal.id, animal]));
+  // The pets have their own section (§5.8). A dog listed under a pasture as
+  // well is the same double-naming the ration filter below exists to stop.
+  const placements = penAssignments(assignments, animals);
 
   return zones
     .filter((zone) => zone.active)
     .map((zone) => {
-      const occupants = occupantsOf(assignments, zone.id, now)
+      const occupants = occupantsOf(placements, zone.id, now)
         .map((animalId) => byId.get(animalId))
         .filter((animal): animal is Animal => animal !== undefined && isOnFarm(animal))
         .map((animal) => ({
@@ -125,6 +128,11 @@ export function guideFeedingPlans(
       .map((animalId) => byId.get(animalId))
       .filter((animal): animal is Animal => animal !== undefined && isOnFarm(animal));
 
+  // Not the dog. He has no pen (§5.8), so counting him against one turns
+  // "West Pen — 3 head" into a line somebody puts out four cows' worth of hay
+  // for. His own bowl is an animal plan, and the pets' own section has it.
+  const placements = penAssignments(assignments, animals);
+
   const rank: Record<FeedingPlan["target"], number> = { group: 0, zone: 1, animal: 2 };
 
   return (
@@ -142,7 +150,7 @@ export function guideFeedingPlans(
         const fed = plan.target === "animal" ? fedBy(plan) : [];
         const heads =
           plan.target === "zone"
-            ? occupantsOf(assignments, plan.targetId, now).filter((animalId) => {
+            ? occupantsOf(placements, plan.targetId, now).filter((animalId) => {
                 const animal = byId.get(animalId);
                 return animal !== undefined && isOnFarm(animal);
               }).length

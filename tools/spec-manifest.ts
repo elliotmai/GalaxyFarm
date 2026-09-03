@@ -544,6 +544,14 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     status: "not-applicable",
     note: "An Animal with species dog|cat, reusing HealthRecord and FeedingPlan — no new entity, by §2's one-animal-model rule.",
   },
+  "A pet has no zone": {
+    section: "5.8",
+    kind: "derivation",
+    declares: ["penAssignments"],
+    phase: "Phase 2",
+    status: "built",
+    note: "Occupancy is worked out from placements a pet is filtered out of, so the map, the Pen Board, the guide and every zone ration agree without a migration.",
+  },
 
   // ---------------------------------------------------------------- §5.10
   CareGuide: {

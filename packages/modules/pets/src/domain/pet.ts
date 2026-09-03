@@ -50,6 +50,34 @@ export function petsOnFarm(animals: readonly Animal[]): Animal[] {
 }
 
 /**
+ * The placements that belong to something that actually lives in a pen (§5.8).
+ *
+ * A pen is a fact about grazing, handling and who has to be let through a
+ * gate. A dog lives in the house and follows whoever is holding the lead, so
+ * "which pasture is the dog in" has no answer worth storing — which is why
+ * §5.8 gives pets their own section of the housesitter guide rather than a
+ * line under a pen, and why nothing on this app asks where a cat is kept.
+ *
+ * It filters **assignments, not animals**, because the join is where the
+ * damage is done. Drop the rows once, at the point where a placement becomes
+ * an occupant, and the pet is gone from the pen board, the map, the guide and
+ * from the safety level a pen derives from who is standing in it — no
+ * migration, and no screen left restating the rule and getting it half right.
+ *
+ * That matters for placements already written. The property map's chips are
+ * draggable, and a dog drawn beside the herd is one slip away from the North
+ * Trap; a row created by that slip stops counting the moment this is applied,
+ * without anything being deleted out from under the history.
+ */
+export function penAssignments<T extends { readonly animalId: Ulid }>(
+  assignments: readonly T[],
+  animals: readonly Pick<Animal, "id" | "species">[],
+): T[] {
+  const pets = new Set(animals.filter(isPet).map((animal) => animal.id));
+  return assignments.filter((assignment) => !pets.has(assignment.animalId));
+}
+
+/**
  * A dated thing somebody said would come round again.
  *
  * `givenOn` is not a completion flag on this record — it is the date of a
