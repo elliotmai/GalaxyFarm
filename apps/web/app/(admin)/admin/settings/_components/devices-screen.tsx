@@ -22,9 +22,11 @@ import {
 import {
   addDevice,
   clearKioskPinAction,
+  deleteDeviceAction,
   lockDeviceAction,
   reissueDeviceAction,
   renameDeviceAction,
+  restoreDeviceAction,
   revokeDeviceAction,
   setKioskPinAction,
   type ActionResult,
@@ -110,11 +112,14 @@ function PairingCodeModal({ device, onClose }: { device: KioskDevice; onClose: (
 export function DevicesScreen({
   propertyId,
   devices,
+  deleted,
   pinSet,
   unavailable,
 }: {
   readonly propertyId: string;
   readonly devices: readonly KioskDevice[];
+  /** Tombstoned screens, restorable for the §4.5 clause 4 retention window. */
+  readonly deleted: readonly KioskDevice[];
   readonly pinSet: boolean;
   readonly unavailable?: string | undefined;
 }) {
@@ -175,6 +180,30 @@ export function DevicesScreen({
     run(() => revokeDeviceAction(device.id));
   }
 
+  /**
+   * Delete — §4.5 clause 3's Elevated tier, because it is a kiosk.
+   *
+   * The consequence differs by what the row is, and saying the wrong one is
+   * worse than saying nothing: a screen that is already revoked has nothing
+   * left to lose, and warning about one going dark would teach people to read
+   * past this dialog.
+   */
+  async function remove(device: KioskDevice) {
+    const live = device.revokedAt === undefined && device.pairedAt !== undefined;
+    const confirmed = await confirmDelete({
+      tier: "elevated",
+      recordName: device.name,
+      entity: "kiosk device",
+      dependents: [],
+      consequence: live
+        ? "This screen goes dark within a minute — the same as revoking it — and the row leaves this list. Restore it from Deleted screens and it picks itself back up without anybody walking out to the barn."
+        : "The row leaves this list. Nothing changes on the screen itself, which is already stopped. Restore it from Deleted screens if you want the record back.",
+    });
+    if (!confirmed) return;
+
+    run(() => deleteDeviceAction(device.id));
+  }
+
   function submitPin() {
     setPinError(undefined);
     if (!/^\d{4,8}$/.test(pinDraft)) {
@@ -213,6 +242,12 @@ export function DevicesScreen({
               hideLabel
               value={renameDraft}
               onChange={(event) => setRenameDraft(event.target.value)}
+              onKeyDown={(event) => {
+                // A rename is one field. Reaching for the mouse to commit it
+                // is the kind of friction that stops people fixing a typo.
+                if (event.key === "Enter") submitRename(device.id);
+                if (event.key === "Escape") setRenamingId(undefined);
+              }}
               autoFocus
             />
             <Button variant="primary" disabled={pending} onClick={() => submitRename(device.id)}>
@@ -307,6 +342,12 @@ export function DevicesScreen({
               </Button>
             </>
           )}
+          {/* Outside the guard above: a revoked screen has no other action
+              left, and clearing it out of the list is the whole reason it is
+              here. */}
+          <Button variant="ghost" disabled={pending} onClick={() => void remove(device)}>
+            Delete
+          </Button>
         </span>
       ),
     },
@@ -400,6 +441,35 @@ export function DevicesScreen({
           )}
         </Card>
       </Section>
+
+      {deleted.length === 0 ? null : (
+        <Section
+          title="Deleted screens"
+          description="Tombstoned rather than removed, so a screen deleted by mistake comes back as it was rather than as a walk out to the barn with a fresh code."
+        >
+          <Card>
+            <ul className="flex flex-col gap-2">
+              {deleted.map((device) => (
+                <li key={device.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="flex flex-col">
+                    <span className="text-ink">{device.name}</span>
+                    <span className="text-sm text-muted">
+                      Deleted {formatDate(device.deletedAt)}
+                    </span>
+                  </span>
+                  <Button
+                    variant="ghost"
+                    disabled={pending}
+                    onClick={() => run(() => restoreDeviceAction(device.id))}
+                  >
+                    Restore
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </Section>
+      )}
 
       {addingName === undefined ? null : (
         <Modal title="Add a screen" onClose={() => setAddingName(undefined)}>

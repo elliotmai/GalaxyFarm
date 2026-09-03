@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 
 import { encodeUlid, type Ulid } from "@galaxy-farm/core";
 import {
@@ -40,6 +40,7 @@ export interface KioskDevice {
   readonly lastSeenAt?: Date | undefined;
   readonly lockedToBoard?: string | undefined;
   readonly revokedAt?: Date | undefined;
+  readonly deletedAt?: Date | undefined;
 }
 
 function deviceFromRow(row: typeof kioskDevices.$inferSelect): KioskDevice {
@@ -55,6 +56,7 @@ function deviceFromRow(row: typeof kioskDevices.$inferSelect): KioskDevice {
     ...(row.lastSeenAt === null ? {} : { lastSeenAt: row.lastSeenAt }),
     ...(row.lockedToBoard === null ? {} : { lockedToBoard: row.lockedToBoard }),
     ...(row.revokedAt === null ? {} : { revokedAt: row.revokedAt }),
+    ...(row.deletedAt === null ? {} : { deletedAt: row.deletedAt }),
   };
 }
 
@@ -66,6 +68,10 @@ export function isRevoked(device: Pick<KioskDevice, "revokedAt">): boolean {
   return device.revokedAt !== undefined;
 }
 
+export function isDeleted(device: Pick<KioskDevice, "deletedAt">): boolean {
+  return device.deletedAt !== undefined;
+}
+
 export async function listDevices(
   propertyId: Ulid,
   db: Database = database(),
@@ -74,6 +80,20 @@ export async function listDevices(
     .select()
     .from(kioskDevices)
     .where(and(eq(kioskDevices.propertyId, propertyId), isNull(kioskDevices.deletedAt)))
+    .orderBy(asc(kioskDevices.name));
+
+  return rows.map(deviceFromRow);
+}
+
+/** Tombstoned screens, for the restore path (§4.5 clause 4). */
+export async function listDeletedDevices(
+  propertyId: Ulid,
+  db: Database = database(),
+): Promise<KioskDevice[]> {
+  const rows = await db
+    .select()
+    .from(kioskDevices)
+    .where(and(eq(kioskDevices.propertyId, propertyId), isNotNull(kioskDevices.deletedAt)))
     .orderBy(asc(kioskDevices.name));
 
   return rows.map(deviceFromRow);
@@ -100,7 +120,12 @@ export async function isDeviceLive(
   db: Database = database(),
 ): Promise<boolean> {
   const device = await findDevice(id, db);
-  return device !== undefined && device.propertyId === propertyId && !isRevoked(device);
+  return (
+    device !== undefined &&
+    device.propertyId === propertyId &&
+    !isRevoked(device) &&
+    !isDeleted(device)
+  );
 }
 
 /** A fresh, unpaired row with a code to hand over. */
@@ -269,15 +294,69 @@ export async function reissuePairing(
 
 /**
  * Revoke — spec §4.5's exception list names device pairing tokens explicitly:
- * "system-owned rows... revocable, not editable." Not a tombstone, and there
- * is deliberately no delete or restore to pair with it: a revoked screen
- * stays visible in Settings, greyed out, as the record that it existed and
- * when it stopped. Full CRUD does not apply here the way clause 1 requires it
- * everywhere else — this row is the named exception.
+ * "system-owned rows... revocable, not editable." The *token* is what that
+ * exempts: there is no editing a credential, only ending it. The row carrying
+ * it is an ordinary record, and it gets the ordinary surface — a name somebody
+ * can correct, and the tombstone below.
+ *
+ * Revoking is not deleting, and the two answer different questions. Revoke
+ * says *this screen has stopped*, and leaves the row in Settings, greyed out,
+ * as the record that it existed and when it ended. Delete says *stop showing
+ * me this row at all*.
  */
 export async function revokeDevice(id: Ulid, now: Date, db: Database = database()): Promise<void> {
   await db
     .update(kioskDevices)
     .set({ revokedAt: now, updatedAt: now })
+    .where(eq(kioskDevices.id, id));
+}
+
+/**
+ * Delete — a tombstone, never a `DELETE` (§4.5 clause 4).
+ *
+ * It stops the screen as surely as revoking does, and by the same mechanism:
+ * `authenticateDevice`, `redeemPairing` and `isDeviceLive` all pass over a
+ * tombstoned row, so a deleted screen loses its session and its pull within
+ * one sync interval whether it was revoked first or not.
+ *
+ * `revokedAt` is deliberately left alone. Clause 4 exists so the answer to
+ * "what if I confirm by mistake" is always "restore it", and that answer is
+ * only worth anything if restoring gives back what was there — a screen that
+ * was working goes on working, without somebody walking a fresh code out to
+ * the barn. Revoking as a side effect of deleting would take that back and
+ * charge a misclick the price of a trip to the barn.
+ *
+ * A live pairing code is left alone for the same reason, and unlike
+ * `tombstoneUser`'s invitation it costs nothing to leave: `redeemPairing`
+ * refuses a tombstoned row outright, so the code is unusable while the screen
+ * is deleted and usable again the moment it is not — which is what somebody
+ * standing in the barn with a code and a fifteen-minute clock needs a restore
+ * to mean.
+ */
+export async function tombstoneDevice(
+  id: Ulid,
+  by: Ulid,
+  now: Date,
+  reason?: string,
+  db: Database = database(),
+): Promise<void> {
+  await db
+    .update(kioskDevices)
+    .set({ deletedAt: now, deletedBy: by, deletedReason: reason ?? null, updatedAt: now })
+    .where(eq(kioskDevices.id, id));
+}
+
+/**
+ * Bring a tombstoned screen back (§4.5 clause 4).
+ *
+ * Its token survived the tombstone, so a screen that was paired and working
+ * when it was deleted is paired and working again — it fails a pull or two in
+ * between and retries, which is the same thing losing signal looks like. A
+ * pairing code that had not run out yet is live again too.
+ */
+export async function restoreDevice(id: Ulid, now: Date, db: Database = database()): Promise<void> {
+  await db
+    .update(kioskDevices)
+    .set({ deletedAt: null, deletedBy: null, deletedReason: null, updatedAt: now })
     .where(eq(kioskDevices.id, id));
 }

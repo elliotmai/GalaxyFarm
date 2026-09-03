@@ -6,7 +6,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { Ulid } from "@galaxy-farm/core";
-import type { Database } from "@galaxy-farm/infra-db";
+import { kioskDevices, type Database } from "@galaxy-farm/infra-db";
 
 import {
   authenticateDevice,
@@ -15,12 +15,15 @@ import {
   isDeviceLive,
   isPaired,
   isRevoked,
+  listDeletedDevices,
   listDevices,
   lockDeviceToBoard,
   redeemPairing,
   reissuePairing,
   renameDevice,
+  restoreDevice,
   revokeDevice,
+  tombstoneDevice,
 } from "../lib/device-store.js";
 
 /**
@@ -35,6 +38,7 @@ const MIGRATIONS_DIR = join(process.cwd(), "packages/infrastructure/db/migration
 
 const PROPERTY = "01ARZ3NDEKTSV4RRFFQ69G5FP1" as Ulid;
 const OTHER_PROPERTY = "01ARZ3NDEKTSV4RRFFQ69G5FP2" as Ulid;
+const OWNER = "01ARZ3NDEKTSV4RRFFQ69G5FU1" as Ulid;
 const NOW = new Date("2026-06-15T12:00:00Z");
 
 let client: PGlite;
@@ -223,5 +227,100 @@ describe("listDevices", () => {
     const devices = await listDevices(PROPERTY, db);
 
     expect(devices.map((d) => d.name)).toEqual(["Barn TV", "Coop tablet"]);
+  });
+});
+
+describe("tombstoneDevice / restoreDevice", () => {
+  it("takes the screen out of the list and into the deleted one (§4.5 clause 4)", async () => {
+    const device = await createDevice({ propertyId: PROPERTY, name: "Barn TV" }, NOW, db);
+
+    await tombstoneDevice(device.id, OWNER, NOW, undefined, db);
+
+    expect(await listDevices(PROPERTY, db)).toEqual([]);
+    expect((await listDeletedDevices(PROPERTY, db)).map((d) => d.name)).toEqual(["Barn TV"]);
+  });
+
+  it("writes a tombstone rather than removing the row", async () => {
+    const device = await createDevice({ propertyId: PROPERTY, name: "Barn TV" }, NOW, db);
+
+    await tombstoneDevice(device.id, OWNER, NOW, "screen was dropped", db);
+    const [row] = await db.select().from(kioskDevices);
+
+    expect(row?.deletedAt?.getTime()).toBe(NOW.getTime());
+    expect(row?.deletedBy).toBe(OWNER);
+    expect(row?.deletedReason).toBe("screen was dropped");
+  });
+
+  it("stops a paired screen, the same as revoking does", async () => {
+    // The point of the deadline in §4.4: a deleted screen has to stop pulling
+    // and stop writing, not merely vanish from a list in the house.
+    const device = await createDevice({ propertyId: PROPERTY, name: "Barn TV" }, NOW, db);
+    const { token } = (await redeemPairing(device.pairingCode!, NOW, db))!;
+
+    await tombstoneDevice(device.id, OWNER, NOW, undefined, db);
+
+    expect(await isDeviceLive(device.id, PROPERTY, db)).toBe(false);
+    expect(await authenticateDevice(token, NOW, db)).toBeUndefined();
+  });
+
+  it("refuses a pairing code that was still live when the screen was deleted", async () => {
+    const device = await createDevice({ propertyId: PROPERTY, name: "Barn TV" }, NOW, db);
+
+    await tombstoneDevice(device.id, OWNER, NOW, undefined, db);
+
+    expect(await redeemPairing(device.pairingCode!, NOW, db)).toBeUndefined();
+  });
+
+  it("gives back a working screen on restore, without a trip to the barn", async () => {
+    // Clause 4's whole point: the answer to "what if I confirm by mistake" is
+    // "restore it", and that is only worth anything if the screen comes back
+    // as it was rather than as a fresh code somebody has to walk out with.
+    const device = await createDevice({ propertyId: PROPERTY, name: "Barn TV" }, NOW, db);
+    const { token } = (await redeemPairing(device.pairingCode!, NOW, db))!;
+    await tombstoneDevice(device.id, OWNER, NOW, undefined, db);
+
+    await restoreDevice(device.id, NOW, db);
+
+    expect((await listDevices(PROPERTY, db)).map((d) => d.name)).toEqual(["Barn TV"]);
+    expect(await listDeletedDevices(PROPERTY, db)).toEqual([]);
+    expect(await isDeviceLive(device.id, PROPERTY, db)).toBe(true);
+    expect((await authenticateDevice(token, NOW, db))?.id).toBe(device.id);
+  });
+
+  it("clears the whole tombstone, so a restored screen can be deleted again", async () => {
+    const device = await createDevice({ propertyId: PROPERTY, name: "Barn TV" }, NOW, db);
+    await tombstoneDevice(device.id, OWNER, NOW, "a reason", db);
+
+    await restoreDevice(device.id, NOW, db);
+    const [row] = await db.select().from(kioskDevices);
+
+    expect(row?.deletedAt).toBeNull();
+    expect(row?.deletedBy).toBeNull();
+    expect(row?.deletedReason).toBeNull();
+  });
+
+  it("does not quietly un-revoke a screen that was already stopped", async () => {
+    // Deleting a revoked screen is tidying the list, not reinstating it.
+    const device = await createDevice({ propertyId: PROPERTY, name: "Barn TV" }, NOW, db);
+    await revokeDevice(device.id, NOW, db);
+    await tombstoneDevice(device.id, OWNER, NOW, undefined, db);
+
+    await restoreDevice(device.id, NOW, db);
+
+    expect(isRevoked((await findDevice(device.id, db))!)).toBe(true);
+    expect(await isDeviceLive(device.id, PROPERTY, db)).toBe(false);
+  });
+
+  it("lists only the requesting property's tombstones", async () => {
+    const mine = await createDevice({ propertyId: PROPERTY, name: "Barn TV" }, NOW, db);
+    const theirs = await createDevice(
+      { propertyId: OTHER_PROPERTY, name: "Someone else's screen" },
+      NOW,
+      db,
+    );
+    await tombstoneDevice(mine.id, OWNER, NOW, undefined, db);
+    await tombstoneDevice(theirs.id, OWNER, NOW, undefined, db);
+
+    expect((await listDeletedDevices(PROPERTY, db)).map((d) => d.name)).toEqual(["Barn TV"]);
   });
 });

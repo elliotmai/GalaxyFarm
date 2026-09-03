@@ -8,10 +8,13 @@ import { currentActor } from "@/lib/auth";
 import {
   createDevice,
   findDevice,
+  isDeleted,
   lockDeviceToBoard,
   reissuePairing,
   renameDevice,
+  restoreDevice,
   revokeDevice,
+  tombstoneDevice,
   type KioskDevice,
 } from "@/lib/device-store";
 import { clearKioskPin, setKioskPin } from "@/lib/kiosk-pin-store";
@@ -147,6 +150,56 @@ export async function revokeDeviceAction(id: string): Promise<ActionResult> {
   await revokeDevice(device.id, new Date());
   revalidated();
   return { ok: true, message: `${device.name} revoked. It will stop syncing shortly.` };
+}
+
+/**
+ * Delete — a tombstone the screen can be brought back from (§4.5 clause 4).
+ *
+ * Elevated rather than Typed: it is a screen, not an aggregate root, and
+ * nothing on the farm is recorded against it — its three whitelisted writes
+ * are attributed to the device, and they stay attributed to it whether the row
+ * is in the list or in the tombstones. What makes it more than Standard is
+ * that a live screen goes dark, which is §4.5's "anything on a kiosk".
+ */
+export async function deleteDeviceAction(id: string, reason?: string): Promise<ActionResult> {
+  const actor = await managingActor();
+  if (actor === undefined) return REFUSED;
+
+  const device = await owned(id, actor.propertyId);
+  if (device === undefined) return { ok: false, error: "That screen is not on this property." };
+  if (isDeleted(device)) return { ok: false, error: `${device.name} is already deleted.` };
+
+  // The write half of an Elevated confirmation devices-screen.tsx's client
+  // component already showed before calling deleteDeviceAction.
+  // crud-guard: allow-unconfirmed — confirmed client-side before this runs
+  await tombstoneDevice(device.id, actor.id, new Date(), reason);
+  revalidated();
+  return {
+    ok: true,
+    message: `${device.name} deleted. Restore it from Deleted screens if that was a slip.`,
+  };
+}
+
+export async function restoreDeviceAction(id: string): Promise<ActionResult> {
+  const actor = await managingActor();
+  if (actor === undefined) return REFUSED;
+
+  const device = await owned(id, actor.propertyId);
+  if (device === undefined) return { ok: false, error: "That screen is not on this property." };
+  if (!isDeleted(device)) return { ok: false, error: `${device.name} is not deleted.` };
+
+  await restoreDevice(device.id, new Date());
+  revalidated();
+  return {
+    ok: true,
+    // Said out loud because a restored screen picks its own session back up
+    // without anybody touching it, which is not what "restore" implies
+    // everywhere else in the app.
+    message:
+      device.revokedAt === undefined && device.pairedAt !== undefined
+        ? `${device.name} restored, and syncing again shortly.`
+        : `${device.name} restored.`,
+  };
 }
 
 export async function setKioskPinAction(pin: string): Promise<ActionResult> {

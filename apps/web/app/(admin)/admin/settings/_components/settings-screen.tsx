@@ -40,6 +40,7 @@ export function SettingsScreen({
   mayManageBranding,
   mayManageDevices,
   devices,
+  deletedDevices,
   pinSet,
   pushDevices,
   notificationSettings,
@@ -59,6 +60,8 @@ export function SettingsScreen({
   /** `devices.manage` — owners only, the same reasoning as `users.manage`. */
   readonly mayManageDevices: boolean;
   readonly devices: readonly KioskDevice[];
+  /** Tombstoned screens, for the §4.5 clause 4 restore path. */
+  readonly deletedDevices: readonly KioskDevice[];
   readonly pinSet: boolean;
   /** This person's own subscribed browsers, and their §6 preferences. */
   readonly pushDevices: readonly PushDevice[];
@@ -137,6 +140,7 @@ export function SettingsScreen({
               <DevicesScreen
                 propertyId={propertyId}
                 devices={devices}
+                deleted={deletedDevices}
                 pinSet={pinSet}
                 {...(devicesUnavailable === undefined ? {} : { unavailable: devicesUnavailable })}
               />
