@@ -143,10 +143,7 @@ export function PlantingsScreen({
           {
             id: "plan",
             label: "Season plan",
-            adornment:
-              openNow.length === 0 ? undefined : (
-                <span className="gf-numeric text-xs text-action">{openNow.length}</span>
-              ),
+            adornment: openNow.length === 0 ? undefined : openNow.length,
           },
         ]}
       >
