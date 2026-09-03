@@ -35,6 +35,7 @@ import {
   type ZoneAssignment,
   type ZoneType,
 } from "@galaxy-farm/core";
+import { penAssignments } from "@galaxy-farm/module-pets";
 
 import { useMutations } from "@/lib/local/mutations";
 
@@ -107,9 +108,16 @@ export function ZonesPanel({
     return animal?.name ?? animal?.tagNumber ?? "Untagged animal";
   };
 
-  /** Who is standing in a zone right now — an assignment with no end date. */
+  /**
+   * Who is standing in a zone right now — an assignment with no end date.
+   *
+   * Pets are not among them (§5.8): a dog has no pen, so counting one against
+   * a pasture's capacity, or naming one in the dialog that asks whether the
+   * pasture may be deleted, is counting something that is not there.
+   */
+  const placements = penAssignments(assignments, animals);
   const occupantsOf = (zone: Zone) =>
-    assignments.filter((a) => a.zoneId === zone.id && a.periodTo === undefined);
+    placements.filter((a) => a.zoneId === zone.id && a.periodTo === undefined);
 
   const mutations = useMutations<Zone>("zones", "zones", zoneSchema, propertyId, actorId);
   const confirmDelete = useConfirmDelete();

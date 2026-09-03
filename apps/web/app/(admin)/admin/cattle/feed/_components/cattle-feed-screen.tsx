@@ -39,6 +39,7 @@ import {
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
+import { penAssignments } from "@galaxy-farm/module-pets";
 import {
   describeGrain,
   herdDemand,
@@ -126,16 +127,18 @@ export function CattleFeedScreen({
    * rather than one, and it restates each ration in the unit its feed is
    * counted in, so a plan written in scoops does not read as bags.
    */
-  const animalScopes = useMemo(
-    () =>
-      animals
-        .filter((animal) => animal.status === "active")
-        .map((animal) => ({
-          id: animal.id,
-          zoneIds: openAssignments(assignments, animal.id).map((entry) => entry.zoneId),
-        })),
-    [animals, assignments],
-  );
+  const animalScopes = useMemo(() => {
+    // Pets bring no pens (§5.8), so a placement naming one — the property map
+    // used to let somebody drag the dog onto a pasture — cannot put him on
+    // that pen's ration and add a dog's worth of cubes to the herd's demand.
+    const placements = penAssignments(assignments, animals);
+    return animals
+      .filter((animal) => animal.status === "active")
+      .map((animal) => ({
+        id: animal.id,
+        zoneIds: openAssignments(placements, animal.id).map((entry) => entry.zoneId),
+      }));
+  }, [animals, assignments]);
 
   const herd = useMemo(
     () =>

@@ -37,6 +37,7 @@ import {
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
+import { penAssignments } from "@galaxy-farm/module-pets";
 import {
   allocateFeedCost,
   costPerHead,
@@ -126,15 +127,21 @@ export function FeedScreen({
     [animals],
   );
 
-  /** Each animal with the pens it is standing in — both slots, outside and in. */
-  const animalScopes = useMemo(
-    () =>
-      liveAnimals.map((animal) => ({
-        id: animal.id,
-        zoneIds: openAssignments(assignments, animal.id).map((entry) => entry.zoneId),
-      })),
-    [liveAnimals, assignments],
-  );
+  /**
+   * Each animal with the pens it is standing in — both slots, outside and in.
+   *
+   * Pets bring none (§5.8): a dog has no pen, so a placement naming one — the
+   * property map used to let somebody drag him onto a pasture — would put him
+   * on that pen's ration and add a dog's worth of range cubes to what the herd
+   * is projected to eat. His own bowl is an animal-target plan and is unaffected.
+   */
+  const animalScopes = useMemo(() => {
+    const placements = penAssignments(assignments, liveAnimals);
+    return liveAnimals.map((animal) => ({
+      id: animal.id,
+      zoneIds: openAssignments(placements, animal.id).map((entry) => entry.zoneId),
+    }));
+  }, [liveAnimals, assignments]);
 
   /**
    * Daily demand per feed type, summed over the herd (§5.3).

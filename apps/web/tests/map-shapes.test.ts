@@ -104,6 +104,18 @@ describe("zoneShapes", () => {
     expect(zoneShapes([TRAP], [BULL], [closed], new Date("2026-02-01T00:00:00Z"))[0]?.rank).toBe(5);
   });
 
+  it("does not let a pet dragged into a pen colour the pen", () => {
+    // The slip this is written for: a dog was dragged onto a pen on the map,
+    // and the row that wrote is still there. A pen is not somewhere a pet is
+    // (§5.8), so it must not inherit his handling level — a green trap gone
+    // red because the house dog bites strangers is a pen nobody trusts again.
+    const dog = animal({ id: id(12), name: "Rusty", species: "dog", safetyLevel: 5 });
+    const [shape] = zoneShapes([TRAP], [dog], [assignment(dog.id, TRAP.id)], NOW);
+
+    expect(shape?.rank).toBe(2);
+    expect(shape?.instructions).toEqual([]);
+  });
+
   it("refuses drops on ground that holds nothing", () => {
     const shapes = zoneShapes(
       [
@@ -232,6 +244,34 @@ describe("animalChips", () => {
     );
 
     expect(chips.map((chip) => chip.label)).toEqual(["Ranger"]);
+  });
+
+  it("keeps the dogs and the cats off it altogether", () => {
+    // Reported: a pet was dragged into a pen it has no business in. It was
+    // draggable because it was drawn — a pet has no pen (§5.8), so its chip
+    // sat in the tray of animals not on the map, in among the stock, one
+    // gesture from the North Trap. The fix is that there is no chip.
+    const chips = animalChips(
+      [TRAP],
+      [
+        animal({ id: id(26), name: "Rusty", species: "dog" }),
+        animal({ id: id(27), name: "Biscuit", species: "cat" }),
+        BULL,
+      ],
+      [],
+      NOW,
+    );
+
+    expect(chips.map((chip) => chip.label)).toEqual(["Ranger"]);
+  });
+
+  it("keeps a pet off it even while a stray placement still names one", () => {
+    // The row a mis-drag already wrote. Nothing is deleted — the history is
+    // append-only — so what has to be true is that it draws nothing.
+    const dog = animal({ id: id(28), name: "Rusty", species: "dog" });
+    const chips = animalChips([TRAP], [dog], [assignment(dog.id, TRAP.id)], NOW);
+
+    expect(chips).toEqual([]);
   });
 
   it("carries her own safety level, and why she is that level", () => {

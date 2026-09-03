@@ -23,6 +23,7 @@ import {
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
+import { penAssignments } from "@galaxy-farm/module-pets";
 
 import { CalvingWatchCard } from "@/app/(admin)/admin/_components/calving-watch-card";
 import { WeaningCard } from "@/app/(admin)/admin/_components/weaning-card";
@@ -68,7 +69,11 @@ export function Dashboard({
     return <SkeletonScreen title="Today" stats={4} rows={5} />;
   }
 
-  const inUse = new Set(assignments.filter((a) => a.periodTo === undefined).map((a) => a.zoneId))
+  // Pens hold stock, not pets (§5.8). A dog with a placement behind him — a
+  // mis-drag on the property map writes one — must not put a pen "in use" or
+  // hand it his handling level on the board below.
+  const placements = penAssignments(assignments, animals);
+  const inUse = new Set(placements.filter((a) => a.periodTo === undefined).map((a) => a.zoneId))
     .size;
   /**
    * Tanks that are out with nothing over them.
@@ -146,7 +151,7 @@ export function Dashboard({
       */}
       <ChoresCard propertyId={propertyId} actorId={actorId} />
 
-      <PenBoard zones={zones} animals={animals} assignments={assignments} />
+      <PenBoard zones={zones} animals={animals} assignments={placements} />
       <FreezeWatch zones={zones} water={water} />
     </div>
   );
