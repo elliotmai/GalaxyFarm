@@ -57,10 +57,30 @@ export default async function KioskPairPage({
       {paired ? <ResumeScreen next={next} /> : <PairForm />}
 
       {paired ? null : (
-        <p className="max-w-sm text-center text-sm text-muted">
-          Get a code from Settings → Kiosk devices on any signed-in phone or laptop, then type it in
-          above. The code is good for fifteen minutes and works once.
-        </p>
+        <>
+          <p className="max-w-sm text-center text-sm text-muted">
+            Get a code from Settings → Kiosk devices on any signed-in phone or laptop, then type it
+            in above. The code is good for fifteen minutes and works once.
+          </p>
+
+          {/*
+           * The way out for the one visitor who is not a barn screen: an owner
+           * on a laptop who followed a bookmark to a board while signed out.
+           * `middleware.ts` sends every signed-out visitor on this surface
+           * here, which is right for the wall-mounted case and wrong for them.
+           *
+           * `as=person` is what stops `/login` bouncing straight back — it
+           * redirects a kiosk-bound visitor here precisely so a screen cannot
+           * strand itself on the public surface, and this is the marker that
+           * says the thing asking has a keyboard.
+           */}
+          <a
+            className="text-sm text-muted underline"
+            href={`/login?next=${encodeURIComponent(next)}&as=person`}
+          >
+            Sign in as yourself instead
+          </a>
+        </>
       )}
     </div>
   );
