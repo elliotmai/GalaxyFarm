@@ -158,6 +158,36 @@ test.describe("pairing a barn screen", () => {
 
     await expect(page.getByRole("button", { name: /pair this screen/i })).toBeVisible();
   });
+
+  test("a stale link to /login for a board does not leave a screen sitting there", async ({
+    page,
+  }) => {
+    // The link every screen stranded by the old build is holding. `/login`
+    // renders on the public surface, whose PWA shell offers a new build on a
+    // bar rather than applying it — so a barn screen that stops here is pinned
+    // to that build for good and no later fix ever reaches it.
+    await page.goto("/login?next=%2Fkiosk%2Fpen-board");
+
+    await expect(page).toHaveURL(/\/kiosk\/pair\?next=%2Fkiosk%2Fpen-board/);
+  });
+
+  test("a person following the same link can still sign in as themselves", async ({ page }) => {
+    // An owner on a laptop with a bookmark to a board. The redirect above is
+    // for screens, and `as=person` is how they say they are not one.
+    await page.goto("/login?next=%2Fkiosk%2Fpen-board&as=person");
+
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.getByLabel(/email/i)).toBeVisible();
+  });
+
+  test("the pairing screen offers that way out rather than dead-ending a person", async ({
+    page,
+  }) => {
+    await page.goto("/kiosk/pen-board");
+
+    await page.getByRole("link", { name: /sign in as yourself/i }).click();
+    await expect(page.getByLabel(/email/i)).toBeVisible();
+  });
 });
 
 test.describe("public surfaces", () => {

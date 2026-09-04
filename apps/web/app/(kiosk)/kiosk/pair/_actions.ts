@@ -110,6 +110,27 @@ export async function resumeKioskSession(): Promise<ResumeResult> {
     return { ok: false, why: "unpaired" };
   }
 
+  /**
+   * Said out loud on the way past, and this is the only place it can be said.
+   *
+   * A resume happening at all means a session went missing, and *why* sessions
+   * go missing here is still not known — the screens report it periodically and
+   * nothing in the app records when. This line is the record: one entry per
+   * lost session, with the device and the moment, in the function log. A day
+   * of them answers the question that guessing has not — whether it is one
+   * screen or all of them, whether it clusters at a time of day, whether it
+   * tracks a deploy.
+   *
+   * `warn` rather than `error`: the recovery worked, so nothing is broken for
+   * whoever is standing there — but a session that went missing on its own is
+   * not normal, and logging it at a level the eye skips would defeat the
+   * point. It becomes noise only once it stops happening, which is exactly
+   * when it can be deleted.
+   */
+  console.warn(
+    `[kiosk:resume] device=${device.id} name=${JSON.stringify(device.name)} at=${new Date().toISOString()} — session was missing, signing back in`,
+  );
+
   let outcome: unknown;
   try {
     outcome = await signIn("kiosk-device", { token, redirect: false });
