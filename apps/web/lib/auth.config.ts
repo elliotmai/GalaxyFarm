@@ -23,7 +23,8 @@ declare module "next-auth" {
 }
 
 export const authConfig = {
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
+  jwt: { maxAge: 30 * 24 * 60 * 60 },
   pages: { signIn: "/login" },
   // Auth.js refuses to trust the Host header unless it is told to, and off
   // Vercel that refusal surfaces as an opaque `UntrustedHost` on the first
