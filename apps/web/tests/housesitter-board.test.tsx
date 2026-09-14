@@ -42,7 +42,7 @@ const guide: CareGuide = {
   updatedAt: NOW,
   title: "While we are away",
   intro: "Gate code is 4417.",
-  includes: ["emergency_contacts", "custom"],
+  includes: ["emergency_contacts", "custom", "chores"],
   active: true,
 };
 
@@ -56,6 +56,17 @@ const section: GuideSection = {
   bodyMarkdown: "Pull the choke out fully before starting it.",
   order: 0,
 };
+
+const weeklyChore: ChoreTemplate = {
+  id: id(5),
+  propertyId: PROPERTY,
+  createdAt: NOW,
+  updatedAt: NOW,
+  title: "Top up the mineral tubs",
+  recurrence: "weekly",
+  recurrenceDays: [2],
+  active: true,
+} as unknown as ChoreTemplate;
 
 const vet: Contact = {
   id: id(3),
@@ -103,7 +114,7 @@ function renderBoard(overrides: { trip?: Trip | undefined } = {}) {
       assignments={[] as ZoneAssignment[]}
       animals={[] as Animal[]}
       contacts={[vet]}
-      templates={[] as ChoreTemplate[]}
+      templates={[weeklyChore]}
       plans={[] as FeedingPlan[]}
       feeds={[] as FeedType[]}
       health={[] as HealthRecord[]}
@@ -190,5 +201,26 @@ describe("the journey", () => {
     await userEvent.click(screen.getByRole("tab", { name: /Travel/ }));
 
     expect(screen.getByText(/F9 4018/)).toBeInTheDocument();
+  });
+});
+
+describe("pens, rations and the routine are one view", () => {
+  it("offers no separate Feeding tab to get lost between", () => {
+    renderBoard();
+
+    expect(screen.queryByRole("tab", { name: /Feeding/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /The animals/ })).toBeInTheDocument();
+  });
+
+  it("puts the standing routine in with the animals rather than under Notes", async () => {
+    renderBoard();
+
+    await userEvent.click(screen.getByRole("tab", { name: /The animals/ }));
+    expect(screen.getByText(/Top up the mineral tubs/)).toBeInTheDocument();
+
+    // It used to live under Notes, which meant a sitter read the pens, then
+    // went hunting in a second panel for whether anything was due weekly.
+    await userEvent.click(screen.getByRole("tab", { name: /Notes/ }));
+    expect(screen.queryByText(/Top up the mineral tubs/)).not.toBeInTheDocument();
   });
 });

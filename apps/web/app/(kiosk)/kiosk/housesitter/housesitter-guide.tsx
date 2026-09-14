@@ -143,19 +143,35 @@ export function HousesitterGuide({
   const custom = composed?.custom ?? [];
   const intro = composed?.intro;
 
+  /**
+   * Pens, rations and the standing routine are one tab, not three.
+   *
+   * They are three answers to one question — *what does this place need from
+   * me* — and splitting them made the sitter the one joining them up: read the
+   * pens, tap across for the ration, tap again for whether it is a Tuesday
+   * thing. Consolidated, a pen and the ration that feeds it are on screen
+   * together.
+   *
+   * They stay three headed sections inside that tab rather than folding the
+   * rations into each pen, because they genuinely do not line up one-to-one —
+   * `care-guide.ts` sets out why at length: a group plan covers the whole
+   * place, an animal plan follows one cow between pens, and folding either
+   * into a pen section prints it everywhere or nowhere.
+   */
   const tabs: TabDefinition[] = [
     { id: "today", label: "Today", ...(choresLeft > 0 ? { adornment: choresLeft } : {}) },
   ];
-  if (pens.length > 0 || pets.length > 0) {
-    tabs.push({ id: "animals", label: "Animals", adornment: pens.length + pets.length });
+  if (pens.length > 0 || pets.length > 0 || feeding.length > 0 || routine.length > 0) {
+    tabs.push({
+      id: "care",
+      label: "The animals",
+      adornment: pens.length + pets.length,
+    });
   }
-  if (feeding.length > 0) tabs.push({ id: "feeding", label: "Feeding", adornment: feeding.length });
   if (people.length > 0)
     tabs.push({ id: "contacts", label: "Who to ring", adornment: people.length });
   if (trip !== undefined) tabs.push({ id: "travel", label: "Travel" });
-  if (intro !== undefined || custom.length > 0 || routine.length > 0) {
-    tabs.push({ id: "notes", label: "Notes" });
-  }
+  if (intro !== undefined || custom.length > 0) tabs.push({ id: "notes", label: "Notes" });
 
   return (
     <div className="flex flex-col gap-density">
@@ -175,98 +191,140 @@ export function HousesitterGuide({
         {(active) => {
           if (active === "today") return <Panel title="Today">{today}</Panel>;
 
-          if (active === "animals") {
+          if (active === "care") {
             return (
               <Panel title="The animals">
-                {pens.map((pen) => (
-                  <div key={pen.zoneId} className="border-l-2 border-edge pl-3">
-                    <p className="flex flex-wrap items-center gap-2 font-medium">
-                      <SafetyBadge level={pen.effectiveLevel} showLabel size="compact" />
-                      {pen.zoneName}
-                    </p>
-                    {pen.animals.length === 0 ? (
-                      <p className="text-muted">Empty at the moment.</p>
-                    ) : (
-                      <ul className="flex flex-col gap-0.5">
-                        {pen.animals.map((animal) => (
-                          <li key={animal.id}>
-                            {animal.name}
-                            {animal.safetyNotes === undefined ? null : (
-                              <span className="text-muted"> — {animal.safetyNotes}</span>
+                {/* Two columns on a barn screen, because this tab is now three
+                    sections and a single column of them is the scroll the tabs
+                    were built to remove. Stacks on anything narrower. */}
+                <div className="grid items-start gap-density lg:grid-cols-2">
+                  <div className="flex flex-col gap-2">
+                    {pens.length === 0 && pets.length === 0 ? null : (
+                      <h3 className="text-xs font-medium uppercase tracking-wide text-ink">
+                        In the pens
+                      </h3>
+                    )}
+
+                    {pens.map((pen) => (
+                      <div key={pen.zoneId} className="border-l-2 border-edge pl-3">
+                        <p className="flex flex-wrap items-center gap-2 font-medium">
+                          <SafetyBadge level={pen.effectiveLevel} showLabel size="compact" />
+                          {pen.zoneName}
+                        </p>
+                        {pen.animals.length === 0 ? (
+                          <p className="text-muted">Empty at the moment.</p>
+                        ) : (
+                          <ul className="flex flex-col gap-0.5">
+                            {pen.animals.map((animal) => (
+                              <li key={animal.id}>
+                                {animal.name}
+                                {animal.safetyNotes === undefined ? null : (
+                                  <span className="text-muted"> — {animal.safetyNotes}</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {pen.instructions.length === 0 ? null : (
+                          <ul className="flex list-disc flex-col gap-0.5 pl-5">
+                            {pen.instructions.map((instruction, index) => (
+                              <li key={`${instruction.sourceId}-${index}`}>
+                                {instruction.text}{" "}
+                                <span className="text-muted">
+                                  (
+                                  {instruction.source === "zone"
+                                    ? "this pen"
+                                    : instruction.sourceName}
+                                  )
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
+
+                    {pets.map((pet) => (
+                      <div key={pet.animalId} className="border-l-2 border-edge pl-3">
+                        <p className="flex flex-wrap items-center gap-2 font-medium">
+                          <SafetyBadge level={pet.safetyLevel} showLabel size="compact" />
+                          {pet.name}
+                          <span className="font-normal text-muted">{pet.species}</span>
+                        </p>
+                        {pet.safetyNotes === undefined ? null : <p>{pet.safetyNotes}</p>}
+                        {pet.instructions === undefined ? null : (
+                          <p className="whitespace-pre-wrap">{pet.instructions}</p>
+                        )}
+                        {pet.feeding.length === 0 ? (
+                          <p className="text-danger">
+                            No ration written down — ask before feeding.
+                          </p>
+                        ) : (
+                          <ul className="flex list-disc flex-col gap-0.5 pl-5">
+                            {pet.feeding.map((line) => (
+                              <li key={line}>{line}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {pet.medicines.length === 0 ? null : (
+                          <p>
+                            <strong>On now:</strong> {pet.medicines.join("; ")}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    {feeding.length === 0 ? null : (
+                      <>
+                        <h3 className="text-xs font-medium uppercase tracking-wide text-ink">
+                          The rations
+                        </h3>
+                        {feeding.map((plan) => (
+                          <div key={plan.id} className="border-l-2 border-edge pl-3">
+                            <p className="font-medium">
+                              {plan.who}
+                              <span className="font-normal text-muted"> · {plan.name}</span>
+                            </p>
+                            {plan.portion === undefined ? null : (
+                              <p className="text-muted">{plan.portion}</p>
                             )}
-                          </li>
+                            <ul className="flex list-disc flex-col gap-0.5 pl-5">
+                              {plan.lines.map((line, index) => (
+                                <li key={`${plan.id}-${index}`}>{line}</li>
+                              ))}
+                            </ul>
+                            {plan.notes === undefined ? null : (
+                              <p className="whitespace-pre-wrap">{plan.notes}</p>
+                            )}
+                          </div>
                         ))}
-                      </ul>
+                      </>
                     )}
-                    {pen.instructions.length === 0 ? null : (
-                      <ul className="flex list-disc flex-col gap-0.5 pl-5">
-                        {pen.instructions.map((instruction, index) => (
-                          <li key={`${instruction.sourceId}-${index}`}>
-                            {instruction.text}{" "}
-                            <span className="text-muted">
-                              ({instruction.source === "zone" ? "this pen" : instruction.sourceName}
-                              )
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
 
-                {pets.map((pet) => (
-                  <div key={pet.animalId} className="border-l-2 border-edge pl-3">
-                    <p className="flex flex-wrap items-center gap-2 font-medium">
-                      <SafetyBadge level={pet.safetyLevel} showLabel size="compact" />
-                      {pet.name}
-                      <span className="font-normal text-muted">{pet.species}</span>
-                    </p>
-                    {pet.safetyNotes === undefined ? null : <p>{pet.safetyNotes}</p>}
-                    {pet.instructions === undefined ? null : (
-                      <p className="whitespace-pre-wrap">{pet.instructions}</p>
-                    )}
-                    {pet.feeding.length === 0 ? (
-                      <p className="text-danger">No ration written down — ask before feeding.</p>
-                    ) : (
-                      <ul className="flex list-disc flex-col gap-0.5 pl-5">
-                        {pet.feeding.map((line) => (
-                          <li key={line}>{line}</li>
-                        ))}
-                      </ul>
-                    )}
-                    {pet.medicines.length === 0 ? null : (
-                      <p>
-                        <strong>On now:</strong> {pet.medicines.join("; ")}
-                      </p>
+                    {routine.length === 0 ? null : (
+                      <>
+                        <h3 className="text-xs font-medium uppercase tracking-wide text-ink">
+                          The routine, beyond today&rsquo;s list
+                        </h3>
+                        <ul className="flex flex-col gap-0.5">
+                          {routine.map((chore) => (
+                            <li key={chore.id}>
+                              <strong>{chore.when}</strong> — {chore.title}
+                              {chore.zoneName === undefined ? null : (
+                                <span className="text-muted"> ({chore.zoneName})</span>
+                              )}
+                              {chore.detail === undefined ? null : (
+                                <span className="text-muted"> · {chore.detail}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
                     )}
                   </div>
-                ))}
-              </Panel>
-            );
-          }
-
-          if (active === "feeding") {
-            return (
-              <Panel title="Feeding the cattle">
-                {feeding.map((plan) => (
-                  <div key={plan.id} className="border-l-2 border-edge pl-3">
-                    <p className="font-medium">
-                      {plan.who}
-                      <span className="font-normal text-muted"> · {plan.name}</span>
-                    </p>
-                    {plan.portion === undefined ? null : (
-                      <p className="text-muted">{plan.portion}</p>
-                    )}
-                    <ul className="flex list-disc flex-col gap-0.5 pl-5">
-                      {plan.lines.map((line, index) => (
-                        <li key={`${plan.id}-${index}`}>{line}</li>
-                      ))}
-                    </ul>
-                    {plan.notes === undefined ? null : (
-                      <p className="whitespace-pre-wrap">{plan.notes}</p>
-                    )}
-                  </div>
-                ))}
+                </div>
               </Panel>
             );
           }
@@ -322,31 +380,14 @@ export function HousesitterGuide({
               <Panel title="Notes">
                 {intro === undefined ? null : <p className="whitespace-pre-wrap">{intro}</p>}
 
+                {/* The routine used to sit here. It moved in beside the pens
+                    and the rations, where it is about the same animals. */}
                 {custom.map((section) => (
                   <div key={section.id} className="flex flex-col gap-1">
                     <h3 className="font-medium text-ink">{section.title}</h3>
                     <p className="whitespace-pre-wrap">{section.bodyMarkdown}</p>
                   </div>
                 ))}
-
-                {routine.length === 0 ? null : (
-                  <div className="flex flex-col gap-1">
-                    <h3 className="font-medium text-ink">The routine, beyond today&rsquo;s list</h3>
-                    <ul className="flex flex-col gap-0.5">
-                      {routine.map((chore) => (
-                        <li key={chore.id}>
-                          <strong>{chore.when}</strong> — {chore.title}
-                          {chore.zoneName === undefined ? null : (
-                            <span className="text-muted"> ({chore.zoneName})</span>
-                          )}
-                          {chore.detail === undefined ? null : (
-                            <span className="text-muted"> · {chore.detail}</span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </Panel>
             );
           }
