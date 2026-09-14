@@ -92,6 +92,10 @@ export const SEARCHABLE_FIELDS = {
   attachments: ["filename", "caption"],
   careGuides: ["title", "intro"],
   guideSections: ["title", "bodyMarkdown"],
+  // Not the legs: they are inside a jsonb field, and this searches text
+  // columns. Nobody looks a trip up by flight number anyway — they look it up
+  // by where it went or who was away.
+  trips: ["name", "destination", "whoIsAway", "notes"],
   choreTemplates: ["title", "detail"],
   tasks: ["title", "detail"],
   calendarEvents: ["title", "detail"],

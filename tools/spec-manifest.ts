@@ -562,6 +562,14 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     status: "built",
   },
 
+  Trip: {
+    section: "5.10",
+    kind: "entity",
+    declares: ["tripSchema", "awayWindow", "currentTrip"],
+    phase: "Phase 4",
+    status: "built",
+  },
+
   // ---------------------------------------------------------------- §5.11
   SupplyItem: {
     section: "5.11",

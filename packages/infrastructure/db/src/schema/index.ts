@@ -1251,6 +1251,48 @@ export const guideSections = pgTable(
   baseIndexes("guide_sections"),
 );
 
+/**
+ * The owners being away (spec §5.10).
+ *
+ * `legs` is jsonb for the reason `careGuides.includes` is `text[]`: sync
+ * patches fields (§4.2), and a child table has no field-level patch. The wall
+ * clocks inside it are clock faces in a place rather than instants — see
+ * `TripLeg` in the housesitting module for why that is the right storage here
+ * and the wrong storage for `startDate`/`endDate`.
+ */
+export const trips = pgTable(
+  "trips",
+  {
+    ...baseColumns,
+    name: text("name").notNull(),
+    destination: text("destination"),
+    startDate: timestamp("start_date", { withTimezone: true }).notNull(),
+    endDate: timestamp("end_date", { withTimezone: true }).notNull(),
+    whoIsAway: text("who_is_away").notNull(),
+    reachableAt: text("reachable_at"),
+    notes: text("notes"),
+    legs: jsonb("legs")
+      .$type<
+        {
+          transport: string;
+          number?: string;
+          from: string;
+          to: string;
+          departAt: string;
+          departTz: string;
+          arriveAt?: string;
+          arriveTz?: string;
+          notes?: string;
+        }[]
+      >()
+      .notNull()
+      .default([]),
+    source: text("source").notNull().default("manual"),
+    externalId: text("external_id"),
+  },
+  baseIndexes("trips"),
+);
+
 export const choreTemplates = pgTable(
   "chore_templates",
   {
@@ -1654,6 +1696,7 @@ export const allTables = {
   attachments,
   careGuides,
   guideSections,
+  trips,
   choreTemplates,
   tasks,
   calendarEvents,
