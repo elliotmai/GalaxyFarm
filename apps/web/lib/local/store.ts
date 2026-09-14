@@ -86,6 +86,7 @@ export const LOCAL_STORES = [
   "attachments",
   "careGuides",
   "guideSections",
+  "trips",
   "choreTemplates",
   "tasks",
   "calendarEvents",
@@ -124,8 +125,10 @@ export type LocalStoreName = (typeof LOCAL_STORES)[number];
  *      chute survives the browser being killed (§4.2). Not an entity — it is
  *      device-local and never syncs — but it is a table, and a table only
  *      appears on a returning device when the version moves.
+ * 17 — trips: when the owners are away and how to reach them, which the
+ *      housesitter board leads with (§5.10).
  */
-export const LOCAL_SCHEMA_VERSION = 16;
+export const LOCAL_SCHEMA_VERSION = 17;
 
 /**
  * Which fields each entity's search box looks at.
@@ -192,6 +195,7 @@ const SEARCHABLE: Readonly<Record<LocalStoreName, readonly string[]>> = {
   attachments: ["filename", "caption"],
   careGuides: ["title", "intro"],
   guideSections: ["title", "bodyMarkdown"],
+  trips: ["name", "destination", "whoIsAway"],
   choreTemplates: ["title", "detail"],
   tasks: ["title", "detail"],
   calendarEvents: ["title", "detail"],

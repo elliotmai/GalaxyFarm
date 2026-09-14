@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { PageBody, PageHeader } from "@galaxy-farm/ui";
 import {
   choreDaySheet,
+  choreProgress,
   type Animal,
   type ChoreTemplate,
   type Contact,
@@ -15,13 +16,17 @@ import {
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
-import type { CareGuide, GuideSection } from "@galaxy-farm/module-housesitting";
+import {
+  currentTrip,
+  type CareGuide,
+  type GuideSection,
+  type Trip,
+} from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 
 import { ChoreBoard } from "@/app/(kiosk)/kiosk/_components/chore-board";
 import { HousesitterGuide } from "@/app/(kiosk)/kiosk/housesitter/housesitter-guide";
-import { FlightItinerary } from "@/app/(kiosk)/kiosk/housesitter/_components/flight-itinerary";
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { guideForSitter } from "@/lib/care-guide-selection";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
@@ -31,23 +36,31 @@ import { useRecords } from "@/lib/local/use-records";
  * Housesitter Mode (spec §4.4, §5.10).
  *
  * The same composed guide the PDF and `/sitter` render, in this surface's own
- * dress — `HousesitterGuide` folds it into tappable rows rather than showing
- * the admin's print preview. Unlike `/sitter`, this device already holds
- * every table the guide draws from (a kiosk gets `records.read`, not the
- * narrow `care.read` a housesitter's phone is scoped to), so it is read
- * entirely from the local store rather than a server round trip.
+ * dress — `HousesitterGuide` lays it out as one strip of tabs over a panel that
+ * never outgrows the screen, rather than showing the admin's print preview.
+ * Unlike `/sitter`, this device already holds every table the guide draws from
+ * (a kiosk gets `records.read`, not the narrow `care.read` a housesitter's
+ * phone is scoped to), so it is read entirely from the local store rather than
+ * a server round trip.
  *
  * The day's chores are checkable right here rather than a link away: a sitter
  * standing at this screen is standing at the one place the whole day is laid
  * out, and sending them to a second board to tick what this one just described
  * is a tap that gets skipped. Feeding is derived from the plans (§2), merged
  * with everything else by part of the day.
+ *
+ * Travel is read from the `trips` table like everything else here. It was
+ * briefly a constant in the source, which was wrong twice over: a barn screen
+ * would have shown last September's flights forever, and no owner can edit a
+ * deployment. `currentTrip` picks whoever is away now — the sitter is never
+ * asked which trip they are sitting for.
  */
 export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
   const { store, loading } = useHousesitterData(propertyId);
 
   const guide = guideForSitter(store.guides);
   const now = useMemo(() => new Date(), []);
+  const trip = useMemo(() => currentTrip(store.trips, now), [store.trips, now]);
   const today = useMemo(() => {
     // Feeding rides the plans rather than a template written beside them —
     // the same derivation the admin day sheet makes, so the two agree.
@@ -60,36 +73,7 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
     return choreDaySheet({ tasks: store.tasks, templates: store.templates, derived }, now, now);
   }, [store.tasks, store.templates, store.plans, store.zones, store.feeds, propertyId, now]);
 
-  const flights = [
-    {
-      flightNumber: "F9 4018",
-      source: "Dallas/Ft. Worth, TX (DFW)",
-      destination: "Orlando, FL (MCO)",
-      departure: "Tue, Sep 15, 2026 – 9:21 AM CT",
-      arrival: "Tue, Sep 15, 2026 – 12:09 PM CT",
-    },
-    {
-      flightNumber: "F9 1565",
-      source: "Orlando, FL (MCO)",
-      destination: "Cincinnati, OH (CVG)",
-      departure: "Tue, Sep 15, 2026 – 4:19 PM CT",
-      arrival: "Tue, Sep 15, 2026 – 6:36 PM CT",
-    },
-    {
-      flightNumber: "F9 1047",
-      source: "Cincinnati, OH (CVG)",
-      destination: "Fort Lauderdale, FL (FLL)",
-      departure: "Sun, Sep 20, 2026 – 10:40 AM CT",
-      arrival: "Sun, Sep 20, 2026 – 1:16 PM CT",
-    },
-    {
-      flightNumber: "F9 3317",
-      source: "Fort Lauderdale, FL (FLL)",
-      destination: "Dallas/Ft. Worth, TX (DFW)",
-      departure: "Sun, Sep 20, 2026 – 5:37 PM CT",
-      arrival: "Sun, Sep 20, 2026 – 9:12 PM CT",
-    },
-  ];
+  const progress = choreProgress(today);
 
   return (
     <PageBody>
@@ -102,25 +86,24 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
       {loading ? (
         <p className="text-muted">Loading…</p>
       ) : (
-        <div className="flex flex-col gap-density">
-          <ChoreBoard entries={today} animals={store.animals} zones={store.zones} day={now} />
-
-          <FlightItinerary flights={flights} />
-
-          <HousesitterGuide
-            guide={guide}
-            sections={store.sections}
-            zones={store.zones}
-            assignments={store.assignments}
-            animals={store.animals}
-            contacts={store.contacts}
-            templates={store.templates}
-            plans={store.plans}
-            feeds={store.feeds}
-            health={store.health}
-            now={now}
-          />
-        </div>
+        <HousesitterGuide
+          guide={guide}
+          sections={store.sections}
+          zones={store.zones}
+          assignments={store.assignments}
+          animals={store.animals}
+          contacts={store.contacts}
+          templates={store.templates}
+          plans={store.plans}
+          feeds={store.feeds}
+          health={store.health}
+          trip={trip}
+          choresLeft={progress.total - progress.done}
+          today={
+            <ChoreBoard entries={today} animals={store.animals} zones={store.zones} day={now} />
+          }
+          now={now}
+        />
       )}
     </PageBody>
   );
@@ -141,6 +124,7 @@ function useHousesitterData(propertyId: Ulid) {
   const plans = useRecords<FeedingPlan>("feedingPlans", query);
   const feeds = useRecords<FeedType>("feedTypes", query);
   const health = useRecords<HealthRecord>("healthRecords", query);
+  const trips = useRecords<Trip>("trips", query);
 
   return {
     loading:
@@ -157,6 +141,7 @@ function useHousesitterData(propertyId: Ulid) {
         plans,
         feeds,
         health,
+        trips,
       ].some((r) => r.loading),
     store: {
       guides: guides.records,
@@ -170,6 +155,7 @@ function useHousesitterData(propertyId: Ulid) {
       plans: plans.records,
       feeds: feeds.records,
       health: health.records,
+      trips: trips.records,
     },
   };
 }

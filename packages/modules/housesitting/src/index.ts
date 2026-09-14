@@ -8,3 +8,4 @@
  */
 
 export * from "./domain/care-guide.js";
+export * from "./domain/trip.js";

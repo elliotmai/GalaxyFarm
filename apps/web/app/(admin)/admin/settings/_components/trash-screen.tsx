@@ -35,6 +35,7 @@ import { useRecords } from "@/lib/local/use-records";
 /** Human labels for the store names, which are database plurals. */
 const LABELS: Partial<Record<LocalStoreName, string>> = {
   animals: "Animals",
+  trips: "Trips",
   zones: "Zones",
   waterSources: "Water sources",
   zoneAssignments: "Zone assignments",

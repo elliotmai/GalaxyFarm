@@ -54,7 +54,7 @@ import {
   meterReadingSchema,
 } from "@galaxy-farm/module-equipment";
 
-import { careGuideSchema, guideSectionSchema } from "@galaxy-farm/module-housesitting";
+import { careGuideSchema, guideSectionSchema, tripSchema } from "@galaxy-farm/module-housesitting";
 
 import {
   bedSchema,
@@ -158,6 +158,7 @@ const SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   contacts: contactSchema,
   attachments: attachmentSchema,
   careGuides: careGuideSchema,
+  trips: tripSchema,
   guideSections: guideSectionSchema,
   choreTemplates: choreTemplateSchema,
   tasks: taskSchema,

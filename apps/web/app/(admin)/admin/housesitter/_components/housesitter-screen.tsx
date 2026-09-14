@@ -13,7 +13,7 @@ import {
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
-import type { CareGuide, GuideSection } from "@galaxy-farm/module-housesitting";
+import type { CareGuide, GuideSection, Trip } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 
@@ -23,6 +23,7 @@ import {
   SitterAccess,
   type SitterRow,
 } from "@/app/(admin)/admin/housesitter/_components/sitter-access";
+import { TripsPanel } from "@/app/(admin)/admin/housesitter/_components/trips-panel";
 import { useFarmName } from "@/lib/branding";
 import { guideFeedingPlans, guideZonesFrom } from "@/lib/guide-composition";
 import { useRecords } from "@/lib/local/use-records";
@@ -68,6 +69,7 @@ export function HousesitterScreen({
   const { records: plans } = useRecords<FeedingPlan>("feedingPlans", query);
   const { records: feeds } = useRecords<FeedType>("feedTypes", query);
   const { records: health } = useRecords<HealthRecord>("healthRecords", query);
+  const { records: trips } = useRecords<Trip>("trips", query);
 
   const [chosenId, setChosenId] = useState<Ulid | undefined>();
 
@@ -149,6 +151,11 @@ export function HousesitterScreen({
         label="Housesitter"
         tabs={[
           { id: "guide", label: "The guide" },
+          {
+            id: "travel",
+            label: "Travel",
+            ...(trips.length === 0 ? {} : { adornment: trips.length }),
+          },
           { id: "preview", label: "Preview and print" },
           { id: "access", label: "Access" },
         ]}
@@ -176,6 +183,8 @@ export function HousesitterScreen({
               propertyId={propertyId}
               actorId={actorId}
             />
+          ) : active === "travel" ? (
+            <TripsPanel trips={trips} propertyId={propertyId} actorId={actorId} />
           ) : active === "preview" ? (
             <GuidePreview
               guide={guide}

@@ -74,6 +74,7 @@ const PINNED_STORES = [
   "attachments",
   "careGuides",
   "guideSections",
+  "trips",
   "choreTemplates",
   "tasks",
   "calendarEvents",
@@ -84,11 +85,11 @@ const PINNED_STORES = [
 describe("the local schema version tracks the store list", () => {
   it("holds exactly the pinned entities at the pinned version", () => {
     expect([...LOCAL_STORES]).toEqual(PINNED_STORES);
-    // 16, not 15: the garden took 15 and the photo upload queue took 16. The
-    // queue is not in LOCAL_STORES — it holds bytes rather than records and
-    // never syncs — so this is the one version bump the store list above does
-    // not explain on its own.
-    expect(LOCAL_SCHEMA_VERSION).toBe(16);
+    // 17, not 16: the garden took 15, the photo upload queue took 16 and
+    // trips took 17. The queue is not in LOCAL_STORES — it holds bytes rather
+    // than records and never syncs — so it is the one version bump the store
+    // list above does not explain on its own.
+    expect(LOCAL_SCHEMA_VERSION).toBe(17);
   });
 
   it("names each store once", () => {
