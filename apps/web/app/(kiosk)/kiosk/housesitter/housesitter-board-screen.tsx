@@ -21,6 +21,7 @@ import type { FeedType } from "@galaxy-farm/module-feed";
 
 import { ChoreBoard } from "@/app/(kiosk)/kiosk/_components/chore-board";
 import { HousesitterGuide } from "@/app/(kiosk)/kiosk/housesitter/housesitter-guide";
+import { FlightItinerary } from "@/app/(kiosk)/kiosk/housesitter/_components/flight-itinerary";
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { guideForSitter } from "@/lib/care-guide-selection";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
@@ -59,6 +60,37 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
     return choreDaySheet({ tasks: store.tasks, templates: store.templates, derived }, now, now);
   }, [store.tasks, store.templates, store.plans, store.zones, store.feeds, propertyId, now]);
 
+  const flights = [
+    {
+      flightNumber: "F9 4018",
+      source: "Dallas/Ft. Worth, TX (DFW)",
+      destination: "Orlando, FL (MCO)",
+      departure: "Tue, Sep 15, 2026 – 9:21 AM CT",
+      arrival: "Tue, Sep 15, 2026 – 12:09 PM CT",
+    },
+    {
+      flightNumber: "F9 1565",
+      source: "Orlando, FL (MCO)",
+      destination: "Cincinnati, OH (CVG)",
+      departure: "Tue, Sep 15, 2026 – 4:19 PM CT",
+      arrival: "Tue, Sep 15, 2026 – 6:36 PM CT",
+    },
+    {
+      flightNumber: "F9 1047",
+      source: "Cincinnati, OH (CVG)",
+      destination: "Fort Lauderdale, FL (FLL)",
+      departure: "Sun, Sep 20, 2026 – 10:40 AM CT",
+      arrival: "Sun, Sep 20, 2026 – 1:16 PM CT",
+    },
+    {
+      flightNumber: "F9 3317",
+      source: "Fort Lauderdale, FL (FLL)",
+      destination: "Dallas/Ft. Worth, TX (DFW)",
+      departure: "Sun, Sep 20, 2026 – 5:37 PM CT",
+      arrival: "Sun, Sep 20, 2026 – 9:12 PM CT",
+    },
+  ];
+
   return (
     <PageBody>
       <PageHeader
@@ -72,6 +104,8 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
       ) : (
         <div className="flex flex-col gap-density">
           <ChoreBoard entries={today} animals={store.animals} zones={store.zones} day={now} />
+
+          <FlightItinerary flights={flights} />
 
           <HousesitterGuide
             guide={guide}
