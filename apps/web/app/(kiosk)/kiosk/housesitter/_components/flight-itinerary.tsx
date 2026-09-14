@@ -23,17 +23,17 @@ export function FlightItinerary({ flights }: { readonly flights: readonly Flight
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       <header className="flex items-baseline justify-between gap-2">
         <h2 className="text-xs font-medium uppercase tracking-wide text-ink">Travel Schedule</h2>
         <span className="text-xs text-muted">{flights.length} flights</span>
       </header>
 
-      <div className="space-y-3">
+      <div className="flex flex-col gap-2">
         {flights.map((flight, index) => (
           <div
             key={`${flight.flightNumber}-${index}`}
-            className="flex flex-col gap-2 border-l-4 border-primary bg-panel p-3"
+            className="flex flex-col gap-2 border-l border-edge bg-panel p-3"
           >
             <div className="flex items-baseline justify-between gap-2">
               <span className="font-mono text-lg font-bold text-ink">{flight.flightNumber}</span>
