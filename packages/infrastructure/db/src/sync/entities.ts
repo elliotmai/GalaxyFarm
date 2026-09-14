@@ -54,11 +54,20 @@ export const BOOKKEEPING_TABLES: readonly string[] = ["syncAudit", "syncFieldMet
  * barn. The second is not secret at all — it is simply read on the server at
  * the moment something is sent, by a screen that sends nothing, so a copy on
  * every device would be one person's preferences on everybody's phone.
+ *
+ * `wander_connections` joined it with the travel connector (§5.10) on the
+ * strongest version of the `kiosk_pins` argument yet. Its token is not scoped
+ * to the one trip the farm follows — it reads *every* trip its owner is on, in
+ * another app entirely — so a copy on a barn screen is the owner's whole
+ * travel history readable from an unlocked feed room. The trip it pulls is a
+ * `trips` row and syncs normally; the credential that fetched it never leaves
+ * the server.
  */
 export const UNTRACKED_TABLES: readonly string[] = [
   "kiosk_pins",
   "push_subscriptions",
   "notification_settings",
+  "wander_connections",
 ];
 
 export const SYNCED_ENTITIES: readonly string[] = Object.keys(allTables).filter(

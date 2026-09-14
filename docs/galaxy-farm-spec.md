@@ -350,6 +350,15 @@ Module skeleton with stub routes for herd / pens / feeding / breeding ("coming s
 
 *Travel is planned elsewhere.* `Trip`'s field names are deliberately [Wander](https://github.com/elliotmai/tripplan)'s field names, so a connector can fill this record from its `trip_legs` by renaming snake_case and nothing more — an owner should not retype a flight time into two apps. `source` (`manual | wander`) says which app owns a row and `externalId` is Wander's own trip id, so a pull updates the row it wrote last time instead of adding a second copy.
 
+*How the connector works.* The owner mints a token in Wander (Account → Connected Apps), pastes it once under Travel on `/admin/housesitter`, picks which trip the farm follows, and the farm pulls its dates and legs into a `Trip` row. Four properties make it safe and boring:
+
+- **The credential never reaches a device.** `wander_connections` sits outside `allTables` with `kiosk_pins` and `push_subscriptions`, on the strongest version of their argument: the token reads *every* trip its owner is on in another app, so a copy on a barn screen is the owner's whole travel history readable from an unlocked feed room. It is also write-only from the browser's side — it arrives once and nothing ever sends it back.
+- **`integrations.manage` is owner-only**, separate from `settings.manage` for the reason `branding.manage` is: what is stored is a credential to somebody else's account, and revoking it silently takes "back Sunday" off the sitter's board.
+- **A pulled trip travels the ordinary way.** It is written through `applyPush`, the same door a kiosk's writes go through, so it lands in the sync audit and reaches every device. Matched on `externalId` rather than name or dates — rename a trip in Wander and it is still the same trip.
+- **Nothing is converted at the boundary.** A leg missing its zone, or carrying an offset where a wall clock belongs, is dropped rather than guessed at: a flight shown at the wrong hour is worse on a housesitter board than a flight not shown at all. The screen says how many were left off.
+
+A trip deleted on the farm is not resurrected by the next pull — deleting it is how somebody says "stop showing this" — and disconnecting forgets the token while leaving the trips already pulled, which are the farm's records by then. `whoIsAway` keeps whatever the owner wrote, because Wander's profile names are "Elliot Mai" and a sitter reads "Elliot and Mai".
+
 ### 5.11 Supplies module (added v0.3)
 
 Everything the ranch runs on that isn't feed, medicine, or engine-bearing equipment — from shavings to show sticks.
