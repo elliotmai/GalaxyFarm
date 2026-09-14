@@ -24,9 +24,11 @@ import {
   type SitterRow,
 } from "@/app/(admin)/admin/housesitter/_components/sitter-access";
 import { TripsPanel } from "@/app/(admin)/admin/housesitter/_components/trips-panel";
+import { WanderPanel } from "@/app/(admin)/admin/housesitter/_components/wander-panel";
 import { useFarmName } from "@/lib/branding";
 import { guideFeedingPlans, guideZonesFrom } from "@/lib/guide-composition";
 import { useRecords } from "@/lib/local/use-records";
+import type { WanderConnection } from "@/lib/wander-store";
 
 /**
  * The housesitter guide (spec §5.10, §7).
@@ -47,6 +49,8 @@ export function HousesitterScreen({
   actorId,
   sitters,
   mayManagePeople,
+  mayConnect,
+  wander,
   unavailable,
   farmName,
 }: {
@@ -54,6 +58,10 @@ export function HousesitterScreen({
   readonly actorId: Ulid;
   readonly sitters: readonly SitterRow[];
   readonly mayManagePeople: boolean;
+  /** `integrations.manage` — owner-only, so the panel is absent for a member. */
+  readonly mayConnect: boolean;
+  /** Read on the server: this row never reaches a local store. */
+  readonly wander?: WanderConnection | undefined;
   readonly unavailable?: string | undefined;
   /** What the server rendered the farm as; the stored name supersedes it. */
   readonly farmName: string;
@@ -184,7 +192,10 @@ export function HousesitterScreen({
               actorId={actorId}
             />
           ) : active === "travel" ? (
-            <TripsPanel trips={trips} propertyId={propertyId} actorId={actorId} />
+            <div className="flex flex-col gap-density">
+              {mayConnect ? <WanderPanel connection={wander} /> : null}
+              <TripsPanel trips={trips} propertyId={propertyId} actorId={actorId} />
+            </div>
           ) : active === "preview" ? (
             <GuidePreview
               guide={guide}

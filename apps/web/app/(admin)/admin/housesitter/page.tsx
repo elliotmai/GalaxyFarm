@@ -7,6 +7,7 @@ import type { SitterRow } from "@/app/(admin)/admin/housesitter/_components/sitt
 import { currentActor } from "@/lib/auth";
 import { withDeadline } from "@/lib/deadline";
 import { listUsers } from "@/lib/user-store";
+import { connectionFor, type WanderConnection } from "@/lib/wander-store";
 
 export const metadata = { title: "Housesitter Guide" };
 
@@ -30,6 +31,7 @@ export default async function AdminHousesitterPage() {
 
   const now = new Date();
   const mayManagePeople = can(actor, "users.manage", now);
+  const mayConnect = can(actor, "integrations.manage", now);
 
   let sitters: readonly SitterRow[] = [];
   let unavailable: string | undefined;
@@ -49,6 +51,18 @@ export default async function AdminHousesitterPage() {
     }
   }
 
+  // Same treatment as the sitter list above, and for the same reason: this
+  // row never reaches a device, and a database it cannot read must not take
+  // the guide down with it. Only the connection panel goes missing.
+  let wander: WanderConnection | undefined;
+  if (mayConnect) {
+    try {
+      wander = await withDeadline(connectionFor(actor.propertyId), "the Wander link");
+    } catch (error) {
+      console.error("[housesitter:wander]", error);
+    }
+  }
+
   return (
     <HousesitterScreen
       propertyId={actor.propertyId}
@@ -64,6 +78,8 @@ export default async function AdminHousesitterPage() {
       farmName={process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME}
       sitters={sitters}
       mayManagePeople={mayManagePeople}
+      mayConnect={mayConnect}
+      {...(wander === undefined ? {} : { wander })}
       {...(unavailable === undefined ? {} : { unavailable })}
     />
   );

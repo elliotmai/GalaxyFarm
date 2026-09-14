@@ -1509,6 +1509,31 @@ export const kioskPins = pgTable("kiosk_pins", {
 });
 
 /**
+ * The link to Wander, where the owner plans travel (spec §5.10).
+ *
+ * **Deliberately outside `allTables`**, the same exception as the two tables
+ * either side of it. The token here is not scoped to the one trip the farm
+ * follows — it reads every trip its owner is on — and sync copies rows to
+ * every device on the property. A barn screen in an unlocked feed room must
+ * never hold it. `apps/web/lib/wander-store.ts` is its only reader and writer,
+ * and nothing it returns to a browser carries `token`.
+ *
+ * A §4.5 system-owned row: created by pasting a token, deleted by
+ * disconnecting, never tombstoned — a tombstone exists so a deletion can
+ * replicate, and nothing here replicates.
+ */
+export const wanderConnections = pgTable("wander_connections", {
+  propertyId: text("property_id").primaryKey(),
+  token: text("token").notNull(),
+  functionsBaseUrl: text("functions_base_url").notNull(),
+  tripId: text("trip_id"),
+  tripName: text("trip_name"),
+  connectedAt: timestamp("connected_at", { withTimezone: true, mode: "date" }).notNull(),
+  lastPulledAt: timestamp("last_pulled_at", { withTimezone: true, mode: "date" }),
+  lastError: text("last_error"),
+});
+
+/**
  * One browser on one device, subscribed to push (spec §6).
  *
  * A subscription is a capability URL plus the two keys that decrypt what is

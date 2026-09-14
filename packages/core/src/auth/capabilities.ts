@@ -52,6 +52,19 @@ export const CAPABILITIES = [
    * farm renames it to everybody the farm deals with. That is an owner's call.
    */
   "branding.manage",
+  /**
+   * Linking the farm to another app the owner uses (§5.10).
+   *
+   * Separate from `settings.manage` on the same grounds as `branding.manage`
+   * above, and more sharply. What is stored is a **credential to somebody
+   * else's account** — the Wander token reads every trip its owner is on, not
+   * only the one the farm follows — and the thing it is exchanged for is where
+   * that person is and when they are home. A member tuning a threshold is
+   * doing the job; a member replacing the owner's travel link is not a
+   * tuning decision, and a member revoking it takes the housesitter board's
+   * "back Sunday" down without touching anything that looks like it.
+   */
+  "integrations.manage",
   "devices.manage",
   "billing.manage",
 ] as const;
@@ -78,9 +91,10 @@ const GRANTS: Readonly<Record<Role, readonly Capability[]>> = {
     "animals.move",
     "settings.manage",
     // Deliberately not `records.purge`, `users.manage`, `devices.manage`,
-    // `billing.manage` or `branding.manage`. Purge is the one action §4.5
-    // makes unrecoverable, two of the others decide who else gets in, and
-    // branding renames the farm to everyone it deals with.
+    // `billing.manage`, `branding.manage` or `integrations.manage`. Purge is
+    // the one action §4.5 makes unrecoverable, two of the others decide who
+    // else gets in, branding renames the farm to everyone it deals with, and
+    // integrations hold a credential to somebody else's account.
   ],
 
   customer: ["records.read.own"],
