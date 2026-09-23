@@ -43,8 +43,15 @@ import { groupChoresForBoard } from "@/lib/chores";
  * the synced store agrees, so the server stays the authority.
  */
 
+/**
+ * The day on screen, as an absolute instant rather than a bare calendar
+ * string — noon in *this device's* real timezone, serialized so the server
+ * reads back the same instant rather than reinterpreting a bare date in its
+ * own timezone (which is what silently shifted a tick onto the wrong day for
+ * any farm whose local time isn't close to the server's).
+ */
 function dayString(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0).toISOString();
 }
 
 export function ChoreBoard({

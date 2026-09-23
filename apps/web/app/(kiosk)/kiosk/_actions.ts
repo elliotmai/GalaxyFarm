@@ -74,7 +74,10 @@ export async function setKioskChoreDone(input: {
     return { ok: false, error: "That chore is not on the list any more." };
   }
 
-  const date = new Date(`${input.day}T12:00:00`);
+  // `input.day` already arrives as an absolute instant — noon in the
+  // kiosk's own timezone — so it's read as-is rather than re-parsed as a
+  // bare date, which would land on this server process's timezone instead.
+  const date = new Date(input.day);
   if (Number.isNaN(date.getTime())) return { ok: false, error: "That day is not a day." };
 
   const result = await tickChore({

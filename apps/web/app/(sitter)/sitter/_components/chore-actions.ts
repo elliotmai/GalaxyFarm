@@ -60,10 +60,11 @@ export async function setChoreDone(input: SetChoreDoneInput): Promise<ChoreActio
     return { ok: false, error: "That chore is not on the list any more." };
   }
 
-  // Midday, so the day is the day whatever the timezone: parsing a bare date
-  // as UTC midnight lands on the day before for anybody west of Greenwich,
-  // which is everybody here.
-  const date = new Date(`${input.day}T12:00:00`);
+  // `input.day` already arrives as an absolute instant — noon in the
+  // sitter's own device timezone — so it's read as-is rather than re-parsed
+  // as a bare date, which would land on this server process's timezone
+  // instead of the sitter's.
+  const date = new Date(input.day);
   if (Number.isNaN(date.getTime())) {
     return { ok: false, error: "That day is not a day." };
   }
