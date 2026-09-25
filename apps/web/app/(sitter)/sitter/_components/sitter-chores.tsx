@@ -59,8 +59,11 @@ export function SitterChores({
         ...(entry.taskId === undefined ? {} : { taskId: entry.taskId }),
         ...(entry.templateId === undefined ? {} : { templateId: entry.templateId }),
         // The day on screen, not "today": a tick landing at ten past midnight
-        // belongs to the evening round it finished.
-        day: `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`,
+        // belongs to the evening round it finished. Sent as noon in this
+        // device's own timezone, as an absolute instant, so the server reads
+        // back the same day rather than reinterpreting a bare date in its own
+        // timezone.
+        day: new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12, 0, 0).toISOString(),
         done: entry.completedAt === undefined,
       });
 

@@ -178,7 +178,9 @@ describe("Today's Chores on a kiosk", () => {
     // Ticked here, with the server action still unanswered.
     expect(action.resolve).toBeDefined();
     expect(row).toHaveAttribute("aria-pressed", "true");
-    expect(action.calls).toEqual([{ taskId: ICE.id, day: "2026-11-12", done: true }]);
+    expect(action.calls).toEqual([
+      { taskId: ICE.id, day: new Date(2026, 10, 12, 12, 0, 0).toISOString(), done: true },
+    ]);
   });
 
   it("puts the tick back when the farm refuses the write", async () => {
