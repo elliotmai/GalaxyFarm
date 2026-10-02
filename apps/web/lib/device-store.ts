@@ -8,7 +8,7 @@ import {
   normalisePairingCode,
   pairingExpiry,
 } from "@galaxy-farm/infra-auth";
-import { kioskDevices, type Database } from "@galaxy-farm/infra-db";
+import { kioskDevices, retryOnDroppedConnection, type Database } from "@galaxy-farm/infra-db";
 
 import { database } from "@/lib/credential-store";
 
@@ -119,7 +119,9 @@ export async function isDeviceLive(
   propertyId: Ulid,
   db: Database = database(),
 ): Promise<boolean> {
-  const device = await findDevice(id, db);
+  // Retried because it is the first query most kiosk requests make, so it is
+  // the one that finds the connection a quiet spell left dead.
+  const device = await retryOnDroppedConnection(() => findDevice(id, db));
   return (
     device !== undefined &&
     device.propertyId === propertyId &&

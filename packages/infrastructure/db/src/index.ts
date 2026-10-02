@@ -6,3 +6,4 @@ export * from "./seed/index.js";
 export * from "./client.js";
 export * from "./baseline.js";
 export * from "./schema-drift.js";
+export * from "./reconnect.js";

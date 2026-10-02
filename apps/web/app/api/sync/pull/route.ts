@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import type { Ulid } from "@galaxy-farm/core";
-import { pullSince, syncedEntities } from "@galaxy-farm/infra-db";
+import { pullSince, retryOnDroppedConnection, syncedEntities } from "@galaxy-farm/infra-db";
 
 import { syncErrorResponse } from "@/lib/api-errors";
 import { currentActor } from "@/lib/auth";
@@ -32,18 +32,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ pages: [] });
   }
 
-  // A revoked screen has to stop pulling within one sync interval, not merely
-  // fail to sign in again whenever its JWT next expires — sessions here are
-  // stateless (spec §4.3), so this is the live check that makes "revoke a
-  // kiosk device" (§4.5) actually take effect promptly rather than eventually.
-  if (actor.role === "kiosk") {
-    const live =
-      actor.deviceId !== undefined &&
-      (await isDeviceLive(actor.deviceId as Ulid, actor.propertyId));
-    if (!live)
-      return NextResponse.json({ error: "This screen has been unpaired" }, { status: 401 });
-  }
-
   let body: { cursors: ReturnType<typeof reviveCursors>; entities?: readonly string[] };
   try {
     const raw = (await request.json()) as Record<string, unknown>;
@@ -59,13 +47,30 @@ export async function POST(request: Request) {
   }
 
   try {
-    const pages = await pullSince(database(), {
-      propertyId: actor.propertyId,
-      cursors: body.cursors,
-      // An unrecognised entity is skipped rather than refused, so a device on
-      // an older build still syncs everything else it knows about.
-      entities: body.entities ?? syncedEntities(),
-    });
+    // A revoked screen has to stop pulling within one sync interval, not merely
+    // fail to sign in again whenever its JWT next expires — sessions here are
+    // stateless (spec §4.3), so this is the live check that makes "revoke a
+    // kiosk device" (§4.5) actually take effect promptly rather than eventually.
+    if (actor.role === "kiosk") {
+      const live =
+        actor.deviceId !== undefined &&
+        (await isDeviceLive(actor.deviceId as Ulid, actor.propertyId));
+      if (!live)
+        return NextResponse.json({ error: "This screen has been unpaired" }, { status: 401 });
+    }
+
+    // Inside the try along with the pull itself: this is a database query
+    // too, and outside it a dropped connection escaped as a bare 500 with no
+    // body — the "responded 500" a barn screen showed after sitting idle.
+    const pages = await retryOnDroppedConnection(() =>
+      pullSince(database(), {
+        propertyId: actor.propertyId,
+        cursors: body.cursors,
+        // An unrecognised entity is skipped rather than refused, so a device on
+        // an older build still syncs everything else it knows about.
+        entities: body.entities ?? syncedEntities(),
+      }),
+    );
 
     return NextResponse.json({ pages });
   } catch (error) {

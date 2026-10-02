@@ -34,6 +34,27 @@ const asUlid = (value: string | undefined): Ulid | undefined =>
   value !== undefined && isUlid(value) ? value : undefined;
 
 /**
+ * A database failure, answered as a result rather than thrown.
+ *
+ * A server action that throws does not come back as `{ ok: false }` — it
+ * rejects inside the board's transition, and with no error boundary on this
+ * surface that replaces the whole screen with Next's error page. A tick that
+ * could not be saved should put the tick back and say so, the same as one the
+ * farm refused.
+ */
+async function orUnreachable(
+  work: () => Promise<KioskResult>,
+  label: string,
+): Promise<KioskResult> {
+  try {
+    return await work();
+  } catch (error) {
+    console.error(`[kiosk:${label}]`, error);
+    return { ok: false, error: "Could not reach the farm's records. Try again in a moment." };
+  }
+}
+
+/**
  * Ticking a chore off, from a kiosk (spec §4.3 `chores.complete`).
  *
  * Reuses `tickChore` directly rather than `/sitter`'s action — a kiosk's
@@ -48,6 +69,10 @@ export async function setKioskChoreDone(input: {
   readonly day: string;
   readonly done: boolean;
 }): Promise<KioskResult> {
+  return orUnreachable(() => tickFromKiosk(input), "chores");
+}
+
+async function tickFromKiosk(input: Parameters<typeof setKioskChoreDone>[0]): Promise<KioskResult> {
   const actor = await kioskActor();
   if (actor === undefined) return { ok: false, error: "Not signed in to this screen." };
 
@@ -103,12 +128,13 @@ export async function logKioskEggs(input: LogEggsInput): Promise<KioskResult> {
   const actor = await kioskActor();
   if (actor === undefined) return { ok: false, error: "Not signed in to this screen." };
 
-  const now = new Date();
-  const outcome = await logEggsForKiosk(actor, input, now);
-  if (!outcome.ok) return { ok: false, error: outcome.reason };
+  return orUnreachable(async () => {
+    const outcome = await logEggsForKiosk(actor, input, new Date());
+    if (!outcome.ok) return { ok: false, error: outcome.reason };
 
-  revalidatePath("/kiosk/eggs");
-  return { ok: true };
+    revalidatePath("/kiosk/eggs");
+    return { ok: true };
+  }, "eggs");
 }
 
 export async function moveKioskAnimal(input: {
@@ -121,16 +147,17 @@ export async function moveKioskAnimal(input: {
     return { ok: false, error: "That is not a real animal or pen." };
   }
 
-  const now = new Date();
-  const outcome = await moveAnimalForKiosk(
-    actor,
-    { animalId: input.animalId as Ulid, zoneId: input.zoneId as Ulid },
-    now,
-  );
-  if (!outcome.ok) return { ok: false, error: outcome.reason };
+  return orUnreachable(async () => {
+    const outcome = await moveAnimalForKiosk(
+      actor,
+      { animalId: input.animalId as Ulid, zoneId: input.zoneId as Ulid },
+      new Date(),
+    );
+    if (!outcome.ok) return { ok: false, error: outcome.reason };
 
-  revalidatePath("/kiosk/pen-board");
-  return { ok: true };
+    revalidatePath("/kiosk/pen-board");
+    return { ok: true };
+  }, "pen-board");
 }
 
 /**
