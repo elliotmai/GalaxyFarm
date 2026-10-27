@@ -11,11 +11,12 @@ import {
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
-import { applyPush, repositoryFor, type Database } from "@galaxy-farm/infra-db";
+import { repositoryFor, type Database } from "@galaxy-farm/infra-db";
 import type { EggBreakdown, EggLog } from "@galaxy-farm/module-poultry";
 
 import { database } from "@/lib/credential-store";
 import { isDeviceLive } from "@/lib/device-store";
+import { applyPushAndMark } from "@/lib/change-stamp";
 
 /**
  * What a kiosk's browser is allowed to write (spec §4.4, §4.3).
@@ -215,7 +216,7 @@ export async function moveAnimalForKiosk(
 
   if (entries.length === 0) return { ok: true };
 
-  const result = await applyPush(db, entries, {
+  const result = await applyPushAndMark(db, entries, {
     propertyId: actor.propertyId,
     clock: systemClock(),
     ids,
@@ -240,7 +241,7 @@ async function push(
   const at = new Date();
   const ids = { next: () => encodeUlid(at.getTime()) };
 
-  const result = await applyPush(
+  const result = await applyPushAndMark(
     db,
     [
       {

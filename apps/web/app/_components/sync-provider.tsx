@@ -14,6 +14,7 @@ import type { ReactNode } from "react";
 import { loadCursors, saveCursors } from "@/lib/local/cursors";
 import { localStore, type LocalStore } from "@/lib/local/store";
 import { photoUploader } from "@/lib/photos/uploader";
+import { nextSyncDelay } from "@/lib/sync-schedule";
 
 /**
  * Runs the sync loop for the tab (spec §4.2).
@@ -30,8 +31,6 @@ import { photoUploader } from "@/lib/photos/uploader";
  * the badge says what is actually still on the device rather than only the
  * part of it that is text.
  */
-
-const EVERY = 60_000;
 
 export interface SyncState {
   readonly store: LocalStore | undefined;
@@ -130,6 +129,7 @@ export function useSync(): SyncState {
 export function SyncProvider({
   children,
   pushEnabled = true,
+  quietOvernight = false,
 }: {
   readonly children: ReactNode;
   /**
@@ -141,6 +141,12 @@ export function SyncProvider({
    * screen keeps a local store at all.
    */
   readonly pushEnabled?: boolean;
+  /**
+   * On for the kiosk surface: an unattended screen drops to a heartbeat every
+   * 30 minutes overnight (`lib/sync-schedule.ts`). A person's phone does not —
+   * somebody up at 2 a.m. with a calving is exactly who wants it current.
+   */
+  readonly quietOvernight?: boolean;
 }) {
   /*
    * Built on the first client render, not at module scope and not in an effect.
@@ -175,6 +181,8 @@ export function SyncProvider({
   const [pending, setPending] = useState(0);
   const [stuck, setStuck] = useState(0);
   const running = useRef(false);
+  /** Server refusals in a row, for the heartbeat's backoff. */
+  const refusals = useRef(0);
 
   // Cursors are a `localStorage` read, so they wait for the client the same way
   // the store does — but only the sync loop below needs them, and that starts
@@ -208,6 +216,10 @@ export function SyncProvider({
 
       setOffline(outcome.offline || photos.offline);
       setProblem(outcome.problem ?? photos.problem);
+      // Only a refusal counts. Offline is not the server's fault, and coming
+      // back into signal fires a sync of its own.
+      if (outcome.problem !== undefined) refusals.current += 1;
+      else if (!outcome.offline) refusals.current = 0;
       if (!outcome.offline && outcome.problem === undefined) {
         setLastSyncedAt(new Date());
         saveCursors(store.engine.cursorState());
@@ -231,7 +243,28 @@ export function SyncProvider({
     if (store === undefined) return;
 
     void syncNow();
-    const timer = setInterval(() => void syncNow(), EVERY);
+
+    // A chain of timeouts rather than an interval, so each wait can be chosen
+    // after the last heartbeat: longer overnight on a kiosk, longer while the
+    // server keeps refusing (`lib/sync-schedule.ts`).
+    let timer: ReturnType<typeof setTimeout>;
+    // A heartbeat still in flight at unmount must not schedule another.
+    let stopped = false;
+    const schedule = () => {
+      if (stopped) return;
+      const delay = nextSyncDelay({
+        at: new Date(),
+        quietOvernight,
+        refusals: refusals.current,
+      });
+      timer = setTimeout(() => {
+        // A hidden tab skips its heartbeat — nobody is looking, and the
+        // visibility listener below syncs the moment somebody is.
+        const tick = document.visibilityState === "hidden" ? Promise.resolve() : syncNow();
+        void tick.finally(schedule);
+      }, delay);
+    };
+    schedule();
 
     // Coming back into signal is the moment that matters most — somebody has
     // just driven out of the pasture with a morning's work queued.
@@ -244,11 +277,12 @@ export function SyncProvider({
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
-      clearInterval(timer);
+      stopped = true;
+      clearTimeout(timer);
       window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [store, syncNow]);
+  }, [store, syncNow, quietOvernight]);
 
   const engine = useMemo<SyncEngineHandle>(
     () => ({ store, syncNow, retryStuck }),

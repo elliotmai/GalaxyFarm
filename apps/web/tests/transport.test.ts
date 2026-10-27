@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { OutboxEntry, Ulid } from "@galaxy-farm/core";
 
-import { httpTransport, reviveRecord } from "../lib/local/transport.js";
+import { httpTransport, reviveRecord, STAMP_MAX_AGE_MS } from "../lib/local/transport.js";
 
 /**
  * The device's half of the wire (spec §4.2).
@@ -215,5 +215,105 @@ describe("httpTransport", () => {
 
     expect(await httpTransport({ fetch }).pull({}, ["animals"])).toEqual([]);
     expect((await httpTransport({ fetch }).push([entry])).accepted).toEqual([]);
+  });
+});
+
+describe("httpTransport pull — the change stamp", () => {
+  const ENTITIES = ["animals", "tasks"] as const;
+  const page = (hasMore: boolean) => ({ entity: "animals", records: [], hasMore });
+
+  function harness(replies: unknown[]) {
+    const sent: Record<string, unknown>[] = [];
+    let clock = 0;
+    const fetch = vi.fn(async (_url: string, init?: RequestInit) => {
+      sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return response(replies.shift());
+    });
+    const transport = httpTransport({
+      fetch: fetch as unknown as typeof globalThis.fetch,
+      now: () => clock,
+    });
+    return {
+      sent,
+      pull: (entities: readonly string[] = ENTITIES) => transport.pull({}, entities),
+      advance: (ms: number) => {
+        clock += ms;
+      },
+    };
+  }
+
+  it("sends no stamp until a pull has caught the device up", async () => {
+    const h = harness([
+      { pages: [page(false)], stamp: "s1" },
+      { pages: [], unchanged: true },
+    ]);
+
+    await h.pull();
+    await h.pull();
+
+    expect(h.sent[0]).not.toHaveProperty("stamp");
+    expect(h.sent[1]).toMatchObject({ stamp: "s1" });
+  });
+
+  it("returns nothing when the server says unchanged", async () => {
+    const h = harness([
+      { pages: [page(false)], stamp: "s1" },
+      { pages: [], stamp: "s1", unchanged: true },
+    ]);
+
+    await h.pull();
+    expect(await h.pull()).toEqual([]);
+  });
+
+  it("does not adopt a stamp mid catch-up", async () => {
+    // Adopting it here would make the engine's next round come back
+    // "unchanged" with a page still waiting on the server.
+    const h = harness([
+      { pages: [page(true)], stamp: "s1" },
+      { pages: [page(false)], stamp: "s1" },
+    ]);
+
+    await h.pull();
+    await h.pull();
+
+    expect(h.sent[1]).not.toHaveProperty("stamp");
+  });
+
+  it("pulls for real when the entity list changes", async () => {
+    const h = harness([{ pages: [page(false)], stamp: "s1" }, { pages: [] }]);
+
+    await h.pull(["animals"]);
+    await h.pull(["animals", "eggs"]);
+
+    expect(h.sent[1]).not.toHaveProperty("stamp");
+  });
+
+  it("stops trusting the stamp after STAMP_MAX_AGE_MS", async () => {
+    const h = harness([
+      { pages: [page(false)], stamp: "s1" },
+      { pages: [], stamp: "s1", unchanged: true },
+      { pages: [] },
+    ]);
+
+    await h.pull();
+    h.advance(STAMP_MAX_AGE_MS - 1);
+    await h.pull();
+    // An "unchanged" answer is not a real pull, so it does not reset the age.
+    h.advance(1);
+    await h.pull();
+
+    expect(h.sent[1]).toMatchObject({ stamp: "s1" });
+    expect(h.sent[2]).not.toHaveProperty("stamp");
+  });
+
+  it("forgets the stamp when the server stops sending one", async () => {
+    // Blobs unreachable: every pull becomes a real one again.
+    const h = harness([{ pages: [page(false)], stamp: "s1" }, { pages: [] }, { pages: [] }]);
+
+    await h.pull();
+    await h.pull();
+    await h.pull();
+
+    expect(h.sent[2]).not.toHaveProperty("stamp");
   });
 });

@@ -21,6 +21,7 @@ import {
 } from "@galaxy-farm/module-cattle";
 import type { Crop, PlannedPlanting, Variety } from "@galaxy-farm/module-garden";
 
+import { markChanged } from "@/lib/change-stamp";
 import { database } from "@/lib/credential-store";
 import {
   frostAlerts,
@@ -272,6 +273,8 @@ export async function POST(request: Request) {
       settings,
       now,
     );
+    // Garden alerts land as calendar events, which every device pulls.
+    if (garden.written > 0) await markChanged(propertyId);
 
     if (snapshot.forecast === undefined) {
       // §6's last acceptance criterion, on the server side: an unreachable
@@ -368,6 +371,7 @@ export async function POST(request: Request) {
       written += 1;
     }
 
+    if (written > 0) await markChanged(propertyId);
     summary.push({ propertyId, watched: cards.length, written, garden });
   }
 

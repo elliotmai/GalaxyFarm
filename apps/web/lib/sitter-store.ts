@@ -15,7 +15,7 @@ import {
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
-import { applyPush, repositoryFor, type Database } from "@galaxy-farm/infra-db";
+import { repositoryFor, type Database } from "@galaxy-farm/infra-db";
 import type { CareGuide, GuideSection } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
@@ -24,6 +24,7 @@ import { isPet } from "@galaxy-farm/module-pets";
 import { guideForSitter, guideIncludes, visibleToSitter } from "@/lib/care-guide-selection";
 import { database } from "@/lib/credential-store";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
+import { applyPushAndMark } from "@/lib/change-stamp";
 
 export { guideForSitter, guideIncludes, visibleToSitter };
 
@@ -237,7 +238,7 @@ export async function tickChore(input: TickInput, db: Database = database()): Pr
       deviceId,
     });
 
-    const result = await applyPush(
+    const result = await applyPushAndMark(
       db,
       [
         {
@@ -277,7 +278,7 @@ export async function tickChore(input: TickInput, db: Database = database()): Pr
 
   if (changes.length === 0) return { ok: true, taskId: input.taskId };
 
-  const result = await applyPush(
+  const result = await applyPushAndMark(
     db,
     [
       {
@@ -362,7 +363,7 @@ async function tickFeedingOccurrence(
   };
 
   const changes = diff({}, record as unknown as Record<string, FieldValue>, { at, deviceId });
-  const result = await applyPush(
+  const result = await applyPushAndMark(
     db,
     [
       {

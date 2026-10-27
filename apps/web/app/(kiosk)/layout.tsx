@@ -59,7 +59,7 @@ export default async function KioskLayout({ children }: { children: React.ReactN
           than `useMutations` — and `/api/sync/push` refuses anything that is
           not `owner` or `member` outright. Pulling stays on regardless of
           role: reads are the entire reason a barn screen keeps a local store. */}
-      <SyncProvider pushEnabled={actor.role === "owner" || actor.role === "member"}>
+      <SyncProvider pushEnabled={actor.role === "owner" || actor.role === "member"} quietOvernight>
         <ToastProvider>
           <ConfirmProvider>
             <main className="p-density">{children}</main>

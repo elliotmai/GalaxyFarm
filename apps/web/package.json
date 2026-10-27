@@ -33,6 +33,7 @@
     "@galaxy-farm/module-poultry": "workspace:*",
     "@galaxy-farm/module-supplies": "workspace:*",
     "@galaxy-farm/ui": "workspace:*",
+    "@netlify/blobs": "11.1.4",
     "@serwist/next": "9.5.12",
     "dexie": "^4.4.4",
     "drizzle-orm": "^0.38.4",

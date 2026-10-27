@@ -1,9 +1,10 @@
 import { diff, encodeUlid, systemClock, type FieldValue, type Ulid } from "@galaxy-farm/core";
-import { applyPush, repositoryFor } from "@galaxy-farm/infra-db";
+import { repositoryFor } from "@galaxy-farm/infra-db";
 import type { Trip } from "@galaxy-farm/module-housesitting";
 
 import { database } from "@/lib/credential-store";
 import { tripFieldsFrom, type TripFields, type WanderTravel } from "@/lib/wander-client";
+import { applyPushAndMark } from "@/lib/change-stamp";
 
 /**
  * Writing a pulled trip onto the farm's records (spec §5.10, §4.2).
@@ -105,7 +106,7 @@ export async function upsertTripFromWander(
 
   const recordId = existing?.id ?? (ids.next() as Ulid);
 
-  const result = await applyPush(
+  const result = await applyPushAndMark(
     db,
     [
       {

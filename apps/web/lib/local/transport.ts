@@ -138,7 +138,21 @@ export interface HttpTransportOptions {
   readonly fetch?: typeof globalThis.fetch;
   readonly pushUrl?: string;
   readonly pullUrl?: string;
+  /** Overridden in tests; the real thing is `Date.now`. */
+  readonly now?: () => number;
 }
+
+/**
+ * How long a device trusts "nothing new" before pulling for real anyway.
+ *
+ * The change stamp (`lib/change-stamp.ts`) is replaced by every server-side
+ * writer of synced records, so in principle a device could trust it forever.
+ * This is the backstop for the write that does not go through one — a missed
+ * `markChanged`, a hand edit in the Neon console — which then reaches devices
+ * within this long rather than never. Six hours is four database wake-ups a
+ * day per screen, against 1,440 when every pull was a query.
+ */
+export const STAMP_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 export function httpTransport<T extends BaseRecord>(
   options: HttpTransportOptions = {},
@@ -146,6 +160,14 @@ export function httpTransport<T extends BaseRecord>(
   const call = options.fetch ?? globalThis.fetch.bind(globalThis);
   const pushUrl = options.pushUrl ?? "/api/sync/push";
   const pullUrl = options.pullUrl ?? "/api/sync/pull";
+  const now = options.now ?? Date.now;
+
+  /*
+   * The change stamp from the last pull that left this device fully caught up,
+   * and for which entities. Memory only: a reload pulls for real once, which
+   * also covers a new build that syncs an entity the old one did not.
+   */
+  let caughtUp: { stamp: string; entities: string; at: number } | undefined;
 
   async function post(url: string, body: unknown): Promise<unknown> {
     const response = await call(url, {
@@ -190,15 +212,42 @@ export function httpTransport<T extends BaseRecord>(
     },
 
     async pull(cursors: CursorSet, entities: readonly string[]): Promise<PullPage<T>[]> {
-      const body = (await post(pullUrl, { cursors, entities })) as {
+      const key = entities.join(",");
+      const trusted =
+        caughtUp !== undefined &&
+        caughtUp.entities === key &&
+        now() - caughtUp.at < STAMP_MAX_AGE_MS;
+
+      const body = (await post(pullUrl, {
+        cursors,
+        entities,
+        ...(trusted ? { stamp: caughtUp!.stamp } : {}),
+      })) as {
         pages?: { entity: string; records: Record<string, unknown>[]; hasMore: boolean }[];
+        stamp?: string;
+        unchanged?: boolean;
       };
 
-      return (body.pages ?? []).map((page) => ({
+      // Nothing new since the stamp we sent. `caughtUp.at` stays put on
+      // purpose: it measures time since the last *real* pull.
+      if (body.unchanged === true) return [];
+
+      const pages = (body.pages ?? []).map((page) => ({
         entity: page.entity,
         records: page.records.map((record) => reviveRecord<T>(record)),
         hasMore: page.hasMore,
       }));
+
+      // Only a pull that brought the device fully up to date may adopt the
+      // stamp. Adopting it mid catch-up would make the engine's next round
+      // answer "unchanged" with pages still waiting, and the device would sit
+      // a page behind until something else changed.
+      caughtUp =
+        typeof body.stamp === "string" && !pages.some((page) => page.hasMore)
+          ? { stamp: body.stamp, entities: key, at: now() }
+          : undefined;
+
+      return pages;
     },
   };
 }

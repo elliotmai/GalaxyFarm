@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { can, isUlid, type Ulid } from "@galaxy-farm/core";
 
 import { currentActor } from "@/lib/auth";
+import { markChanged } from "@/lib/change-stamp";
 import {
   createDevice,
   findDevice,
@@ -126,6 +127,9 @@ export async function reissueDeviceAction(id: string): Promise<ActionResult> {
   if (device === undefined) return { ok: false, error: "That screen is not on this property." };
 
   const reissued = await reissuePairing(device.id, new Date());
+  // A screen answered "nothing new" by the change stamp never reaches the
+  // liveness check in the pull, so stopping one has to change the stamp too.
+  await markChanged(actor.propertyId);
   if (reissued === undefined) return { ok: false, error: "Could not issue a new code." };
 
   revalidated();
@@ -148,6 +152,7 @@ export async function revokeDeviceAction(id: string): Promise<ActionResult> {
   // component already showed before calling revokeDeviceAction.
   // crud-guard: allow-unconfirmed — confirmed client-side before this runs
   await revokeDevice(device.id, new Date());
+  await markChanged(actor.propertyId);
   revalidated();
   return { ok: true, message: `${device.name} revoked. It will stop syncing shortly.` };
 }
@@ -173,6 +178,7 @@ export async function deleteDeviceAction(id: string, reason?: string): Promise<A
   // component already showed before calling deleteDeviceAction.
   // crud-guard: allow-unconfirmed — confirmed client-side before this runs
   await tombstoneDevice(device.id, actor.id, new Date(), reason);
+  await markChanged(actor.propertyId);
   revalidated();
   return {
     ok: true,

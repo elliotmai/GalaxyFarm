@@ -5,6 +5,7 @@ import { pullSince, retryOnDroppedConnection, syncedEntities } from "@galaxy-far
 
 import { syncErrorResponse } from "@/lib/api-errors";
 import { currentActor } from "@/lib/auth";
+import { currentStamp } from "@/lib/change-stamp";
 import { database } from "@/lib/credential-store";
 import { isDeviceLive } from "@/lib/device-store";
 import { reviveCursors } from "@/lib/sync-payload";
@@ -15,6 +16,11 @@ import { reviveCursors } from "@/lib/sync-payload";
  * Scoped to the session's property, tombstones included. A deletion travels as
  * a record: one that simply stopped appearing would live on forever on the
  * device that missed the pull.
+ *
+ * A device that sends back the change stamp it last caught up to, and finds it
+ * unchanged, is told "nothing new" without a database query — see
+ * `lib/change-stamp.ts`. That is what lets Neon scale to zero between the
+ * farm's actual edits instead of being woken every minute by every screen.
  */
 
 export const dynamic = "force-dynamic";
@@ -32,18 +38,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ pages: [] });
   }
 
-  let body: { cursors: ReturnType<typeof reviveCursors>; entities?: readonly string[] };
+  let body: {
+    cursors: ReturnType<typeof reviveCursors>;
+    entities?: readonly string[];
+    stamp?: string;
+  };
   try {
     const raw = (await request.json()) as Record<string, unknown>;
     body = {
       cursors: reviveCursors(raw["cursors"]),
       ...(Array.isArray(raw["entities"]) ? { entities: raw["entities"] as string[] } : {}),
+      ...(typeof raw["stamp"] === "string" ? { stamp: raw["stamp"] } : {}),
     };
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Malformed payload" },
       { status: 400 },
     );
+  }
+
+  // Read before the query, never after: a write that commits once this has
+  // been read changes the stamp, so the device's next check pulls it.
+  const stamp = await currentStamp(actor.propertyId);
+  if (stamp !== undefined && body.stamp === stamp) {
+    return NextResponse.json({ pages: [], stamp, unchanged: true });
   }
 
   try {
@@ -72,7 +90,7 @@ export async function POST(request: Request) {
       }),
     );
 
-    return NextResponse.json({ pages });
+    return NextResponse.json({ pages, ...(stamp === undefined ? {} : { stamp }) });
   } catch (error) {
     // Never a bare 500. A device whose sync is failing keeps working from its
     // local store, so nobody finds out unless the response says so.

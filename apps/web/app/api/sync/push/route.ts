@@ -8,12 +8,12 @@ import {
   type OutboxEntry,
   type PushRejection,
 } from "@galaxy-farm/core";
-import { applyPush } from "@galaxy-farm/infra-db";
 
 import { syncErrorResponse } from "@/lib/api-errors";
 import { currentActor } from "@/lib/auth";
 import { database } from "@/lib/credential-store";
 import { reviveOutboxEntries } from "@/lib/sync-payload";
+import { applyPushAndMark } from "@/lib/change-stamp";
 
 /**
  * /api/sync/push — a device's queued work, applied and merged (spec §4.2).
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await applyPush(database(), permitted, {
+    const result = await applyPushAndMark(database(), permitted, {
       propertyId: actor.propertyId,
       clock: systemClock(),
       ids: { next: () => encodeUlid(Date.now()) },
