@@ -12,7 +12,6 @@ export default async function AdminHorsesHerdPage() {
   return (
     <HorseShell
       title={"Herd"}
-      route={"/admin/horses/herd"}
       holds={"Who is here, whose they are, and what each one is like to handle."}
     />
   );

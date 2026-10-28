@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { PageBody, PageHeader, Tabs, Tile } from "@galaxy-farm/ui";
+import { Button, PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import { addCalendarDays, endOfDay, startOfDay, type Ulid, type Zone } from "@galaxy-farm/core";
 import {
   lossesIn,
@@ -13,7 +13,11 @@ import {
 } from "@galaxy-farm/module-poultry";
 
 import { FlocksPanel } from "@/app/(admin)/admin/chickens/flock/_components/flocks-panel";
-import { HeadcountPanel } from "@/app/(admin)/admin/chickens/flock/_components/headcount-panel";
+import {
+  HeadcountPanel,
+  RecordChange,
+} from "@/app/(admin)/admin/chickens/flock/_components/headcount-panel";
+import { PhoneAddButton } from "@/app/(admin)/admin/horses/_components/list-row";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -31,7 +35,7 @@ import { useRecords } from "@/lib/local/use-records";
  * the count on a card would disagree with the log that produced it.
  */
 
-/** The window the two loss tiles look back over. */
+/** The window the recent-changes line looks back over. */
 const RECENT_DAYS = 30;
 
 export function FlockScreen({
@@ -54,10 +58,9 @@ export function FlockScreen({
   /**
    * Which tab, and which flock the log is about.
    *
-   * Lifted out of `Tabs` so a card can send somebody to the log with its own
-   * flock already chosen. "Four went last night" is two taps from the card
-   * that made you think it, and the log stays the one place a change is
-   * written.
+   * Lifted out of `Tabs` so a row can open the headcount form with its own
+   * flock already chosen. "Four went last night" is one tap from the row that
+   * made you think it, and the log stays the one place a change is written.
    */
   const [tab, setTab] = useState("flocks");
   const [focused, setFocused] = useState<Ulid | undefined>();
@@ -110,90 +113,118 @@ export function FlockScreen({
     )
     .reduce((total, entry) => total + entry.quantity, 0);
 
+  /** The last thirty days, in one line — said only when something happened. */
+  const recent = [
+    losses.gone === 0
+      ? undefined
+      : `${losses.gone} lost${losses.predator > 0 ? ` (${losses.predator} taken)` : ""}`,
+    gained === 0 ? undefined : `${gained} added`,
+  ].filter((part): part is string => part !== undefined);
+
+  /** Which flock the headcount form opens on, or "any"; undefined when shut. */
+  const [recording, setRecording] = useState<Ulid | "any" | undefined>();
+
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Flock"
-        title="Flocks"
-        subtitle="How many birds there are, and what happened to the ones that are not."
-      />
+      {/* Bottom clearance on a phone for the floating record button. */}
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <PageHeader
+          eyebrow="Flock"
+          title="Flocks"
+          subtitle={[
+            `${birds} bird${birds === 1 ? "" : "s"}`,
+            `${live.length} flock${live.length === 1 ? "" : "s"}`,
+            flocks.length === live.length ? undefined : `${flocks.length - live.length} off`,
+          ]
+            .filter((part) => part !== undefined)
+            .join(" · ")}
+          actions={
+            // The most-used write on this screen, so it is the one primary
+            // action. Hidden on a phone by a wrapper — the button's own
+            // `inline-flex` wins over a `hidden` passed in.
+            <span className="hidden sm:block">
+              <Button variant="primary" onClick={() => setRecording("any")}>
+                <span aria-hidden="true">±</span> Record a change
+              </Button>
+            </span>
+          }
+        />
 
-      <div className="gf-stat-row">
-        <Tile
-          label="Birds"
-          value={birds}
-          tone="identity"
-          emphasis
-          hint={live.length === 0 ? "No flocks yet" : "Across every live flock"}
-        />
-        <Tile
+        {/*
+          The four tiles this used to have, as one line. Losses are the number
+          that decides whether to walk the fence, so they are said in red when
+          there are any — and nothing at all is said when nothing happened.
+          A sale is not a loss: a bird sold left on purpose.
+        */}
+        {recent.length === 0 ? null : (
+          <p className={`text-sm ${losses.gone > 0 ? "text-danger" : "text-muted"}`}>
+            Last {RECENT_DAYS} days: {recent.join(" · ")}.{" "}
+            <button
+              type="button"
+              onClick={() => setTab("log")}
+              className="inline-flex min-h-target items-center font-semibold underline underline-offset-2"
+            >
+              See the log
+            </button>
+          </p>
+        )}
+
+        <Tabs
           label="Flocks"
-          value={live.length}
-          tone="action"
-          hint={
-            flocks.length === live.length
-              ? undefined
-              : `${flocks.length - live.length} switched off`
+          activeTab={tab}
+          onTabChange={setTab}
+          tabs={[
+            { id: "flocks", label: "Flocks" },
+            { id: "log", label: "Headcount log" },
+          ]}
+        >
+          {(active) =>
+            active === "flocks" ? (
+              <FlocksPanel
+                flocks={flocks}
+                adjustments={adjustments}
+                zones={zones}
+                eggLogs={eggLogs}
+                loading={loading}
+                propertyId={propertyId}
+                actorId={actorId}
+                onRecordChange={(flock) => {
+                  setFocused(flock.id);
+                  setRecording(flock.id);
+                }}
+              />
+            ) : (
+              <HeadcountPanel
+                // Remounted when the flock changes, so the history opens on the
+                // one last recorded against rather than whatever was chosen.
+                key={focused ?? "any"}
+                flocks={flocks}
+                adjustments={adjustments}
+                loading={logLoading}
+                propertyId={propertyId}
+                actorId={actorId}
+                {...(focused === undefined ? {} : { focusedFlockId: focused })}
+              />
+            )
           }
-        />
-        <Tile
-          label={`Lost in ${RECENT_DAYS} days`}
-          value={losses.gone}
-          tone={losses.gone > 0 ? "danger" : "calm"}
-          emphasis={losses.gone > 0}
-          hint={
-            losses.predator > 0
-              ? `${losses.predator} to something getting in`
-              : "Died, taken, or culled"
-          }
-        />
-        <Tile
-          label={`Added in ${RECENT_DAYS} days`}
-          value={gained}
-          tone="calm"
-          hint="Bought in or hatched here"
-        />
+        </Tabs>
+
+        <PhoneAddButton onClick={() => setRecording("any")}>Record a change</PhoneAddButton>
       </div>
 
-      <Tabs
-        label="Flocks"
-        activeTab={tab}
-        onTabChange={setTab}
-        tabs={[
-          { id: "flocks", label: "Flocks" },
-          { id: "log", label: "Headcount log" },
-        ]}
-      >
-        {(active) =>
-          active === "flocks" ? (
-            <FlocksPanel
-              flocks={flocks}
-              adjustments={adjustments}
-              zones={zones}
-              eggLogs={eggLogs}
-              loading={loading}
-              propertyId={propertyId}
-              actorId={actorId}
-              onRecordChange={(flock) => {
-                setFocused(flock.id);
-                setTab("log");
-              }}
-            />
-          ) : (
-            <HeadcountPanel
-              // Remounted when the flock changes, so the form opens on the one
-              // whose card sent us here rather than on whatever was chosen last.
-              key={focused ?? "any"}
-              flocks={flocks}
-              adjustments={adjustments}
-              loading={logLoading}
-              propertyId={propertyId}
-              actorId={actorId}
-              {...(focused === undefined ? {} : { focusedFlockId: focused })}
-            />
-          )
-        }
-      </Tabs>
+      {recording === undefined ? null : (
+        <RecordChange
+          // Remounted per flock, so the form opens on the one whose row sent
+          // us here rather than on whatever was chosen last.
+          key={recording}
+          flocks={flocks}
+          adjustments={adjustments}
+          propertyId={propertyId}
+          actorId={actorId}
+          focusedFlockId={recording === "any" ? focused : recording}
+          onClose={() => setRecording(undefined)}
+        />
+      )}
     </PageBody>
   );
 }

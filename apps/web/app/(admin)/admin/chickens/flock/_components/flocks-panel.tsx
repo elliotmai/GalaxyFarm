@@ -4,13 +4,10 @@ import { useState } from "react";
 
 import {
   Button,
-  CardGrid,
   Checkbox,
   EmptyState,
   Modal,
   Pill,
-  RecordCard,
-  Section,
   Select,
   TextArea,
   TextInput,
@@ -31,6 +28,7 @@ import {
 } from "@galaxy-farm/module-poultry";
 
 import { REASON_LABEL } from "@/app/(admin)/admin/chickens/flock/_components/reasons";
+import { ListRow, RowIconButton, RowList } from "@/app/(admin)/admin/horses/_components/list-row";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -41,9 +39,13 @@ import { useMutations } from "@/lib/local/mutations";
  * §5.4 makes quail a value in `species` rather than a second module, so this
  * screen is the whole of poultry however the farm's taste in birds changes.
  *
- * The count on each card is derived, never typed. What can be typed is the
+ * The count on each row is derived, never typed. What can be typed is the
  * count on the day the flock was first written down; everything after it comes
  * from the log.
+ *
+ * Rows, not cards: the count in the badge, the name, one line, and one chip
+ * for whatever is wrong. The row opens the editor (where delete lives); the
+ * ± beside it records a change against that flock.
  */
 
 function formatDate(value: Date): string {
@@ -97,6 +99,7 @@ export function FlocksPanel({
   readonly loading: boolean;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /** Opens the headcount form on this flock. */
   readonly onRecordChange: (flock: Flock) => void;
 }) {
   const mutations = useMutations<Flock>("flocks", "flocks", flockSchema, propertyId, actorId);
@@ -140,7 +143,7 @@ export function FlocksPanel({
 
   // End of today, not this instant: a date-only entry is stored at midday, so
   // an "as of now" asked at six in the morning would leave this morning's
-  // losses out of the count on the card.
+  // losses out of the count on the row.
   const now = endOfDay(new Date());
 
   function startCreate() {
@@ -273,27 +276,19 @@ export function FlocksPanel({
 
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title="Flocks"
-        description="One record per group of birds. The count on each is worked out from the headcount log, so it is never a number that quietly went stale."
-        actions={
-          <Button variant="primary" onClick={startCreate}>
-            Add a flock
-          </Button>
-        }
-      >
-        {flocks.length === 0 ? (
-          <EmptyState
-            title="No flocks yet"
-            detail="Add the coop as a flock with the birds you have today. Everything after that is logged as it happens."
-            action={
-              <Button variant="primary" onClick={startCreate}>
-                Add the first flock
-              </Button>
-            }
-          />
-        ) : (
-          <CardGrid columns={3}>
+      {flocks.length === 0 ? (
+        <EmptyState
+          title="No flocks yet"
+          detail="Add the coop as a flock with the birds you have today. Everything after is logged."
+          action={
+            <Button variant="primary" onClick={startCreate}>
+              Add the first flock
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          <RowList label="Flocks">
             {[...flocks]
               .sort((left, right) => Number(right.active) - Number(left.active))
               .map((flock) => {
@@ -302,142 +297,159 @@ export function FlocksPanel({
                 const coop = zoneName(flock.zoneId);
 
                 return (
-                  <RecordCard
+                  <ListRow
                     key={flock.id}
-                    tone={!flock.active ? "neutral" : count === 0 ? "danger" : "calm"}
-                    title={flock.name}
-                    subtitle={`${SPECIES_LABEL[flock.species]}${coop === undefined ? "" : ` · ${coop}`}`}
-                    actions={
-                      <Pill tone={flock.active ? "calm" : "neutral"} dot={!flock.active}>
-                        {flock.active ? "in the yard" : "switched off"}
-                      </Pill>
-                    }
-                    meta={
+                    lead={
                       <>
-                        <Pill tone={count === 0 ? "danger" : "identity"}>
-                          {count} bird{count === 1 ? "" : "s"}
-                        </Pill>
-                        <Pill tone="neutral">
-                          {entries === 0
-                            ? `opened at ${flock.openingCount}`
-                            : `${flock.openingCount} to start · ${entries} change${entries === 1 ? "" : "s"}`}
-                        </Pill>
-                        {flock.breedMix === undefined ? null : (
-                          <Pill tone="neutral">{flock.breedMix}</Pill>
-                        )}
+                        {count}
+                        <span className="sr-only"> bird{count === 1 ? "" : "s"},</span>
                       </>
                     }
-                  >
-                    {flock.notes === undefined ? null : (
-                      <p className="text-sm text-muted">{flock.notes}</p>
-                    )}
-                    {coop === undefined ? (
-                      <p className="text-sm text-muted">
-                        No coop set — the pen board has nowhere to draw these birds.
-                      </p>
-                    ) : null}
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="ghost" onClick={() => onRecordChange(flock)}>
-                        Record a change
-                      </Button>
-                      <Button variant="ghost" onClick={() => startEdit(flock)}>
-                        Edit
-                      </Button>
-                      <Button variant="ghost" onClick={() => void removeFlock(flock)}>
-                        Delete
-                      </Button>
-                    </div>
-                  </RecordCard>
+                    title={flock.name}
+                    line={[
+                      SPECIES_LABEL[flock.species],
+                      coop,
+                      flock.breedMix,
+                      entries === 0
+                        ? `opened at ${flock.openingCount}`
+                        : `${flock.openingCount} to start, ${entries} change${entries === 1 ? "" : "s"}`,
+                    ]}
+                    // One chip, for what is wrong: switched off first, then an
+                    // empty coop, then no coop — without one the pen board has
+                    // nowhere to draw these birds.
+                    chip={
+                      !flock.active ? (
+                        <Pill tone="neutral">Switched off</Pill>
+                      ) : count === 0 ? (
+                        <Pill tone="danger">Empty</Pill>
+                      ) : coop === undefined ? (
+                        <Pill tone="danger">No coop</Pill>
+                      ) : undefined
+                    }
+                    label={`Edit ${flock.name}, ${count} bird${count === 1 ? "" : "s"}`}
+                    onOpen={() => startEdit(flock)}
+                    trailing={
+                      <RowIconButton
+                        label={`Record a change to ${flock.name}`}
+                        onClick={() => onRecordChange(flock)}
+                      >
+                        <span aria-hidden="true" className="text-lg font-semibold leading-none">
+                          ±
+                        </span>
+                      </RowIconButton>
+                    }
+                  />
                 );
               })}
-          </CardGrid>
-        )}
-      </Section>
+          </RowList>
+          <div>
+            <Button variant="ghost" onClick={startCreate}>
+              + Add a flock
+            </Button>
+          </div>
+        </>
+      )}
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
-          size="wide"
+          placement="side"
           title={editing === undefined ? "New flock" : `Editing ${editing.name}`}
-          description="A group of birds kept together. Quail go here too — same screen, different value."
+          description="Quail go here too — same screen, different species."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Add flock" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                // The editor closes first, so the typed confirmation is the
+                // only dialog on screen rather than a second one on this.
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const flock = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void removeFlock(flock);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
-              <TextInput
-                label="Name"
-                required
-                hint="What you call them out loud — &ldquo;the big coop&rdquo;, &ldquo;the bantams&rdquo;."
-                value={draft.name}
-                error={errors["name"]}
-                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-              />
-              <Select
-                label="Species"
-                options={SPECIES_OPTIONS}
-                value={draft.species}
-                error={errors["species"]}
-                onChange={(event) =>
-                  setDraft({ ...draft, species: event.target.value as FlockSpecies })
-                }
-              />
-              <Select
-                label="Coop"
-                placeholder="Not set"
-                hint="A zone, like everywhere else on the farm. Coops are listed first."
-                options={[
-                  { value: "", label: "Not set" },
-                  ...places.map((zone) => ({
-                    value: zone.id,
-                    label: zone.type === "coop" ? zone.name : `${zone.name} (${zone.type})`,
-                  })),
-                ]}
-                value={draft.zoneId}
-                error={errors["zoneId"]}
-                onChange={(event) => setDraft({ ...draft, zoneId: event.target.value })}
-              />
-              <TextInput
-                label="Breed mix"
-                hint="&ldquo;12 ISA Browns, 6 Easter Eggers&rdquo; — prose, not a list to maintain."
-                value={draft.breedMix}
-                error={errors["breedMix"]}
-                onChange={(event) => setDraft({ ...draft, breedMix: event.target.value })}
-              />
-              <TextInput
-                label="Count to start from"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                numeric
-                hint="How many there were when you first wrote the flock down. Everything since comes from the log — change this only if that first count was wrong."
-                value={draft.openingCount}
-                error={errors["openingCount"]}
-                onChange={(event) => setDraft({ ...draft, openingCount: event.target.value })}
-              />
-            </div>
-
+            <TextInput
+              label="Name"
+              required
+              hint="“The big coop”, “the bantams”."
+              value={draft.name}
+              error={errors["name"]}
+              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+            />
+            <Select
+              label="Species"
+              options={SPECIES_OPTIONS}
+              value={draft.species}
+              error={errors["species"]}
+              onChange={(event) =>
+                setDraft({ ...draft, species: event.target.value as FlockSpecies })
+              }
+            />
+            <Select
+              label="Coop"
+              placeholder="Not set"
+              hint="Coops are listed first."
+              options={[
+                { value: "", label: "Not set" },
+                ...places.map((zone) => ({
+                  value: zone.id,
+                  label: zone.type === "coop" ? zone.name : `${zone.name} (${zone.type})`,
+                })),
+              ]}
+              value={draft.zoneId}
+              error={errors["zoneId"]}
+              onChange={(event) => setDraft({ ...draft, zoneId: event.target.value })}
+            />
+            <TextInput
+              label="Breed mix"
+              hint="“12 ISA Browns, 6 Easter Eggers”"
+              value={draft.breedMix}
+              error={errors["breedMix"]}
+              onChange={(event) => setDraft({ ...draft, breedMix: event.target.value })}
+            />
+            <TextInput
+              label="Count to start from"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              numeric
+              // The one hint worth its line: changing this is not how a
+              // count is corrected, and editing it to "fix" today's number
+              // would rewrite the flock's whole history.
+              hint="The first count only. Changes since go in the log."
+              value={draft.openingCount}
+              error={errors["openingCount"]}
+              onChange={(event) => setDraft({ ...draft, openingCount: event.target.value })}
+            />
             <Checkbox
               label="Still in the yard"
-              hint="Untick a flock that is gone. It keeps its history and stops counting towards the birds on the property."
+              hint="Untick a flock that is gone. It keeps its history."
               checked={draft.active}
               onChange={(event) => setDraft({ ...draft, active: event.target.checked })}
             />
             <TextArea
               label="Notes"
               rows={3}
-              hint="Which one goes broody, where they get out, who they will not tolerate."
               value={draft.notes}
               error={errors["notes"]}
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Add flock" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}

@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
-
-import { CardGrid, PageBody, PageHeader, Pill, RecordCard, Section, Tile } from "@galaxy-farm/ui";
+import { PageBody, PageHeader, Pill } from "@galaxy-farm/ui";
 import {
   formatMoney,
   totalAcquisitionCost,
@@ -14,6 +12,8 @@ import { budgetOutlook, horseCandidates, nextUp, unshopped } from "@galaxy-farm/
 
 import { useRecords } from "@/lib/local/use-records";
 
+import { ListRow, RowList } from "./list-row";
+
 /**
  * Horses (spec §5.9, §7 `/admin/horses`).
  *
@@ -24,31 +24,17 @@ import { useRecords } from "@/lib/local/use-records";
  * It is a real screen rather than a placeholder because the two live surfaces
  * have numbers worth seeing together. A want with no horse against it and a
  * horse over the budget set for it are the two things this section is for, and
- * both are answered before anybody clicks anything.
+ * both are answered before anybody clicks anything — as one line of facts on
+ * each row rather than a row of tiles, because two links with numbers on them
+ * is the whole screen.
  */
 
 /** The stub routes §5.9 asks for, and what each will hold. */
 const SHELLS: readonly { href: string; label: string; holds: string }[] = [
-  {
-    href: "/admin/horses/herd",
-    label: "Herd",
-    holds: "Who is here, whose they are, and what each one is like to handle.",
-  },
-  {
-    href: "/admin/horses/pens",
-    label: "Pens",
-    holds: "Which horse is in which trap, and what that pen's safety level becomes with him in it.",
-  },
-  {
-    href: "/admin/horses/feeding",
-    label: "Feeding",
-    holds: "Rations in the units they are fed in, and what a horse costs to keep.",
-  },
-  {
-    href: "/admin/horses/breeding",
-    label: "Breeding",
-    holds: "Covers, foaling dates, and what a cross was for.",
-  },
+  { href: "/admin/horses/herd", label: "Herd", holds: "Who is here and how each handles" },
+  { href: "/admin/horses/pens", label: "Pens", holds: "Who is in which trap" },
+  { href: "/admin/horses/feeding", label: "Feeding", holds: "Rations and cost to keep" },
+  { href: "/admin/horses/breeding", label: "Breeding", holds: "Covers and foaling dates" },
 ];
 
 export function HorsesScreen({ propertyId }: { readonly propertyId: Ulid }) {
@@ -68,6 +54,7 @@ export function HorsesScreen({ propertyId }: { readonly propertyId: Ulid }) {
       candidate.status !== "passed" &&
       candidate.status !== "gone",
   );
+  const passed = candidates.filter((candidate) => candidate.status === "passed").length;
   const cheapest = open
     .map((candidate) => totalAcquisitionCost(candidate))
     .sort((left, right) => left.cents - right.cents)[0];
@@ -77,96 +64,63 @@ export function HorsesScreen({ propertyId }: { readonly propertyId: Ulid }) {
       <PageHeader
         eyebrow="Horses"
         title="Horses"
-        subtitle="No horses yet. The shopping is live anyway — §5.9 calls this the purchase furthest out and the one most worth researching slowly, so the roadmap and the comparison run years ahead of the module."
+        subtitle={`No horses yet · ${open.length} under consideration`}
       />
 
-      <div className="gf-stat-row">
-        <Tile label="On the roadmap" value={steps.length} tone="identity" hint="Still open" />
-        <Tile
-          label="Planned spend"
-          value={formatMoney(outlook.total)}
-          hint={
-            outlook.unpriced === 0
-              ? "Everything open is priced"
-              : `${outlook.unpriced} not priced — not counted here`
-          }
-        />
-        <Tile label="Under consideration" value={open.length} tone="action" />
-        <Tile
-          label="Cheapest all in"
-          value={cheapest === undefined ? "—" : formatMoney(cheapest)}
-          hint={cheapest === undefined ? "Nothing being compared yet" : "Hauling and exam included"}
-        />
-      </div>
-
-      <Section
-        title="Live now"
-        description="Both work with no horse on the place, which is the whole reason they are built first."
-      >
-        <CardGrid columns={2}>
-          <RecordCard
-            tone="identity"
-            title={
-              <Link href="/admin/horses/roadmap" className="underline underline-offset-4">
-                Roadmap
-              </Link>
-            }
-            subtitle="What the horses are for, what has to be true before one arrives, and the budget for each want."
-            meta={
-              <>
-                <Pill tone="identity">{steps.length} open</Pill>
-                {notStarted.length === 0 ? (
-                  <Pill tone="calm">every want has a horse against it</Pill>
-                ) : (
-                  <Pill tone="action">{notStarted.length} with nothing under consideration</Pill>
-                )}
-              </>
+      <section aria-labelledby="horses-live" className="flex flex-col gap-2.5">
+        <h2 id="horses-live" className="text-xs font-semibold uppercase tracking-wide text-muted">
+          Live now
+        </h2>
+        <RowList label="Live now">
+          <ListRow
+            href="/admin/horses/roadmap"
+            title="Roadmap"
+            line={[
+              `${steps.length} open`,
+              `${formatMoney(outlook.total)} planned`,
+              // Unpriced wants are left out of the total, so the line says so
+              // rather than letting the sum look complete.
+              outlook.unpriced === 0 ? undefined : `${outlook.unpriced} not priced`,
+            ]}
+            chip={
+              notStarted.length === 0 ? undefined : (
+                <Pill tone="action">{notStarted.length} unshopped</Pill>
+              )
             }
           />
-          <RecordCard
-            tone="action"
-            title={
-              <Link href="/admin/horses/candidates" className="underline underline-offset-4">
-                Candidates
-              </Link>
-            }
-            subtitle="Horses under consideration, compared on total acquisition cost rather than on the asking price."
-            meta={
-              <>
-                <Pill tone="action">{open.length} in play</Pill>
-                <Pill tone="neutral">
-                  {candidates.filter((candidate) => candidate.status === "passed").length} passed,
-                  kept
-                </Pill>
-              </>
-            }
+          <ListRow
+            href="/admin/horses/candidates"
+            title="Candidates"
+            line={[
+              `${open.length} in play`,
+              cheapest === undefined ? undefined : `cheapest ${formatMoney(cheapest)} all in`,
+              passed === 0 ? undefined : `${passed} passed, kept`,
+            ]}
           />
-        </CardGrid>
-      </Section>
+        </RowList>
+      </section>
 
-      <Section
-        title="When the horses arrive"
-        description="Stub routes today, so navigation and permissions are already real and the module lands in a place laid out for it."
-      >
-        <CardGrid columns={2}>
+      {/*
+        The shells, quietly. They are real routes so navigation and permissions
+        are already right, but none of them has anything in it, so they sit
+        below the live work as plain rows rather than four cards of their own.
+      */}
+      <section aria-labelledby="horses-later" className="flex flex-col gap-2.5">
+        <h2 id="horses-later" className="text-xs font-semibold uppercase tracking-wide text-muted">
+          When the horses arrive
+        </h2>
+        <RowList label="When the horses arrive">
           {SHELLS.map((shell) => (
-            <RecordCard
+            <ListRow
               key={shell.href}
-              tone="neutral"
-              title={
-                <Link href={shell.href} className="underline underline-offset-4">
-                  {shell.label}
-                </Link>
-              }
-              subtitle={shell.holds}
-              // Under the text rather than opposite the title: three of these
-              // four subtitles wrap, and a corner pill lands in a different
-              // place on each card when they do.
-              meta={<Pill tone="neutral">coming soon</Pill>}
+              href={shell.href}
+              title={shell.label}
+              line={[shell.holds]}
+              chip={<Pill tone="neutral">Coming soon</Pill>}
             />
           ))}
-        </CardGrid>
-      </Section>
+        </RowList>
+      </section>
     </PageBody>
   );
 }

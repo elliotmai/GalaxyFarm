@@ -10,10 +10,6 @@ export default async function AdminHorsesBreedingPage() {
   if (actor === undefined) redirect("/login?next=/admin/horses/breeding");
 
   return (
-    <HorseShell
-      title={"Breeding"}
-      route={"/admin/horses/breeding"}
-      holds={"Covers, foaling dates, and what a cross was for."}
-    />
+    <HorseShell title={"Breeding"} holds={"Covers, foaling dates, and what a cross was for."} />
   );
 }

@@ -4,13 +4,10 @@ import { useState } from "react";
 
 import {
   Button,
-  Card,
-  CardGrid,
   Checkbox,
   EmptyState,
   Modal,
   Pill,
-  Section,
   Select,
   TextArea,
   TextInput,
@@ -37,6 +34,7 @@ import {
 } from "@galaxy-farm/core";
 import { FEED_UNITS, type FeedType } from "@galaxy-farm/module-feed";
 
+import { ListRow, RowList } from "@/app/(admin)/admin/horses/_components/list-row";
 import { describePlanLine, nameList } from "@/lib/feed-lines";
 import { plansFeeding } from "@/lib/pet-care";
 import { useMutations } from "@/lib/local/mutations";
@@ -312,124 +310,147 @@ export function PetFeedingPanel({
 
   return (
     <div className="flex flex-col gap-density">
+      {/*
+        One quiet line rather than a section: a ration names a feed from the
+        catalog, and the kibble belongs under category 'pet' so it stays out
+        of the cattle ration's totals.
+      */}
       {catalog.length === 0 ? (
-        <Section title="Nothing to feed" description="A ration names a feed from the catalog.">
-          <EmptyState
-            title="No feed cataloged"
-            detail="Add the kibble on the Feed inventory screen — category 'pet', so it stays out of the cattle ration's totals — and it will be offered here."
-          />
-        </Section>
+        <p className="text-sm text-danger">
+          No feed in the catalog — add the kibble on the Feed screen, category &lsquo;pet&rsquo;.
+        </p>
       ) : null}
 
-      <Section
-        title="Rations"
-        description="Written in the units it is fed in, because that is what somebody follows at six in the morning. A bowl two pets share is one ration, and it shows on both their cards."
-      >
-        {pets.length === 0 ? (
-          <EmptyState title="No pets yet" detail="Add a pet before writing what it eats." />
-        ) : (
-          <CardGrid columns={2}>
-            {pets.map((pet) => {
-              const mine = plansFeeding(pet.id, plans);
+      {/*
+        Per pet, a heading and its rations as rows. A bowl two pets share is
+        one ration and shows under both. Written in the units it is fed in,
+        because that is what somebody follows at six in the morning.
+      */}
+      {pets.length === 0 ? (
+        <EmptyState title="No pets yet" detail="Add a pet before writing what it eats." />
+      ) : (
+        pets.map((pet) => {
+          const mine = plansFeeding(pet.id, plans);
 
-              return (
-                <Card
-                  key={pet.id}
-                  title={displayName(pet)}
-                  actions={
-                    <Button onClick={() => startAdd(pet.id)} disabled={catalog.length === 0}>
-                      Add a ration
-                    </Button>
-                  }
+          return (
+            <section
+              key={pet.id}
+              aria-label={`${displayName(pet)}'s rations`}
+              className="flex flex-col gap-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  {displayName(pet)}
+                </h2>
+                <Button
+                  variant="ghost"
+                  onClick={() => startAdd(pet.id)}
+                  disabled={catalog.length === 0}
+                  aria-label={`Add a ration for ${displayName(pet)}`}
                 >
-                  {mine.length === 0 ? (
-                    <p className="text-sm text-muted">
-                      Nothing written down. The guide will say so, which is the same as telling a
-                      helper to guess.
-                    </p>
-                  ) : (
-                    <ul className="flex flex-col gap-density">
-                      {mine.map((plan) => (
-                        <li key={plan.id} className="flex flex-col gap-1">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span className="text-density text-ink">{plan.name}</span>
-                            {plan.active ? null : <Pill tone="neutral">paused</Pill>}
-                            {isShared(plan) ? <Pill tone="action">shared bowl</Pill> : null}
-                          </span>
-                          <ul className="flex flex-col gap-1 text-sm text-muted">
-                            {plan.lines.map((line: FeedingPlanLine, index) => (
-                              <li key={`${line.feedTypeId}-${index}`}>
-                                {describePlanLine(
-                                  line,
-                                  feeds,
-                                  isShared(plan)
-                                    ? animalsFedBy(plan).map((held) => petName(held))
-                                    : [],
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                          {plan.specialNotes === undefined ? null : (
-                            <p className="text-sm text-muted">{plan.specialNotes}</p>
-                          )}
-                          <span className="flex gap-1">
-                            <Button variant="ghost" onClick={() => startEdit(plan)}>
-                              Edit
-                            </Button>
-                            <Button variant="ghost" onClick={() => void toggleActive(plan)}>
-                              {plan.active ? "Pause" : "Resume"}
-                            </Button>
-                            <Button variant="ghost" onClick={() => void remove(plan)}>
-                              Delete
-                            </Button>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </Card>
-              );
-            })}
-          </CardGrid>
-        )}
-      </Section>
+                  + Ration
+                </Button>
+              </div>
+              {mine.length === 0 ? (
+                // The guide will say so too, which is the same as telling a
+                // helper to guess — so it is said in the action colour.
+                <p className="text-sm text-action">Nothing written down.</p>
+              ) : (
+                <RowList label={`${displayName(pet)}'s rations`}>
+                  {mine.map((plan) => (
+                    <ListRow
+                      key={plan.id}
+                      title={plan.name}
+                      line={[
+                        ...plan.lines.map((line: FeedingPlanLine) =>
+                          describePlanLine(
+                            line,
+                            feeds,
+                            isShared(plan) ? animalsFedBy(plan).map((held) => petName(held)) : [],
+                          ),
+                        ),
+                        plan.specialNotes,
+                      ]}
+                      chip={
+                        !plan.active ? (
+                          <Pill tone="neutral">Paused</Pill>
+                        ) : isShared(plan) ? (
+                          <Pill tone="action">Shared bowl</Pill>
+                        ) : undefined
+                      }
+                      label={`Edit ${plan.name}`}
+                      onOpen={() => startEdit(plan)}
+                    />
+                  ))}
+                </RowList>
+              )}
+            </section>
+          );
+        })
+      )}
 
       {draft === undefined ? null : (
         <Modal
-          size="wide"
+          placement="side"
           title={
             editing === undefined
               ? `A ration for ${nameList(draft.fedIds.map((held) => petName(held as Ulid)))}`
               : `Editing ${editing.name}`
           }
-          description="One line per feed and per time of day. A morning and an evening feed of the same food are two lines."
+          description="One line per feed and per time of day."
           onClose={close}
           footer={
-            <div className="flex gap-2">
+            <>
               <Button variant="primary" busy={busy} onClick={() => void save()}>
                 {editing === undefined ? "Write it" : "Save changes"}
               </Button>
               <Button onClick={close}>Cancel</Button>
-            </div>
+              {editing === undefined ? null : (
+                <>
+                  {/* Pause in one tap, as the row used to offer — out of
+                      season without losing it. */}
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      const plan = editing;
+                      close();
+                      void toggleActive(plan);
+                    }}
+                  >
+                    {editing.active ? "Pause" : "Resume"}
+                  </Button>
+                  {/* The editor closes first, so the confirmation is the only
+                      dialog on screen. */}
+                  <Button
+                    variant="danger"
+                    className="ml-auto"
+                    onClick={() => {
+                      const plan = editing;
+                      close();
+                      void remove(plan);
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </>
+              )}
+            </>
           }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
-              <TextInput
-                label="Name"
-                required
-                value={draft.name}
-                error={errors["name"]}
-                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-              />
-            </div>
+            <TextInput
+              label="Name"
+              required
+              value={draft.name}
+              error={errors["name"]}
+              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+            />
 
             <fieldset className="flex flex-col gap-2">
               <legend className="text-sm font-medium text-ink">Who eats this</legend>
-              <p className="text-sm text-muted">
-                More than one, when they share a bowl. One ration rather than two keeps the amount
-                in one place, so correcting it corrects it for both.
-              </p>
+              {/* One ration rather than two keeps the amount in one place, so
+                  correcting it corrects it for both. */}
+              <p className="text-sm text-muted">More than one, when they share a bowl.</p>
               <div className="grid grid-cols-2 gap-x-density sm:grid-cols-3">
                 {pets.map((pet) => (
                   <Checkbox
@@ -463,7 +484,9 @@ export function PetFeedingPanel({
             {draft.fedIds.length < 2 ? null : (
               <Select
                 label="The amounts below are"
-                hint="Two cats on one bowl is a combined amount. Read per head it would put twice the food out and run the bag down twice as fast."
+                // Read per head, a shared amount puts twice the food out and
+                // runs the bag down twice as fast.
+                hint="Two cats on one bowl is usually a combined amount."
                 value={draft.portion}
                 error={errors["portion"]}
                 options={[
@@ -494,9 +517,10 @@ export function PetFeedingPanel({
                     key={index}
                     className="flex flex-col gap-2 rounded-density border border-edge p-3"
                   >
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                    <div className="grid grid-cols-2 gap-2">
                       <Select
                         label="Feed"
+                        className="col-span-2"
                         value={line.feedTypeId}
                         options={catalog.map((feed) => ({
                           value: feed.id,
@@ -592,7 +616,7 @@ export function PetFeedingPanel({
             <TextArea
               label="Special notes"
               rows={2}
-              hint="Anything a helper must know that is not an amount — allergies, what they must not have."
+              hint="Allergies, what they must not have."
               value={draft.specialNotes}
               error={errors["specialNotes"]}
               onChange={(event) => setDraft({ ...draft, specialNotes: event.target.value })}

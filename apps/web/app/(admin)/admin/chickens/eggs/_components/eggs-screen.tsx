@@ -1,6 +1,6 @@
 "use client";
 
-import { PageBody, PageHeader, Tabs, Tile } from "@galaxy-farm/ui";
+import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import { addCalendarDays, endOfDay, startOfDay, type Contact, type Ulid } from "@galaxy-farm/core";
 import {
   eggsOnHand,
@@ -26,7 +26,7 @@ import { useRecords } from "@/lib/local/use-records";
  * the first tab — a total and a date, both already filled in, and a breakdown
  * only for whoever wants one.
  *
- * Every number above the tabs is derived from the two logs. Nothing here is a
+ * Every number in the header is derived from the two logs. Nothing here is a
  * stored total, so correcting a miscounted Tuesday corrects the week, the lay
  * rate, and the basket at the same time.
  */
@@ -57,7 +57,7 @@ export function EggsScreen({
    * A collection carries a *date*, and a date-only value is stored at midday so
    * it reads as the same day whichever timezone a device is set to. Asked as of
    * the instant, the basket brought in at half past six this morning is stamped
-   * six hours in the future and none of these tiles would show it — which is
+   * six hours in the future and none of these numbers would show it — which is
    * exactly when somebody is standing there having just logged it.
    */
   const now = endOfDay(new Date());
@@ -77,42 +77,31 @@ export function EggsScreen({
 
   return (
     <PageBody>
+      {/*
+        The four numbers the tiles used to carry, as facts beside the title.
+        Each is derived, so correcting a row corrects all of them at once.
+      */}
       <PageHeader
         eyebrow="Flock"
         title="Eggs"
-        subtitle="What came in this morning, what the week looks like, and where they went."
+        subtitle={[
+          `${collectedToday} today`,
+          `${collectedWeek} in 7 days`,
+          rate === undefined ? undefined : `${rate.toFixed(2)} per bird a day`,
+          `${basket} in the basket`,
+        ]
+          .filter((part) => part !== undefined)
+          .join(" · ")}
       />
 
-      <div className="gf-stat-row">
-        <Tile
-          label="Today"
-          value={collectedToday}
-          tone="identity"
-          emphasis
-          hint={collectedToday === 0 ? "Nothing logged yet today" : "Collected today"}
-        />
-        <Tile label="Last 7 days" value={collectedWeek} tone="action" />
-        <Tile
-          label="Per bird per day"
-          value={rate === undefined ? "—" : rate.toFixed(2)}
-          tone={rate === undefined ? "neutral" : rate < 0.4 ? "danger" : "calm"}
-          hint={
-            birds === 0
-              ? "No birds counted — add a flock and its headcount"
-              : `Over 7 days, across ${birds} bird${birds === 1 ? "" : "s"}`
-          }
-        />
-        <Tile
-          label="In the basket"
-          value={basket}
-          tone={basket < 0 ? "danger" : "neutral"}
-          hint={
-            basket < 0
-              ? "More has gone out than was logged coming in"
-              : "Collected, less what has left"
-          }
-        />
-      </div>
+      {/* Said only when it is wrong. */}
+      {basket < 0 ? (
+        <p className="text-sm text-danger">More eggs have gone out than were logged coming in.</p>
+      ) : rate !== undefined && rate < 0.4 ? (
+        <p className="text-sm text-danger">Lay rate is low this week.</p>
+      ) : birds === 0 && logs.length > 0 ? (
+        <p className="text-sm text-muted">No birds counted, so there is no rate per bird.</p>
+      ) : null}
 
       <Tabs
         label="Eggs"

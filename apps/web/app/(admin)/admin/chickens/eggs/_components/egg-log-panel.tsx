@@ -4,17 +4,13 @@ import { useState } from "react";
 
 import {
   Button,
-  Card,
-  DataTable,
   EmptyState,
   Modal,
-  Section,
   Select,
   TextArea,
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import { type CrudError, type Ulid } from "@galaxy-farm/core";
 import {
@@ -29,6 +25,12 @@ import {
   breakdownSum,
   describeBreakdown,
 } from "@/app/(admin)/admin/chickens/eggs/_components/breakdown-editor";
+import {
+  ChipRow,
+  FilteredLine,
+  ListRow,
+  RowList,
+} from "@/app/(admin)/admin/horses/_components/list-row";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -36,8 +38,9 @@ import { useMutations } from "@/lib/local/mutations";
  *
  * The Collect tab writes; this one is the rest of the surface that clause 1
  * asks for — find it, read it, fix it, remove it. Nothing on this screen is a
- * derived read model, so every number the tiles and the trends show can be
- * traced back to a row here and corrected at the source.
+ * derived read model, so every number the header and the trends show can be
+ * traced back to a row here and corrected at the source. A row is the count,
+ * the day and one line; it opens its editor, which is where delete lives.
  */
 
 function formatDate(value: Date): string {
@@ -174,98 +177,97 @@ export function EggLogPanel({
     });
   }
 
-  const columns: readonly Column<EggLog>[] = [
-    {
-      key: "when",
-      header: "Collected",
-      primary: true,
-      render: (log) => formatDate(log.collectedOn),
-    },
-    { key: "flock", header: "Flock", render: (log) => flockName(log.flockId) ?? "Whole place" },
-    { key: "total", header: "Eggs", numeric: true, render: (log) => log.total },
-    {
-      key: "breakdown",
-      header: "Breakdown",
-      render: (log) =>
-        log.breakdown.length === 0 ? (
-          <span className="text-muted">—</span>
-        ) : (
-          describeBreakdown(log.breakdown)
-        ),
-    },
-    { key: "notes", header: "Note", render: (log) => log.notes ?? "—" },
-    {
-      key: "actions",
-      header: "",
-      render: (log) => (
-        <span className="flex gap-2">
-          <Button variant="ghost" onClick={() => startEdit(log)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void removeLog(log)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
+  /** The chips: every flock, each one, and the logs that named none. */
+  const chips = [
+    { key: "all", label: "Every flock" },
+    ...flocks.map((flock) => ({ key: flock.id as string, label: flock.name })),
+    ...(logs.some((log) => log.flockId === undefined)
+      ? [{ key: "none", label: "No flock named" }]
+      : []),
   ];
 
   if (loading) return <p className="text-muted">Loading the egg log…</p>;
 
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title="Every collection"
-        actions={
-          <Select
-            label="Flock"
-            hideLabel
-            value={filter}
-            options={[
-              { value: "all", label: "Every flock" },
-              ...flocks.map((flock) => ({ value: flock.id, label: flock.name })),
-              { value: "none", label: "No flock named" },
-            ]}
-            onChange={(event) => setFilter(event.target.value)}
-          />
-        }
-      >
-        <Card>
-          <DataTable
-            caption="Egg collections"
-            columns={columns}
-            rows={history}
-            rowKey={(log) => log.id}
-            empty={
-              <EmptyState
-                title="Nothing collected yet"
-                detail="Log a basket on the Collect tab and it appears here, where it can be corrected or removed."
-              />
-            }
-          />
-        </Card>
-      </Section>
+      {chips.length <= 2 ? null : (
+        <ChipRow label="Filter by flock" chips={chips} value={filter} onChange={setFilter} />
+      )}
+
+      {filter === "all" ? null : (
+        <FilteredLine
+          shown={history.length}
+          total={logs.length}
+          what={chips.find((chip) => chip.key === filter)?.label ?? ""}
+          onClear={() => setFilter("all")}
+        />
+      )}
+
+      {history.length === 0 ? (
+        <EmptyState
+          title="Nothing collected yet"
+          detail="Log a basket on the Collect tab and it appears here."
+        />
+      ) : (
+        <RowList label="Egg collections">
+          {history.map((log) => (
+            <ListRow
+              key={log.id}
+              lead={log.total}
+              title={formatDate(log.collectedOn)}
+              line={[
+                flockName(log.flockId) ?? "Whole place",
+                log.breakdown.length === 0 ? undefined : describeBreakdown(log.breakdown),
+                log.notes,
+              ]}
+              label={`Edit ${log.total} egg${log.total === 1 ? "" : "s"} on ${formatDate(log.collectedOn)}`}
+              onOpen={() => startEdit(log)}
+            />
+          ))}
+        </RowList>
+      )}
 
       {draft === undefined || editing === undefined ? null : (
         <Modal
           key={editing.id}
-          size="wide"
+          placement="side"
           title={`Editing ${formatDate(editing.collectedOn)}`}
           description="Correct the count, the day, or which coop it came from."
           onClose={closeEdit}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void saveEdit()}>
+                Save changes
+              </Button>
+              <Button onClick={closeEdit}>Cancel</Button>
+              <Button
+                variant="danger"
+                className="ml-auto"
+                onClick={() => {
+                  // The editor closes first, so the confirmation is the
+                  // only dialog on screen.
+                  const log = editing;
+                  closeEdit();
+                  void removeLog(log);
+                }}
+              >
+                Delete
+              </Button>
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-3">
-              <Select
-                label="Flock"
-                value={draft.flockId}
-                options={[
-                  { value: "", label: "Whole place" },
-                  ...flocks.map((flock) => ({ value: flock.id, label: flock.name })),
-                ]}
-                error={errors["flockId"]}
-                onChange={(event) => setDraft({ ...draft, flockId: event.target.value })}
-              />
+            <Select
+              label="Flock"
+              value={draft.flockId}
+              options={[
+                { value: "", label: "Whole place" },
+                ...flocks.map((flock) => ({ value: flock.id, label: flock.name })),
+              ]}
+              error={errors["flockId"]}
+              onChange={(event) => setDraft({ ...draft, flockId: event.target.value })}
+            />
+            <div className="grid grid-cols-2 gap-density">
               <TextInput
                 label="Collected"
                 type="date"
@@ -281,9 +283,7 @@ export function EggLogPanel({
                 step={1}
                 numeric
                 disabled={draft.breakdown.length > 0}
-                hint={
-                  draft.breakdown.length > 0 ? "Counted from the breakdown." : "Eggs in the basket."
-                }
+                hint={draft.breakdown.length > 0 ? "From the breakdown." : undefined}
                 value={
                   draft.breakdown.length > 0 ? String(breakdownSum(draft.breakdown)) : draft.total
                 }
@@ -305,13 +305,6 @@ export function EggLogPanel({
               error={errors["notes"]}
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void saveEdit()}>
-                Save changes
-              </Button>
-              <Button onClick={closeEdit}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}
