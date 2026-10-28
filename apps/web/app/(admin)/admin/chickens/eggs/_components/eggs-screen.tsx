@@ -83,7 +83,7 @@ export function EggsScreen({
         subtitle="What came in this morning, what the week looks like, and where they went."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile
           label="Today"
           value={collectedToday}

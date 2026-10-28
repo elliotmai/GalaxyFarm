@@ -154,7 +154,7 @@ export function SuppliesScreen({
         subtitle="Shavings through show sticks. On hand is the opening count plus what was bought, less what was used — so correcting a purchase moves the total by itself."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="Items" value={items.length} />
         <Tile
           label="At the reorder point"

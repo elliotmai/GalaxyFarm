@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { Button, Card, EmptyState, Meter, Pill, useToast } from "@galaxy-farm/ui";
+import { Pill, useToast } from "@galaxy-farm/ui";
 import {
   choreDaySheet,
   choreProgress,
@@ -32,19 +32,30 @@ import { useRecords } from "@/lib/local/use-records";
  * be ticked without leaving. §12 asks for every frequent action to be within
  * two taps of its context; a chore ticked from here is one.
  *
- * Only the first few, and only the ones still open. The full day, the days
- * either side of it, and the templates behind it are a link away.
+ * A checklist rather than a row of "Done" buttons: a box that fills in is the
+ * shape a chore list has on paper, and a ticked line staying put (struck
+ * through) shows how far through the day is without a progress bar. The full
+ * day, the days either side of it, and the templates behind it are a link
+ * away.
  */
 
-const SHOWN = 4;
+/** Past this many, the card shows only what is still open. */
+const SHOWN = 8;
 
-export function ChoresCard({
-  propertyId,
-  actorId,
-}: {
-  readonly propertyId: Ulid;
-  readonly actorId: Ulid;
-}) {
+export interface ChoreSheet {
+  readonly sheet: readonly ChoreEntry[];
+  readonly progress: ReturnType<typeof choreProgress>;
+  readonly busy: string | undefined;
+  readonly tick: (entry: ChoreEntry) => Promise<void>;
+}
+
+/**
+ * Today's sheet and the tick that changes it.
+ *
+ * A hook rather than a card so the Today screen can count what is overdue in
+ * its "Needs you" list from the same sheet the checklist draws.
+ */
+export function useChoreSheet(propertyId: Ulid, actorId: Ulid): ChoreSheet {
   const query = { propertyId };
   const { records: tasks } = useRecords<Task>("tasks", query);
   const { records: templates } = useRecords<ChoreTemplate>("choreTemplates", query);
@@ -68,11 +79,12 @@ export function ChoresCard({
     now,
   );
   const sheet = choreDaySheet({ tasks, templates, derived }, today, now);
-  const progress = choreProgress(sheet);
 
   async function tick(entry: ChoreEntry) {
     setBusy(entry.id);
     try {
+      // A toggle: ticking a finished chore un-ticks it, and `toggleChore` owns
+      // the subtle half of that.
       const result = await toggleChore(api, {
         entry,
         template: templates.find((candidate) => candidate.id === entry.templateId),
@@ -87,78 +99,113 @@ export function ChoresCard({
     }
   }
 
-  const open = sheet.filter((entry) => entry.completedAt === undefined);
-  const link = (
-    <Link href="/admin/chores" className="text-action underline underline-offset-2">
-      All chores
-    </Link>
-  );
+  return { sheet, progress: choreProgress(sheet), busy, tick };
+}
 
-  if (progress.total === 0) {
-    return (
-      <Card title="Chores">
-        <EmptyState
-          title="Nothing on today"
-          detail="No template fires today and nobody wrote anything down. Set one up and it will turn up on its day by itself."
-          action={link}
-        />
-      </Card>
-    );
-  }
+function timeOf(date: Date): string {
+  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+export function ChoresChecklist({ chores }: { readonly chores: ChoreSheet }) {
+  const { sheet, progress, busy, tick } = chores;
+  const open = sheet.filter((entry) => entry.completedAt === undefined);
+  // In the sheet's own order, so a ticked line stays where the finger left it.
+  // Only on a long day does the list narrow to what is still open.
+  const shown = sheet.length <= SHOWN ? sheet : open.slice(0, SHOWN);
+  const hidden = sheet.length <= SHOWN ? 0 : open.length - shown.length;
 
   return (
-    <Card
-      title="Chores"
-      actions={
-        progress.overdue > 0 ? (
-          <Pill tone="danger" dot>
-            {progress.overdue} overdue
-          </Pill>
-        ) : progress.open === 0 ? (
-          <Pill tone="calm">All done</Pill>
-        ) : (
-          <Pill tone="action">{progress.open} to do</Pill>
-        )
-      }
-    >
-      <div className="flex flex-col gap-density">
-        <Meter
-          value={progress.fraction}
-          tone={progress.overdue > 0 ? "danger" : progress.open === 0 ? "calm" : "action"}
-          label="Today"
-          detail={`${progress.done} of ${progress.total} done`}
-        />
-
-        {open.length === 0 ? (
-          <p className="text-sm text-muted">Everything asked for today is finished.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {open.slice(0, SHOWN).map((entry) => (
-              <li
-                key={entry.id}
-                className="flex flex-wrap items-center justify-between gap-2 border-b border-edge pb-2 last:border-0 last:pb-0"
-              >
-                <span className="flex min-w-0 items-center gap-2 text-density text-ink">
-                  {entry.title}
-                  {entry.carriedOver ? <Pill tone="danger">Owed</Pill> : null}
-                </span>
-                <Button
-                  variant="primary"
-                  disabled={busy === entry.id}
-                  onClick={() => void tick(entry)}
-                >
-                  Done
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
+    <section aria-labelledby="today-chores" className="flex min-w-0 flex-col gap-2.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id="today-chores" className="text-xs font-semibold uppercase tracking-wide text-muted">
+          Chores{progress.total === 0 ? "" : ` · ${progress.done} of ${progress.total}`}
+        </h2>
+        <Link
+          href="/admin/chores"
+          className="text-sm font-medium text-action underline-offset-2 hover:underline"
+        >
+          All chores
+        </Link>
       </div>
 
-      <p className="mt-density text-sm text-muted">
-        {open.length > SHOWN ? `${open.length - SHOWN} more still to do. ` : ""}
-        {link}
-      </p>
-    </Card>
+      {progress.total === 0 ? (
+        <p className="rounded-density border border-rule bg-panel px-4 py-3 text-sm text-muted">
+          Nothing on today.
+        </p>
+      ) : (
+        <ul className="divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
+          {shown.map((entry) => {
+            const done = entry.completedAt !== undefined;
+            const late = !done && entry.overdue;
+
+            return (
+              <li key={entry.id}>
+                {/*
+                  The whole row is the label, so the target is the line and not
+                  a 24px box. A real checkbox underneath: it is announced as
+                  one, and Space toggles it.
+                */}
+                <label className="flex min-h-[52px] cursor-pointer items-center gap-3 px-4 py-2 hover:bg-canvas">
+                  <input
+                    type="checkbox"
+                    className="peer sr-only"
+                    checked={done}
+                    disabled={busy === entry.id}
+                    onChange={() => void tick(entry)}
+                  />
+                  <span
+                    aria-hidden
+                    className={[
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2",
+                      "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-action",
+                      done ? "border-action bg-action text-action-ink" : "border-edge bg-panel",
+                    ].join(" ")}
+                  >
+                    {done ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M5 12l5 5 9-10"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : null}
+                  </span>
+                  <span
+                    className={[
+                      "min-w-0 flex-1 text-density",
+                      done ? "text-muted line-through" : "text-ink",
+                    ].join(" ")}
+                  >
+                    {entry.title}
+                  </span>
+                  {entry.carriedOver && !done ? <Pill tone="danger">Owed</Pill> : null}
+                  <span
+                    className={[
+                      "shrink-0 text-sm [font-variant-numeric:tabular-nums]",
+                      late ? "font-medium text-danger" : "text-muted",
+                    ].join(" ")}
+                  >
+                    {timeOf(entry.dueAt)}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {hidden > 0 ? (
+        <p className="text-sm text-muted">
+          {hidden} more still to do in{" "}
+          <Link href="/admin/chores" className="text-action underline underline-offset-2">
+            all chores
+          </Link>
+          .
+        </p>
+      ) : null}
+    </section>
   );
 }

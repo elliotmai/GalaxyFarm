@@ -131,7 +131,7 @@ export function ChoresScreen({
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile
           label="To do"
           value={progress.open}

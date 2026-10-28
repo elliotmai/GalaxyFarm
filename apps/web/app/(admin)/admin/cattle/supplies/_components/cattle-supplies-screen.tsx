@@ -123,7 +123,7 @@ export function CattleSuppliesScreen({
         subtitle="What is on hand for breeding and treating, and what is running out."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile
           label="Straws on hand"
           value={straws.reduce((total, entry) => total + entry.strawsOnHand, 0)}

@@ -141,7 +141,7 @@ export function SalesScreen({
         subtitle="What each animal cost, what it brought, and which figures are still missing an input."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="Animals costed" value={rollup.animals} />
         <Tile label="Total cost" value={money(rollup.totalCost)} tone="danger" />
         <Tile label="Total revenue" value={money(rollup.totalRevenue)} tone="calm" />

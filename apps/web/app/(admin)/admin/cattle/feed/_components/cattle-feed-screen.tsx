@@ -211,7 +211,7 @@ export function CattleFeedScreen({
         subtitle="What gets put out, for whom, and how much of each feed that adds up to in a day."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="Plans" value={plans.length} />
         <Tile label="Feeding now" value={active.length} tone="calm" />
         <Tile label="Feeds in the catalog" value={feeds.length} tone="identity" />

@@ -178,11 +178,11 @@ export const monoFamily = 'var(--font-mono-loaded, "IBM Plex Mono"), ui-monospac
  * data-dense tables with side panels.
  *
  * Radius travels with the density and with the treatment it carries: a herd
- * book is a document and keeps its corners tight, a phone is a phone, and
+ * book is a document and keeps its corners modest, a phone is a phone, and
  * signage has no radius at all.
  */
 export const density = {
-  desktop: { control: "36px", touchTarget: "36px", textSize: "15px", gap: "12px", radius: "3px" },
+  desktop: { control: "36px", touchTarget: "36px", textSize: "15px", gap: "12px", radius: "8px" },
   mobile: { control: "44px", touchTarget: "44px", textSize: "16px", gap: "14px", radius: "10px" },
   kiosk: { control: "64px", touchTarget: "64px", textSize: "20px", gap: "20px", radius: "0px" },
 } as const;

@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
-import { Badge, Button, Card, Checkbox, Select, useConfirmDelete, useToast } from "@galaxy-farm/ui";
+import { Button, Checkbox, Select, useConfirmDelete, useToast } from "@galaxy-farm/ui";
 import {
   encodeUlid,
   moveToZone,
@@ -11,6 +11,7 @@ import {
   type Animal,
   type Property,
   type Ulid,
+  type WatchSettings,
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
@@ -50,13 +51,25 @@ import { useRecords } from "@/lib/local/use-records";
  * one will appear.
  */
 
-export function WeaningCard({
-  propertyId,
-  actorId,
-}: {
-  readonly propertyId: Ulid;
-  readonly actorId: Ulid;
-}) {
+export interface WeaningWatch {
+  /** Groups coming up, most pressing first. Empty for most of the year. */
+  readonly batches: readonly WeaningBatch[];
+  /** The groups already past the day the oldest had to be off. */
+  readonly late: readonly WeaningBatch[];
+  readonly settings: WatchSettings;
+  readonly animals: readonly Animal[];
+  readonly profiles: readonly CattleProfile[];
+  readonly zones: readonly Zone[];
+  readonly assignments: readonly ZoneAssignment[];
+}
+
+/**
+ * What is coming up for weaning, read but not acted on.
+ *
+ * Separate from the panel so the Today screen can say "3 calves to wean" in
+ * one row without drawing the controls, and open the panel only when asked.
+ */
+export function useWeaningWatch(propertyId: Ulid): WeaningWatch {
   const { records: animals } = useRecords<Animal>("animals", { propertyId });
   const { records: profiles } = useRecords<CattleProfile>("cattleProfiles", { propertyId });
   const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", { propertyId });
@@ -72,23 +85,6 @@ export function WeaningCard({
     () => resolveWatchSettings(properties.find((entry) => entry.id === propertyId)?.watchSettings),
     [properties, propertyId],
   );
-
-  const profileApi = useMutations<CattleProfile>(
-    "cattleProfiles",
-    "cattleProfiles",
-    cattleProfileSchema,
-    propertyId,
-    actorId,
-  );
-  const placements = useMutations<ZoneAssignment>(
-    "zoneAssignments",
-    "zoneAssignments",
-    zoneAssignmentSchema,
-    propertyId,
-    actorId,
-  );
-  const { show } = useToast();
-  const confirm = useConfirmDelete();
 
   // One clock for the render, so a calf cannot be 134 days old in the heading
   // and 135 in its own line.
@@ -108,6 +104,45 @@ export function WeaningCard({
       }),
     [animals, profiles, calvings, asOf, settings],
   );
+
+  return {
+    batches,
+    late: overdueToWean(batches),
+    settings,
+    animals,
+    profiles,
+    zones,
+    assignments,
+  };
+}
+
+export function WeaningPanel({
+  propertyId,
+  actorId,
+  watch,
+}: {
+  readonly propertyId: Ulid;
+  readonly actorId: Ulid;
+  readonly watch: WeaningWatch;
+}) {
+  const { batches, settings, animals, profiles, zones, assignments } = watch;
+
+  const profileApi = useMutations<CattleProfile>(
+    "cattleProfiles",
+    "cattleProfiles",
+    cattleProfileSchema,
+    propertyId,
+    actorId,
+  );
+  const placements = useMutations<ZoneAssignment>(
+    "zoneAssignments",
+    "zoneAssignments",
+    zoneAssignmentSchema,
+    propertyId,
+    actorId,
+  );
+  const { show } = useToast();
+  const confirm = useConfirmDelete();
 
   /** Calves ticked for this round, keyed by id. Everything starts ticked. */
   const [excluded, setExcluded] = useState<ReadonlySet<Ulid>>(new Set());
@@ -268,19 +303,8 @@ export function WeaningCard({
 
   if (batches.length === 0) return null;
 
-  const late = overdueToWean(batches);
-
   return (
-    <Card
-      title="Coming up for weaning"
-      actions={
-        late.length === 0 ? (
-          <Badge tone="calm">{batches.length} due soon</Badge>
-        ) : (
-          <Badge tone="danger">{late.length} past the day</Badge>
-        )
-      }
-    >
+    <div className="flex flex-col gap-density">
       <div className="flex flex-col gap-density">
         {batches.map((batch) => {
           const taking = batch.calves.filter((calf) => !excluded.has(calf.calfId));
@@ -348,11 +372,11 @@ export function WeaningCard({
         })}
       </div>
 
-      <p className="mt-density text-sm text-muted">
-        Calves may come off from {settings.weaningEarliestDays} days and must be off by{" "}
-        {settings.weaningLatestDays}. A group waits for its youngest to be old enough, and is
-        ordered by whichever calf runs out of road first. Change either under Settings → Watch.
+      {/* The rule as two numbers. The reasoning behind it lives in Settings. */}
+      <p className="text-sm text-muted">
+        Off from {settings.weaningEarliestDays} days, by {settings.weaningLatestDays}. Change under
+        Settings → Watch.
       </p>
-    </Card>
+    </div>
   );
 }

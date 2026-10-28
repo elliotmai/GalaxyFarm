@@ -206,7 +206,7 @@ export function HealthScreen({
         subtitle="Treatments, and the withdrawal clock they start. The clearance date is computed from the treatment, so correcting one moves the other."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="Treatments" value={records.length} />
         <Tile
           label="Under withdrawal"

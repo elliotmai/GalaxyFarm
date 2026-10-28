@@ -91,7 +91,7 @@ export function PlantingsScreen({
         subtitle="The beds, what is in them, what has been done to it, and what the season plan says goes in next."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile
           label="In the ground"
           value={live.length}

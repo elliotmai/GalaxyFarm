@@ -80,7 +80,7 @@ export function HorsesScreen({ propertyId }: { readonly propertyId: Ulid }) {
         subtitle="No horses yet. The shopping is live anyway — §5.9 calls this the purchase furthest out and the one most worth researching slowly, so the roadmap and the comparison run years ahead of the module."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="On the roadmap" value={steps.length} tone="identity" hint="Still open" />
         <Tile
           label="Planned spend"

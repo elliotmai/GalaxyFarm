@@ -286,7 +286,7 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
         meta={`${formatDate(range.from)} – ${formatDate(range.to)} · ${daysBetween(range)} days`}
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile
           label="Spent"
           value={formatMoney({ cents: spent })}

@@ -118,7 +118,7 @@ export function FlockScreen({
         subtitle="How many birds there are, and what happened to the ones that are not."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile
           label="Birds"
           value={birds}

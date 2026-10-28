@@ -75,7 +75,7 @@ export function HarvestScreen({
         subtitle="What came off the beds, and what is on the shelf because of it."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile
           label="On the shelf"
           value={shelf.length}

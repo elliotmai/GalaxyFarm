@@ -199,7 +199,7 @@ export function WeightsScreen({
         subtitle="Birth weights are the reliable ones. Every figure below says what it assumes, and the 205-day weight is unadjusted."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="Weights taken" value={weights.length} />
         <Tile label="Animals weighed" value={growth.length} tone="identity" />
         <Tile label="With a birth weight" value={withBirth} tone="calm" hint="The reliable ones" />

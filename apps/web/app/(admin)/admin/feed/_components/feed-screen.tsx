@@ -191,7 +191,7 @@ export function FeedScreen({
         subtitle="What is in the barn, what the plans are eating through it, and the date you have to order by. Daily demand comes from the plans — it is never typed in."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="Feed types" value={feeds.filter((feed) => feed.active).length} />
         <Tile
           label="To order now"
@@ -1016,7 +1016,7 @@ function CostPerHead({
           />
         }
       >
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="gf-stat-row">
           <Tile label="Head fed" value={fed.length} />
           <Tile label="Cost per head" value={money(perHead)} tone="identity" emphasis />
           <Tile

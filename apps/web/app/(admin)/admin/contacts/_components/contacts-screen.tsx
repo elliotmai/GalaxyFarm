@@ -239,7 +239,7 @@ export function ContactsScreen({
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="Contacts" value={contacts.length} tone="identity" />
         <Tile
           label="Vets"

@@ -198,7 +198,7 @@ describe("DataTable", () => {
     expect(within(table).getByText("1320")).toHaveClass("gf-numeric");
   });
 
-  it("renders a card per row for a phone, built from the same columns", () => {
+  it("renders a list row per row for a phone, built from the same columns", () => {
     // A seven-column table on a 375px screen is one you read by dragging
     // sideways, and the moment you drag, the name of the animal the row is
     // about scrolls off the left.
@@ -206,7 +206,7 @@ describe("DataTable", () => {
 
     const cards = screen.getByRole("list");
     expect(within(cards).getAllByRole("listitem")).toHaveLength(rows.length);
-    // The identity column heads the card; the rest arrive as labelled pairs.
+    // The identity column heads the row; the rest arrive as labelled pairs.
     expect(within(cards).getByText("Andromeda")).toBeInTheDocument();
     expect(within(cards).getAllByRole("term").length).toBeGreaterThan(0);
   });
@@ -243,8 +243,8 @@ describe("Card and Badge", () => {
   });
 
   it("shows a badge's text, which is what carries its meaning", () => {
-    // Outlined rather than filled: a page of filled badges would compete with
-    // the safety chips, where a block of colour means something specific.
+    // A pale tint rather than a block of colour: a page of saturated badges
+    // would compete with the safety chips, where a full fill means something.
     render(<Badge tone="danger">Overdue</Badge>);
 
     expect(screen.getByText("Overdue")).toBeInTheDocument();

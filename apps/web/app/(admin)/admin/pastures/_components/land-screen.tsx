@@ -82,7 +82,7 @@ export function LandScreen({
         subtitle="The places, the tanks they drink from, and what has gone on the ground."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile
           label="Zones in use"
           value={live.length}

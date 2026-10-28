@@ -621,7 +621,7 @@ export function EquipmentCandidatesScreen({
         subtitle="What you are actually looking at, compared on what it would cost to get here and keep running — not on the asking price."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="Under consideration" value={open.length} tone="identity" />
         <Tile
           label="Listing or sale within a fortnight"

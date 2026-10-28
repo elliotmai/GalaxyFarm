@@ -16,57 +16,67 @@ import type { HTMLAttributes, ReactNode } from "react";
  */
 
 /**
- * The first sentence, and everything after it.
+ * Whether a piece of text is a fact or an explanation (spec §8 v0.9).
  *
- * Deliberately conservative: it needs a terminator followed by whitespace and
- * a non-space, so a decimal, a version or a §-reference is never a break. The
- * whole corpus was checked for the case that would defeat it — an abbreviation
- * ending in a full stop, "Dr.", "a.m.", "e.g." — and there is not one. If one
- * is written later it splits a sentence in half, which is visible the moment
- * the screen is opened rather than silent.
+ * `subtitle` and `description` were documented as one line and handed
+ * paragraphs: a hundred and ninety-nine of them, median 116 characters. The
+ * first fix folded everything after the first sentence behind "More", which
+ * still left a grey sentence above every heading on every screen.
+ *
+ * So a header now carries facts only — "42 head", "Deleted records" — and an
+ * explanation goes behind a `?` beside the title. Short single-sentence text is
+ * a fact and stays on screen; anything longer, or with a second sentence, is
+ * an explanation. Something that is not a string (a count, a chip) is always a
+ * fact, because a screen built it from data.
+ *
+ * Nothing is deleted. The arithmetic behind an on-hand count is genuinely
+ * non-obvious, and a farm app that hides why a number moved is worse than a
+ * wordy one — it is just read once, not every day.
  */
-const SENTENCE = /^(.+?[.?!])\s+(\S[\s\S]*)$/;
+const SECOND_SENTENCE = /[.?!]\s+\S/;
+const FACT_LENGTH = 70;
+
+export function isExplanation(text: ReactNode): text is string {
+  return typeof text === "string" && (text.length > FACT_LENGTH || SECOND_SENTENCE.test(text));
+}
 
 /**
- * The explanation, folded (spec §8 v0.9).
+ * The `?` beside a title, and the explanation it opens.
  *
- * `subtitle` is documented below as "one line under the title", and `Section`
- * says much the same. What they were actually passed is a paragraph: a hundred
- * and ninety-nine of them, median 116 characters, up to 283 — so the Supplies
- * screen opened with three lines about how a running total is computed before
- * a single supply appeared. Two grey lines above every heading on every screen
- * is most of what "cluttered" meant.
- *
- * None of it is deleted, because none of it is padding. The arithmetic behind
- * an on-hand count is genuinely non-obvious, and a farm app that hides why a
- * number moved is worse than a wordy one. But it is read once, on the day
- * somebody meets the screen, and it competes with the records every day after.
- *
- * So the first sentence stays — it names the thing, which is what the prop
- * promised — and the rest goes behind a disclosure. On paper the whole text
- * prints, since a folded explanation is no use to somebody holding a sheet.
- *
- * A description with only one sentence is already within its contract and is
- * left exactly as it was, toggle and all.
+ * A `<details>` rather than a popover with state: it opens and closes without
+ * any script, and the summary is a real button to a keyboard and a screen
+ * reader.
  */
-function Explainer({ children, className }: { readonly children: ReactNode; className: string }) {
-  const split = typeof children === "string" ? SENTENCE.exec(children) : null;
-  if (split === null) return <p className={className}>{children}</p>;
-
+export function HelpToggle({
+  about,
+  children,
+}: {
+  /** Names what is being explained, for the button's accessible name. */
+  readonly about: string;
+  readonly children: ReactNode;
+}) {
   return (
-    <details className={className}>
+    <details className="gf-help group relative inline-block align-middle">
       <summary
-        // The native marker is dropped for a word. A triangle beside a
-        // sentence reads as a tree node — as though the section itself
-        // collapsed — and this only ever opens one more line of prose.
-        className="gf-summary cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+        aria-label={`About ${about}`}
+        className={[
+          "gf-summary flex h-7 w-7 cursor-pointer list-none items-center justify-center",
+          "rounded-full border border-rule bg-panel text-sm font-semibold text-muted",
+          "hover:text-ink group-open:border-action group-open:text-action",
+          "[&::-webkit-details-marker]:hidden",
+        ].join(" ")}
       >
-        {split[1]}{" "}
-        <span className="whitespace-nowrap text-action underline decoration-dotted underline-offset-2">
-          More
-        </span>
+        ?
       </summary>
-      <p className="mt-1">{split[2]}</p>
+      <div
+        className={[
+          "absolute left-0 top-9 z-30 w-[min(22rem,calc(100vw-2rem))] rounded-density",
+          "border border-rule bg-panel p-density text-sm font-normal leading-relaxed text-ink",
+          "shadow-[0_12px_32px_-12px_rgba(20,23,27,0.35)]",
+        ].join(" ")}
+      >
+        {children}
+      </div>
     </details>
   );
 }
@@ -93,15 +103,20 @@ export interface PageHeaderProps {
  */
 export function PageHeader({ title, subtitle, eyebrow, actions, meta }: PageHeaderProps) {
   return (
-    <header className="flex flex-col gap-3 border-b border-rule pb-density">
+    <header className="flex flex-col gap-2">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
+          {/* Not on a phone, where the tab strips right above already say
+              "Cattle" — the same word twice in a 390px column is a row lost. */}
           {eyebrow === undefined ? null : (
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted">{eyebrow}</p>
+            <p className="hidden text-xs font-medium text-muted md:block">{eyebrow}</p>
           )}
-          <h1 className="text-ink">{title}</h1>
-          {subtitle === undefined ? null : (
-            <Explainer className="max-w-prose text-sm text-muted">{subtitle}</Explainer>
+          <div className="flex items-center gap-2">
+            <h1 className="text-ink">{title}</h1>
+            {isExplanation(subtitle) ? <HelpToggle about={title}>{subtitle}</HelpToggle> : null}
+          </div>
+          {subtitle === undefined || isExplanation(subtitle) ? null : (
+            <div className="max-w-prose text-sm text-muted">{subtitle}</div>
           )}
         </div>
         {actions === undefined ? null : (
@@ -142,9 +157,14 @@ export function Section({
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="flex flex-col gap-0.5">
-          <h2 className="text-ink">{title}</h2>
-          {description === undefined ? null : (
-            <Explainer className="max-w-prose text-sm text-muted">{description}</Explainer>
+          <div className="flex items-center gap-2">
+            <h2 className="text-ink">{title}</h2>
+            {isExplanation(description) ? (
+              <HelpToggle about={title}>{description}</HelpToggle>
+            ) : null}
+          </div>
+          {description === undefined || isExplanation(description) ? null : (
+            <div className="max-w-prose text-sm text-muted">{description}</div>
           )}
         </div>
         {actions}
@@ -205,7 +225,13 @@ export function DetailList({ items, columns = 2 }: DetailListProps) {
 }
 
 /**
- * A responsive rank of numbers. Two up on a phone, four on a laptop.
+ * A responsive rank of numbers. One swipeable row on a phone, four up on a
+ * laptop.
+ *
+ * Two up on a phone was five tiles in three rows — a screenful of numbers
+ * before the first record, most of them zero on a quiet day. As a single row
+ * that scrolls sideways it costs one row whatever the count, and the list the
+ * screen is actually for starts above the fold.
  *
  * Distinct from `CardGrid`, which goes one up on a phone: two small numbers
  * side by side are readable on a 375px screen and two record cards are not.
@@ -218,7 +244,7 @@ export function DetailList({ items, columns = 2 }: DetailListProps) {
  * looks subtly unlike its neighbour for no reason anybody can name.
  */
 export function StatRow({ children }: { readonly children: ReactNode }) {
-  return <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{children}</div>;
+  return <div className="gf-stat-row">{children}</div>;
 }
 
 /**

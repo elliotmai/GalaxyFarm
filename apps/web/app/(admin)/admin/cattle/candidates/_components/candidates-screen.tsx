@@ -215,7 +215,7 @@ export function CattleCandidatesScreen({
         subtitle="Cattle under consideration, compared on what they would actually cost to get here — not on the asking price."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="Under consideration" value={open.length} tone="identity" />
         <Tile
           label="Sale within a fortnight"

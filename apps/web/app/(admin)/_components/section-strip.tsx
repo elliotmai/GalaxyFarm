@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { SUB_SECTIONS, destinationFor, sectionFor } from "@/app/(admin)/_components/nav-groups";
+import {
+  SUB_SECTIONS,
+  VIEW_GROUPS,
+  destinationFor,
+  sectionFor,
+} from "@/app/(admin)/_components/nav-groups";
 import type { NavItem } from "@/app/(admin)/_components/nav-groups";
 
 /**
@@ -27,6 +32,7 @@ function Strip({
   current,
   label,
   quiet = false,
+  segmented = false,
 }: {
   readonly items: readonly NavItem[];
   /**
@@ -42,6 +48,8 @@ function Strip({
   readonly current: string | undefined;
   readonly label: string;
   readonly quiet?: boolean;
+  /** A segmented control: a few big choices rather than a run of tabs. */
+  readonly segmented?: boolean;
 }) {
   return (
     <div
@@ -50,7 +58,11 @@ function Strip({
       // behaviour they do not have.
       aria-label={label}
       className={`flex gap-1 overflow-x-auto ${
-        quiet ? "" : "border-b border-rule"
+        segmented
+          ? "rounded-density bg-raised p-1 sm:self-start"
+          : quiet
+            ? ""
+            : "border-b border-rule"
       } [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
       role="navigation"
     >
@@ -68,15 +80,21 @@ function Strip({
             prefetch
             aria-current={here ? "page" : undefined}
             className={
-              quiet
-                ? `flex min-h-target shrink-0 items-center rounded-density px-3 text-sm ${
-                    here ? "bg-raised font-semibold text-ink" : "text-muted hover:text-ink"
-                  }`
-                : `flex min-h-target shrink-0 items-center border-b-2 px-3 text-density ${
+              segmented
+                ? `flex min-h-target flex-1 shrink-0 items-center justify-center rounded-density px-4 text-sm sm:flex-none ${
                     here
-                      ? "border-action font-semibold text-ink"
-                      : "border-transparent text-muted hover:text-ink"
+                      ? "bg-panel font-semibold text-ink shadow-[0_1px_3px_rgba(20,23,27,0.15)]"
+                      : "text-muted hover:text-ink"
                   }`
+                : quiet
+                  ? `flex min-h-target shrink-0 items-center rounded-full px-3 text-sm ${
+                      here ? "bg-action/10 font-semibold text-action" : "text-muted hover:text-ink"
+                    }`
+                  : `flex min-h-target shrink-0 items-center border-b-2 px-3 text-density ${
+                      here
+                        ? "border-action font-semibold text-ink"
+                        : "border-transparent text-muted hover:text-ink"
+                    }`
             }
           >
             {item.label}
@@ -105,6 +123,12 @@ export function SectionStrip() {
   // sitting inside Cattle.
   const view = subs?.find((sub) => sub.href === pathname);
 
+  // Grouped views: the groups as a segmented control, then the chosen group's
+  // own views. A detail page sits in no group, so nothing is lit and no second
+  // row is drawn — the same rule the flat strip keeps for it.
+  const groups = section === undefined ? undefined : VIEW_GROUPS[section.href];
+  const group = groups?.find((candidate) => candidate.views.some((v) => v.href === pathname));
+
   return (
     <div className="mb-density flex flex-col gap-2">
       {showPrimary ? (
@@ -114,7 +138,22 @@ export function SectionStrip() {
           label={`${destination.label} sections`}
         />
       ) : null}
-      {subs === undefined ? null : (
+      {subs === undefined ? null : groups !== undefined ? (
+        <>
+          <Strip
+            items={groups.map((candidate) => ({
+              href: candidate.views[0]?.href ?? "",
+              label: candidate.label,
+            }))}
+            current={group?.views[0]?.href}
+            label={`${section?.label ?? ""} views`}
+            segmented
+          />
+          {group === undefined || group.views.length < 2 ? null : (
+            <Strip items={group.views} current={view?.href} label={`${group.label} views`} quiet />
+          )}
+        </>
+      ) : (
         <Strip items={subs} current={view?.href} label={`${section?.label ?? ""} views`} quiet />
       )}
     </div>

@@ -103,7 +103,7 @@ export function RisksScreen({ propertyId }: { readonly propertyId: Ulid }) {
         subtitle="Eight questions asked about every animal at once. Nothing here is a verdict — it is the herd pointing at something."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile
           label="Animals flagged"
           value={flagged.length}

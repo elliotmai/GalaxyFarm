@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 
 import { ConfirmProvider, ToastProvider } from "@galaxy-farm/ui";
 
-import { AdminNav } from "@/app/(admin)/_components/admin-nav";
+import { AdminNav, BottomTabs } from "@/app/(admin)/_components/admin-nav";
+import { SearchPaletteProvider } from "@/app/(admin)/_components/search-palette";
 import { Refreshable } from "@/app/(admin)/_components/refreshable";
 import { SectionStrip } from "@/app/(admin)/_components/section-strip";
 import { PwaShell } from "@/app/_components/pwa-shell";
@@ -51,15 +52,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <SyncProvider>
         <ToastProvider>
           <ConfirmProvider>
-            <div className="flex min-h-screen flex-col md:flex-row">
-              {/*
+            <SearchPaletteProvider propertyId={actor.propertyId}>
+              <div className="flex min-h-screen flex-col md:flex-row">
+                {/*
                 Sticky and full height so the sidebar scrolls in its own right.
                 That is what preserves its position across a navigation: the
                 layout does not remount, so the scrolled element survives — and
                 a nav that jumps back to the top every time you click a link is
                 the thing that makes a long list unusable.
               */}
-              {/*
+                {/*
                 Sticky on both, for two different reasons. On a laptop it is a
                 full-height column that scrolls in its own right, which is what
                 preserves its position across a navigation — the layout does
@@ -71,25 +73,30 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 on screen forty rows into the herd, rather than back at the top
                 where you would have to scroll to reach it.
               */}
-              <aside className="sticky top-0 z-20 border-b border-edge bg-panel md:h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
-                <AdminNav propertyId={actor.propertyId} farmName={farmName} />
-              </aside>
-              {/* Tighter gutters on a phone: 14px of padding either side of a
+                <aside className="sticky top-0 z-20 border-b border-edge bg-panel md:h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
+                  <AdminNav propertyId={actor.propertyId} farmName={farmName} />
+                </aside>
+                {/* Tighter gutters on a phone: 14px of padding either side of a
                   375px screen is 7% of the width, and every table and form
                   inside is competing for the rest. */}
-              <main className="min-w-0 flex-1 px-3 py-density md:p-density">
-                <Refreshable>
-                  {/*
+                {/* The bottom padding on a phone is the tab bar's height plus the
+                  home-indicator inset, so the last row of a list scrolls clear
+                  of the bar rather than ending underneath it. */}
+                <main className="min-w-0 flex-1 px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-density md:p-density md:pb-density">
+                  <Refreshable>
+                    {/*
                     In the layout rather than in each screen, so a page cannot
                     forget it and so it survives a navigation without
                     remounting — which is what keeps a thirteen-tab strip from
                     losing its scroll every time you change view.
                   */}
-                  <SectionStrip />
-                  {children}
-                </Refreshable>
-              </main>
-            </div>
+                    <SectionStrip />
+                    {children}
+                  </Refreshable>
+                </main>
+              </div>
+              <BottomTabs />
+            </SearchPaletteProvider>
           </ConfirmProvider>
         </ToastProvider>
       </SyncProvider>

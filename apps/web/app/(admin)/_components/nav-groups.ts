@@ -226,3 +226,56 @@ export function sectionFor(pathname: string): NavItem | undefined {
       (SUB_SECTIONS[section.href] ?? []).some((sub) => isWithin(sub, pathname)),
   );
 }
+
+/** A handful of a section's views that belong together, under one name. */
+export interface ViewGroup {
+  readonly label: string;
+  readonly views: readonly NavItem[];
+}
+
+const cattleView = (href: string): NavItem => {
+  const found = (SUB_SECTIONS["/admin/cattle"] ?? []).find((view) => view.href === href);
+  if (found === undefined) throw new Error(`${href} is not a cattle view`);
+  return found;
+};
+
+/**
+ * Thirteen views of one herd, as four questions (spec §8 v0.9).
+ *
+ * A strip of thirteen tabs scrolls, which kept the sidebar short, but the eye
+ * still has to read all thirteen to find one. Grouped, the first strip is four
+ * words — what the herd is, what it is making, how it is, what it is worth —
+ * and the second holds only the views of the one chosen.
+ *
+ * Every view here is one of `SUB_SECTIONS`, so reachability is unchanged and
+ * the test that guards it still reads the flat list. A view in no group would
+ * be reachable by URL and by search but missing from the strip, which
+ * `nav-reachability.test.ts` checks for.
+ */
+export const VIEW_GROUPS: Readonly<Record<string, readonly ViewGroup[]>> = {
+  "/admin/cattle": [
+    {
+      label: "Herd",
+      views: ["/admin/cattle", "/admin/cattle/weights", "/admin/cattle/feed"].map(cattleView),
+    },
+    {
+      label: "Breeding",
+      views: [
+        "/admin/cattle/breeding",
+        "/admin/cattle/calving",
+        "/admin/cattle/supplies",
+        "/admin/cattle/ancestors",
+        "/admin/cattle/catalog",
+        "/admin/cattle/candidates",
+      ].map(cattleView),
+    },
+    {
+      label: "Health",
+      views: ["/admin/cattle/health", "/admin/cattle/risks"].map(cattleView),
+    },
+    {
+      label: "Sales",
+      views: ["/admin/cattle/sales", "/admin/cattle/roadmap"].map(cattleView),
+    },
+  ],
+};

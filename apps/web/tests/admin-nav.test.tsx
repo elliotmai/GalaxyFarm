@@ -86,14 +86,21 @@ describe("AdminNav", () => {
 });
 
 describe("SectionStrip", () => {
-  it("puts the thirteen cattle views on the cattle screen", () => {
+  it("puts the thirteen cattle views on the cattle screen, as four groups", () => {
     at("/admin/cattle/breeding");
     render(<SectionStrip />);
 
-    const views = screen.getByRole("navigation", { name: "Cattle views" });
-    for (const label of ["Herd", "Breeding", "Calving", "Health", "Weights", "Sales"]) {
+    const groups = screen.getByRole("navigation", { name: "Cattle views" });
+    for (const label of ["Herd", "Breeding", "Health", "Sales"]) {
+      expect(within(groups).getByRole("link", { name: label })).toBeInTheDocument();
+    }
+
+    // The chosen group's own views, and only those.
+    const views = screen.getByRole("navigation", { name: "Breeding views" });
+    for (const label of ["Breeding", "Calving", "Tank and fridge", "Ancestors", "Catalog"]) {
       expect(within(views).getByRole("link", { name: label })).toBeInTheDocument();
     }
+    expect(within(views).queryByRole("link", { name: "Weights" })).not.toBeInTheDocument();
   });
 
   it("offers the other species alongside cattle", () => {

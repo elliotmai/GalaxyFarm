@@ -200,7 +200,7 @@ export function CattleRoadmapScreen({
         subtitle="What the herd is being bred toward, and the matings planned to get there. Recording a plan turns it into a breeding record."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="Goals" value={goals.filter((g) => g.active).length} tone="identity" />
         <Tile
           label="Matings planned"

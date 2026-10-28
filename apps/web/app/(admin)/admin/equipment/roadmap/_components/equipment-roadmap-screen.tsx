@@ -261,7 +261,7 @@ export function EquipmentRoadmapScreen({
         subtitle="What the place still needs, in the order it is actually shopped for. Candidates hang off these lines, so a want accumulates the real machines you looked at."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile
           label="Needs"
           value={open.filter((item) => item.priority === "need").length}

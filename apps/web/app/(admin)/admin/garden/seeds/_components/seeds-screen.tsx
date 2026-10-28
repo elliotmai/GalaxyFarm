@@ -61,7 +61,7 @@ export function SeedsScreen({
         subtitle="What is in the box, and the crops and varieties it is seed for."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile
           label="Seed entries"
           value={seed.length}

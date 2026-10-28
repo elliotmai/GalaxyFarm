@@ -82,7 +82,7 @@ export function PetsScreen({
         subtitle="The dogs and the cats — what they eat, what they are on, and what a helper needs to know."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="Pets" value={pets.length} tone="identity" />
         <Tile
           label="Care due"

@@ -333,7 +333,7 @@ export function FleetScreen({
         subtitle="The fleet, what the meters read, and what each rule says is due. A rule with two triggers comes due at whichever arrives first."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile label="In service" value={running.length} tone="calm" />
         <Tile
           label="Down"

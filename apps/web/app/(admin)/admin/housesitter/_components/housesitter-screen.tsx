@@ -117,7 +117,7 @@ export function HousesitterScreen({
         subtitle="Written once, composed live. The pens, the routine and the numbers come from the farm's own records every time it is opened."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="gf-stat-row">
         <Tile
           label="Guides"
           value={guides.length}

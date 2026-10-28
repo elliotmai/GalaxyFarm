@@ -4,6 +4,7 @@ import {
   NAV,
   SUB_SECTIONS,
   UTILITY,
+  VIEW_GROUPS,
   allNavRoutes,
   destinationFor,
   sectionFor,
@@ -34,6 +35,17 @@ describe("admin nav reachability", () => {
     const orphaned = adminRoutes.filter((route) => !reachable.has(route));
 
     expect(orphaned, "these admin routes have no way in from the nav").toEqual([]);
+  });
+
+  it("puts every view of a grouped section in exactly one group", () => {
+    for (const [section, groups] of Object.entries(VIEW_GROUPS)) {
+      const grouped = groups.flatMap((group) => group.views.map((view) => view.href));
+      const views = (SUB_SECTIONS[section] ?? []).map((view) => view.href);
+
+      expect([...grouped].sort(), `${section} views missing from or doubled in a group`).toEqual(
+        [...views].sort(),
+      );
+    }
   });
 
   it("points at nothing that does not exist", () => {
