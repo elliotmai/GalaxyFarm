@@ -104,8 +104,12 @@ export function Landing({
             >
               Ask about boarding
             </Link>
+            {/* To sign-in rather than to /account: the farm's owner and a
+                calf's owner both press this, and sign-in sends each to their
+                own surface. Pointing at /account landed the farm's owner on a
+                customer page that does not exist yet. */}
             <Link
-              href="/account"
+              href="/login"
               className="min-h-target rounded-density border border-edge px-5 py-2.5 text-density font-medium text-ink hover:border-action"
             >
               Owner sign in
