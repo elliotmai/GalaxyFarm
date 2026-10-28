@@ -21,6 +21,9 @@ export function PagePlaceholder({
   // page's single `main` landmark, and a second one nested inside it is invalid
   // HTML — a screen reader offers two "main" landmarks and neither is the page.
   // It also broke the e2e suite's `main` locator, which is how it was found.
+  // Said as a plan rather than as a gap: "coming later" with when, not a
+  // developer's note and a raw route, which read as a broken page to the
+  // people the app is for. The route stays on the element for the tests.
   return (
     <section
       data-testid="page-placeholder"
@@ -28,11 +31,12 @@ export function PagePlaceholder({
       className="flex flex-col gap-density"
     >
       <h1 className="text-ink">{title}</h1>
-      <p className="text-muted">
-        This screen is scaffolded but not implemented yet.
-        {phase ? ` Planned for ${phase}.` : ""}
-      </p>
-      <code className="text-sm text-muted">{route}</code>
+      <div className="flex flex-col items-center gap-2 rounded-density border border-dashed border-rule p-8 text-center">
+        <p className="text-density font-semibold text-ink">Not built yet</p>
+        <p className="max-w-prose text-sm text-muted">
+          {phase ? `Planned for ${phase}.` : "Planned for a later phase."}
+        </p>
+      </div>
     </section>
   );
 }

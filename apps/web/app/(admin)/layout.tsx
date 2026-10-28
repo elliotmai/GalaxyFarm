@@ -83,10 +83,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 {/* Tighter gutters on a phone: 14px of padding either side of a
                   375px screen is 7% of the width, and every table and form
                   inside is competing for the rest. */}
-                {/* The bottom padding on a phone is the tab bar's height plus the
-                  home-indicator inset, so the last row of a list scrolls clear
-                  of the bar rather than ending underneath it. */}
-                <main className="min-w-0 flex-1 px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-density md:p-density md:pb-density">
+                {/* The bottom padding on a phone clears the tab bar, the floating
+                  add button above it and the home-indicator inset, so the last
+                  row of a list scrolls clear of both rather than under them. */}
+                <main className="min-w-0 flex-1 px-3 pb-[calc(9rem+env(safe-area-inset-bottom))] pt-density md:p-density md:pb-density">
                   <Refreshable>
                     {/*
                     In the layout rather than in each screen, so a page cannot

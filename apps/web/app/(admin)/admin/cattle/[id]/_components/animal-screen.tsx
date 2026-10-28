@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import {
@@ -138,6 +138,18 @@ export function AnimalScreen({
     [slug, animals, registrationOf],
   );
 
+  // The URL the record answers to now. Somebody who arrived by an old link
+  // gets moved to the current one rather than being left on a stale address
+  // that will stop working the next time something changes. In an effect, not
+  // during render: navigating while rendering updates the router mid-render,
+  // which React refuses and reports as an error.
+  const canonical =
+    found === undefined ? undefined : animalSlug(found.animal, registrationOf(found.animal));
+  const moveTo = found?.stale === true && canonical !== slug ? canonical : undefined;
+  useEffect(() => {
+    if (moveTo !== undefined) router.replace(`/admin/cattle/${moveTo}`);
+  }, [moveTo, router]);
+
   if (loading) return <p className="text-muted">Looking…</p>;
 
   if (found === undefined) {
@@ -219,14 +231,6 @@ export function AnimalScreen({
   ]
     .filter((part) => part !== undefined && part !== "")
     .join(" · ");
-
-  // The URL the record answers to now. Somebody who arrived by an old link
-  // gets moved to the current one rather than being left on a stale address
-  // that will stop working the next time something changes.
-  const canonical = animalSlug(animal, registrationOf(animal));
-  if (found.stale && canonical !== slug) {
-    router.replace(`/admin/cattle/${canonical}`);
-  }
 
   const timeline: TimelineInputs = {
     animal,

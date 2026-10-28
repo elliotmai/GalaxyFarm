@@ -273,7 +273,7 @@ export function PropertyMapScreen({
   return (
     <PageBody>
       <PageHeader
-        eyebrow="Today"
+        eyebrow="Farm"
         title="Property map"
         subtitle={`${drawnCount} of ${zones.length} zones drawn`}
       />
