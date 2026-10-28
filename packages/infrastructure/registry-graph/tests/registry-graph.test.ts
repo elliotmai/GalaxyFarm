@@ -292,11 +292,8 @@ describe("searching", () => {
   });
 
   it("matches a name however the crawl spaced it", async () => {
-    // The reported symptom, and the tightest fit for it: `znt` worked and
-    // names did not. `CONTAINS` is an exact substring test, and a page that
-    // renders "ZNT MONTEGO BAY" can hold a non-breaking space between the
-    // words — so typing the name as it appears matches nothing, while a
-    // single word with no spaces in it matches perfectly.
+    // A page that renders "ZNT MONTEGO BAY" can hold a non-breaking space
+    // between the words, so the name is matched word by word as well as whole.
     const fetch = vi.fn().mockResolvedValue(reply(["total"], [[0]]));
     await graphFor(fetch as never).search({ text: "ZNT Montego  Bay" });
 
@@ -305,19 +302,27 @@ describe("searching", () => {
       parameters: Record<string, unknown>;
     };
 
-    // Both spellings of the search, so an index can still serve the plain one.
     expect(body.parameters["text"]).toBe("znt montego  bay");
-    expect(body.parameters["squashed"]).toBe("zntmontegobay");
-    // And both spellings of the stored value, non-breaking space included.
+    expect(body.parameters["words"]).toEqual(["znt", "montego", "bay"]);
     expect(body.statement).toContain("CONTAINS $text");
-    expect(body.statement).toContain("CONTAINS $squashed");
-    expect(body.statement).toContain("\\u00A0");
+    expect(body.statement).toContain("all(word IN $words");
   });
 
-  it("leaves the squashed form null when nothing was typed", async () => {
+  it("does not rewrite every name in the crawl to search it", async () => {
+    // Five nested `replace` calls per field, per animal, over a hundred
+    // thousand animals is what timed the search out.
+    const fetch = vi.fn().mockResolvedValue(reply(["total"], [[0]]));
+    await graphFor(fetch as never).search({ text: "Montego Bay", sex: "male" });
+
+    for (const call of fetch.mock.calls) {
+      const body = JSON.parse((call[1] as { body: string }).body) as { statement: string };
+      expect(body.statement).not.toContain("replace(");
+    }
+  });
+
+  it("leaves the words empty when nothing was typed", async () => {
     // In step with `text`, so the one guard in front of the OR chain covers
-    // both and an empty box stays "no filter" rather than matching everything
-    // against an empty string.
+    // both and an empty box stays "no filter".
     const fetch = vi.fn().mockResolvedValue(reply(["total"], [[0]]));
     await graphFor(fetch as never).search({ text: "   " });
 
@@ -326,7 +331,39 @@ describe("searching", () => {
     };
 
     expect(body.parameters["text"]).toBeNull();
-    expect(body.parameters["squashed"]).toBeNull();
+    expect(body.parameters["words"]).toEqual([]);
+  });
+
+  it("still shows the page when a count times out", async () => {
+    // The counts are commentary; the animals are the answer.
+    const fetch = vi.fn(async (_url: string, init: { body: string }) => {
+      const { statement } = JSON.parse(init.body) as { statement: string };
+      if (statement.includes("RETURN count")) {
+        throw Object.assign(new Error("The operation was aborted due to timeout"), {
+          name: "TimeoutError",
+        });
+      }
+      return reply(ANIMAL_FIELDS, [montegoBay]);
+    });
+
+    const result = await graphFor(fetch as never).search({ text: "montego", sex: "male" });
+
+    expect(result.found).toHaveLength(1);
+    expect(result.total).toBe(1);
+    expect(result.unpapered).toBe(0);
+    expect(result.excludedByFilters).toBe(0);
+  });
+
+  it("says what to do when the page itself times out", async () => {
+    const fetch = vi.fn().mockRejectedValue(
+      Object.assign(new Error("The operation was aborted due to timeout"), {
+        name: "TimeoutError",
+      }),
+    );
+
+    await expect(graphFor(fetch as never).search({ text: "bull" })).rejects.toThrow(
+      /took longer than 15 seconds/,
+    );
   });
 
   it("says how many the filters removed, when a filter is set", async () => {

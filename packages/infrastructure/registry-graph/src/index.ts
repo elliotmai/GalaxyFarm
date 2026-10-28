@@ -79,6 +79,16 @@ export interface RegistryGraphOptions {
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
+/**
+ * How long the side counts get before the page is shown without them.
+ *
+ * The page of animals is the answer; the counts around it — how many in all,
+ * how many unpapered, how many the filters removed — are commentary. A count
+ * is a scan of the whole crawl, and letting one hold the page hostage is how a
+ * search for one bull came back as "aborted due to timeout".
+ */
+const COUNT_TIMEOUT_MS = 8_000;
+
 /** A page of results. Enough to choose from, small enough to read. */
 const DEFAULT_LIMIT = 25;
 
@@ -258,17 +268,34 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
   const endpoint = queryEndpoint(options.url, options.database);
   const authorization = `Basic ${btoa(`${options.username}:${options.password}`)}`;
 
-  async function run(statement: string, parameters: Record<string, unknown>): Promise<Row[]> {
-    const response = await doFetch(endpoint, {
-      method: "POST",
-      headers: {
-        authorization,
-        "content-type": "application/json",
-        accept: "application/json",
-      },
-      body: JSON.stringify({ statement, parameters }),
-      signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-    });
+  async function run(
+    statement: string,
+    parameters: Record<string, unknown>,
+    timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  ): Promise<Row[]> {
+    let response: Response;
+    try {
+      response = await doFetch(endpoint, {
+        method: "POST",
+        headers: {
+          authorization,
+          "content-type": "application/json",
+          accept: "application/json",
+        },
+        body: JSON.stringify({ statement, parameters }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      // The platform's own words here are "The operation was aborted due to
+      // timeout", which says nothing about what to do next.
+      if (error instanceof Error && error.name === "TimeoutError") {
+        throw new Error(
+          `The catalog took longer than ${Math.round(timeoutMs / 1000)} seconds to answer. ` +
+            "Try a registration number or a longer part of the name.",
+        );
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       // The body carries Neo4j's own reason, which is worth surfacing: most
@@ -290,34 +317,26 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
   }
 
   /**
-   * A text match that does not care how the crawl spaced the words.
+   * A name match that does not care how the crawl spaced the words.
    *
    * `CONTAINS` is an exact substring test, and a crawled name is not exactly
    * what it looks like: a page that renders "ZNT MONTEGO BAY" can hold a
    * non-breaking space between the words, or two spaces, or a tab. Typing the
-   * name as it appears on screen then matches nothing at all — while a single
-   * word with no spaces in it, like `znt`, matches perfectly. That is the
-   * reported shape exactly: one-word searches work and names do not.
+   * name as it appears on screen then matches nothing at all.
    *
-   * So each field is compared twice: as it is, and with every space taken out
-   * of both sides. The second is what survives a crawl; the first is kept
-   * because it is the one an index could ever serve.
+   * So the name is matched word by word: every word typed has to appear in it,
+   * and whatever separates them in the crawl never enters into it. This used
+   * to squash the spaces out of both sides with five nested `replace` calls on
+   * every field of every animal — correct, and slow enough on a hundred
+   * thousand animals that the search timed out before it answered.
    *
-   * Written as nested `replace` calls because Cypher has no regular-expression
-   * replace of its own — the list is the whitespace an HTML page actually
-   * leaves behind, not every character Unicode calls a space.
+   * The whole phrase is still tried first, as the cheap common case. Tattoos
+   * and numbers have no spaces in them, so they get the plain test alone.
    */
-  const WHITESPACE = ["' '", "'\\u00A0'", "'\\t'", "'\\n'", "'\\r'"];
+  const matches = (property: string): string => `toLower(coalesce(${property}, '')) CONTAINS $text`;
 
-  const squashed = (property: string): string =>
-    WHITESPACE.reduce(
-      (inner, character) => `replace(${inner}, ${character}, '')`,
-      `toLower(coalesce(${property}, ''))`,
-    );
-
-  /** Both spellings of one field, for the `OR` chain below. */
-  const matches = (property: string): string =>
-    `toLower(coalesce(${property}, '')) CONTAINS $text OR ${squashed(property)} CONTAINS $squashed`;
+  const nameMatches = `(${matches("a.name")}
+           OR all(word IN $words WHERE toLower(coalesce(a.name, '')) CONTAINS word))`;
 
   /**
    * The `WHERE` every search shares.
@@ -330,7 +349,7 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
     WHERE ($association IS NULL OR reg.association = $association)
       AND ($sex IS NULL OR a.sex = $sex)
       AND ($text IS NULL
-           OR ${matches("a.name")}
+           OR ${nameMatches}
            OR ${matches("a.tattoo")}
            OR ${matches("reg.regNumber")})`;
 
@@ -362,7 +381,7 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
   const TEXT_ONLY = `
     MATCH (a:Animal)-[:HAS_REGISTRATION]->(reg:Registration)
     WHERE ($text IS NULL
-           OR ${matches("a.name")}
+           OR ${nameMatches}
            OR ${matches("a.tattoo")}
            OR ${matches("reg.regNumber")})
     RETURN count(DISTINCT a) AS total`;
@@ -371,7 +390,7 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
     MATCH (a:Animal)
     WHERE ($sex IS NULL OR a.sex = $sex)
       AND ($text IS NULL
-           OR ${matches("a.name")}
+           OR ${nameMatches}
            OR ${matches("a.tattoo")})
       AND NOT (a)-[:HAS_REGISTRATION]->(:Registration)
     RETURN count(a) AS total`;
@@ -384,13 +403,13 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
     sex: query.sex === undefined ? null : query.sex === "male" ? "M" : "F",
     text:
       query.text === undefined || query.text.trim() === "" ? null : query.text.trim().toLowerCase(),
-    // The same words with every space taken out, to compare against a name the
-    // crawl spaced differently. Null in step with `text`, so the guard in front
-    // of the OR chain covers both.
-    squashed:
+    // The same words one by one, to match a name the crawl spaced differently.
+    // Empty in step with `text` being null, so the guard in front of the OR
+    // chain covers both.
+    words:
       query.text === undefined || query.text.trim() === ""
-        ? null
-        : query.text.toLowerCase().replace(/\s+/gu, ""),
+        ? []
+        : query.text.trim().toLowerCase().split(/\s+/u),
   });
 
   return {
@@ -407,11 +426,15 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
       // learn nothing is a round trip on somebody's phone.
       const filtered = parameters.association !== null || parameters.sex !== null;
 
+      // Only the page is required. A count that times out or fails leaves its
+      // figure at what the page itself shows, rather than failing the search.
+      const count = (statement: string): Promise<Row[]> =>
+        run(statement, parameters, COUNT_TIMEOUT_MS).catch(() => []);
+
       const [counted, page, unpapered, textOnly] = await Promise.all([
-        run(
+        count(
           `MATCH (a:Animal)-[:HAS_REGISTRATION]->(reg:Registration) ${WHERE}
            RETURN count(DISTINCT a) AS total`,
-          parameters,
         ),
         run(
           // One row per animal, not per paper. The match fans out over
@@ -431,22 +454,28 @@ export function neo4jRegistryGraph(options: RegistryGraphOptions): RegistryGraph
            RETURN ${RETURN_ANIMAL}`,
           { ...parameters, limit },
         ),
-        run(UNPAPERED, parameters),
-        filtered ? run(TEXT_ONLY, parameters) : Promise.resolve([]),
+        count(UNPAPERED),
+        filtered ? count(TEXT_ONLY) : Promise.resolve([]),
       ]);
 
-      const total = asNumber(counted[0]?.["total"]) ?? 0;
+      const found = oncePerAnimal(page)
+        .map(toAnimal)
+        .filter((entry): entry is RegistryAnimal => entry !== undefined);
+      const total = asNumber(counted[0]?.["total"]) ?? found.length;
 
       return {
-        found: oncePerAnimal(page)
-          .map(toAnimal)
-          .filter((entry): entry is RegistryAnimal => entry !== undefined),
+        found,
         total,
         unpapered: asNumber(unpapered[0]?.["total"]) ?? 0,
         // Never negative: the unfiltered count can only be the larger of the
         // two, but a graph changing between two concurrent queries could make
         // it look otherwise, and a negative "excluded" is nonsense on screen.
-        excludedByFilters: Math.max(0, (asNumber(textOnly[0]?.["total"]) ?? total) - total),
+        // And nothing at all when the count it is measured against did not come
+        // back: a page length is not a total to subtract from.
+        excludedByFilters:
+          counted.length === 0
+            ? 0
+            : Math.max(0, (asNumber(textOnly[0]?.["total"]) ?? total) - total),
       };
     },
 
