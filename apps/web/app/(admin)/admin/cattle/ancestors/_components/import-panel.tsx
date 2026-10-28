@@ -5,10 +5,8 @@ import { useState } from "react";
 import {
   Button,
   Callout,
-  Card,
   DetailList,
   Pill,
-  Section,
   Select,
   TextArea,
   TextInput,
@@ -293,98 +291,91 @@ export function DigitalBeefImport({
     }
   }
 
+  // No heading of its own: it opens in a dialog that already says what it is.
   return (
-    <Section
-      title="Import from Digital Beef"
-      description="The associations expose no interface, so this reads the page a person would read. Everything is shown for approval before anything is saved."
-    >
-      <Card>
-        <div className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-[12rem_1fr]">
-            <Select
-              label="Association"
-              hint="Which registry issued the number."
-              value={association}
-              options={READABLE_REGISTRIES.map((value) => ({
-                value,
-                label: registryFor(value)?.name ?? value,
-              }))}
-              onChange={(event) => setAssociation(event.target.value)}
-            />
-            <TextInput
-              label="Registration number"
-              hint="Off the certificate. That plus the association is the whole address."
-              numeric
-              value={registration}
-              onChange={(event) => setRegistration(event.target.value)}
-              placeholder="4219133"
-            />
-          </div>
+    <div className="flex flex-col gap-density">
+      <div className="flex flex-col gap-density">
+        <div className="grid grid-cols-1 gap-density sm:grid-cols-[12rem_1fr]">
+          <Select
+            label="Association"
+            value={association}
+            options={READABLE_REGISTRIES.map((value) => ({
+              value,
+              label: registryFor(value)?.name ?? value,
+            }))}
+            onChange={(event) => setAssociation(event.target.value)}
+          />
+          <TextInput
+            label="Registration number"
+            hint="Off the certificate."
+            numeric
+            value={registration}
+            onChange={(event) => setRegistration(event.target.value)}
+            placeholder="4219133"
+          />
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => void fetchByUrl()} busy={busy}>
-              Fetch and read it
-            </Button>
-            {url === "" ? null : (
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm text-action underline underline-offset-2"
-              >
-                Open the page yourself
-              </a>
-            )}
-          </div>
-
-          <details className="rounded-density border border-edge p-density">
-            <summary className="cursor-pointer text-density font-medium text-ink">
-              Or paste the whole address instead
-            </summary>
-            <div className="pt-density">
-              <TextInput
-                label="Animal's web address"
-                hint="Overrides the two fields above. Only needed if an association changes the shape of its addresses."
-                value={pasted}
-                onChange={(event) => setPasted(event.target.value)}
-                placeholder="https://shorthorn.digitalbeef.com/modules.php?…&animal_registration=4219133"
-              />
-            </div>
-          </details>
-
-          <details className="rounded-density border border-edge p-density">
-            <summary className="cursor-pointer text-density font-medium text-ink">
-              Or paste the page — works when the site will not talk to our server
-            </summary>
-            <div className="flex flex-col gap-density pt-density">
-              <p className="text-sm text-muted">
-                Open the animal&apos;s page in a browser, select the whole page and copy it, then
-                paste it here. This works behind a login and regardless of what the
-                association&apos;s host thinks of our server. Paste it as it comes — the blank rows
-                in the pedigree chart are what say which ancestors are missing, so do not tidy it
-                up.
-              </p>
-              <TextArea
-                label="The page"
-                rows={6}
-                value={html}
-                onChange={(event) => setHtml(event.target.value)}
-              />
-              <div>
-                <Button variant="ghost" onClick={readPasted}>
-                  Read what I pasted
-                </Button>
-              </div>
-            </div>
-          </details>
-
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => void fetchByUrl()} busy={busy}>
+            Fetch and read it
+          </Button>
+          {url === "" ? null : (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-action underline underline-offset-2"
+            >
+              Open the page yourself
+            </a>
           )}
         </div>
-      </Card>
+
+        <details className="rounded-density border border-rule p-density">
+          <summary className="flex min-h-target cursor-pointer items-center text-density font-medium text-ink">
+            Or paste the whole address instead
+          </summary>
+          <div className="pt-density">
+            <TextInput
+              label="Animal's web address"
+              hint="Overrides the two fields above."
+              value={pasted}
+              onChange={(event) => setPasted(event.target.value)}
+              placeholder="https://shorthorn.digitalbeef.com/modules.php?…&animal_registration=4219133"
+            />
+          </div>
+        </details>
+
+        <details className="rounded-density border border-rule p-density">
+          <summary className="flex min-h-target cursor-pointer items-center text-density font-medium text-ink">
+            Or paste the page — when the site will not talk to our server
+          </summary>
+          <div className="flex flex-col gap-density pt-density">
+            {/* The blank rows in the pedigree chart are what say which
+                  ancestors are missing, so a tidied paste reads wrong. */}
+            <p className="text-sm text-muted">
+              Select the whole page in your browser, copy, and paste it here as it comes.
+            </p>
+            <TextArea
+              label="The page"
+              rows={6}
+              value={html}
+              onChange={(event) => setHtml(event.target.value)}
+            />
+            <div>
+              <Button variant="ghost" onClick={readPasted}>
+                Read what I pasted
+              </Button>
+            </div>
+          </div>
+        </details>
+
+        {error === undefined ? null : (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
+      </div>
 
       {preview === undefined ? null : (
         <Preview
@@ -406,7 +397,7 @@ export function DigitalBeefImport({
           onDiscard={() => setPreview(undefined)}
         />
       )}
-    </Section>
+    </div>
   );
 }
 
@@ -435,18 +426,18 @@ function Preview({
   );
 
   return (
-    <Card title="What it read">
+    // A hairline and a heading rather than a card: it already sits in a dialog.
+    <section className="flex flex-col gap-density border-t border-rule pt-density">
+      <h3 className="text-ink">What it read</h3>
       <div className="flex flex-col gap-density">
         {nothingRead ? (
           <Callout tone="danger" title="Nothing on that page looked like an animal">
-            The page came back but nothing could be read off it. Either it is a login page, or the
-            template has changed. Pasting the page yourself is worth trying before anything else.
+            Probably a login page, or the template changed. Try pasting the page yourself.
           </Callout>
         ) : animal.missing.length > 0 ? (
           <Callout tone="action" title={`Could not find: ${animal.missing.join(", ")}`}>
-            Those fields were looked for by name and not found. That is different from the animal
-            not having them — check the page before saving, because it usually means the template
-            moved.
+            Looked for by name and not found — usually the template moved. Check the page before
+            saving.
           </Callout>
         ) : null}
 
@@ -486,10 +477,9 @@ function Preview({
             tone="action"
             title={`${proposed.length} of these may already be on file under another registry`}
           >
-            One animal registered with two associations has two numbers, and neither page mentions
-            the other. Tick the ones to join up — the second number gets added to the record that is
-            already here. Leave one unticked and it comes in as a separate animal, which is the
-            safer mistake: a duplicate is visible and can be merged later, a wrong join is not.
+            Tick the ones to join up and the second number is added to the record already here.
+            Unticked comes in as a separate animal — the safer mistake, since a duplicate can be
+            merged later and a wrong join cannot.
           </Callout>
         )}
 
@@ -514,10 +504,8 @@ function Preview({
               tone="action"
               title={`${plan.unplaced.length} could not be placed on the chart`}
             >
-              The chart had gaps that could not be accounted for, so where these sit is unknown.
-              They are still worth saving — but their position has to be set by hand, because
-              guessing puts a bull on the wrong side of a pedigree and every relatedness figure
-              worked out afterwards is quietly wrong.
+              Still worth saving, but set their place by hand — a guess puts a bull on the wrong
+              side of a pedigree.
             </Callout>
             {plan.unplaced.map((row) => (
               <Row key={row.key} row={row} existing={existing} ticked={false} />
@@ -534,7 +522,7 @@ function Preview({
           </Button>
         </div>
       </div>
-    </Card>
+    </section>
   );
 }
 

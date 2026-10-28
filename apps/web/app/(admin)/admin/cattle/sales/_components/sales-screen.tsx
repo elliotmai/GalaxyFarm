@@ -1,27 +1,24 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 import {
   Button,
   Callout,
-  Card,
   Checkbox,
-  DataTable,
   EmptyState,
+  Modal,
   PageBody,
-  PageHeader,
   Pill,
-  RecordCard,
   Section,
   Select,
+  StatRow,
   Tabs,
   TextInput,
   Tile,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import {
   displayName,
@@ -49,6 +46,13 @@ import {
   type TransactionType,
 } from "@galaxy-farm/module-cattle";
 
+import {
+  AddFab,
+  facts,
+  Row,
+  Rows,
+  ScreenHeader,
+} from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
 import { animalHref } from "@/lib/animal-slug";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
@@ -91,6 +95,16 @@ const TABS = [
   { id: "processing", label: "Processing" },
 ] as const;
 
+type TabId = (typeof TABS)[number]["id"];
+
+/** What the header's one button records, on each tab. */
+const ADD_LABEL: Record<TabId, string> = {
+  pl: "Record sale",
+  sales: "Record sale",
+  acquisitions: "Record acquisition",
+  processing: "Record delivery",
+};
+
 export function SalesScreen({
   propertyId,
   actorId,
@@ -104,6 +118,10 @@ export function SalesScreen({
   const { records: acquisitions } = useRecords<AcquisitionRecord>("acquisitionRecords", query);
   const { records: health } = useRecords<HealthRecord>("healthRecords", query);
   const { records: processing } = useRecords<ProcessingRecord>("processingRecords", query);
+
+  const [tab, setTab] = useState<TabId>("pl");
+  /** Whether the current tab's form panel is open. */
+  const [adding, setAdding] = useState(false);
 
   const now = new Date();
   // Every animal on the place, for reading a record back. One Animal model
@@ -132,128 +150,208 @@ export function SalesScreen({
   }, [sales, acquisitions, health, processing]);
 
   const rollup = herdRollup(rows);
+  const incomplete = rollup.animals - rollup.completeAnimals;
+
+  function startAdd() {
+    // From the P&L the commonest thing to record is a sale, so the button
+    // goes there rather than being missing.
+    if (tab === "pl") setTab("sales");
+    setAdding(true);
+  }
+
+  const shared = {
+    cattle,
+    byId,
+    propertyId,
+    actorId,
+    open: adding,
+    onClose: () => setAdding(false),
+  };
 
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Cattle"
-        title="Sales and finance"
-        subtitle="What each animal cost, what it brought, and which figures are still missing an input."
-      />
-
-      <div className="gf-stat-row">
-        <Tile label="Animals costed" value={rollup.animals} />
-        <Tile label="Total cost" value={money(rollup.totalCost)} tone="danger" />
-        <Tile label="Total revenue" value={money(rollup.totalRevenue)} tone="calm" />
-        <Tile
-          label="Net"
-          value={money(rollup.net)}
-          tone={rollup.net.cents >= 0 ? "calm" : "danger"}
-          emphasis
-          hint={
-            rollup.completeAnimals === rollup.animals
-              ? "Every figure complete"
-              : `${rollup.animals - rollup.completeAnimals} missing an input`
+      {/* Bottom clearance on a phone, so the floating button never covers a row. */}
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <ScreenHeader
+          title="Sales and finance"
+          facts={facts(
+            `${rollup.animals} costed`,
+            rollup.animals > 0 && `net ${money(rollup.net)}`,
+            incomplete > 0 && `${incomplete} incomplete`,
+          )}
+          action={
+            <span className="hidden sm:block">
+              <Button variant="primary" aria-haspopup="dialog" onClick={startAdd}>
+                <span aria-hidden="true">+</span> {ADD_LABEL[tab]}
+              </Button>
+            </span>
           }
         />
-      </div>
 
-      <Tabs tabs={TABS} label="Cattle finance">
-        {(active) => (
-          <div className="pt-density">
-            {active === "pl" ? (
-              <Section
-                title="Per animal"
-                description="A figure marked incomplete is missing a cost line — usually feed, which is apportioned in §5.3."
-              >
-                {rows.length === 0 ? (
-                  <EmptyState
-                    title="Nothing costed yet"
-                    detail="Record an acquisition or a sale and the per-animal picture builds itself from what is already logged."
-                  />
-                ) : (
-                  <div className="grid grid-cols-1 gap-density md:grid-cols-2 xl:grid-cols-3">
-                    {rows.map((row) => {
-                      const animal = byId.get(row.animalId);
-                      return (
-                        <RecordCard
-                          key={row.animalId}
-                          tone={row.net.cents >= 0 ? "calm" : "danger"}
-                          title={
-                            animal === undefined ? (
-                              "Unknown animal"
-                            ) : (
-                              <Link
-                                href={animalHref(animal)}
-                                className="underline decoration-edge underline-offset-4 hover:decoration-action"
-                              >
-                                {displayName(animal)}
-                              </Link>
-                            )
-                          }
-                          subtitle={`${money(row.totalRevenue)} in, ${money(row.totalCost)} out`}
-                          actions={
-                            <Pill tone={row.net.cents >= 0 ? "calm" : "danger"}>
-                              {money(row.net)}
-                            </Pill>
-                          }
-                          meta={
-                            <>
-                              {row.acquisitionCost.cents > 0 ? (
-                                <Pill>bought {money(row.acquisitionCost)}</Pill>
-                              ) : null}
-                              {row.healthCost.cents > 0 ? (
-                                <Pill>health {money(row.healthCost)}</Pill>
-                              ) : null}
-                              {row.feedCost.cents > 0 ? (
-                                <Pill>feed {money(row.feedCost)}</Pill>
-                              ) : null}
-                              {row.complete ? null : (
-                                <Pill tone="action" dot>
-                                  incomplete
-                                </Pill>
-                              )}
-                            </>
-                          }
-                        />
-                      );
-                    })}
-                  </div>
+        <Tabs
+          tabs={TABS}
+          label="Cattle finance"
+          activeTab={tab}
+          onTabChange={(id) => {
+            setTab(id as TabId);
+            setAdding(false);
+          }}
+        >
+          {(active) =>
+            active === "pl" ? (
+              <div className="flex flex-col gap-density">
+                {rows.length === 0 ? null : (
+                  <StatRow>
+                    <Tile
+                      label="Net"
+                      value={money(rollup.net)}
+                      tone={rollup.net.cents >= 0 ? "calm" : "danger"}
+                      emphasis
+                      hint={
+                        incomplete === 0
+                          ? "Every figure complete"
+                          : `${incomplete} missing an input`
+                      }
+                    />
+                    <Tile label="Revenue" value={money(rollup.totalRevenue)} />
+                    <Tile label="Cost" value={money(rollup.totalCost)} />
+                  </StatRow>
                 )}
-              </Section>
+
+                <Section
+                  title="Per animal"
+                  description="A figure marked incomplete is missing a cost line — usually feed, which is apportioned in §5.3."
+                >
+                  {rows.length === 0 ? (
+                    <EmptyState
+                      title="Nothing costed yet"
+                      detail="Record an acquisition or a sale and the picture builds from what is logged."
+                    />
+                  ) : (
+                    <Rows label="Profit and loss by animal">
+                      {rows.map((row) => {
+                        const animal = byId.get(row.animalId);
+                        return (
+                          <Row
+                            key={row.animalId}
+                            title={animal === undefined ? "Unknown animal" : displayName(animal)}
+                            href={animal === undefined ? undefined : animalHref(animal)}
+                            line={facts(
+                              `${money(row.totalRevenue)} in`,
+                              `${money(row.totalCost)} out`,
+                              row.acquisitionCost.cents > 0 &&
+                                `bought ${money(row.acquisitionCost)}`,
+                              row.healthCost.cents > 0 && `health ${money(row.healthCost)}`,
+                              row.feedCost.cents > 0 && `feed ${money(row.feedCost)}`,
+                            )}
+                            chip={
+                              <span className="flex items-center gap-2">
+                                {row.complete ? null : (
+                                  <Pill tone="action" dot>
+                                    Incomplete
+                                  </Pill>
+                                )}
+                                <span
+                                  className={`gf-numeric font-semibold ${row.net.cents >= 0 ? "text-ink" : "text-danger"}`}
+                                >
+                                  {money(row.net)}
+                                </span>
+                              </span>
+                            }
+                          />
+                        );
+                      })}
+                    </Rows>
+                  )}
+                </Section>
+              </div>
             ) : active === "sales" ? (
-              <SalesTab
-                cattle={cattle}
-                sales={sales}
-                health={health}
-                byId={byId}
-                now={now}
-                propertyId={propertyId}
-                actorId={actorId}
-              />
+              <SalesTab {...shared} sales={sales} health={health} now={now} />
             ) : active === "acquisitions" ? (
-              <AcquisitionsTab
-                cattle={cattle}
-                acquisitions={acquisitions}
-                byId={byId}
-                propertyId={propertyId}
-                actorId={actorId}
-              />
+              <AcquisitionsTab {...shared} acquisitions={acquisitions} />
             ) : (
-              <ProcessingTab
-                cattle={cattle}
-                processing={processing}
-                health={health}
-                byId={byId}
-                now={now}
-                propertyId={propertyId}
-                actorId={actorId}
-              />
-            )}
-          </div>
-        )}
-      </Tabs>
+              <ProcessingTab {...shared} processing={processing} health={health} now={now} />
+            )
+          }
+        </Tabs>
+
+        <AddFab onClick={startAdd}>{ADD_LABEL[tab]}</AddFab>
+      </div>
     </PageBody>
+  );
+}
+
+/** What every tab's form panel is handed. */
+interface PanelProps {
+  /** The herd, already narrowed to cattle — never the whole menagerie. */
+  readonly cattle: readonly Animal[];
+  readonly byId: ReadonlyMap<Ulid, Animal>;
+  readonly propertyId: Ulid;
+  readonly actorId: Ulid;
+  readonly open: boolean;
+  readonly onClose: () => void;
+}
+
+function DeleteButton({
+  label,
+  onClick,
+}: {
+  readonly label: string;
+  readonly onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="inline-flex min-h-target min-w-target items-center justify-center rounded-full text-muted hover:bg-raised hover:text-danger focus-visible:outline-2 focus-visible:outline-action"
+    >
+      <svg
+        aria-hidden="true"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M4 7h16" />
+        <path d="M10 11v6M14 11v6" />
+        <path d="M6 7l1 13h10l1-13" />
+        <path d="M9 7V4h6v3" />
+      </svg>
+    </button>
+  );
+}
+
+/**
+ * A form panel's footer: the submit, which names the form so Enter in a field
+ * and the button are the same submit, and a way out. The panel stays open
+ * after a save with the animal still chosen — a load going to the sale barn
+ * is several rows in a row.
+ */
+function PanelFooter({
+  formId,
+  busy,
+  disabled,
+  label,
+  onClose,
+}: {
+  readonly formId: string;
+  readonly busy: boolean;
+  readonly disabled?: boolean;
+  readonly label: string;
+  readonly onClose: () => void;
+}) {
+  return (
+    <>
+      <Button variant="primary" type="submit" form={formId} busy={busy} disabled={disabled}>
+        {label}
+      </Button>
+      <Button onClick={onClose}>Done</Button>
+    </>
   );
 }
 
@@ -265,16 +363,14 @@ function SalesTab({
   now,
   propertyId,
   actorId,
-}: {
-  /** The herd, already narrowed to cattle — never the whole menagerie. */
-  readonly cattle: readonly Animal[];
+  open,
+  onClose,
+}: PanelProps & {
   readonly sales: readonly SaleRecord[];
   readonly health: readonly HealthRecord[];
-  readonly byId: ReadonlyMap<Ulid, Animal>;
   readonly now: Date;
-  readonly propertyId: Ulid;
-  readonly actorId: Ulid;
 }) {
+  const formId = useId();
   const api = useMutations<SaleRecord>(
     "saleRecords",
     "saleRecords",
@@ -387,42 +483,61 @@ function SalesTab({
     show({ message: "Sale deleted", tone: "danger" });
   }
 
-  const columns: readonly Column<SaleRecord>[] = [
-    {
-      key: "animal",
-      header: "Animal",
-      primary: true,
-      render: (record) => {
-        const animal = byId.get(record.animalId);
-        return animal === undefined ? "Unknown" : displayName(animal);
-      },
-    },
-    { key: "date", header: "Date", render: (record) => formatDate(record.date) },
-    { key: "type", header: "Sold", render: (record) => record.type.replace(/_/g, " ") },
-    { key: "price", header: "Price", numeric: true, render: (record) => money(record.price) },
-    {
-      key: "net",
-      header: "Net",
-      numeric: true,
-      // The number that actually landed, after the barn took its cut.
-      render: (record) => money(netSaleProceeds(record)),
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (record) => (
-        <Button variant="ghost" onClick={() => void remove(record)}>
-          Delete
-        </Button>
-      ),
-    },
-  ];
-
   return (
-    <div className="flex flex-col gap-density">
-      <Section title="Record a sale">
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+    <>
+      {sales.length === 0 ? (
+        <EmptyState title="Nothing sold yet" />
+      ) : (
+        <Rows label="Sales">
+          {[...sales]
+            .sort((a, b) => b.date.getTime() - a.date.getTime())
+            .map((record) => {
+              const animal = byId.get(record.animalId);
+              const name = animal === undefined ? "Unknown animal" : displayName(animal);
+              return (
+                <Row
+                  key={record.id}
+                  title={name}
+                  line={facts(
+                    formatDate(record.date),
+                    record.type.replace(/_/g, " "),
+                    `price ${money(record.price)}`,
+                  )}
+                  notes={record.notes}
+                  // The number that actually landed, after the barn took its cut.
+                  chip={<Figure>{money(netSaleProceeds(record))}</Figure>}
+                  action={
+                    <DeleteButton
+                      label={`Delete sale of ${name} on ${formatDate(record.date)}`}
+                      onClick={() => void remove(record)}
+                    />
+                  }
+                />
+              );
+            })}
+        </Rows>
+      )}
+
+      {!open ? null : (
+        <Modal
+          placement="side"
+          title="Record a sale"
+          onClose={onClose}
+          footer={
+            <PanelFooter
+              formId={formId}
+              busy={busy}
+              disabled={blocked}
+              label={clear ? "Record sale" : "Record sale under override"}
+              onClose={onClose}
+            />
+          }
+        >
+          <form
+            id={formId}
+            onSubmit={(event) => void submit(event)}
+            className="flex flex-col gap-density"
+          >
             <Select
               label="Animal"
               value={animalId}
@@ -434,6 +549,33 @@ function SalesTab({
               }))}
               required
             />
+
+            {clear ? null : (
+              <Callout
+                tone="danger"
+                title={`${chosen === undefined ? "That animal" : displayName(chosen)} is under withdrawal${withdrawal === undefined ? "" : ` until ${formatDate(withdrawal.clearsOn)}`}`}
+              >
+                <div className="flex flex-col gap-density pt-2">
+                  <p>
+                    Not for the food chain. A sale to another producer can go ahead, on the record.
+                  </p>
+                  <Checkbox
+                    label="Sell it anyway"
+                    checked={override}
+                    onChange={(event) => setOverride(event.target.checked)}
+                  />
+                  {override ? (
+                    <TextInput
+                      label="Why this is not a slaughter sale"
+                      value={overrideReason}
+                      onChange={(event) => setOverrideReason(event.target.value)}
+                      required
+                    />
+                  ) : null}
+                </div>
+              </Callout>
+            )}
+
             <TextInput
               label="Price ($)"
               type="number"
@@ -454,7 +596,7 @@ function SalesTab({
             />
             <TextInput
               label="Commission ($)"
-              hint="What the barn took, so the net is the number that landed."
+              hint="What the barn took, so the net is what landed."
               type="number"
               inputMode="decimal"
               step="0.01"
@@ -468,62 +610,22 @@ function SalesTab({
               onChange={(event) => setDate(event.target.value)}
               required
             />
-          </div>
 
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          {clear ? null : (
-            <Callout
-              tone="danger"
-              title={`${chosen === undefined ? "That animal" : displayName(chosen)} is under withdrawal${withdrawal === undefined ? "" : ` until ${formatDate(withdrawal.clearsOn)}`}`}
-            >
-              <div className="flex flex-col gap-density pt-2">
-                <p>
-                  It must not enter the food chain before that date. A sale to another producer is a
-                  different matter — if that is what this is, say so and it goes on the record.
-                </p>
-                <Checkbox
-                  label="Sell it anyway"
-                  checked={override}
-                  onChange={(event) => setOverride(event.target.checked)}
-                />
-                {override ? (
-                  <TextInput
-                    label="Why this is not a slaughter sale"
-                    value={overrideReason}
-                    onChange={(event) => setOverrideReason(event.target.value)}
-                    required
-                  />
-                ) : null}
-              </div>
-            </Callout>
-          )}
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" busy={busy} disabled={blocked}>
-              {clear ? "Record sale" : "Record sale under override"}
-            </Button>
-          </div>
-        </form>
-      </Section>
-
-      <Section title="Every sale">
-        <Card>
-          <DataTable
-            caption="Sales"
-            columns={columns}
-            rows={[...sales].sort((a, b) => b.date.getTime() - a.date.getTime())}
-            rowKey={(record) => record.id}
-            empty={<EmptyState title="Nothing sold yet" detail="Record a sale above." />}
-          />
-        </Card>
-      </Section>
-    </div>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
+            )}
+          </form>
+        </Modal>
+      )}
+    </>
   );
+}
+
+/** The figure a money row is about, in the numeric face so a column lines up. */
+function Figure({ children }: { readonly children: ReactNode }) {
+  return <span className="gf-numeric font-semibold text-ink">{children}</span>;
 }
 
 function AcquisitionsTab({
@@ -532,14 +634,12 @@ function AcquisitionsTab({
   byId,
   propertyId,
   actorId,
-}: {
-  /** The herd, already narrowed to cattle — never the whole menagerie. */
-  readonly cattle: readonly Animal[];
+  open,
+  onClose,
+}: PanelProps & {
   readonly acquisitions: readonly AcquisitionRecord[];
-  readonly byId: ReadonlyMap<Ulid, Animal>;
-  readonly propertyId: Ulid;
-  readonly actorId: Ulid;
 }) {
+  const formId = useId();
   const api = useMutations<AcquisitionRecord>(
     "acquisitionRecords",
     "acquisitionRecords",
@@ -607,35 +707,52 @@ function AcquisitionsTab({
     show({ message: "Acquisition deleted", tone: "danger" });
   }
 
-  const columns: readonly Column<AcquisitionRecord>[] = [
-    {
-      key: "animal",
-      header: "Animal",
-      primary: true,
-      render: (record) => {
-        const animal = byId.get(record.animalId);
-        return animal === undefined ? "Unknown" : displayName(animal);
-      },
-    },
-    { key: "date", header: "Date", render: (record) => formatDate(record.date) },
-    { key: "type", header: "Bought", render: (record) => record.type.replace(/_/g, " ") },
-    { key: "price", header: "Price", numeric: true, render: (record) => money(record.price) },
-    {
-      key: "actions",
-      header: "",
-      render: (record) => (
-        <Button variant="ghost" onClick={() => void remove(record)}>
-          Delete
-        </Button>
-      ),
-    },
-  ];
-
   return (
-    <div className="flex flex-col gap-density">
-      <Section title="Record an acquisition">
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
+    <>
+      {acquisitions.length === 0 ? (
+        <EmptyState
+          title="Nothing bought yet"
+          detail="A home-raised calf has no acquisition — its cost is feed and health."
+        />
+      ) : (
+        <Rows label="Acquisitions">
+          {[...acquisitions]
+            .sort((a, b) => b.date.getTime() - a.date.getTime())
+            .map((record) => {
+              const animal = byId.get(record.animalId);
+              const name = animal === undefined ? "Unknown animal" : displayName(animal);
+              return (
+                <Row
+                  key={record.id}
+                  title={name}
+                  line={facts(formatDate(record.date), record.type.replace(/_/g, " "))}
+                  chip={<Figure>{money(record.price)}</Figure>}
+                  action={
+                    <DeleteButton
+                      label={`Delete purchase of ${name} on ${formatDate(record.date)}`}
+                      onClick={() => void remove(record)}
+                    />
+                  }
+                />
+              );
+            })}
+        </Rows>
+      )}
+
+      {!open ? null : (
+        <Modal
+          placement="side"
+          title="Record an acquisition"
+          onClose={onClose}
+          footer={
+            <PanelFooter formId={formId} busy={busy} label="Record acquisition" onClose={onClose} />
+          }
+        >
+          <form
+            id={formId}
+            onSubmit={(event) => void submit(event)}
+            className="flex flex-col gap-density"
+          >
             <Select
               label="Animal"
               value={animalId}
@@ -669,37 +786,16 @@ function AcquisitionsTab({
               onChange={(event) => setDate(event.target.value)}
               required
             />
-          </div>
 
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          <Button type="submit" busy={busy}>
-            Record acquisition
-          </Button>
-        </form>
-      </Section>
-
-      <Section title="Every acquisition">
-        <Card>
-          <DataTable
-            caption="Acquisitions"
-            columns={columns}
-            rows={[...acquisitions].sort((a, b) => b.date.getTime() - a.date.getTime())}
-            rowKey={(record) => record.id}
-            empty={
-              <EmptyState
-                title="Nothing bought yet"
-                detail="A home-raised calf has no acquisition — its cost is feed and health, apportioned."
-              />
-            }
-          />
-        </Card>
-      </Section>
-    </div>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
+            )}
+          </form>
+        </Modal>
+      )}
+    </>
   );
 }
 
@@ -725,16 +821,14 @@ function ProcessingTab({
   now,
   propertyId,
   actorId,
-}: {
-  /** The herd, already narrowed to cattle — never the whole menagerie. */
-  readonly cattle: readonly Animal[];
+  open,
+  onClose,
+}: PanelProps & {
   readonly processing: readonly ProcessingRecord[];
   readonly health: readonly HealthRecord[];
-  readonly byId: ReadonlyMap<Ulid, Animal>;
   readonly now: Date;
-  readonly propertyId: Ulid;
-  readonly actorId: Ulid;
 }) {
+  const formId = useId();
   const api = useMutations<ProcessingRecord>(
     "processingRecords",
     "processingRecords",
@@ -833,63 +927,77 @@ function ProcessingTab({
     show({ message: "Processing record deleted", tone: "danger" });
   }
 
-  const columns: readonly Column<ProcessingRecord>[] = [
-    {
-      key: "animal",
-      header: "Animal",
-      primary: true,
-      render: (record) => {
-        const animal = byId.get(record.animalId);
-        return animal === undefined ? (
-          <span className="text-muted">Unknown</span>
-        ) : (
-          <Link
-            href={animalHref(animal)}
-            className="font-medium text-ink underline decoration-edge underline-offset-4 hover:decoration-action"
-          >
-            {displayName(animal)}
-          </Link>
-        );
-      },
-    },
-    { key: "delivered", header: "Delivered", render: (r) => formatDate(r.deliveredOn) },
-    { key: "live", header: "Live", numeric: true, render: (r) => lb(r.liveScaleWeightLb) },
-    { key: "hanging", header: "Hanging", numeric: true, render: (r) => lb(r.hangingWeightLb) },
-    {
-      key: "dressing",
-      header: "Dressing",
-      numeric: true,
-      render: (record) => {
-        const percent = dressingPercentage(record);
-        if (percent === undefined) return <span className="text-muted">—</span>;
-        // Sixty to sixty-four is the ordinary range for a finished animal.
-        return (
-          <Pill tone={percent >= 60 && percent <= 64 ? "calm" : "action"}>
-            {percent.toFixed(1)}%
-          </Pill>
-        );
-      },
-    },
-    { key: "cost", header: "Cost", numeric: true, render: (r) => money(r.processingCost) },
-    {
-      key: "actions",
-      header: "",
-      render: (record) => (
-        <Button variant="ghost" onClick={() => void remove(record)}>
-          Delete
-        </Button>
-      ),
-    },
-  ];
-
   return (
-    <div className="flex flex-col gap-density">
-      <Section
-        title="Deliver to the processor"
-        description="Dressing percentage is why this record exists: hanging weight over live weight is how you find out whether an animal that looked good actually was."
-      >
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
+    <Section
+      title="Deliveries"
+      description="Dressing percentage is why this record exists: hanging weight over live weight is how you find out whether an animal that looked good actually was."
+    >
+      {processing.length === 0 ? (
+        <EmptyState
+          title="Nothing processed yet"
+          detail="Live and hanging weight together give the dressing percentage."
+        />
+      ) : (
+        <Rows label="Processing records">
+          {[...processing]
+            .sort((a, b) => b.deliveredOn.getTime() - a.deliveredOn.getTime())
+            .map((record) => {
+              const animal = byId.get(record.animalId);
+              const name = animal === undefined ? "Unknown animal" : displayName(animal);
+              const percent = dressingPercentage(record);
+              return (
+                <Row
+                  key={record.id}
+                  title={name}
+                  href={animal === undefined ? undefined : animalHref(animal)}
+                  line={facts(
+                    `delivered ${formatDate(record.deliveredOn)}`,
+                    record.liveScaleWeightLb !== undefined &&
+                      `live ${lb(record.liveScaleWeightLb)}`,
+                    record.hangingWeightLb !== undefined && `hanging ${lb(record.hangingWeightLb)}`,
+                    record.processingCost !== undefined && money(record.processingCost),
+                  )}
+                  notes={record.notes}
+                  chip={
+                    percent === undefined ? undefined : (
+                      // Sixty to sixty-four is the ordinary range for a finished animal.
+                      <Pill tone={percent >= 60 && percent <= 64 ? "calm" : "action"}>
+                        {percent.toFixed(1)}%
+                      </Pill>
+                    )
+                  }
+                  action={
+                    <DeleteButton
+                      label={`Delete delivery of ${name} on ${formatDate(record.deliveredOn)}`}
+                      onClick={() => void remove(record)}
+                    />
+                  }
+                />
+              );
+            })}
+        </Rows>
+      )}
+
+      {!open ? null : (
+        <Modal
+          placement="side"
+          title="Deliver to the processor"
+          onClose={onClose}
+          footer={
+            <PanelFooter
+              formId={formId}
+              busy={busy}
+              disabled={blocked}
+              label={clear ? "Record delivery" : "Record delivery under override"}
+              onClose={onClose}
+            />
+          }
+        >
+          <form
+            id={formId}
+            onSubmit={(event) => void submit(event)}
+            className="flex flex-col gap-density"
+          >
             <Select
               label="Animal"
               value={animalId}
@@ -903,6 +1011,24 @@ function ProcessingTab({
                 }))}
               required
             />
+
+            {clear ? null : (
+              <Callout
+                tone="danger"
+                title={`${chosen === undefined ? "That animal" : displayName(chosen)} is under withdrawal until ${formatDate(withdrawal?.clearsOn)}`}
+              >
+                <div className="flex flex-col gap-density pt-2">
+                  <p>Delivering it now is a residue violation, not a paperwork problem.</p>
+                  <TextInput
+                    label="If you are doing this anyway, say why"
+                    hint="Goes on the record — for custom-exempt harvest for your own freezer."
+                    value={override}
+                    onChange={(event) => setOverride(event.target.value)}
+                  />
+                </div>
+              </Callout>
+            )}
+
             <TextInput
               label="Delivered"
               type="date"
@@ -936,58 +1062,15 @@ function ProcessingTab({
               value={cost}
               onChange={(event) => setCost(event.target.value)}
             />
-          </div>
 
-          {clear ? null : (
-            <Callout
-              tone="danger"
-              title={`${chosen === undefined ? "That animal" : displayName(chosen)} is under withdrawal until ${formatDate(withdrawal?.clearsOn)}`}
-            >
-              <div className="flex flex-col gap-density pt-2">
-                <p>
-                  Delivering it to a processor before that date puts it in the food chain inside a
-                  withdrawal period. That is a residue violation, not a paperwork problem.
-                </p>
-                <TextInput
-                  label="If you are doing this anyway, say why"
-                  hint="Goes on the record. Custom-exempt harvest for your own freezer is the case this exists for."
-                  value={override}
-                  onChange={(event) => setOverride(event.target.value)}
-                />
-              </div>
-            </Callout>
-          )}
-
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          <div>
-            <Button type="submit" busy={busy} disabled={blocked}>
-              {clear ? "Record delivery" : "Record delivery under override"}
-            </Button>
-          </div>
-        </form>
-      </Section>
-
-      <Section title="Every delivery">
-        <Card>
-          <DataTable
-            caption="Processing records"
-            columns={columns}
-            rows={[...processing].sort((a, b) => b.deliveredOn.getTime() - a.deliveredOn.getTime())}
-            rowKey={(record) => record.id}
-            empty={
-              <EmptyState
-                title="Nothing processed yet"
-                detail="Record a delivery above. Live and hanging weight together give the dressing percentage."
-              />
-            }
-          />
-        </Card>
-      </Section>
-    </div>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
+            )}
+          </form>
+        </Modal>
+      )}
+    </Section>
   );
 }

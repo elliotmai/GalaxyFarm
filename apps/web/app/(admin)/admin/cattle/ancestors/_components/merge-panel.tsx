@@ -225,8 +225,7 @@ export function MergeAncestors({
                   <li key={warning}>{warning}</li>
                 ))}
               </ul>
-              Nothing on the kept record is overwritten — this is only so you know what is being set
-              aside. A merge cannot be undone.
+              Nothing on the kept record is overwritten. A merge cannot be undone.
             </Callout>
           )}
         </>
@@ -238,7 +237,7 @@ export function MergeAncestors({
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2 border-t border-edge pt-density">
+      <div className="flex flex-wrap gap-2 border-t border-rule pt-density">
         <Button onClick={() => void merge()} busy={busy} disabled={drop === undefined}>
           Merge them
         </Button>

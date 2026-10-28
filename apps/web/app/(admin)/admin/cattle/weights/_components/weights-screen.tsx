@@ -1,25 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import {
   Button,
-  Card,
-  DataTable,
   EmptyState,
-  Meter,
+  Modal,
   PageBody,
-  PageHeader,
-  Pill,
-  RecordCard,
   Section,
   Select,
   TextInput,
-  Tile,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -34,6 +26,15 @@ import {
   type WeightRecord,
 } from "@galaxy-farm/module-cattle";
 
+import {
+  AddFab,
+  Chip,
+  ChipRow,
+  facts,
+  Row,
+  Rows,
+  ScreenHeader,
+} from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
 import { animalHref } from "@/lib/animal-slug";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
@@ -78,6 +79,8 @@ export function WeightsScreen({
   );
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
+  const [view, setView] = useState<"growth" | "log">("growth");
+  const [adding, setAdding] = useState(false);
 
   const byId = useMemo(() => new Map(animals.map((a) => [a.id, a])), [animals]);
 
@@ -150,165 +153,164 @@ export function WeightsScreen({
     show({ message: "Weight deleted", tone: "danger" });
   }
 
-  const columns: readonly Column<WeightRecord>[] = [
-    {
-      key: "animal",
-      header: "Animal",
-      primary: true,
-      render: (record) => {
-        const animal = byId.get(record.animalId);
-        return animal === undefined ? (
-          <span className="text-muted">Unknown</span>
-        ) : (
-          <Link
-            href={animalHref(animal)}
-            className="font-medium text-ink underline decoration-edge underline-offset-4 hover:decoration-action"
-          >
-            {displayName(animal)}
-          </Link>
-        );
-      },
-    },
-    { key: "date", header: "Date", render: (record) => formatDate(record.date) },
-    { key: "weight", header: "Weight", numeric: true, render: (record) => lb(record.weightLb) },
-    {
-      key: "context",
-      header: "Context",
-      render: (record) => (
-        <Pill tone={record.context === "birth" ? "identity" : "neutral"}>{record.context}</Pill>
-      ),
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (record) => (
-        <Button variant="ghost" onClick={() => void remove(record)}>
-          Delete
-        </Button>
-      ),
-    },
-  ];
-
   const withBirth = growth.filter((row) => row.birth !== undefined).length;
+  const bestAdg = growth.length === 0 ? undefined : Math.max(...growth.map((row) => row.adg ?? 0));
+  const log = [...weights].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Cattle"
-        title="Weights"
-        subtitle="Birth weights are the reliable ones. Every figure below says what it assumes, and the 205-day weight is unadjusted."
-      />
-
-      <div className="gf-stat-row">
-        <Tile label="Weights taken" value={weights.length} />
-        <Tile label="Animals weighed" value={growth.length} tone="identity" />
-        <Tile label="With a birth weight" value={withBirth} tone="calm" hint="The reliable ones" />
-        <Tile
-          label="Best lifetime ADG"
-          value={
-            growth.length === 0
-              ? "—"
-              : `${Math.max(...growth.map((row) => row.adg ?? 0)).toFixed(2)} lb/d`
+      {/* Bottom clearance on a phone, so the floating button never covers a row. */}
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <ScreenHeader
+          title="Weights"
+          facts={facts(
+            `${growth.length} weighed`,
+            withBirth > 0 && `${withBirth} with a birth weight`,
+            bestAdg !== undefined && bestAdg > 0 && `best ${bestAdg.toFixed(2)} lb/d`,
+          )}
+          action={
+            <span className="hidden sm:block">
+              <Button variant="primary" aria-haspopup="dialog" onClick={() => setAdding(true)}>
+                <span aria-hidden="true">+</span> Record weight
+              </Button>
+            </span>
           }
         />
-      </div>
 
-      <Section title="Record a weight">
-        <AddWeight cattle={cattle} api={api} />
-      </Section>
+        {/*
+          Two real views of one log: how each animal is growing, which is what
+          the screen is for, and the weighings themselves, which is where a
+          mistyped one gets found and deleted.
+        */}
+        <ChipRow label="View">
+          <Chip on={view === "growth"} onClick={() => setView("growth")}>
+            By animal
+          </Chip>
+          <Chip on={view === "log"} onClick={() => setView("log")}>
+            Every weight
+            <span className="gf-numeric text-xs opacity-80">{weights.length}</span>
+          </Chip>
+        </ChipRow>
 
-      {growth.length === 0 ? null : (
-        <Section
-          title="How they are growing"
-          description="Average daily gain is first weight to last, not an average of the intervals — the intervals are unevenly spaced."
-        >
-          <div className="grid grid-cols-1 gap-density md:grid-cols-2 xl:grid-cols-3">
-            {growth.map((row) => (
-              <RecordCard
-                key={row.animalId}
-                tone={row.adg !== undefined && row.adg >= 2 ? "calm" : "neutral"}
-                title={
-                  row.animal === undefined ? (
-                    "Unknown animal"
-                  ) : (
-                    <Link
-                      href={animalHref(row.animal)}
-                      className="underline decoration-edge underline-offset-4 hover:decoration-action"
-                    >
-                      {displayName(row.animal)}
-                    </Link>
-                  )
-                }
-                subtitle={`${row.count} weight${row.count === 1 ? "" : "s"} · last ${formatDate(row.latest?.date)}`}
-                actions={<Pill tone="action">{lb(row.latest?.weightLb)}</Pill>}
-                meta={
-                  <>
-                    {row.adg === undefined ? null : (
-                      <Pill tone="calm">{row.adg.toFixed(2)} lb/d lifetime</Pill>
-                    )}
-                    {row.recent === undefined ? null : (
-                      <Pill>{row.recent.toFixed(2)} lb/d since last</Pill>
-                    )}
-                    {row.w205 === undefined ? null : (
-                      <Pill tone="identity">{Math.round(row.w205)} lb at 205 d, unadjusted</Pill>
-                    )}
-                  </>
-                }
-              >
-                {/*
-                  A show calf is aimed at a target weight on a date. Until that
-                  target is a field, the bar reads against the heaviest animal
-                  on the place — which is at least a real comparison rather
-                  than an invented goal.
-                */}
-                <Meter
-                  value={
-                    (row.latest?.weightLb ?? 0) /
-                    Math.max(...growth.map((other) => other.latest?.weightLb ?? 1))
-                  }
-                  tone="action"
-                  label="Against the heaviest here"
-                  detail={lb(row.latest?.weightLb)}
-                />
-              </RecordCard>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      <Section title="Every weight">
         {loading ? (
           <p className="text-muted">Looking…</p>
-        ) : (
-          <Card>
-            <DataTable
-              caption="Weight records"
-              columns={columns}
-              rows={[...weights].sort((a, b) => b.date.getTime() - a.date.getTime())}
-              rowKey={(record) => record.id}
-              empty={
-                <EmptyState
-                  title="Nothing weighed yet"
-                  detail="A birth weight is the one worth having. Everything after it is a scale in a chute and an animal that would rather not be on it."
+        ) : weights.length === 0 ? (
+          <EmptyState
+            title="Nothing weighed yet"
+            detail="A birth weight is the one worth having."
+            action={
+              <Button variant="primary" onClick={() => setAdding(true)}>
+                Record a weight
+              </Button>
+            }
+          />
+        ) : view === "growth" ? (
+          <Section
+            title="How they are growing"
+            description="Average daily gain is first weight to last, not an average of the intervals — the intervals are unevenly spaced. The 205-day weight is unadjusted."
+          >
+            <Rows label="Animals weighed">
+              {growth.map((row) => (
+                <Row
+                  key={row.animalId}
+                  title={row.animal === undefined ? "Unknown animal" : displayName(row.animal)}
+                  href={row.animal === undefined ? undefined : animalHref(row.animal)}
+                  line={facts(
+                    `last ${formatDate(row.latest?.date)}`,
+                    row.adg !== undefined && `${row.adg.toFixed(2)} lb/d lifetime`,
+                    row.recent !== undefined && `${row.recent.toFixed(2)} since last`,
+                    // Unadjusted, and said so everywhere it is shown.
+                    row.w205 !== undefined && `205 d ${Math.round(row.w205)} lb unadj.`,
+                  )}
+                  chip={<Weight lb={row.latest?.weightLb} />}
                 />
-              }
-            />
-          </Card>
+              ))}
+            </Rows>
+          </Section>
+        ) : (
+          <Rows label="Weight records">
+            {log.map((record) => {
+              const animal = byId.get(record.animalId);
+              const name = animal === undefined ? "Unknown animal" : displayName(animal);
+              return (
+                <Row
+                  key={record.id}
+                  title={name}
+                  href={animal === undefined ? undefined : animalHref(animal)}
+                  line={facts(formatDate(record.date), record.context)}
+                  notes={record.notes}
+                  chip={<Weight lb={record.weightLb} />}
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => void remove(record)}
+                      aria-label={`Delete ${record.weightLb} lb for ${name} on ${formatDate(record.date)}`}
+                      className="inline-flex min-h-target min-w-target items-center justify-center rounded-full text-muted hover:bg-raised hover:text-danger focus-visible:outline-2 focus-visible:outline-action"
+                    >
+                      <TrashIcon />
+                    </button>
+                  }
+                />
+              );
+            })}
+          </Rows>
         )}
-      </Section>
+
+        <AddFab onClick={() => setAdding(true)}>Record weight</AddFab>
+
+        {adding ? <AddWeight cattle={cattle} api={api} onClose={() => setAdding(false)} /> : null}
+      </div>
     </PageBody>
   );
 }
 
+/** The figure a weight row is about, set in the numeric face so a column of them lines up. */
+function Weight({ lb: value }: { readonly lb: number | undefined }) {
+  return <span className="gf-numeric font-semibold text-ink">{lb(value)}</span>;
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 7h16" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M6 7l1 13h10l1-13" />
+      <path d="M9 7V4h6v3" />
+    </svg>
+  );
+}
+
+/**
+ * The form, in a side panel (a bottom sheet on a phone).
+ *
+ * It stays open after a weight is saved, with the animal and the context kept
+ * and the weight cleared: weighing goes down a line of calves in a chute, and
+ * the next one is the same form again.
+ */
 function AddWeight({
   cattle,
   api,
+  onClose,
 }: {
   /** The herd, already narrowed to cattle — never the whole menagerie. */
   readonly cattle: readonly Animal[];
   readonly api: ReturnType<typeof useMutations<WeightRecord>>;
+  readonly onClose: () => void;
 }) {
   const { show } = useToast();
+  // The save button is in the panel's footer and names this form, so Enter in
+  // the weight field and the button are the same submit.
+  const formId = useId();
   const [animalId, setAnimalId] = useState("");
   const [weight, setWeight] = useState("");
   const [context, setContext] = useState<WeightContext>("other");
@@ -354,8 +356,24 @@ function AddWeight({
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-      <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
+    <Modal
+      placement="side"
+      title="Record a weight"
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="primary" type="submit" form={formId} busy={busy}>
+            Record weight
+          </Button>
+          <Button onClick={onClose}>Done</Button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        onSubmit={(event) => void submit(event)}
+        className="flex flex-col gap-density"
+      >
         <Select
           label="Animal"
           value={animalId}
@@ -370,13 +388,14 @@ function AddWeight({
           label="Weight (lb)"
           type="number"
           inputMode="decimal"
+          numeric
           value={weight}
           onChange={(event) => setWeight(event.target.value)}
           required
         />
         <Select
           label="Context"
-          hint="Birth, weaning and yearling are the ones that feed a figure."
+          hint="Birth, weaning and yearling feed a figure."
           value={context}
           onChange={(event) => setContext(event.target.value as WeightContext)}
           options={WEIGHT_CONTEXTS.map((value) => ({ value, label: value }))}
@@ -389,17 +408,13 @@ function AddWeight({
           required
         />
         <TextInput label="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
-      </div>
 
-      {error === undefined ? null : (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      )}
-
-      <Button type="submit" busy={busy}>
-        Record weight
-      </Button>
-    </form>
+        {error === undefined ? null : (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
+      </form>
+    </Modal>
   );
 }

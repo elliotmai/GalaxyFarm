@@ -238,14 +238,11 @@ export function PairingPlanner({
 
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title="Try a pairing"
-        description="Nothing here is saved. It is the look you take before you pull the straw."
-      >
+      <Section title="Try a pairing" description="Nothing here is saved.">
         <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
           <SearchSelect
             label="Sire"
-            hint="Bulls only — ours and the ones on the papers. Type any part of a name or a number."
+            hint="Bulls only — ours and the ones on the papers."
             value={sireKey}
             placeholder="Choose a bull"
             options={sireOptions}
@@ -253,7 +250,6 @@ export function PairingPlanner({
           />
           <SearchSelect
             label="Dam"
-            hint="Active cows here."
             value={damId}
             placeholder="Choose a cow"
             options={damOptions}
@@ -265,7 +261,7 @@ export function PairingPlanner({
       {!chosen ? (
         <EmptyState
           title="Pick a sire and a dam"
-          detail="You will get the calf's breeding, the colors it can be, how close the two are, and what defects the pairing could carry."
+          detail="Breeding, colour, relatedness and defect risk for the calf."
         />
       ) : (
         <>
@@ -280,8 +276,7 @@ export function PairingPlanner({
               title={`This pairing carries ${defects.carried.map((defect) => defect).join(" and ")}`}
             >
               {defects.carried.map((defect) => `${DEFECT_NAMES[defect]} (${defect})`).join(", ")}.
-              No carrier belongs on this place — that is the rule, and it is stricter than the
-              genetics require on purpose.
+              No carrier belongs on this place.
             </Callout>
           ) : null}
 
@@ -340,7 +335,7 @@ export function PairingPlanner({
             {composition.length === 0 ? (
               <EmptyState
                 title="Not enough on file"
-                detail="Both parents need a breed composition before the calf's can be worked out. Add one on each animal's profile."
+                detail="Both parents need a breed composition on their profile."
               />
             ) : (
               <Card>
@@ -402,9 +397,7 @@ export function PairingPlanner({
                         association will paper it as.
                       */}
                       <span className="text-sm text-muted">
-                        Off the AMAA upgrading chart, which is a lookup on both parents&apos;
-                        classes rather than a sum — it is more generous than halving in places, and
-                        it is what papers actually get issued on.
+                        AMAA chart, off both parents&apos; classes — what papers are issued on.
                       </span>
                       {upgrade.conditions.map((condition) => (
                         <span key={condition} className="text-sm text-muted">
@@ -420,7 +413,7 @@ export function PairingPlanner({
 
           <Section
             title="What color"
-            description="Both loci together. Roan has no color of its own — it takes the one Extension gave it, so black through roan is a blue roan. Worked out from the parents' coats and pedigrees; a hair card sharpens it but is not needed."
+            description="Both loci together, from the parents' coats and pedigrees. Roan takes the colour Extension gave it, so black through roan is a blue roan."
           >
             {calfColour === undefined || calfColour.outcomes.length === 0 ? (
               <EmptyState
@@ -430,7 +423,7 @@ export function PairingPlanner({
                     ? "That bull is not on file, so there is no coat and no pedigree to work from."
                     : damCoat === undefined
                       ? "That cow is not on file, so there is no coat and no pedigree to work from."
-                      : "Neither parent's coat is recorded and neither has a pedigree that settles one. A colour on each of them is usually enough — red is e/e outright, and roan is R/r."
+                      : "Record a colour on each parent — that is usually enough."
                 }
               />
             ) : (
@@ -523,107 +516,105 @@ export function PairingPlanner({
 
           <Section
             title="How close they are"
-            description={`Wright's coefficient over ${RELATEDNESS_GENERATIONS} generations, counting every route through each shared ancestor rather than the shortest.`}
+            description={`Wright's coefficient, ${RELATEDNESS_GENERATIONS} generations`}
           >
             {kinship === undefined ? null : kinship.pedigreeIncomplete &&
               kinship.common.length === 0 ? (
-              <Callout tone="action" title="Not enough pedigree to say">
-                One or both of these animals has no parents recorded, so "no common ancestors" here
-                is silence rather than a clean bill. Set their sire and dam first.
-              </Callout>
+              // Silence is not a clean bill: with no parents recorded, "no
+              // common ancestors" is what an empty pedigree always says.
+              <p className="text-sm text-action">
+                Not enough pedigree to say — set both animals&apos; sire and dam first.
+              </p>
             ) : kinship.common.length === 0 ? (
-              <Card>
-                <p className="text-density text-ink">{verdict?.summary}</p>
-              </Card>
+              <p className="text-sm text-muted">{verdict?.summary}</p>
             ) : (
-              <Card>
-                <div className="flex flex-col gap-3">
-                  <p className="text-density text-ink">{verdict?.summary}</p>
+              <>
+                <p className="text-sm text-muted">{verdict?.summary}</p>
+                {/* One row per shared ancestor: who, the two routes to them as
+                    one line, and their share of the figure as the one chip. */}
+                <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
                   {kinship.common.map((ancestor) => (
-                    <div
+                    <li
                       key={`${ancestor.ref.kind}:${ancestor.ref.id}`}
-                      className="flex flex-wrap items-center justify-between gap-2 border-t border-edge pt-3"
+                      className="flex items-center justify-between gap-3 px-density py-3"
                     >
-                      <span className="text-density text-ink">
-                        {ancestor.name}
-                        {ancestor.regNumber === undefined ? null : (
-                          <span className="ml-2 text-sm text-muted">{ancestor.regNumber}</span>
-                        )}
-                      </span>
-                      <span className="flex flex-wrap items-center gap-2">
-                        <Pill>
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="truncate font-semibold text-ink">
+                          {ancestor.name}
+                          {ancestor.regNumber === undefined ? null : (
+                            <span className="ml-2 text-sm font-normal text-muted">
+                              {ancestor.regNumber}
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-sm text-muted">
                           {ancestor.viaSire === 0
-                            ? "is the sire"
+                            ? "Is the sire"
                             : `${ancestor.viaSire} up the sire`}
-                        </Pill>
-                        <Pill>
+                          {" · "}
                           {ancestor.viaDam === 0 ? "is the dam" : `${ancestor.viaDam} up the dam`}
-                        </Pill>
-                        <Pill tone="identity">
-                          {(ancestor.contribution * 100).toFixed(1)}% of it
-                        </Pill>
+                        </span>
                       </span>
-                    </div>
+                      <span className="shrink-0">
+                        <Pill tone="identity">{(ancestor.contribution * 100).toFixed(1)}%</Pill>
+                      </span>
+                    </li>
                   ))}
-                </div>
-              </Card>
+                </ul>
+              </>
             )}
           </Section>
 
           <Section
             title="Defects"
-            description="TH, PHA and DS are simple recessives, and a carrier is a healthy animal you cannot pick out of a pen."
+            description="TH, PHA and DS — simple recessives; a carrier looks healthy."
           >
             {sireProfile === undefined || damProfile === undefined ? (
               <EmptyState
                 title="No test results on file"
-                detail="Record hair-card results on each animal's profile. Nothing recorded is not the same as free — the whole risk here is an untested animal out of a carrier line."
+                detail="Record results on each animal's profile. Untested is not free."
               />
             ) : risks.length === 0 ? (
-              <Card>
-                <p className="text-density text-calm">
-                  Both animals are free of everything on file. Nothing to flag.
-                </p>
-              </Card>
+              <p className="text-sm text-calm">Both free of everything on file.</p>
             ) : (
-              <Card>
-                <div className="flex flex-col gap-3">
-                  {risks.map((risk) => (
-                    <div key={risk.defect} className="flex flex-col gap-1">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-density text-ink">
-                          {risk.defect}
-                          <span className="ml-2 text-sm text-muted">
-                            {DEFECT_NAMES[risk.defect]}
-                          </span>
+              // A row per defect: the name, both parents' status and the odds
+              // as one line, and a chip only where a calf could be affected or
+              // one side is untested — the cases somebody has to act on.
+              <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
+                {risks.map((risk) => (
+                  <li
+                    key={risk.defect}
+                    className="flex items-center justify-between gap-3 px-density py-3"
+                  >
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="font-semibold text-ink">
+                        {risk.defect}
+                        <span className="ml-2 text-sm font-normal text-muted">
+                          {DEFECT_NAMES[risk.defect]}
                         </span>
-                        <span className="flex flex-wrap gap-2">
-                          <Pill tone={risk.sire === "free" ? "calm" : "danger"}>
-                            sire {risk.sire.replace(/_/g, " ")}
-                          </Pill>
-                          <Pill tone={risk.dam === "free" ? "calm" : "danger"}>
-                            dam {risk.dam.replace(/_/g, " ")}
-                          </Pill>
-                        </span>
-                      </div>
-                      {risk.affectedChance > 0 ? (
-                        <p className="text-sm text-danger">
-                          {percent(risk.affectedChance)} of calves affected,{" "}
-                          {percent(risk.carrierChance)} carrying it.
-                        </p>
-                      ) : risk.uncertain ? (
-                        <p className="text-sm text-muted">
-                          Untested on one side. That is not a clean result — it is no result.
-                        </p>
-                      ) : (
-                        <p className="text-sm text-muted">
-                          No affected calves, {percent(risk.carrierChance)} carriers.
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </Card>
+                      </span>
+                      <span className="text-sm text-muted">
+                        Sire {risk.sire.replace(/_/g, " ")} · dam {risk.dam.replace(/_/g, " ")}
+                        {risk.affectedChance > 0
+                          ? ` · ${percent(risk.carrierChance)} carriers`
+                          : risk.uncertain
+                            ? ""
+                            : ` · no affected calves, ${percent(risk.carrierChance)} carriers`}
+                      </span>
+                    </span>
+                    {risk.affectedChance > 0 ? (
+                      <span className="shrink-0">
+                        <Pill tone="danger">{percent(risk.affectedChance)} affected</Pill>
+                      </span>
+                    ) : risk.uncertain ? (
+                      // Not a clean result — no result.
+                      <span className="shrink-0">
+                        <Pill tone="action">Untested</Pill>
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
             )}
           </Section>
 

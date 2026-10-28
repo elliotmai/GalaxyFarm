@@ -158,11 +158,22 @@ beforeEach(() => {
   stored.current = { animals: EVERYBODY };
 });
 
+/**
+ * The cattle logs' forms are side panels now, opened by the screen's one add
+ * button. On a phone that button floats and on a laptop it is in the header;
+ * both are drawn, so the first is the one pressed.
+ */
+async function openPanel(name: RegExp) {
+  const user = userEvent.setup();
+  await user.click(screen.getAllByRole("button", { name })[0] as HTMLElement);
+}
+
 describe("Cattle · Sales", () => {
   it("offers only cattle when recording a sale", async () => {
     const user = userEvent.setup();
     view(<SalesScreen propertyId={PROPERTY} actorId={ACTOR} />);
     await user.click(screen.getByRole("tab", { name: /Sales/ }));
+    await openPanel(/Record sale/);
 
     expectHerdOnly(optionsOf("Animal"), HERD);
   });
@@ -171,6 +182,7 @@ describe("Cattle · Sales", () => {
     const user = userEvent.setup();
     view(<SalesScreen propertyId={PROPERTY} actorId={ACTOR} />);
     await user.click(screen.getByRole("tab", { name: /Acquisitions/ }));
+    await openPanel(/Record acquisition/);
 
     expectHerdOnly(optionsOf("Animal"), HERD);
   });
@@ -179,31 +191,35 @@ describe("Cattle · Sales", () => {
     const user = userEvent.setup();
     view(<SalesScreen propertyId={PROPERTY} actorId={ACTOR} />);
     await user.click(screen.getByRole("tab", { name: /Processing/ }));
+    await openPanel(/Record delivery/);
 
     expectHerdOnly(optionsOf("Animal"), HERD);
   });
 });
 
 describe("Cattle · Weights", () => {
-  it("offers only cattle", () => {
+  it("offers only cattle", async () => {
     view(<WeightsScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await openPanel(/Record weight/);
 
     expectHerdOnly(optionsOf("Animal"), HERD);
   });
 
-  it("still leaves out cattle that are no longer active", () => {
+  it("still leaves out cattle that are no longer active", async () => {
     // The species filter is added to the status one, not swapped for it.
     const sold = animal({ species: "cattle", name: "Vega", status: "sold" });
     stored.current = { animals: [...EVERYBODY, sold] };
     view(<WeightsScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await openPanel(/Record weight/);
 
     expect(optionsOf("Animal")).not.toContain("Vega");
   });
 });
 
 describe("Cattle · Health", () => {
-  it("offers only cattle", () => {
+  it("offers only cattle", async () => {
     view(<HealthScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await openPanel(/Record treatment/);
 
     expectHerdOnly(optionsOf("Animal"), HERD);
   });
@@ -213,6 +229,7 @@ describe("Cattle · Feed plans", () => {
   it("offers only cattle once the plan feeds one animal", async () => {
     const user = userEvent.setup();
     view(<CattleFeedScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await openPanel(/Add plan/);
 
     await user.selectOptions(screen.getByLabelText("Feeds"), "animal");
 
@@ -221,10 +238,19 @@ describe("Cattle · Feed plans", () => {
 });
 
 describe("Cattle · Breeding", () => {
-  // Both Dam pickers on this screen at once — the breeding record's and the
-  // planner's beside it.
-  it("offers only cows as dams, in every picker on the screen", async () => {
+  /** The form is a side panel now, opened from the header. */
+  async function openRecordPanel() {
+    const user = userEvent.setup();
+    await user.click(
+      screen.getAllByRole("button", { name: "Record a breeding" })[0] as HTMLElement,
+    );
+  }
+
+  // The record panel's pickers. The planner's are a tab away and covered by
+  // its own block below.
+  it("offers only cows as dams when recording a breeding", async () => {
     view(<BreedingScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await openRecordPanel();
 
     const dams = (await comboOptions("Dam")).join(" · ");
     expect(dams).toContain("Andromeda");
@@ -233,8 +259,9 @@ describe("Cattle · Breeding", () => {
     for (const name of [...OTHER_SPECIES, "Orion"]) expect(dams).not.toContain(name);
   });
 
-  it("offers only bulls as sires, in every picker on the screen", async () => {
+  it("offers only bulls as sires when recording a breeding", async () => {
     view(<BreedingScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await openRecordPanel();
 
     const sires = (await comboOptions("Sire")).join(" · ");
     expect(sires).toContain("Orion");
@@ -261,8 +288,12 @@ describe("Cattle · Pairing planner", () => {
 });
 
 describe("Cattle · Calving", () => {
-  it("offers only cows as the dam", () => {
+  it("offers only cows as the dam", async () => {
     view(<CalvingScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    // The form is a side panel, opened from the header.
+    await userEvent
+      .setup()
+      .click(screen.getAllByRole("button", { name: "Record a calving" })[0] as HTMLElement);
 
     const dams = optionsOf("Dam");
     expect(dams).toContain("Andromeda (6001A)");

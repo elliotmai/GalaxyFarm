@@ -1,23 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 
 import {
   Button,
-  Card,
-  DataTable,
+  DetailList,
   EmptyState,
+  Modal,
   PageBody,
   PageHeader,
   Pill,
-  RecordCard,
   Section,
   Select,
   TextInput,
-  Tile,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import {
   CANDIDATE_STATUSES,
@@ -45,8 +42,11 @@ import { useRecords } from "@/lib/local/use-records";
  *
  * The other thing this screen exists to do is make a sale date impossible to
  * miss. "Auction lots are a deadline, not a browse" — a lot you meant to bid
- * on is gone at a time nobody controls, so the days remaining are on the card
- * rather than in a field somebody has to open.
+ * on is gone at a time nobody controls, so the days remaining are the one
+ * chip on the row rather than in a field somebody has to open.
+ *
+ * Rows open a side panel with the status ladder and the costs; adding is a
+ * side panel too, so neither pushes the comparison down the page.
  */
 
 function formatDate(value: Date | undefined): string {
@@ -143,176 +143,307 @@ export function CattleCandidatesScreen({
     show({ message: "Candidate deleted", tone: "danger" });
   }
 
-  const columns: readonly Column<PurchaseCandidate>[] = [
-    { key: "title", header: "Animal", primary: true, render: (c) => c.title },
-    {
-      key: "status",
-      header: "Status",
-      render: (c) => <Pill tone={c.status === "passed" ? "neutral" : "action"}>{c.status}</Pill>,
-    },
-    { key: "asking", header: "Asking", numeric: true, render: (c) => formatMoney(c.askingPrice) },
-    {
-      key: "total",
-      header: "All in",
-      numeric: true,
-      // The number the decision is actually made on.
-      render: (c) => formatMoney(totalAcquisitionCost(c)),
-    },
-    {
-      key: "sale",
-      header: "Sale",
-      render: (c) => {
-        const on = saleDateOf(c);
-        if (on === undefined) return <span className="text-muted">—</span>;
-        const days = daysUntil(on, now);
-        return days < 0 ? (
-          <span className="text-muted">{formatDate(on)}</span>
-        ) : (
-          <Pill tone={days <= 3 ? "danger" : days <= 14 ? "action" : "neutral"} dot={days <= 3}>
-            {days === 0 ? "today" : `${days} d`}
-          </Pill>
-        );
-      },
-    },
-    { key: "where", header: "Where", render: (c) => c.location ?? "—" },
-    {
-      key: "actions",
-      header: "",
-      render: (candidate) => (
-        <span className="flex flex-wrap items-end gap-2">
+  const [adding, setAdding] = useState(false);
+  const [openId, setOpenId] = useState<Ulid | undefined>();
+  const opened = candidates.find((candidate) => candidate.id === openId);
+  const [view, setView] = useState<View>("all");
+
+  const cheapest = open
+    .map((candidate) => totalAcquisitionCost(candidate))
+    .sort((left, right) => left.cents - right.cents)[0] as Money | undefined;
+  const passed = candidates.filter((c) => c.status === "passed").length;
+
+  const counts: Readonly<Record<View, number>> = {
+    all: candidates.length,
+    open: open.length,
+    purchased: candidates.filter((c) => c.status === "purchased").length,
+    passed,
+  };
+  const shown = [...candidates]
+    .filter((candidate) => inView(candidate, view))
+    .sort((left, right) => totalAcquisitionCost(left).cents - totalAcquisitionCost(right).cents);
+
+  /** The sale-date chip: a deadline, coloured by how close it is. */
+  const saleChip = (candidate: PurchaseCandidate) => {
+    const on = saleDateOf(candidate);
+    if (on === undefined) return undefined;
+    const days = daysUntil(on, now);
+    if (days < 0) return undefined;
+    return (
+      <Pill tone={days <= 3 ? "danger" : days <= 14 ? "action" : "neutral"} dot={days <= 3}>
+        {days === 0 ? "today" : `${days} d`}
+      </Pill>
+    );
+  };
+
+  return (
+    <PageBody>
+      {/* Bottom clearance on a phone, for the floating button and the tab bar. */}
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <PageHeader
+          eyebrow="Cattle"
+          title="Candidates"
+          subtitle={[
+            `${open.length} under consideration`,
+            ...(cheapest === undefined ? [] : [`cheapest ${formatMoney(cheapest)} all in`]),
+            ...(passed === 0 ? [] : [`${passed} passed`]),
+          ].join(" · ")}
+          actions={
+            // A wrapper hides it on a phone: the button's own `inline-flex`
+            // would win over a `hidden` passed to it.
+            <span className="hidden sm:block">
+              <Button variant="primary" onClick={() => setAdding(true)}>
+                <span aria-hidden="true">+</span> Add a candidate
+              </Button>
+            </span>
+          }
+        />
+
+        {/*
+          The deadlines, only when there are any. "Auction lots are a deadline,
+          not a browse" — a lot you meant to bid on is gone at a time nobody
+          controls, so they lead, soonest first.
+        */}
+        {deadlines.length === 0 ? null : (
+          <Section title="Sale dates coming up" description="Within a fortnight">
+            <ul aria-label="Sale dates coming up" className={LIST}>
+              {deadlines.map(({ candidate }) => {
+                const detail = detailOf(candidate);
+                return (
+                  <CandidateRow
+                    key={candidate.id}
+                    candidate={candidate}
+                    line={[
+                      `${formatMoney(totalAcquisitionCost(candidate))} all in`,
+                      detail.lotNumber === undefined ? undefined : `lot ${detail.lotNumber}`,
+                      detail.saleType?.replace(/_/g, " "),
+                      candidate.location,
+                    ]}
+                    chip={saleChip(candidate)}
+                    onOpen={() => setOpenId(candidate.id)}
+                  />
+                );
+              })}
+            </ul>
+          </Section>
+        )}
+
+        <Section title="Comparison" description="Cheapest all in first, hauling included.">
+          <div
+            role="group"
+            aria-label="Filter by status"
+            className="-mx-1 flex items-center gap-1 overflow-x-auto px-1"
+          >
+            {VIEWS.map((entry) => {
+              const on = view === entry.key;
+              return (
+                <button
+                  key={entry.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setView(on ? "all" : entry.key)}
+                  className={[
+                    "inline-flex min-h-target shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm",
+                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action",
+                    on
+                      ? "bg-action/15 font-semibold text-action"
+                      : "font-medium text-muted hover:bg-raised hover:text-ink",
+                  ].join(" ")}
+                >
+                  {entry.label}
+                  <span className="gf-numeric text-xs opacity-80">{counts[entry.key]}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {view === "all" ? null : (
+            <p
+              className="flex flex-wrap items-center gap-x-2 text-sm text-muted"
+              aria-live="polite"
+            >
+              <span>
+                Showing {shown.length} of {candidates.length}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>{VIEWS.find((entry) => entry.key === view)?.label}</span>
+              <button
+                type="button"
+                onClick={() => setView("all")}
+                className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
+              >
+                Clear
+              </button>
+            </p>
+          )}
+
+          {loading ? (
+            <p className="text-muted">Looking…</p>
+          ) : shown.length === 0 ? (
+            <EmptyState
+              title={candidates.length === 0 ? "Nothing under consideration" : "None here"}
+              {...(candidates.length === 0
+                ? {
+                    detail: "Hauling goes on the record, so the comparison is on the real cost.",
+                    action: (
+                      <Button variant="primary" onClick={() => setAdding(true)}>
+                        Add a candidate
+                      </Button>
+                    ),
+                  }
+                : { action: <Button onClick={() => setView("all")}>Show all</Button> })}
+            />
+          ) : (
+            <ul aria-label="Cattle candidates" className={LIST}>
+              {shown.map((candidate) => (
+                <CandidateRow
+                  key={candidate.id}
+                  candidate={candidate}
+                  // The all-in figure leads: it is the number the decision is
+                  // actually made on, and what the list is sorted by.
+                  line={[
+                    `${formatMoney(totalAcquisitionCost(candidate))} all in`,
+                    `${formatMoney(candidate.askingPrice)} asking`,
+                    candidate.status.replace(/_/g, " "),
+                    candidate.location,
+                  ]}
+                  chip={saleChip(candidate)}
+                  onOpen={() => setOpenId(candidate.id)}
+                />
+              ))}
+            </ul>
+          )}
+        </Section>
+
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
+        >
+          <span aria-hidden="true" className="text-xl leading-none">
+            +
+          </span>
+          Add a candidate
+        </button>
+      </div>
+
+      {adding ? <AddCandidate api={api} onClose={() => setAdding(false)} /> : null}
+
+      {opened === undefined ? null : (
+        <Modal
+          title={opened.title}
+          placement="side"
+          onClose={() => setOpenId(undefined)}
+          footer={
+            <>
+              <Button onClick={() => setOpenId(undefined)}>Done</Button>
+              {/* Closed first, so the confirmation is the only dialog showing. */}
+              <Button
+                variant="danger"
+                className="ml-auto"
+                onClick={() => {
+                  setOpenId(undefined);
+                  void remove(opened);
+                }}
+              >
+                Delete
+              </Button>
+            </>
+          }
+        >
           {/*
             A candidate walks watching → contacted → inspected → offer_made,
             and ends at purchased, passed or gone. A Pass button alone would
-            record only the endings, so the whole ladder is here.
+            record only the endings, so the whole ladder is here. Saved on
+            change, as it was on the row.
           */}
           <Select
             label="Status"
-            hideLabel
-            value={candidate.status}
-            onChange={(event) => void setStatus(candidate, event.target.value as CandidateStatus)}
+            value={opened.status}
+            onChange={(event) => void setStatus(opened, event.target.value as CandidateStatus)}
             options={CANDIDATE_STATUSES.map((value) => ({
               value,
               label: value.replace(/_/g, " "),
             }))}
           />
-          <Button variant="ghost" onClick={() => void remove(candidate)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
-
-  const cheapest = open
-    .map((candidate) => totalAcquisitionCost(candidate))
-    .sort((left, right) => left.cents - right.cents)[0] as Money | undefined;
-
-  return (
-    <PageBody>
-      <PageHeader
-        eyebrow="Cattle"
-        title="Candidates"
-        subtitle="Cattle under consideration, compared on what they would actually cost to get here — not on the asking price."
-      />
-
-      <div className="gf-stat-row">
-        <Tile label="Under consideration" value={open.length} tone="identity" />
-        <Tile
-          label="Sale within a fortnight"
-          value={deadlines.length}
-          tone={deadlines.length > 0 ? "danger" : "neutral"}
-          emphasis={deadlines.length > 0}
-          hint={deadlines.length > 0 ? "A deadline, not a browse" : undefined}
-        />
-        <Tile
-          label="Cheapest all-in"
-          value={cheapest === undefined ? "—" : formatMoney(cheapest)}
-        />
-        <Tile
-          label="Passed"
-          value={candidates.filter((c) => c.status === "passed").length}
-          hint="Kept, with the reason"
-        />
-      </div>
-
-      {deadlines.length === 0 ? null : (
-        <Section
-          title="Sale dates coming up"
-          description="A lot you meant to bid on is gone at a time nobody controls."
-        >
-          <div className="grid grid-cols-1 gap-density md:grid-cols-2 xl:grid-cols-3">
-            {deadlines.map(({ candidate, on }) => {
-              const detail = detailOf(candidate);
-              const days = daysUntil(on, now);
-              return (
-                <RecordCard
-                  key={candidate.id}
-                  tone={days <= 3 ? "danger" : "action"}
-                  title={candidate.title}
-                  subtitle={candidate.location}
-                  actions={
-                    <Pill tone={days <= 3 ? "danger" : "action"} dot={days <= 3}>
-                      {days === 0 ? "today" : `${days} d`}
-                    </Pill>
-                  }
-                  meta={
-                    <>
-                      <Pill>{formatMoney(totalAcquisitionCost(candidate))} all in</Pill>
-                      {detail.lotNumber === undefined ? null : (
-                        <Pill tone="identity">lot {detail.lotNumber}</Pill>
-                      )}
-                      {detail.saleType === undefined ? null : (
-                        <Pill>{detail.saleType.replace(/_/g, " ")}</Pill>
-                      )}
-                    </>
-                  }
-                />
-              );
-            })}
-          </div>
-        </Section>
+          <DetailList
+            items={[
+              { label: "All in", value: formatMoney(totalAcquisitionCost(opened)) },
+              { label: "Asking", value: formatMoney(opened.askingPrice) },
+              ...opened.additionalCosts.map((cost) => ({
+                label: cost.label,
+                value: formatMoney(cost.amount),
+              })),
+              { label: "Where", value: opened.location },
+              { label: "Sold how", value: detailOf(opened).saleType?.replace(/_/g, " ") },
+              { label: "Sale date", value: formatDate(saleDateOf(opened)) },
+              { label: "Lot", value: detailOf(opened).lotNumber },
+            ]}
+          />
+        </Modal>
       )}
-
-      <Section title="Add a candidate">
-        <AddCandidate api={api} />
-      </Section>
-
-      <Section
-        title="Comparison"
-        description="Sorted on total acquisition cost. A cheaper animal four hundred miles away is often not the cheaper animal."
-      >
-        {loading ? (
-          <p className="text-muted">Looking…</p>
-        ) : (
-          <Card>
-            <DataTable
-              caption="Cattle candidates"
-              columns={columns}
-              rows={[...candidates].sort(
-                (left, right) =>
-                  totalAcquisitionCost(left).cents - totalAcquisitionCost(right).cents,
-              )}
-              rowKey={(candidate) => candidate.id}
-              empty={
-                <EmptyState
-                  title="Nothing under consideration"
-                  detail="Add a heifer or a show prospect above. Hauling and commission go on the record, so the comparison is on what it would really cost."
-                />
-              }
-            />
-          </Card>
-        )}
-      </Section>
     </PageBody>
+  );
+}
+
+const LIST =
+  "flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel";
+
+/** The status views offered as chips; pressing the one that is on goes back to all. */
+type View = "all" | "open" | "purchased" | "passed";
+
+const VIEWS: readonly { readonly key: View; readonly label: string }[] = [
+  { key: "open", label: "Open" },
+  { key: "purchased", label: "Purchased" },
+  { key: "passed", label: "Passed" },
+];
+
+function inView(candidate: PurchaseCandidate, view: View): boolean {
+  if (view === "all") return true;
+  if (view === "open") return candidate.status !== "passed" && candidate.status !== "purchased";
+  return candidate.status === view;
+}
+
+/** One candidate: the title, one muted line of facts, at most one chip. */
+function CandidateRow({
+  candidate,
+  line,
+  chip,
+  onOpen,
+}: {
+  readonly candidate: PurchaseCandidate;
+  readonly line: readonly (string | undefined)[];
+  readonly chip: ReactNode;
+  readonly onOpen: () => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex min-h-[60px] w-full items-center gap-3 px-density py-2 text-left hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate font-semibold text-ink">{candidate.title}</span>
+          <span className="truncate text-sm text-muted">
+            {line.filter((part): part is string => part !== undefined && part !== "").join(" · ")}
+          </span>
+        </span>
+        {chip === undefined ? null : <span className="shrink-0">{chip}</span>}
+      </button>
+    </li>
   );
 }
 
 function AddCandidate({
   api,
+  onClose,
 }: {
   readonly api: ReturnType<typeof useMutations<PurchaseCandidate>>;
+  readonly onClose: () => void;
 }) {
   const { show } = useToast();
+  const formId = useId();
   const [title, setTitle] = useState("");
   const [asking, setAsking] = useState("");
   const [haul, setHaul] = useState("");
@@ -359,10 +490,7 @@ function AddCandidate({
         );
         return;
       }
-      setTitle("");
-      setAsking("");
-      setHaul("");
-      setLot("");
+      onClose();
       show({ message: "Added to the comparison", tone: "success" });
     } finally {
       setBusy(false);
@@ -370,33 +498,52 @@ function AddCandidate({
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-      <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+    <Modal
+      title="Add a candidate"
+      placement="side"
+      onClose={onClose}
+      footer={
+        <>
+          {/* Tied to the form by `form`, so it stays pinned while fields scroll. */}
+          <Button type="submit" form={formId} variant="primary" busy={busy}>
+            Add candidate
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        onSubmit={(event) => void submit(event)}
+        className="flex flex-col gap-density"
+      >
         <TextInput
           label="Animal"
-          hint="&ldquo;Bred Maine heifer, Weatherford&rdquo;"
+          placeholder="Bred Maine heifer, Weatherford"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           required
         />
-        <TextInput
-          label="Asking ($)"
-          type="number"
-          inputMode="decimal"
-          step="0.01"
-          value={asking}
-          onChange={(event) => setAsking(event.target.value)}
-          required
-        />
-        <TextInput
-          label="Hauling ($)"
-          hint="Counted in the all-in figure the comparison sorts on."
-          type="number"
-          inputMode="decimal"
-          step="0.01"
-          value={haul}
-          onChange={(event) => setHaul(event.target.value)}
-        />
+        <div className="grid grid-cols-2 gap-density">
+          <TextInput
+            label="Asking ($)"
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            value={asking}
+            onChange={(event) => setAsking(event.target.value)}
+            required
+          />
+          <TextInput
+            label="Hauling ($)"
+            hint="Counted in the all-in figure."
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            value={haul}
+            onChange={(event) => setHaul(event.target.value)}
+          />
+        </div>
         <TextInput
           label="Where"
           value={location}
@@ -411,29 +558,27 @@ function AddCandidate({
             label: value.replace(/_/g, " "),
           }))}
         />
-        <TextInput
-          label="Sale date"
-          hint="A lot is a deadline. Leave blank for a private treaty."
-          type="date"
-          value={saleDate}
-          onChange={(event) => setSaleDate(event.target.value)}
-        />
-        <TextInput
-          label="Lot number"
-          value={lot}
-          onChange={(event) => setLot(event.target.value)}
-        />
-      </div>
+        <div className="grid grid-cols-2 gap-density">
+          <TextInput
+            label="Sale date"
+            hint="Blank for private treaty."
+            type="date"
+            value={saleDate}
+            onChange={(event) => setSaleDate(event.target.value)}
+          />
+          <TextInput
+            label="Lot number"
+            value={lot}
+            onChange={(event) => setLot(event.target.value)}
+          />
+        </div>
 
-      {error === undefined ? null : (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      )}
-
-      <Button type="submit" busy={busy}>
-        Add candidate
-      </Button>
-    </form>
+        {error === undefined ? null : (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
+      </form>
+    </Modal>
   );
 }

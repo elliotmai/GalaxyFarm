@@ -2,30 +2,28 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 import {
-  Badge,
   Button,
   Callout,
-  Card,
   DetailList,
   EmptyState,
+  Modal,
+  Pill,
   Select,
-  Tile,
   TextInput,
   PageBody,
-  PageHeader,
   SafetyBadge,
   Section,
   TextArea,
-  StatRow,
   Tabs,
   useConfirmDelete,
   useToast,
 } from "@galaxy-farm/ui";
 import {
-  ageInMonths,
+  animalsWithoutOutside,
   effectiveSlot,
   openAssignments,
   type Animal,
@@ -36,12 +34,19 @@ import {
 import {
   animalsUnderWithdrawal,
   ASSOCIATIONS,
+  awaitingCalving,
+  CATTLE_CLASS_SINGULAR,
+  cattleClass,
   cattleProfileSchema,
+  damsThatHaveCalved,
   describeComposition,
   describeCompositionSource,
   HORN_STATUSES,
   isPapered,
+  projectedDueDate,
   type Association,
+  type BreedingRecord,
+  type CalvingRecord,
   type CattleProfile,
   type ExternalAnimal,
   type ResolvedComposition,
@@ -59,7 +64,9 @@ import {
   Pedigree,
   WeightsTab,
 } from "@/app/(admin)/admin/cattle/[id]/_components/animal-tabs";
+import { Chip, ChipRow } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
 import { GeneticsPanel } from "@/app/(admin)/admin/cattle/[id]/_components/genetics-panel";
+import { ageLabel, flagFor } from "@/app/(admin)/admin/cattle/_components/herd-row";
 import { PhotoPanel, PhotoQuickCapture } from "@/app/_components/photo-panel";
 import { animalSlug, animalTitle, resolveAnimalSlug } from "@/lib/animal-slug";
 import { compositionLookup, compositionOfAnimal } from "@/lib/composition";
@@ -69,10 +76,11 @@ import { useRecords } from "@/lib/local/use-records";
 /**
  * One animal, everything about her (spec §7, §5.2).
  *
- * §7 lists the tabs: overview · pedigree · breeding · health · weights ·
- * feeding · finance · photos. Most are real here; the ones that are not name
- * what they will hold rather than pretending to be finished, because a tab
- * that renders an empty card teaches nobody whether it is empty or broken.
+ * The top of the page is who she is, said once: the tag, the name, one line of
+ * facts and at most one chip — the same anatomy as her row in the herd, so the
+ * page reads as that row opened rather than as a different screen. The old
+ * header carried six badges and a rank of tiles repeating them, and the one
+ * badge that mattered looked like the other five.
  *
  * The URL is a slug, not an id — see `lib/animal-slug.ts`. The record is found
  * by walking the herd on the device rather than by a keyed lookup, which is
@@ -96,6 +104,12 @@ export function AnimalScreen({
   const { records: zones } = useRecords<Zone>("zones", { propertyId });
   const { records: placements } = useRecords<ZoneAssignment>("zoneAssignments", { propertyId });
   const { records: health } = useRecords<HealthRecord>("healthRecords", { propertyId });
+  const { records: breedings } = useRecords<BreedingRecord>("breedingRecords", { propertyId });
+  const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", { propertyId });
+
+  // One clock for the whole render, so the age, the class and the due date
+  // cannot disagree with each other on the morning of a birthday.
+  const asOf = useMemo(() => new Date(), []);
 
   const registrationOf = useMemo(() => {
     const byAnimal = new Map(profiles.map((profile) => [profile.animalId, profile]));
@@ -114,7 +128,7 @@ export function AnimalScreen({
       <PageBody>
         <EmptyState
           title="No animal by that name"
-          detail="Nothing on this device answers to that tag, registration, or name. It may have been deleted, or the link may predate a rename."
+          detail="Nothing on this device answers to that tag, registration, or name."
           action={
             <Link href="/admin/cattle" className="text-action underline">
               Back to the herd
@@ -150,15 +164,46 @@ export function AnimalScreen({
   const outside = standing.find((entry) => entry.slot === "outside");
   const inside = standing.find((entry) => entry.slot === "inside");
   const zone = (outside ?? inside)?.zone;
-  const months = ageInMonths(animal, new Date());
 
   // #15: a withdrawal must be unmissable here. Selling or slaughtering an
   // animal inside one is a residue violation, and the person about to do it is
-  // usually looking at this page — so it gets a banner above the tabs rather
-  // than a badge in a row of badges that already has six.
-  const withdrawal = animalsUnderWithdrawal(health, new Date()).find(
+  // usually looking at this page — so it gets its own line above the tabs
+  // rather than a chip among chips.
+  const withdrawal = animalsUnderWithdrawal(health, asOf).find(
     (entry) => entry.animalId === animal.id,
   );
+
+  // The same class and the same chip her herd row shows, worked out the same
+  // way, so the list and the page never describe one cow two ways.
+  const kind = cattleClass(animal, asOf, {
+    hasCalved: damsThatHaveCalved(calvings, breedings).has(animal.id),
+  });
+  const due = awaitingCalving(breedings, calvings, asOf)
+    .filter((record) => record.damId === animal.id)
+    .map(projectedDueDate)
+    .sort((left, right) => left.getTime() - right.getTime())[0];
+  const flag = flagFor({
+    animal,
+    // The withdrawal has the line under the header to itself; spending the
+    // chip on it too would say it twice and hide whatever is next.
+    withdrawn: false,
+    unplaced: animalsWithoutOutside([animal], placements, indoorZoneIds).length > 0,
+    due,
+    now: asOf,
+  });
+
+  const where = [outside?.zone?.name, inside?.zone?.name].filter(Boolean).join(" and ");
+  const facts = [
+    kind === undefined ? animal.sex : CATTLE_CLASS_SINGULAR[kind],
+    ageLabel(animal, asOf),
+    where,
+    animal.ownership === "client" ? "Client calf" : undefined,
+    breeding.composition.length === 0
+      ? undefined
+      : `${describeComposition(breeding.composition)}${breeding.source === "parents" ? " (from parents)" : ""}`,
+  ]
+    .filter((part) => part !== undefined && part !== "")
+    .join(" · ");
 
   // The URL the record answers to now. Somebody who arrived by an old link
   // gets moved to the current one rather than being left on a stale address
@@ -168,26 +213,48 @@ export function AnimalScreen({
     router.replace(`/admin/cattle/${canonical}`);
   }
 
+  const tag = animal.tagNumber;
+
   return (
     <PageBody>
-      <PageHeader
-        eyebrow={
-          <span>
-            <Link href="/admin/cattle" className="hover:text-ink">
-              Cattle
-            </Link>{" "}
-            · Herd
-          </span>
-        }
-        title={animalTitle(animal)}
-        actions={
-          <>
+      <header className="flex flex-col gap-2">
+        {/* The trail, on a laptop only — on a phone the tab bar already says
+            where this is, and the row is worth more to the name. */}
+        <p className="hidden text-xs font-medium text-muted md:block">
+          <Link href="/admin/cattle" className="hover:text-ink">
+            Cattle
+          </Link>{" "}
+          · Herd
+        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            {/* The ear tag, as on her row: what somebody at the chute reads
+                off her ear, so it is the first thing on the page. */}
+            <span
+              aria-hidden={tag === undefined || tag === "" ? true : undefined}
+              className="gf-numeric flex h-14 min-w-[3.5rem] max-w-[7rem] shrink-0 items-center justify-center rounded-full bg-raised px-2 font-semibold text-action"
+            >
+              <span className="truncate">{tag === undefined || tag === "" ? "–" : tag}</span>
+            </span>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-ink">{animalTitle(animal)}</h1>
+                {flag === undefined ? null : flag.kind === "safety" ? (
+                  <SafetyBadge level={flag.level} size="compact" />
+                ) : (
+                  <Pill tone={flag.tone}>{flag.label}</Pill>
+                )}
+              </div>
+              {facts === "" ? null : <p className="text-sm text-muted">{facts}</p>}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             {/*
               Tap the camera, take the photo. That is the whole of issue #9's
               "adding a photo is ≤2 taps from the animal's profile", and it is
-              why the control is here rather than behind the Photos tab — a tab
-              would spend the first tap getting to it. The bytes queue on the
-              device and go up on the sync heartbeat, so it works in a pen.
+              why the control is here rather than behind the Photos view — a
+              tab would spend the first tap getting to it. The bytes queue on
+              the device and go up on the sync heartbeat, so it works in a pen.
             */}
             <PhotoQuickCapture
               propertyId={propertyId}
@@ -202,72 +269,27 @@ export function AnimalScreen({
             {animal.sex === "female" && animal.status === "active" ? (
               <Link
                 href={`/admin/cattle/calving?dam=${animal.id}`}
-                className="rounded-density border border-edge px-density py-2 text-sm font-medium text-ink hover:border-action"
+                className="inline-flex min-h-target items-center rounded-density bg-action px-4 font-medium text-action-ink hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
               >
                 Record a calving
               </Link>
             ) : null}
-          </>
-        }
-        subtitle={
-          breeding.composition.length === 0
-            ? undefined
-            : `${describeComposition(breeding.composition)}${breeding.source === "parents" ? " (from its parents)" : ""}`
-        }
-        meta={
-          <>
-            <SafetyBadge level={animal.safetyLevel} />
-            <Badge tone="neutral">{animal.status}</Badge>
-            {animal.ownership === "client" ? <Badge tone="identity">Client calf</Badge> : null}
-            {profile !== undefined && isPapered(profile) ? (
-              <Badge tone="calm">Papered</Badge>
-            ) : (
-              <Badge tone="neutral">Unpapered</Badge>
-            )}
-            {standing.map((entry) =>
-              entry.zone === undefined ? null : (
-                <Badge key={entry.assignment.id} tone="action">
-                  {entry.zone.name}
-                </Badge>
-              ),
-            )}
-          </>
-        }
-      />
+          </div>
+        </div>
+      </header>
 
       {withdrawal === undefined ? null : (
         <Callout
           tone="danger"
-          title={`Under withdrawal for ${withdrawal.daysRemaining} more day${withdrawal.daysRemaining === 1 ? "" : "s"}`}
+          title={`Withdrawal — not clear for sale or slaughter until ${withdrawal.clearsOn.toLocaleDateString(
+            undefined,
+            { day: "numeric", month: "long", year: "numeric" },
+          )}`}
         >
-          {withdrawal.product === undefined
-            ? "Not clear for sale or slaughter until "
-            : `${withdrawal.product}. Not clear for sale or slaughter until `}
-          {withdrawal.clearsOn.toLocaleDateString(undefined, {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          })}
-          .
+          {withdrawal.product === undefined ? "" : `${withdrawal.product} · `}
+          {withdrawal.daysRemaining} more day{withdrawal.daysRemaining === 1 ? "" : "s"}
         </Callout>
       )}
-
-      <StatRow>
-        <Tile label="Tag" value={animal.tagNumber ?? "—"} />
-        <Tile
-          label="Age"
-          value={months === undefined ? "—" : `${Math.floor(months / 12)}y ${months % 12}m`}
-          hint={animal.dobIsEstimate ? "Date of birth is an estimate" : undefined}
-        />
-        <Tile label="Sex" value={animal.sex} />
-        <Tile
-          label="Where"
-          value={outside?.zone?.name ?? inside?.zone?.name ?? "Unassigned"}
-          {...(outside !== undefined && inside !== undefined
-            ? { hint: `and ${inside.zone?.name ?? "inside"}` }
-            : {})}
-        />
-      </StatRow>
 
       <AnimalTabs
         animal={animal}
@@ -283,28 +305,33 @@ export function AnimalScreen({
   );
 }
 
+/**
+ * §7's profile views, four on the strip and the rest one tap further.
+ *
+ * Eleven tabs was a strip that scrolled sideways on a phone with the one you
+ * wanted off the edge. The four on the strip are the ones reached for in a
+ * working week; pedigree, papers, genetics, finance and photos are reached for
+ * when somebody is selling or registering her, and they live behind More with
+ * their own row of chips. Nothing went: every view is still two taps at most.
+ */
 const TABS = [
   { id: "overview", label: "Overview" },
-  { id: "registrations", label: "Registrations" },
-  { id: "genetics", label: "Genetics" },
-  { id: "pedigree", label: "Pedigree" },
-  { id: "breeding", label: "Breeding" },
   { id: "health", label: "Health" },
   { id: "weights", label: "Weights" },
-  { id: "feeding", label: "Feeding" },
+  { id: "breeding", label: "Breeding" },
+  { id: "more", label: "More" },
+] as const;
+
+const MORE = [
+  { id: "pedigree", label: "Pedigree" },
+  { id: "papers", label: "Papers" },
+  { id: "genetics", label: "Genetics" },
   { id: "finance", label: "Finance" },
   { id: "photos", label: "Photos" },
 ] as const;
 
-/**
- * §7's profile tabs: overview · pedigree · breeding · health · weights ·
- * feeding · finance · photos, plus registrations, which §5.2 asks for and
- * which is the first thing anybody wants off a papered animal.
- *
- * The unbuilt ones say so rather than rendering an empty card — somebody
- * looking at a blank panel cannot tell whether this cow has no health records
- * or whether the screen broke.
- */
+type MoreView = (typeof MORE)[number]["id"];
+
 function AnimalTabs({
   animal,
   profile,
@@ -325,158 +352,202 @@ function AnimalTabs({
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
 }) {
+  const [more, setMore] = useState<MoreView>("pedigree");
+
+  function moreView(view: MoreView): ReactNode {
+    if (view === "pedigree") {
+      return (
+        <Pedigree animal={animal} profile={profile} propertyId={propertyId} actorId={actorId} />
+      );
+    }
+    if (view === "papers") {
+      return (
+        <div className="flex flex-col gap-density">
+          <Registrations
+            animal={animal}
+            profile={profile}
+            propertyId={propertyId}
+            actorId={actorId}
+          />
+          {/* The papers and what it is are the same conversation (#15). */}
+          <BreedField
+            animal={animal}
+            profile={profile}
+            profiles={profiles}
+            propertyId={propertyId}
+            actorId={actorId}
+          />
+          <BreedComposition
+            animal={animal}
+            profile={profile}
+            propertyId={propertyId}
+            actorId={actorId}
+          />
+        </div>
+      );
+    }
+    if (view === "genetics") {
+      return (
+        <GeneticsPanel
+          profile={profile}
+          animalId={animal.id}
+          profiles={profiles}
+          outsiders={outsiders}
+          propertyId={propertyId}
+          actorId={actorId}
+        />
+      );
+    }
+    if (view === "finance") return <FinanceTab animal={animal} propertyId={propertyId} />;
+    return (
+      <PhotoPanel
+        propertyId={propertyId}
+        actorId={actorId}
+        ownerEntity="Animal"
+        ownerId={animal.id}
+        recordName={animalTitle(animal)}
+      />
+    );
+  }
+
   return (
     <Tabs label="Animal profile" tabs={[...TABS]}>
       {(active) => {
-        if (active === "overview")
-          return <Overview animal={animal} profile={profile} zone={zone} breeding={breeding} />;
-        if (active === "registrations") {
+        if (active === "overview") {
           return (
-            <>
-              <Registrations
-                animal={animal}
-                profile={profile}
-                propertyId={propertyId}
-                actorId={actorId}
-              />
-              {/* The papers and what it is are the same conversation (#15). */}
-              <BreedField
-                animal={animal}
-                profile={profile}
-                profiles={profiles}
-                propertyId={propertyId}
-                actorId={actorId}
-              />
-              <BreedComposition
-                animal={animal}
-                profile={profile}
-                propertyId={propertyId}
-                actorId={actorId}
-              />
-            </>
-          );
-        }
-        if (active === "genetics") {
-          return (
-            <GeneticsPanel
+            <Overview
+              animal={animal}
               profile={profile}
-              animalId={animal.id}
-              profiles={profiles}
-              outsiders={outsiders}
+              zone={zone}
+              breeding={breeding}
               propertyId={propertyId}
               actorId={actorId}
             />
           );
         }
-        if (active === "pedigree") {
-          return (
-            <Pedigree animal={animal} profile={profile} propertyId={propertyId} actorId={actorId} />
-          );
-        }
-        if (active === "breeding") return <BreedingTab animal={animal} propertyId={propertyId} />;
         if (active === "health") return <HealthTab animal={animal} propertyId={propertyId} />;
         if (active === "weights") return <WeightsTab animal={animal} propertyId={propertyId} />;
-        if (active === "finance") return <FinanceTab animal={animal} propertyId={propertyId} />;
-        if (active === "photos") {
-          return (
-            <PhotoPanel
-              propertyId={propertyId}
-              actorId={actorId}
-              ownerEntity="Animal"
-              ownerId={animal.id}
-              recordName={animalTitle(animal)}
-            />
-          );
-        }
+        if (active === "breeding") return <BreedingTab animal={animal} propertyId={propertyId} />;
 
-        const tab = TABS.find((entry) => entry.id === active);
-        return <Pending what={tab?.label ?? "This"} />;
+        return (
+          <div className="flex flex-col gap-density">
+            <ChipRow label="More about this animal">
+              {MORE.map((entry) => (
+                <Chip key={entry.id} on={more === entry.id} onClick={() => setMore(entry.id)}>
+                  {entry.label}
+                </Chip>
+              ))}
+            </ChipRow>
+            {moreView(more)}
+          </div>
+        );
       }}
     </Tabs>
   );
 }
 
+/**
+ * What anyone needs before they open her gate, then what she looks like.
+ *
+ * Handling leads because it is the part of this page that keeps people safe.
+ * Name, tag and sex are not repeated here — the header already says them —
+ * and an empty field is left out rather than drawn as a dash, so what is on
+ * screen is only what somebody has actually said.
+ */
 function Overview({
   animal,
   profile,
   zone,
   breeding,
+  propertyId,
+  actorId,
 }: {
   readonly animal: Animal;
   readonly profile: CattleProfile | undefined;
   readonly zone: Zone | undefined;
   readonly breeding: ResolvedComposition;
+  readonly propertyId: Ulid;
+  readonly actorId: Ulid;
 }) {
-  return (
-    <div className="flex flex-col gap-density pt-density">
-      <Section title="Identity">
-        <DetailList
-          items={[
-            { label: "Name", value: animal.name },
-            { label: "Tag number", value: animal.tagNumber },
-            { label: "Sex", value: animal.sex },
-            {
-              label: "Date of birth",
-              value:
-                animal.dob === undefined
-                  ? undefined
-                  : `${animal.dob.toLocaleDateString()}${animal.dobIsEstimate ? " (estimated)" : ""}`,
-            },
-            { label: "Status", value: animal.status },
-            { label: "Ownership", value: animal.ownership === "own" ? "Ours" : "Client" },
-          ]}
-        />
-      </Section>
+  const [editing, setEditing] = useState(false);
 
-      <Section title="Description">
-        <DetailList
-          items={[
-            {
-              label: "Breed composition",
-              value:
-                breeding.composition.length === 0
-                  ? undefined
-                  : describeComposition(breeding.composition),
-            },
-            {
-              // Said out loud, because "79.57% Maine, off the AMAA papers" and
-              // "roughly three-quarters Maine, worked out from her parents"
-              // are different claims, and the first is the one a buyer checks.
-              label: "Where that comes from",
-              value: describeCompositionSource(breeding),
-              wide: true,
-            },
-            { label: "Horns", value: profile?.hornStatus },
-            { label: "Color", value: profile?.colour },
-            { label: "Markings", value: profile?.markings, wide: true },
-          ]}
-        />
+  const handling = [
+    { label: "Why", value: animal.safetyNotes },
+    { label: "Care instructions", value: animal.customInstructions },
+    { label: "Pen instructions", value: zone?.customInstructions },
+  ].filter((item) => item.value !== undefined && item.value !== "");
+
+  const details = [
+    {
+      label: "Date of birth",
+      value:
+        animal.dob === undefined
+          ? undefined
+          : `${animal.dob.toLocaleDateString()}${animal.dobIsEstimate ? " (estimated)" : ""}`,
+    },
+    { label: "Status", value: animal.status },
+    { label: "Ownership", value: animal.ownership === "own" ? "Ours" : "Client" },
+    {
+      label: "Breed",
+      value:
+        breeding.composition.length === 0 ? undefined : (
+          <span className="flex flex-col gap-0.5">
+            <span>{describeComposition(breeding.composition)}</span>
+            {/* Said out loud, because "79.57% Maine, off the AMAA papers" and
+                "roughly three-quarters Maine, worked out from her parents"
+                are different claims, and the first is the one a buyer checks. */}
+            <span className="text-sm text-muted">{describeCompositionSource(breeding)}</span>
+          </span>
+        ),
+    },
+    { label: "Papers", value: profile !== undefined && isPapered(profile) ? "Papered" : "None" },
+    { label: "Horns", value: profile?.hornStatus },
+    { label: "Color", value: profile?.colour },
+    { label: "Markings", value: profile?.markings, wide: true },
+    { label: "Notes", value: animal.notes, wide: true },
+  ].filter((item) => item.value !== undefined && item.value !== "");
+
+  return (
+    <div className="flex flex-col gap-density">
+      <Section title="Handling">
+        <div className="flex flex-col gap-3">
+          <SafetyBadge level={animal.safetyLevel} />
+          {handling.length === 0 ? null : <DetailList columns={1} items={handling} />}
+        </div>
       </Section>
 
       <Section
-        title="Handling"
-        description="What anyone working around this animal needs to know before they open a gate."
+        title="Details"
+        actions={
+          <Button variant="ghost" aria-haspopup="dialog" onClick={() => setEditing(true)}>
+            Edit description
+          </Button>
+        }
       >
-        <DetailList
-          columns={1}
-          items={[
-            {
-              label: "Safety level",
-              value: <SafetyBadge level={animal.safetyLevel} />,
-            },
-            { label: "Why", value: animal.safetyNotes, wide: true },
-            { label: "Care instructions", value: animal.customInstructions, wide: true },
-            { label: "Pen instructions", value: zone?.customInstructions, wide: true },
-            { label: "Notes", value: animal.notes, wide: true },
-          ]}
-        />
+        <DetailList items={details} />
       </Section>
+
+      {editing ? (
+        <Description
+          // Keyed on the profile so the form remounts when one arrives. Its
+          // fields seed from `profile` at mount, and the profile is read from
+          // the local store a tick after the animal is — without this the
+          // description would seed from nothing and then quietly save a
+          // blank over what was there.
+          key={profile?.id ?? "new"}
+          animal={animal}
+          profile={profile}
+          propertyId={propertyId}
+          actorId={actorId}
+          onClose={() => setEditing(false)}
+        />
+      ) : null}
     </div>
   );
 }
 
 /**
- * The papers, and what she looks like (spec §5.2, issue #15).
+ * The papers (spec §5.2, issue #15).
  *
  * An animal can be registered in several associations at once, which is
  * ordinary for show cattle, so this is a list rather than a pair of fields.
@@ -487,7 +558,8 @@ function Overview({
  * transposed digit in a registration number is the single likeliest mistake
  * on this screen, and making the fix go through a delete confirmation that
  * warns about phone calls to the association trains people to click past the
- * warning that matters (§4.5 clause 3).
+ * warning that matters (§4.5 clause 3). The form is a side panel, so opening
+ * it never pushes the list down the page.
  */
 function Registrations({
   animal,
@@ -510,6 +582,8 @@ function Registrations({
   const { show } = useToast();
   const confirmDelete = useConfirmDelete();
 
+  /** Whether the panel is open. */
+  const [open, setOpen] = useState(false);
   const [association, setAssociation] = useState<Association>("Maine-Anjou");
   const [regNumber, setRegNumber] = useState("");
   const [registeredName, setRegisteredName] = useState("");
@@ -523,12 +597,18 @@ function Registrations({
   const keyOf = (entry: Registration) => `${entry.association}:${entry.regNumber}`;
 
   function reset() {
+    setOpen(false);
     setEditingKey(undefined);
     setAssociation("Maine-Anjou");
     setRegNumber("");
     setRegisteredName("");
     setTattoo("");
     setError(undefined);
+  }
+
+  function startAdd() {
+    reset();
+    setOpen(true);
   }
 
   function startEdit(entry: Registration) {
@@ -538,6 +618,7 @@ function Registrations({
     setRegisteredName(entry.registeredName ?? "");
     setTattoo(entry.tattoo ?? "");
     setError(undefined);
+    setOpen(true);
   }
 
   async function submit(event: React.FormEvent) {
@@ -632,56 +713,94 @@ function Registrations({
     });
     if (!confirmed) return;
 
-    if (keyOf(entry) === editingKey) reset();
     await profiles.update(profile.id, {
       registrations: registrations.filter((existing) => keyOf(existing) !== keyOf(entry)),
     } as Partial<CattleProfile>);
     show({ message: "Registration removed", tone: "danger" });
   }
 
-  return (
-    <div className="flex flex-col gap-density pt-density">
-      <Section
-        title="Registrations"
-        description="§12 decision 1: the associations expose nothing programmatically, so these are entered by hand."
-      >
-        {registrations.length === 0 ? (
-          <EmptyState
-            title="No papers recorded"
-            detail="Add an association and number below. An animal can be registered in more than one."
-          />
-        ) : (
-          <div className="flex flex-col gap-3">
-            {registrations.map((entry) => (
-              <Card key={keyOf(entry)}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <DetailList
-                    columns={3}
-                    items={[
-                      { label: "Association", value: entry.association },
-                      { label: "Number", value: entry.regNumber },
-                      { label: "Registered name", value: entry.registeredName },
-                      { label: "Tattoo", value: entry.tattoo },
-                    ]}
-                  />
-                  <span className="flex gap-2">
-                    <Button variant="ghost" onClick={() => startEdit(entry)}>
-                      Edit
-                    </Button>
-                    <Button variant="ghost" onClick={() => void remove(entry)}>
-                      Remove
-                    </Button>
-                  </span>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </Section>
+  const editing = registrations.find((entry) => keyOf(entry) === editingKey);
+  const formId = useId();
 
-      <Section title={editingKey === undefined ? "Add a registration" : "Edit this registration"}>
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+  return (
+    <Section
+      title="Registrations"
+      // §12 decision 1: the associations expose nothing programmatically, so
+      // these are typed in by hand — which is why editing them is cheap.
+      description={registrations.length === 0 ? undefined : `${registrations.length} on file`}
+      actions={
+        <Button aria-haspopup="dialog" onClick={startAdd}>
+          <span aria-hidden="true">+</span> Add registration
+        </Button>
+      }
+    >
+      {registrations.length === 0 ? (
+        <p className="text-sm text-muted">No papers recorded.</p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
+          {registrations.map((entry) => (
+            <li key={keyOf(entry)} className="flex items-center gap-2 py-2 pl-4 pr-1">
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate font-semibold text-ink">
+                  {entry.association} <span className="gf-numeric">{entry.regNumber}</span>
+                </span>
+                {entry.registeredName === undefined && entry.tattoo === undefined ? null : (
+                  <span className="truncate text-sm text-muted">
+                    {[
+                      entry.registeredName,
+                      entry.tattoo === undefined ? undefined : `Tattoo ${entry.tattoo}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                )}
+              </span>
+              <Button
+                variant="ghost"
+                aria-haspopup="dialog"
+                aria-label={`Edit ${entry.association} ${entry.regNumber}`}
+                onClick={() => startEdit(entry)}
+              >
+                Edit
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {open ? (
+        <Modal
+          placement="side"
+          title={editingKey === undefined ? "Add a registration" : "Edit this registration"}
+          onClose={reset}
+          footer={
+            <>
+              <Button variant="primary" type="submit" form={formId} busy={busy}>
+                {editingKey === undefined ? "Add registration" : "Save registration"}
+              </Button>
+              <Button onClick={reset}>Cancel</Button>
+              {editing === undefined ? null : (
+                // The panel closes first, so the confirmation is the only
+                // dialog on screen rather than a second one stacked on this.
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    reset();
+                    void remove(editing);
+                  }}
+                >
+                  Remove
+                </Button>
+              )}
+            </>
+          }
+        >
+          <form
+            id={formId}
+            onSubmit={(event) => void submit(event)}
+            className="flex flex-col gap-density"
+          >
             <Select
               label="Association"
               value={association}
@@ -698,7 +817,7 @@ function Registrations({
             />
             <TextInput
               label="Registered name"
-              hint="As it reads on the certificate, if that differs from the barn name."
+              hint="Only if it differs from the barn name."
               value={registeredName}
               onChange={(event) => setRegisteredName(event.target.value)}
             />
@@ -707,34 +826,10 @@ function Registrations({
               value={tattoo}
               onChange={(event) => setTattoo(event.target.value)}
             />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" busy={busy}>
-              {editingKey === undefined ? "Add registration" : "Save registration"}
-            </Button>
-            {editingKey === undefined ? null : (
-              <Button variant="ghost" onClick={reset}>
-                Cancel
-              </Button>
-            )}
-          </div>
-        </form>
-      </Section>
-
-      {/*
-        Keyed on the profile so the form remounts when one arrives. Its fields
-        seed from `profile` at mount, and the profile is read from the local
-        store a tick after the animal is — without this the description would
-        seed from nothing and then quietly save a blank over what was there.
-      */}
-      <Description
-        key={profile?.id ?? "new"}
-        animal={animal}
-        profile={profile}
-        propertyId={propertyId}
-        actorId={actorId}
-      />
-    </div>
+          </form>
+        </Modal>
+      ) : null}
+    </Section>
   );
 }
 
@@ -751,11 +846,13 @@ function Description({
   profile,
   propertyId,
   actorId,
+  onClose,
 }: {
   readonly animal: Animal;
   readonly profile: CattleProfile | undefined;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  readonly onClose: () => void;
 }) {
   const profiles = useMutations<CattleProfile>(
     "cattleProfiles",
@@ -771,6 +868,9 @@ function Description({
   const [markings, setMarkings] = useState(profile?.markings ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  // The save button sits in the panel's footer, outside the form, and names
+  // the form so Enter in a field and the button are the same submit.
+  const formId = useId();
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -806,32 +906,44 @@ function Description({
         return;
       }
       show({ message: "Description saved", tone: "success" });
+      onClose();
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Section
+    <Modal
+      placement="side"
       title="Description"
-      description="How you pick this one out of a pen of eleven that look the same."
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="primary" type="submit" form={formId} busy={busy}>
+            Save description
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+        </>
+      }
     >
-      <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-        <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
-          <Select
-            label="Horn status"
-            value={hornStatus}
-            placeholder="Not recorded"
-            onChange={(event) => setHornStatus(event.target.value as HornStatus | "")}
-            options={HORN_STATUSES.map((value) => ({ value, label: value }))}
-          />
-          <TextInput
-            label="Color"
-            hint="Black, red, roan, black baldy — whatever you would say on the phone."
-            value={colour}
-            onChange={(event) => setColour(event.target.value)}
-          />
-        </div>
+      <form
+        id={formId}
+        onSubmit={(event) => void submit(event)}
+        className="flex flex-col gap-density"
+      >
+        <Select
+          label="Horn status"
+          value={hornStatus}
+          placeholder="Not recorded"
+          onChange={(event) => setHornStatus(event.target.value as HornStatus | "")}
+          options={HORN_STATUSES.map((value) => ({ value, label: value }))}
+        />
+        <TextInput
+          label="Color"
+          hint="Black, red, roan, black baldy."
+          value={colour}
+          onChange={(event) => setColour(event.target.value)}
+        />
         <TextArea
           label="Markings"
           rows={3}
@@ -845,30 +957,7 @@ function Description({
             {error}
           </p>
         )}
-
-        <div>
-          <Button type="submit" busy={busy}>
-            Save description
-          </Button>
-        </div>
       </form>
-    </Section>
-  );
-}
-
-/**
- * A tab that is not built yet, saying so.
- *
- * Better than an empty card: somebody looking at a blank panel cannot tell
- * whether this animal has no health records or whether the screen failed.
- */
-function Pending({ what }: { readonly what: string }) {
-  return (
-    <div className="pt-density">
-      <EmptyState
-        title={`${what} is not built yet`}
-        detail={`The records behind ${what.toLowerCase()} exist in the cattle module and are tested; this tab is where they will be shown.`}
-      />
-    </div>
+    </Modal>
   );
 }

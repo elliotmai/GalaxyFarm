@@ -117,12 +117,16 @@ function view() {
 
 const named = (label: string) => new RegExp(`^${label}\\b`);
 
+/** The form is a side panel, opened from the header. */
+async function openForm(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getAllByRole("button", { name: "Record a breeding" })[0] as HTMLElement);
+}
+
 /**
  * Pick a row out of a type-to-filter picker by typing at it.
  *
- * The last one under that label, deliberately: the pairing planner sits above
- * the form with a Dam and a Sire of its own, and the form is the one being
- * tested.
+ * The last one under that label, so a second picker of the same name
+ * elsewhere on the screen can never be the one typed into.
  */
 async function pick(user: ReturnType<typeof userEvent.setup>, label: string, typed: string) {
   const boxes = screen.getAllByRole("combobox", { name: named(label) });
@@ -135,6 +139,7 @@ async function pick(user: ReturnType<typeof userEvent.setup>, label: string, typ
 async function recordBreeding(typed: string, option: RegExp) {
   const user = userEvent.setup();
   view();
+  await openForm(user);
 
   const dams = await pick(user, "Dam", "Andromeda");
   await user.click(within(dams).getByRole("option", { name: /Andromeda/ }));
@@ -183,6 +188,7 @@ describe("Recording an AI breeding", () => {
   it("offers the tank, with what is in it", async () => {
     const user = userEvent.setup();
     view();
+    await openForm(user);
 
     const list = await pick(user, "Sire", "Montego");
     expect(within(list).getByRole("option", { name: /ZNT Montego Bay/ }).textContent).toContain(
@@ -268,5 +274,42 @@ describe("The breeding log", () => {
     expect(within(log).getByText("ZNT Bandwagon")).toBeTruthy();
     expect(within(log).getByText("ZNT Montego Bay")).toBeTruthy();
     expect(within(log).getByText("straw")).toBeTruthy();
+  });
+});
+
+describe("A preg check", () => {
+  it("is entered in a panel and saved onto the service", async () => {
+    // It used to unfold two selects inside the table row, which widened the
+    // row it was in. The write is the same either way.
+    const user = userEvent.setup();
+    stored.current = {
+      ...stored.current,
+      breedingRecords: [
+        {
+          id: "01ARZ3NDEKTSV4RRFFQ69G5B01" as Ulid,
+          propertyId: PROPERTY,
+          createdAt: new Date("2026-02-14"),
+          updatedAt: new Date("2026-02-14"),
+          damId: ANDROMEDA.id,
+          method: "AI",
+          sireName: "ZNT Bandwagon",
+          date: new Date("2026-02-14"),
+        },
+      ],
+    };
+    view();
+
+    await user.click(screen.getAllByRole("button", { name: "Preg check" })[0] as HTMLElement);
+    const panel = screen.getByRole("dialog");
+    await user.selectOptions(within(panel).getByLabelText(/^Result/), "open");
+    await user.click(within(panel).getByRole("button", { name: "Save" }));
+
+    expect(saved.updated).toContainEqual(
+      expect.objectContaining({
+        store: "breedingRecords",
+        patch: { pregCheck: expect.objectContaining({ result: "open", method: "ultrasound" }) },
+      }),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

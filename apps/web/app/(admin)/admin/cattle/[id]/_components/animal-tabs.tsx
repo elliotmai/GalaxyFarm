@@ -1,27 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 import {
   Button,
-  Callout,
-  Card,
-  DataTable,
-  DetailList,
   EmptyState,
   Meter,
+  Modal,
   PedigreeChart,
   Pill,
   SearchSelect,
   Section,
+  StatRow,
   TagInput,
   TextInput,
+  Tile,
   useConfirmDelete,
   useToast,
   type Ancestor,
-  type Column,
   type SearchOption,
+  type Tone,
 } from "@galaxy-farm/ui";
 import { displayName, formatMoney, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -34,7 +34,6 @@ import {
   calvingInterval,
   cattleProfileSchema,
   daysBred,
-  describeComposition,
   healthHistoryFor,
   inferAncestorSexes,
   isUnderWithdrawal,
@@ -68,17 +67,23 @@ import {
   type WeightRecord,
 } from "@galaxy-farm/module-cattle";
 
+import { facts, Row, Rows } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
 import { useMutations } from "@/lib/local/mutations";
 import { usePedigreeSource } from "@/lib/pedigree-source";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
- * The per-animal tabs §7 asks for (issues #15, #16, #20).
+ * The per-animal views §7 asks for (issues #15, #16, #20).
  *
  * Each is a view over records that live elsewhere — nothing here is a second
- * store. The health tab reads the same `healthRecords` the health screen
+ * store. The health view reads the same `healthRecords` the health screen
  * writes, so a treatment logged in a chute is on her page before anybody
  * navigates.
+ *
+ * Records are rows (`record-rows.tsx`), the herd list's anatomy: what happened
+ * in bold, one muted line of facts, at most one chip. They used to be a card
+ * per record holding a grid of six labelled pairs, which on a phone is a
+ * screen per breeding.
  *
  * Split out of `animal-screen.tsx` because that file had grown past the point
  * where the page's own structure was visible in it.
@@ -94,19 +99,25 @@ function lb(value: number | undefined): string {
   return value === undefined ? "—" : `${Math.round(value)} lb`;
 }
 
+/** A link styled as a secondary button, for "go and record it over there". */
+function ActionLink({ href, children }: { readonly href: string; readonly children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex min-h-target items-center rounded-density border border-edge bg-panel px-4 text-density font-medium text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+    >
+      {children}
+    </Link>
+  );
+}
+
 /* ------------------------------------------------------------------ breeds */
 
 /**
- * The breed-composition editor (issue #15).
+ * The breed, in words (issue #15).
  *
- * Percentages, not fractions: "½ Maine ¼ Chi ¼ Shorthorn" is written 50/25/25
- * on every paper this farm will handle, and a three-way split with a third in
- * it has no exact fractional form anyway.
- *
- * The running total is shown while editing rather than only on save. A
- * composition that does not reach 100 is refused by the schema — an animal
- * recorded as 50% Maine and nothing else means the other half was *forgotten*,
- * not that it is unknown, and it would misstate a percentage on a sale sheet.
+ * More than one, because a crossbred animal is more than one — and separate
+ * from the percentages, which come off the papers.
  */
 export function BreedField({
   animal,
@@ -155,10 +166,7 @@ export function BreedField({
   }
 
   return (
-    <Section
-      title="Breed"
-      description="What this one is, in words. More than one, because a crossbred animal is more than one — and separate from the percentages below, which come off the papers."
-    >
+    <Section title="Breed">
       <TagInput
         label="Breed"
         value={named.length > 0 ? named : derived}
@@ -171,14 +179,26 @@ export function BreedField({
         suggestions={[...breedsInUse(profiles), ...BREEDS]}
         hint={
           named.length === 0 && derived.length > 0
-            ? "Worked out from the percentages below. Edit it and what you type is kept instead."
-            : "Kept as typed. Leave it empty to go back to whatever the percentages say."
+            ? "From the percentages below. Type to override."
+            : "Leave empty to use the percentages."
         }
       />
     </Section>
   );
 }
 
+/**
+ * The breed-composition editor (issue #15).
+ *
+ * Percentages, not fractions: "½ Maine ¼ Chi ¼ Shorthorn" is written 50/25/25
+ * on every paper this farm will handle, and a three-way split with a third in
+ * it has no exact fractional form anyway.
+ *
+ * The running total is shown while editing rather than only on save. A
+ * composition that does not reach 100 is refused by the schema — an animal
+ * recorded as 50% Maine and nothing else means the other half was *forgotten*,
+ * not that it is unknown, and it would misstate a percentage on a sale sheet.
+ */
 export function BreedComposition({
   animal,
   profile,
@@ -254,59 +274,65 @@ export function BreedComposition({
   return (
     <Section
       title="Breed composition"
-      description="Percentages as they are written on the papers. It has to add to 100 — a partial composition means half was forgotten, not that it is unknown."
-    >
-      {shares.length === 0 ? (
-        <EmptyState
-          title="No composition recorded"
-          detail="Plenty of commercial cattle arrive with nobody's idea of what they are. Add the shares you know."
-        />
-      ) : (
-        <div className="flex flex-col gap-3">
-          <p className="text-density text-ink">{describeComposition(shares)}</p>
-          {shares.map((share) => (
-            <div key={`${share.breed}-${share.percent}`} className="flex flex-col gap-1">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-density text-ink">{share.breed}</span>
-                <span className="flex items-center gap-2">
-                  <Pill tone="identity">{share.percent}%</Pill>
-                  <Button variant="ghost" onClick={() => void drop(share)}>
-                    Remove
-                  </Button>
-                </span>
-              </div>
-              <Meter value={share.percent / 100} tone="identity" />
-            </div>
-          ))}
-
-          <p
-            className={`text-sm ${complete ? "text-calm" : "text-danger"}`}
+      // The total is the fact this section exists to say, so it sits where a
+      // subtitle would and turns red the moment it stops being 100.
+      description={
+        shares.length === 0 ? (
+          "As written on the papers."
+        ) : (
+          <span
+            className={complete ? "text-calm" : "text-danger"}
             role={complete ? undefined : "alert"}
           >
-            {complete
-              ? "Adds to 100%."
-              : `Adds to ${total}% — this will not save until it reaches 100.`}
-          </p>
+            {complete ? "Adds to 100%" : `Adds to ${total}% — will not save until 100`}
+          </span>
+        )
+      }
+    >
+      {shares.length === 0 ? null : (
+        <div className="flex flex-col gap-3">
+          {shares.map((share) => (
+            <div key={`${share.breed}-${share.percent}`} className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <Meter
+                  value={share.percent / 100}
+                  tone="identity"
+                  label={share.breed}
+                  detail={`${share.percent}%`}
+                />
+              </div>
+              <button
+                type="button"
+                aria-label={`Remove ${share.breed}`}
+                onClick={() => void drop(share)}
+                className="inline-flex min-h-target min-w-target shrink-0 items-center justify-center rounded-full text-muted hover:bg-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-action"
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
-      <form onSubmit={(event) => void add(event)} className="flex flex-wrap items-end gap-3">
-        <div className="min-w-0 flex-1">
+      <form onSubmit={(event) => void add(event)} className="flex flex-wrap items-end gap-2">
+        <div className="min-w-0 flex-1 basis-40">
           <TextInput
             label="Breed"
             value={breed}
             onChange={(event) => setBreed(event.target.value)}
           />
         </div>
-        <TextInput
-          label="Percent"
-          type="number"
-          inputMode="decimal"
-          value={percent}
-          onChange={(event) => setPercent(event.target.value)}
-        />
+        <div className="w-24">
+          <TextInput
+            label="Percent"
+            type="number"
+            inputMode="decimal"
+            value={percent}
+            onChange={(event) => setPercent(event.target.value)}
+          />
+        </div>
         <Button type="submit" busy={busy}>
-          Add breed
+          Add
         </Button>
       </form>
     </Section>
@@ -345,6 +371,7 @@ export function Pedigree({
   const { records: profiles } = useRecords<CattleProfile>("cattleProfiles", query);
   const { records: outsiders } = useRecords<ExternalAnimal>("externalAnimals", query);
   const [generations, setGenerations] = useState(4);
+  const [editing, setEditing] = useState(false);
 
   const source = usePedigreeSource({ animals, profiles, outsiders });
   const self: ParentRef = { kind: "animal", id: animal.id };
@@ -356,63 +383,99 @@ export function Pedigree({
   const repeats = repeatedAncestors(buildPedigree(self, source, MAX_PEDIGREE_GENERATIONS));
   const depth = pedigreeDepth(buildPedigree(self, source, MAX_PEDIGREE_GENERATIONS));
 
+  const editButton = (
+    <Button variant="ghost" aria-haspopup="dialog" onClick={() => setEditing(true)}>
+      Edit sire and dam
+    </Button>
+  );
+
   return (
     <div className="flex flex-col gap-density">
       <Section
         title="Pedigree"
-        description="As far back as the papers go. Ancestors that are not ours are held as external animals — a five-generation tree has thirty of them and this farm owns two."
+        description={
+          !hasParents || tree === undefined
+            ? undefined
+            : depth === 0
+              ? "No ancestors recorded"
+              : `Papers go back ${depth} generation${depth === 1 ? "" : "s"}`
+        }
         actions={
-          <span className="gf-no-print flex flex-wrap items-center gap-2">
-            {[3, 4, 5].map((n) => (
-              <Button
-                key={n}
-                variant={n === generations ? "primary" : "ghost"}
-                onClick={() => setGenerations(n)}
-              >
-                {n} gen
+          hasParents ? (
+            <span className="gf-no-print flex flex-wrap items-center gap-1">
+              {[3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  aria-pressed={n === generations}
+                  onClick={() => setGenerations(n)}
+                  className={[
+                    "inline-flex min-h-target items-center whitespace-nowrap rounded-full px-3 text-sm",
+                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action",
+                    n === generations
+                      ? "bg-action/15 font-semibold text-action"
+                      : "font-medium text-muted hover:bg-raised hover:text-ink",
+                  ].join(" ")}
+                >
+                  {n} gen
+                </button>
+              ))}
+              {/*
+                A pedigree is something you hand to a buyer (#16). The browser's
+                own print is the right mechanism — it already knows about paper
+                sizes and margins — so this triggers it and the print stylesheet
+                in the theme drops the navigation and the buttons.
+              */}
+              <Button variant="ghost" onClick={() => window.print()}>
+                Print
               </Button>
-            ))}
-            {/*
-              A pedigree is something you hand to a buyer (#16). The browser's
-              own print is the right mechanism — it already knows about paper
-              sizes and margins — so this triggers it and the print stylesheet
-              in the theme drops the navigation and the buttons.
-            */}
-            <Button variant="ghost" onClick={() => window.print()}>
-              Print
-            </Button>
-          </span>
+            </span>
+          ) : undefined
         }
       >
         {!hasParents || tree === undefined ? (
           <EmptyState
             title="No pedigree recorded"
-            detail="Set the sire and dam below, and everything above them follows from the ancestors already on file."
+            detail="Set the sire and dam, and everything above them follows from the ancestors on file."
+            action={
+              <Button variant="primary" aria-haspopup="dialog" onClick={() => setEditing(true)}>
+                Set sire and dam
+              </Button>
+            }
           />
         ) : (
           <div className="flex flex-col gap-density">
+            <Rows label="Parents">
+              <Row
+                title={tree.sire?.name ?? "Unknown"}
+                line={facts("Sire", tree.sire?.regNumber)}
+              />
+              <Row title={tree.dam?.name ?? "Unknown"} line={facts("Dam", tree.dam?.regNumber)} />
+            </Rows>
+            <div className="gf-no-print flex flex-wrap items-center justify-between gap-2">
+              {editButton}
+              <Link
+                href="/admin/cattle/ancestors"
+                className="inline-flex min-h-target items-center text-sm text-action underline-offset-2 hover:underline"
+              >
+                Manage ancestors
+              </Link>
+            </div>
+
+            {/* Line breeding is ordinary in show cattle — and it is also how a
+                mistyped registration number shows itself, so it gets a line. */}
+            {repeats.size === 0 ? null : (
+              <p className="text-sm text-identity">
+                {repeats.size} ancestor{repeats.size === 1 ? " appears" : "s appear"} more than once
+                — check the numbers.
+              </p>
+            )}
+
             <PedigreeChart
               root={toAncestor(tree, repeats)}
               generations={generations}
-              caption={
-                <>
-                  {depth === 0
-                    ? "No ancestors recorded."
-                    : `Papers go back ${depth} generation${depth === 1 ? "" : "s"}.`}{" "}
-                  Solid cells are ours; dashed ones are on paper only
-                  {repeats.size === 0 ? "" : ', and one marked "repeat" appears more than once'}.
-                </>
-              }
+              caption={<>Solid cells are ours; dashed are on paper only.</>}
             />
-
-            {repeats.size === 0 ? null : (
-              <Callout tone="identity" title="Line breeding in this pedigree">
-                {repeats.size} ancestor{repeats.size === 1 ? "" : "s"} appear
-                {repeats.size === 1 ? "s" : ""} more than once. That is ordinary in show cattle —
-                but it is also how a mistyped registration number shows itself, so it is worth a
-                look at the numbers.
-              </Callout>
-            )}
 
             {/*
               The same tree as a nested list. Not a fallback nobody sees: it is
@@ -420,7 +483,7 @@ export function Pedigree({
               the chart is cut off by a page break, and what somebody checks a
               registration number against.
             */}
-            <details className="rounded-density border border-edge bg-panel p-density">
+            <details className="rounded-density border border-rule bg-panel p-density">
               <summary className="cursor-pointer text-density font-medium text-ink">
                 Read it as a list
               </summary>
@@ -432,16 +495,19 @@ export function Pedigree({
         )}
       </Section>
 
-      <Parents
-        animal={animal}
-        profile={profile}
-        profiles={profiles}
-        animals={animals}
-        outsiders={outsiders}
-        source={source}
-        propertyId={propertyId}
-        actorId={actorId}
-      />
+      {editing ? (
+        <Parents
+          animal={animal}
+          profile={profile}
+          profiles={profiles}
+          animals={animals}
+          outsiders={outsiders}
+          source={source}
+          propertyId={propertyId}
+          actorId={actorId}
+          onClose={() => setEditing(false)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -461,7 +527,7 @@ function toAncestor(node: PedigreeNode, repeats: ReadonlyMap<string, number>): A
 }
 
 /**
- * Setting a sire and a dam (issue #16).
+ * Setting a sire and a dam (issue #16), in a side panel.
  *
  * Either parent can be one of ours or a name off a certificate, which is why
  * both dropdowns list the herd and the ancestors together rather than making
@@ -478,6 +544,7 @@ function Parents({
   source,
   propertyId,
   actorId,
+  onClose,
 }: {
   readonly animal: Animal;
   readonly profile: CattleProfile | undefined;
@@ -487,6 +554,7 @@ function Parents({
   readonly source: PedigreeSource;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  readonly onClose: () => void;
 }) {
   const api = useMutations<CattleProfile>(
     "cattleProfiles",
@@ -496,6 +564,7 @@ function Parents({
     actorId,
   );
   const { show } = useToast();
+  const formId = useId();
 
   const refKey = (ref: ParentRef | undefined) => (ref === undefined ? "" : `${ref.kind}:${ref.id}`);
   const [sire, setSire] = useState(refKey(profile?.sire));
@@ -592,59 +661,57 @@ function Parents({
         return;
       }
       show({ message: "Parents saved", tone: "success" });
+      onClose();
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Section
+    <Modal
+      placement="side"
       title="Sire and dam"
-      description="Either can be one of ours or a name off a certificate. Everything above them is already on file."
-      actions={
-        <Link
-          href="/admin/cattle/ancestors"
-          className="text-sm text-action underline underline-offset-2"
-        >
-          Manage ancestors
-        </Link>
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="primary" type="submit" form={formId} busy={busy}>
+            Save parents
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+        </>
       }
     >
-      <form onSubmit={(event) => void save(event)} className="flex flex-col gap-density">
-        <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
-          <SearchSelect
-            label="Sire"
-            hint="Bulls only. Type any part of a name or a registration number."
-            value={sire}
-            placeholder="Unknown"
-            clearLabel="Unknown"
-            options={options("male")}
-            onChange={setSire}
-          />
-          <SearchSelect
-            label="Dam"
-            hint="Cows only."
-            value={dam}
-            placeholder="Unknown"
-            clearLabel="Unknown"
-            options={options("female")}
-            onChange={setDam}
-          />
-        </div>
+      <form
+        id={formId}
+        onSubmit={(event) => void save(event)}
+        className="flex flex-col gap-density"
+      >
+        <SearchSelect
+          label="Sire"
+          hint="Bulls only. Name or registration number."
+          value={sire}
+          placeholder="Unknown"
+          clearLabel="Unknown"
+          options={options("male")}
+          onChange={setSire}
+        />
+        <SearchSelect
+          label="Dam"
+          hint="Cows only."
+          value={dam}
+          placeholder="Unknown"
+          clearLabel="Unknown"
+          options={options("female")}
+          onChange={setDam}
+        />
 
         {error === undefined ? null : (
           <p role="alert" className="text-sm text-danger">
             {error}
           </p>
         )}
-
-        <div>
-          <Button type="submit" busy={busy}>
-            Save parents
-          </Button>
-        </div>
       </form>
-    </Section>
+    </Modal>
   );
 }
 
@@ -657,8 +724,10 @@ function PedigreeBranch({ node }: { readonly node: PedigreeNode }) {
     <ul className="flex flex-col gap-2 border-l border-edge pl-density">
       <li className="flex flex-wrap items-center gap-2">
         <span className="text-density font-medium text-ink">{node.name}</span>
-        {node.regNumber === undefined ? null : <Pill>{node.regNumber}</Pill>}
-        {node.ref.kind === "external" ? <Pill tone="neutral">outside</Pill> : null}
+        {node.regNumber === undefined ? null : (
+          <span className="gf-numeric text-sm text-muted">{node.regNumber}</span>
+        )}
+        {node.ref.kind === "external" ? <span className="text-sm text-muted">outside</span> : null}
       </li>
       {parents.length === 0 ? null : (
         <li>
@@ -672,6 +741,9 @@ function PedigreeBranch({ node }: { readonly node: PedigreeNode }) {
 }
 
 /* --------------------------------------------------------------- breeding */
+
+/** The preg check, as the one chip a service row is allowed. */
+const CHECK_TONE: Record<string, Tone> = { bred: "calm", open: "danger", recheck: "action" };
 
 export function BreedingTab({
   animal,
@@ -691,71 +763,65 @@ export function BreedingTab({
   return (
     <div className="flex flex-col gap-density">
       <Section
-        title="Breeding"
-        description="Every service, and the dates that follow from it."
-        actions={
-          <Link
-            href={`/admin/cattle/breeding`}
-            className="text-sm text-action underline underline-offset-2"
-          >
-            Breeding screen
-          </Link>
-        }
+        title="Services"
+        description={hers.length === 0 ? undefined : `${hers.length} recorded`}
+        actions={<ActionLink href="/admin/cattle/breeding">Breeding screen</ActionLink>}
       >
         {hers.length === 0 ? (
-          <EmptyState title="Never bred" detail="Record a service on the breeding screen." />
+          <p className="text-sm text-muted">Never bred.</p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {hers.map((record) => (
-              <Card key={record.id}>
-                <DetailList
-                  columns={3}
-                  items={[
-                    { label: "Bred", value: formatDate(record.date) },
-                    { label: "Method", value: record.method },
-                    { label: "Due", value: formatDate(projectedDueDate(record)) },
-                    {
-                      label: "Day",
-                      value: daysBred(record, now) < 0 ? "—" : daysBred(record, now),
-                    },
-                    { label: "Check", value: record.pregCheck?.result ?? "not checked" },
-                    { label: "Notes", value: record.notes, wide: true },
-                  ]}
+          <Rows label="Services">
+            {hers.map((record) => {
+              const day = daysBred(record, now);
+              const result = record.pregCheck?.result;
+              return (
+                <Row
+                  key={record.id}
+                  title={`Bred ${formatDate(record.date)}`}
+                  line={facts(
+                    record.method,
+                    `due ${formatDate(projectedDueDate(record))}`,
+                    day >= 0 && `day ${day}`,
+                  )}
+                  notes={record.notes}
+                  chip={
+                    result === undefined ? (
+                      <Pill tone="neutral">Not checked</Pill>
+                    ) : (
+                      <Pill tone={CHECK_TONE[result] ?? "neutral"}>{capitalise(result)}</Pill>
+                    )
+                  }
                 />
-              </Card>
-            ))}
-          </div>
+              );
+            })}
+          </Rows>
         )}
       </Section>
 
       <Section
         title="Calvings"
-        description={
-          interval === undefined
-            ? "The calving history."
-            : `${interval} days between the last two — the number that says whether a yearly interval is holding.`
-        }
+        // The interval is the number that says whether a yearly calving is
+        // holding, so it is the fact beside the heading.
+        description={interval === undefined ? undefined : `${interval} days between the last two`}
       >
         {herCalvings.length === 0 ? (
-          <EmptyState title="Never calved" detail="Nothing recorded yet." />
+          <p className="text-sm text-muted">Never calved.</p>
         ) : (
-          <div className="flex flex-col gap-3">
+          <Rows label="Calvings">
             {herCalvings.map((record) => (
-              <Card key={record.id}>
-                <DetailList
-                  columns={3}
-                  items={[
-                    { label: "Calved", value: formatDate(record.date) },
-                    { label: "Ease", value: record.calvingEase },
-                    { label: "Vigour", value: record.vigour },
-                    { label: "Birth weight", value: lb(record.birthWeightLb) },
-                    { label: "Assisted", value: record.assisted ? "yes" : "no" },
-                    { label: "Notes", value: record.notes, wide: true },
-                  ]}
-                />
-              </Card>
+              <Row
+                key={record.id}
+                title={`Calved ${formatDate(record.date)}`}
+                line={facts(
+                  `ease ${record.calvingEase}`,
+                  `vigour ${record.vigour}`,
+                  record.birthWeightLb === undefined ? undefined : lb(record.birthWeightLb),
+                )}
+                notes={record.notes}
+                chip={record.assisted ? <Pill tone="action">Assisted</Pill> : undefined}
+              />
             ))}
-          </div>
+          </Rows>
         )}
       </Section>
     </div>
@@ -774,72 +840,52 @@ export function HealthTab({
   const { records } = useRecords<HealthRecord>("healthRecords", { propertyId });
   const now = new Date();
   const hers = healthHistoryFor(records, animal.id);
-  const held = hers.filter((record) => isUnderWithdrawal(record, now));
-
-  const columns: readonly Column<HealthRecord>[] = [
-    { key: "date", header: "Date", primary: true, render: (r) => formatDate(r.date) },
-    { key: "type", header: "Type", render: (r) => r.type },
-    { key: "product", header: "Product", render: (r) => r.product ?? "—" },
-    {
-      key: "withdrawal",
-      header: "Withdrawal",
-      render: (r) => {
-        const ends = withdrawalEndDate(r);
-        if (ends === undefined) return <span className="text-muted">None</span>;
-        return isUnderWithdrawal(r, now) ? (
-          <Pill tone="danger" dot>
-            until {formatDate(ends)}
-          </Pill>
-        ) : (
-          <Pill tone="calm">cleared</Pill>
-        );
-      },
-    },
-    { key: "by", header: "By", render: (r) => r.administeredBy ?? "—" },
-  ];
 
   return (
     <Section
-      title="Health"
-      description="Treatments, and the withdrawal each one starts."
+      title="Treatments"
+      description={hers.length === 0 ? undefined : `${hers.length} on file`}
       actions={
         // #17: two taps to a treatment. This link, then Record — the animal
         // arrives chosen, the date is today, and the product is the last one
         // used. A round of blackleg is forty calves and one bottle, and
         // re-picking that bottle forty times is forty chances to pick wrong.
-        <Link
-          href={`/admin/cattle/health?animal=${animal.id}`}
-          className="text-sm text-action underline underline-offset-2"
-        >
+        <ActionLink href={`/admin/cattle/health?animal=${animal.id}`}>
           Record a treatment
-        </Link>
+        </ActionLink>
       }
     >
-      {held.length === 0 ? null : (
-        <Card title="Not clear for sale">
-          <p className="text-density text-danger">
-            {displayName(animal)} is inside a withdrawal period until{" "}
-            {formatDate(
-              held
-                .map((record) => withdrawalEndDate(record) as Date)
-                .sort((a, b) => b.getTime() - a.getTime())[0],
-            )}
-            .
-          </p>
-        </Card>
+      {/* The withdrawal itself is the line above the tabs; here each record
+          says only whether it is the one still holding her. */}
+      {hers.length === 0 ? (
+        <p className="text-sm text-muted">No treatments on file.</p>
+      ) : (
+        <Rows label={`Health records for ${displayName(animal)}`}>
+          {hers.map((record) => {
+            const ends = withdrawalEndDate(record);
+            const held = ends !== undefined && isUnderWithdrawal(record, now);
+            return (
+              <Row
+                key={record.id}
+                title={record.product ?? capitalise(record.type)}
+                line={facts(
+                  formatDate(record.date),
+                  record.product === undefined ? undefined : record.type,
+                  record.administeredBy,
+                  ends !== undefined && !held && "withdrawal cleared",
+                )}
+                chip={
+                  held ? (
+                    <Pill tone="danger" dot>
+                      Until {formatDate(ends)}
+                    </Pill>
+                  ) : undefined
+                }
+              />
+            );
+          })}
+        </Rows>
       )}
-
-      <Card>
-        <DataTable
-          caption={`Health records for ${displayName(animal)}`}
-          columns={columns}
-          rows={hers}
-          rowKey={(record) => record.id}
-          empty={
-            <EmptyState title="Nothing recorded" detail="No treatments on file for this animal." />
-          }
-        />
-      </Card>
     </Section>
   );
 }
@@ -864,38 +910,38 @@ export function WeightsTab({
       ? undefined
       : unadjusted205DayWeight(birth, weaning);
   const heaviest = Math.max(...series.map((entry) => entry.weightLb), 1);
+  const latest = series[series.length - 1];
 
   return (
     <Section
       title="Weights"
-      description="Birth weights are the reliable ones. The 205-day figure is unadjusted — the age-of-dam and sex factors are not applied."
-      actions={
-        <Link
-          href="/admin/cattle/weights"
-          className="text-sm text-action underline underline-offset-2"
-        >
-          Weights screen
-        </Link>
+      description={
+        series.length === 0
+          ? undefined
+          : `${series.length} weighing${series.length === 1 ? "" : "s"}`
       }
+      actions={<ActionLink href="/admin/cattle/weights">Weights screen</ActionLink>}
     >
       {series.length === 0 ? (
-        <EmptyState title="Never weighed" detail="Record one on the weights screen." />
+        <p className="text-sm text-muted">Never weighed.</p>
       ) : (
         <div className="flex flex-col gap-density">
-          <DetailList
-            columns={3}
-            items={[
-              { label: "Birth", value: lb(birth?.weightLb) },
-              { label: "Weaning", value: lb(weaning?.weightLb) },
-              { label: "Latest", value: lb(series[series.length - 1]?.weightLb) },
-              { label: "Lifetime ADG", value: adg === undefined ? "—" : `${adg.toFixed(2)} lb/d` },
-              {
-                label: "205-day, unadjusted",
-                value: w205 === undefined ? "—" : lb(w205),
-              },
-              { label: "Weights taken", value: series.length },
-            ]}
-          />
+          <StatRow>
+            <Tile
+              label="Latest"
+              value={lb(latest?.weightLb)}
+              hint={latest === undefined ? undefined : formatDate(latest.date)}
+            />
+            <Tile label="Lifetime ADG" value={adg === undefined ? "—" : `${adg.toFixed(2)} lb/d`} />
+            <Tile label="Birth" value={lb(birth?.weightLb)} />
+            <Tile
+              label="Weaning"
+              value={lb(weaning?.weightLb)}
+              // Unadjusted: the age-of-dam and sex factors are not applied, and
+              // the label says so because the adjusted figure is the one quoted.
+              hint={w205 === undefined ? undefined : `205-day ${lb(w205)}, unadjusted`}
+            />
+          </StatRow>
 
           <div className="flex flex-col gap-2">
             {series.map((entry) => (
@@ -940,40 +986,37 @@ export function FinanceTab({
   return (
     <Section
       title="Finance"
-      description="What it cost and what it brought."
-      actions={
-        <Link
-          href="/admin/cattle/sales"
-          className="text-sm text-action underline underline-offset-2"
-        >
-          Sales screen
-        </Link>
-      }
+      actions={<ActionLink href="/admin/cattle/sales">Sales screen</ActionLink>}
     >
-      <DetailList
-        columns={3}
-        items={[
-          { label: "Acquisition", value: formatMoney(pl.acquisitionCost) },
-          { label: "Health", value: formatMoney(pl.healthCost) },
-          { label: "Feed", value: formatMoney(pl.feedCost) },
-          { label: "Breeding", value: formatMoney(pl.breedingCost) },
-          { label: "Total cost", value: formatMoney(pl.totalCost) },
-          { label: "Revenue", value: formatMoney(pl.totalRevenue) },
-        ]}
-      />
-
-      <Card title={pl.net.cents >= 0 ? "In front" : "Behind"}>
-        <p className="gf-figure text-ink">{formatMoney(pl.net)}</p>
-        {pl.complete ? null : (
+      <StatRow>
+        <Tile
+          label={pl.net.cents >= 0 ? "In front" : "Behind"}
+          value={formatMoney(pl.net)}
+          tone={pl.complete ? "neutral" : "action"}
           // Said plainly rather than shown as a clean number. A home-raised
           // calf with no feed allocation shows a flattering profit that is
           // arithmetically right and practically misleading.
-          <p className="pt-2 text-sm text-muted">
-            One or more cost lines has no figure behind it yet — usually feed, which is apportioned
-            in §5.3. Treat this as incomplete rather than as a profit.
-          </p>
-        )}
-      </Card>
+          hint={pl.complete ? undefined : "Incomplete — a cost line has no figure yet"}
+        />
+        <Tile label="Revenue" value={formatMoney(pl.totalRevenue)} />
+        <Tile label="Total cost" value={formatMoney(pl.totalCost)} />
+      </StatRow>
+
+      <Rows label="Costs">
+        <Row title="Acquisition" chip={<Money value={formatMoney(pl.acquisitionCost)} />} />
+        <Row title="Health" chip={<Money value={formatMoney(pl.healthCost)} />} />
+        {/* Usually the blank one: feed is apportioned in §5.3. */}
+        <Row title="Feed" chip={<Money value={formatMoney(pl.feedCost)} />} />
+        <Row title="Breeding" chip={<Money value={formatMoney(pl.breedingCost)} />} />
+      </Rows>
     </Section>
   );
+}
+
+function Money({ value }: { readonly value: string }) {
+  return <span className="gf-numeric text-ink">{value}</span>;
+}
+
+function capitalise(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

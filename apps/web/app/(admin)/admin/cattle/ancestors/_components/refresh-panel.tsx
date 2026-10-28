@@ -229,8 +229,7 @@ export function RefreshFromAssociation({
     <div className="flex flex-col gap-density">
       {papers.length === 0 ? (
         <Callout tone="action" title="No registration number on file">
-          There is nothing to look up. Add the association and the number first and this can go and
-          read the page.
+          Add the association and the number first.
         </Callout>
       ) : (
         <>
@@ -239,7 +238,7 @@ export function RefreshFromAssociation({
               label="Check against"
               hint={
                 papers.length > 1
-                  ? "This animal is papered twice. Each registry holds its own record, and they do not always agree."
+                  ? "Papered twice — the registries do not always agree."
                   : undefined
               }
               value={which}
@@ -266,9 +265,9 @@ export function RefreshFromAssociation({
             </div>
           </div>
 
-          <details className="rounded-density border border-edge p-density">
-            <summary className="cursor-pointer text-density font-medium text-ink">
-              Or paste the page — works when the site will not talk to our server
+          <details className="rounded-density border border-rule p-density">
+            <summary className="flex min-h-target cursor-pointer items-center text-density font-medium text-ink">
+              Or paste the page — when the site will not talk to our server
             </summary>
             <div className="flex flex-col gap-density pt-density">
               <TextArea
@@ -309,13 +308,12 @@ export function RefreshFromAssociation({
 
       {!chartMissing ? null : (
         <Callout tone="action" title="That page came back without its pedigree chart">
+          {/* Digital Beef loads the pedigree tab separately, so a fetch can
+              come back with the name and colour and no ancestors — and defect
+              results are only ever printed on the chart. */}
           <p>
-            Digital Beef renders the animal&apos;s details on the page and loads the pedigree tab
-            separately, so a fetch can come back with the name and the color and no ancestors at
-            all. <strong>Defect results only exist on the chart</strong> — they are printed beside
-            each ancestor, never on the animal&apos;s own page — so without it there are none to
-            read. Open the page in a browser and paste it below; a select-all copies what the tabs
-            loaded.
+            Defect results are only on the chart. Open the page, let the pedigree load, and paste it
+            below.
           </p>
           {url === undefined ? null : (
             <a
@@ -333,25 +331,21 @@ export function RefreshFromAssociation({
       {strangers.length === 0 ? null : (
         <Callout tone="action" title={`${strangers.length} on this chart are not on file`}>
           {strangers.slice(0, 6).join(", ")}
-          {strangers.length > 6 ? `, and ${strangers.length - 6} more` : ""}. A refresh does not add
-          animals — importing this page does, and it shows every one for approval and wires the
-          whole tree at once. Use &ldquo;Import from Digital Beef&rdquo; with this animal&apos;s
-          number.
+          {strangers.length > 6 ? `, and ${strangers.length - 6} more` : ""}. A check does not add
+          animals — import this animal&apos;s number to bring them in.
         </Callout>
       )}
 
       {changes === undefined ? null : changes.length === 0 && others.length === 0 ? (
         <Callout tone="calm" title="Nothing has changed">
-          Everything on the page matches what is on file. Worth knowing — it means the record has
-          not gone stale, which is not the same as nobody having looked.
+          The page matches what is on file.
         </Callout>
       ) : (
         <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted">
-            Blanks being filled in are ticked. A value being <em>changed</em> is not — what is on
-            file may have been corrected by hand, and a re-read of the page is not evidence against
-            that.
-          </p>
+          {/* A change is never pre-ticked: what is on file may have been
+              corrected by hand, and a re-read of the page is not evidence
+              against that. */}
+          <p className="text-sm text-muted">Blanks are ticked; changes are yours to tick.</p>
           {changes.map((change) => (
             <label
               key={change.field}
@@ -385,11 +379,9 @@ export function RefreshFromAssociation({
                 This page&apos;s pedigree also says something about {others.length} ancestor
                 {others.length === 1 ? "" : "s"} already on file.
               </p>
-              <p className="text-sm text-muted">
-                Digital Beef never prints an animal&apos;s own genetic tests on its own page — it
-                prints them beside it on the chart of everything descended from it. This is the only
-                place they can be read from.
-              </p>
+              {/* Digital Beef never prints an animal's own genetic tests on
+                  its own page, only beside it on its descendants' charts —
+                  this is the only place they can be read from. */}
               {others.map((entry) => (
                 <div key={entry.animal.id} className="flex flex-col gap-1 pt-2">
                   <span className="text-density font-medium text-ink">{entry.animal.name}</span>

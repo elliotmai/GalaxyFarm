@@ -581,34 +581,30 @@ export function RefreshAllAncestors({
     <div className="flex flex-col gap-density">
       {queue.length === 0 ? (
         <Callout tone="action" title="Nothing to check">
-          No ancestor on file has a registration number with one of the three associations, so there
-          is no page to look up.
+          No ancestor has a number with one of the three associations.
         </Callout>
       ) : (
         <>
+          {/* One page at a time: thirty at once is how a farm's address gets
+              blocked, and nobody is waiting on the difference. */}
           <p className="text-density text-ink">
-            {queue.length} of {animals.length} ancestors have a number this can look up. Each page
-            is fetched one at a time — thirty at once is how a farm&apos;s address gets blocked, and
-            nobody is waiting on the difference.
+            {queue.length} of {animals.length} ancestors have a number to look up.
           </p>
 
           {unreachable.length === 0 ? null : (
             <Callout tone="neutral" title={`${unreachable.length} have no page this can check`}>
-              <p>
-                Not a failure — there is simply nowhere to look. Anything with a link is on a site
-                this app cannot read; open it and fill the record in by hand.
-              </p>
+              <p>Anything with a link is on a site this cannot read — fill it in by hand.</p>
               <PageLinks entries={unreachable} />
             </Callout>
           )}
 
           {!running && !stopped ? (
             <>
+              {/* Defect results are read off the pedigree charts, never an
+                  animal's own page — so the farm's own animals are read too:
+                  their charts are the only place the top of the tree appears. */}
               <p className="text-sm text-muted">
-                Defect results are read off the <em>pedigree charts</em>. Digital Beef never prints
-                an animal&apos;s own genetic tests on its own page — only beside it on the pages of
-                everything descended from it — so the farm&apos;s own animals are read too, because
-                their charts are the only place the sire and dam at the top of the tree appear.
+                The farm&apos;s own papered animals are read too.
               </p>
               <div>
                 <Button onClick={() => void run()}>Check all {pages} pages</Button>
@@ -627,17 +623,12 @@ export function RefreshAllAncestors({
 
       {pending.length === 0 ? null : (
         <Callout tone="action" title={`${pending.length} need the page pasting in`}>
+          {/* Two causes, one remedy: a host that refuses this server answers a
+              browser, and a server fetch can miss the separately loaded
+              pedigree tab — the only place defect results are printed. */}
           <p>
-            Two things land here and both have the same remedy. A host that will not answer this
-            server will answer a browser; and Digital Beef loads the pedigree tab separately, so a
-            server fetch can come back with names and colors and no ancestors.{" "}
-            <strong>Defect results only exist on the chart</strong> — printed beside each ancestor,
-            never on the animal&apos;s own page.
-          </p>
-          <p className="mt-1">
-            Open one, wait for the pedigree to draw, select all, copy, and paste it below. What it
-            reads joins the list of proposals underneath, ticked the same way and saved by the same
-            button.
+            Open each, let the pedigree draw, select all, and paste it below. It joins the proposals
+            underneath.
           </p>
         </Callout>
       )}
@@ -681,7 +672,7 @@ export function RefreshAllAncestors({
             <div className="flex flex-col gap-2">
               <TextArea
                 label={`The page for ${entry.label}`}
-                hint="Select all on the animal's page and paste it here. This works regardless of what the host thinks of our server, and behind a login."
+                hint="Select all on the animal's page and paste it here."
                 rows={6}
                 value={drafts[entry.key] ?? ""}
                 onChange={(event) => setDrafts({ ...drafts, [entry.key]: event.target.value })}
@@ -704,11 +695,7 @@ export function RefreshAllAncestors({
       {ourFindings.length === 0 ? null : (
         <div className="flex flex-col gap-2">
           <p className="text-density font-medium text-ink">The farm&apos;s own animals</p>
-          <p className="text-sm text-muted">
-            Breed makeup, color and horn status off their own papers. This is the one place a
-            registered animal of ours picks up a composition from the association rather than having
-            it worked out from its parents.
-          </p>
+          <p className="text-sm text-muted">Makeup, color and horns off their own papers.</p>
           {ourFindings.map((finding) => (
             <div key={finding.profile.id} className="flex flex-col gap-1 border-t border-edge pt-3">
               <span className="text-density font-medium text-ink">{finding.label}</span>
@@ -744,17 +731,15 @@ export function RefreshAllAncestors({
       {findings.length === 0 && ourFindings.length === 0 ? (
         stopped ? (
           <Callout tone="calm" title="Nothing has changed">
-            Every page that could be read matches what is on file. That is worth knowing: the
-            records have not gone stale.
+            Every page that could be read matches what is on file.
           </Callout>
         ) : null
       ) : (
         <div className="flex flex-col gap-density">
-          <p className="text-sm text-muted">
-            Blanks being filled in are ticked. A value being <em>changed</em> is not — what is on
-            file may have been corrected by hand, and a re-read of the page is not evidence against
-            that.
-          </p>
+          {/* A change is never pre-ticked: what is on file may have been
+              corrected by hand, and a re-read of the page is not evidence
+              against that. */}
+          <p className="text-sm text-muted">Blanks are ticked; changes are yours to tick.</p>
 
           {findings.map((finding) => (
             <div key={finding.animal.id} className="flex flex-col gap-2 border-t border-edge pt-3">

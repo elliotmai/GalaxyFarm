@@ -1,12 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 
 import {
   Button,
-  Callout,
-  Card,
-  DataTable,
   EmptyState,
   Modal,
   PageBody,
@@ -18,10 +15,8 @@ import {
   TagInput,
   TextArea,
   TextInput,
-  Tile,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -68,6 +63,11 @@ import { useRecords } from "@/lib/local/use-records";
  * which is why this screen exists at all: an ancestor with a mistyped
  * registration number has to be fixable without deleting the tree that hangs
  * off it.
+ *
+ * A list screen like the herd: search, bull-or-cow chips with their counts,
+ * the rest of the filters behind one button, and rows that open the record.
+ * Adding and editing are a side panel; importing a page is a dialog of its
+ * own, because it is a workflow rather than a section of this list.
  */
 
 function refKey(ref: ParentRef | undefined): string {
@@ -174,6 +174,7 @@ export function AncestorsScreen({
     [outsiders],
   );
   const [draft, setDraft] = useState<Draft | undefined>();
+  const formId = useId();
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
@@ -556,197 +557,385 @@ export function AncestorsScreen({
     }
   }
 
-  const columns: readonly Column<ExternalAnimal>[] = [
-    {
-      key: "name",
-      header: "Name",
-      primary: true,
-      render: (row) => (
-        <button
-          type="button"
-          onClick={() => setTrail([row.id])}
-          className="text-left text-action underline decoration-edge underline-offset-4 hover:decoration-action"
-        >
-          {row.name}
-        </button>
-      ),
-    },
-    {
-      key: "association",
-      header: "Registered",
-      render: (row) => {
-        const papers = allRegistrations(row);
-        return papers.length === 0 ? (
-          <span className="text-muted">—</span>
-        ) : (
-          <span className="flex flex-wrap gap-1.5">
-            {papers.map((entry) => (
-              <Pill key={`${entry.association}-${entry.regNumber}`} tone="identity">
-                {entry.association} {entry.regNumber}
-              </Pill>
-            ))}
-          </span>
-        );
-      },
-    },
-    {
-      key: "breed",
-      header: "Breed",
-      render: (row) => {
-        const breeds = breedsOf(row);
-        return breeds.length === 0 ? (
-          <span className="text-muted">—</span>
-        ) : (
-          <span className="flex flex-wrap gap-1.5">
-            {breeds.map((breed) => (
-              // Hollow when nobody typed it: the makeup said so, which is a
-              // weaker claim than a person writing it down.
-              <Pill key={breed} tone={(row.breed ?? []).length === 0 ? "neutral" : "identity"}>
-                {breed}
-              </Pill>
-            ))}
-          </span>
-        );
-      },
-    },
-    {
-      key: "sex",
-      header: "Bull or cow",
-      render: (row) => {
-        const verdict = sexes.get(row.id);
-        if (verdict?.conflict === true) {
-          // Two records disagree about this animal, so one of the pedigrees
-          // hanging off it is wrong. Said out loud rather than resolved by
-          // picking a winner, which would hide the mistake.
-          return (
-            <Pill tone="danger" dot>
-              used as both
-            </Pill>
-          );
-        }
-        if (verdict?.sex === undefined) return <span className="text-muted">not yet placed</span>;
-        return (
-          <Pill tone={verdict.inferred ? "neutral" : "calm"}>
-            {verdict.sex === "male" ? "bull" : "cow"}
-            {verdict.inferred ? " (from the pedigree)" : ""}
-          </Pill>
-        );
-      },
-    },
-    {
-      key: "detail",
-      header: "Off the papers",
-      render: (row) => {
-        const parts = [
-          row.colour,
-          row.hornStatus,
-          row.dob === undefined ? undefined : row.dob.toLocaleDateString(),
-          row.breedComposition === undefined || row.breedComposition.length === 0
-            ? undefined
-            : row.breedComposition.map((share) => `${share.percent}% ${share.breed}`).join(" "),
-          row.coi === undefined ? undefined : `COI ${row.coi}%`,
-        ].filter((part): part is string => part !== undefined && part !== "");
+  /**
+   * The one muted line under a name: its papers, its breed, and its parents.
+   *
+   * What the old seven-column table spread across a row, said as a sentence.
+   * Colour, horns, makeup and who descends from it are on the record itself,
+   * one tap away, where they can be read alongside everything else it is.
+   */
+  const lineFor = (row: ExternalAnimal) => {
+    const papers = allRegistrations(row).map((entry) => `${entry.association} ${entry.regNumber}`);
+    const parents = [row.sire, row.dam]
+      .filter((ref): ref is ParentRef => ref !== undefined)
+      .map((ref) => source.describe(ref)?.name ?? "unknown");
+    return [
+      ...papers,
+      breedsOf(row).join(" × "),
+      parents.length === 0 ? "" : `by ${parents.join(" × ")}`,
+    ]
+      .filter((part) => part !== "")
+      .join(" · ");
+  };
 
-        const carries = (row.geneticTests ?? []).filter(
-          (test) => test.status === "carrier" || test.status === "affected",
-        );
-
-        return (
-          <span className="flex flex-wrap items-center gap-1.5">
-            {parts.length === 0 ? <span className="text-muted">—</span> : parts.join(" · ")}
-            {carries.length === 0 ? null : (
-              <Pill tone="danger" dot>
-                {carries.map((test) => test.defect).join(", ")} carrier
-              </Pill>
-            )}
-          </span>
-        );
-      },
-    },
-    {
-      key: "parents",
-      header: "Parents",
-      render: (row) => {
-        const parents = [row.sire, row.dam]
-          .filter((ref): ref is ParentRef => ref !== undefined)
-          .map((ref) => source.describe(ref)?.name ?? "unknown");
-        return parents.length === 0 ? <span className="text-muted">—</span> : parents.join(" × ");
-      },
-    },
-    {
-      key: "used",
-      header: "Ancestor of",
-      render: (row) => {
-        const named = [...new Set(dependentsOf.get(`external:${row.id}`) ?? [])];
-        return named.length === 0 ? (
-          <span className="text-muted">nobody yet</span>
-        ) : (
-          <span className="flex flex-wrap gap-1.5">
-            {named.map((label) => (
-              <Pill key={label}>{label}</Pill>
-            ))}
-          </span>
-        );
-      },
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (row) => (
-        // One way in. Everything that used to be four buttons on every row of
-        // a four-hundred-row table lives on the record itself now, where the
-        // rest of what it is can be read at the same time.
-        <Button variant="ghost" onClick={() => setTrail([row.id])}>
-          Open
-        </Button>
-      ),
-    },
-  ];
+  /**
+   * The one chip, chosen.
+   *
+   * A sex the pedigrees disagree about first — one of the trees hanging off it
+   * is wrong — then a defect it carries, because that is the fact that keeps
+   * an animal's line off this place. Nothing for the ordinary case.
+   */
+  const chipFor = (row: ExternalAnimal) => {
+    if (sexes.get(row.id)?.conflict === true) {
+      return (
+        <Pill tone="danger" dot>
+          used as both
+        </Pill>
+      );
+    }
+    const carried = (row.geneticTests ?? []).filter(
+      (test) => test.status === "carrier" || test.status === "affected",
+    );
+    if (carried.length > 0) {
+      return (
+        <Pill tone="danger" dot>
+          {carried.map((test) => test.defect).join(", ")} carrier
+        </Pill>
+      );
+    }
+    return undefined;
+  };
 
   const referenced = [...dependentsOf.keys()].length;
   const sireCount = outsiders.filter((animal) => sexes.get(animal.id)?.sex === "male").length;
   const damCount = outsiders.filter((animal) => sexes.get(animal.id)?.sex === "female").length;
 
+  // Every filter but the chips, so each chip can carry the count it would show.
+  const unchipped = filterAncestors(
+    showLoose ? outsiders : used,
+    { ...filter, sex: "all" },
+    sexes,
+    dependentsOf,
+  );
+  const countFor = (sex: AncestorFilter["sex"]) =>
+    sex === "all"
+      ? unchipped.length
+      : unchipped.filter((row) =>
+          sex === "unknown" ? sexes.get(row.id)?.sex === undefined : sexes.get(row.id)?.sex === sex,
+        ).length;
+  const chips: readonly { readonly key: AncestorFilter["sex"]; readonly label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "male", label: "Bulls" },
+    { key: "female", label: "Cows" },
+    { key: "unknown", label: "Not yet placed" },
+  ];
+
+  /** What is narrowing the list, in words — said whenever anything is. */
+  const activeFilters = [
+    filter.search.trim() === "" ? undefined : `"${filter.search.trim()}"`,
+    filter.sex === "all" ? undefined : chips.find((chip) => chip.key === filter.sex)?.label,
+    filter.association === "" ? undefined : filter.association,
+    filter.breed === "" ? undefined : filter.breed,
+    filter.usage === "used"
+      ? "named by a pedigree"
+      : filter.usage === "unused"
+        ? "nothing points at it"
+        : undefined,
+    filter.papers === "registered"
+      ? "has a number"
+      : filter.papers === "multiple"
+        ? "in two registries"
+        : filter.papers === "unregistered"
+          ? "name only"
+          : undefined,
+  ].filter((part): part is string => part !== undefined);
+  const panelFilters = [
+    filter.association !== "",
+    filter.breed !== "",
+    filter.usage !== "all",
+    filter.papers !== "all",
+  ].filter(Boolean).length;
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Cattle"
-        title="Ancestors"
-        subtitle="The pedigree behind this herd — outside animals these cattle actually descend from."
-        actions={
-          <span className="flex flex-wrap gap-2">
+      {/* Bottom clearance on a phone, for the floating button and the tab bar. */}
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <PageHeader
+          eyebrow="Cattle"
+          title="Ancestors"
+          subtitle={`${outsiders.length} on file · ${sireCount} bulls · ${damCount} cows`}
+          actions={
+            <span className="flex flex-wrap gap-2">
+              <Button onClick={() => setImporting(true)}>Import</Button>
+              {/* A wrapper hides it on a phone: the button's own `inline-flex`
+                  would win over a `hidden` passed to it. */}
+              <span className="hidden sm:block">
+                <Button variant="primary" onClick={startCreate}>
+                  <span aria-hidden="true">+</span> Add an ancestor
+                </Button>
+              </span>
+            </span>
+          }
+        />
+
+        {/*
+          The exceptions, one line each. A sex the pedigrees disagree about is
+          a wrong tree somewhere and leads; the ones nothing descends from are
+          kept, not hidden for good — an animal added five minutes ago should
+          not vanish because it has not been wired up yet.
+        */}
+        {conflicted.length === 0 ? null : (
+          <p className="text-sm text-danger" role="status">
+            {conflicted.length} used as both a sire and a dam:{" "}
+            {conflicted.map((animal) => animal.name).join(", ")}. Set the sex by hand, then fix the
+            record that disagrees.
+          </p>
+        )}
+        {loose.length === 0 ? null : (
+          <p className="text-sm text-muted">
+            {loose.length} on file that nothing here descends from
+            {showLoose ? ", shown with the rest." : ", kept out of the way."}{" "}
+            <button
+              type="button"
+              onClick={() => setShowLoose(!showLoose)}
+              className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
+            >
+              {showLoose ? "Hide them again" : "Show them"}
+            </button>
+          </p>
+        )}
+
+        <div className="flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <TextInput
+              label="Search"
+              hideLabel
+              value={filter.search}
+              onChange={(event) => setFilter({ ...filter, search: event.target.value })}
+              placeholder="Name, number, tattoo, colour or breeder"
+            />
+          </div>
+          <Button aria-haspopup="dialog" onClick={() => setFiltersOpen(true)}>
+            Filters{panelFilters === 0 ? "" : ` (${panelFilters})`}
+          </Button>
+        </div>
+
+        {/*
+          Bull or cow, as one row of toggles that are also the counts. It is
+          the distinction every question on this page turns on, so it is one
+          press rather than a select in a panel. Scrolls sideways on a phone
+          rather than wrapping and pushing the list down.
+        */}
+        <div
+          role="group"
+          aria-label="Bull or cow"
+          className="-mx-1 flex items-center gap-1 overflow-x-auto px-1"
+        >
+          {chips.map((chip) => {
+            const on = filter.sex === chip.key;
+            return (
+              <button
+                key={chip.key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setFilter({ ...filter, sex: on ? "all" : chip.key })}
+                className={[
+                  "inline-flex min-h-target shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm",
+                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action",
+                  on
+                    ? "bg-action/15 font-semibold text-action"
+                    : "font-medium text-muted hover:bg-raised hover:text-ink",
+                ].join(" ")}
+              >
+                {chip.label}
+                <span className="gf-numeric text-xs opacity-80">{countFor(chip.key)}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/*
+          What is on, whenever anything is. A narrowed list that does not say
+          so reads as a smaller herd of ancestors, and the one somebody is
+          looking for "is not on file".
+        */}
+        {activeFilters.length === 0 ? null : (
+          <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted" aria-live="polite">
+            <span>
+              Showing {shown.length} of {outsiders.length}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>{activeFilters.join(" · ")}</span>
+            <button
+              type="button"
+              onClick={() => setFilter(NO_FILTER)}
+              className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
+            >
+              Clear
+            </button>
+          </p>
+        )}
+
+        {loading ? (
+          <p className="text-muted">Looking…</p>
+        ) : outsiders.length === 0 ? (
+          <EmptyState
+            title="No ancestors on file"
+            detail="Add a sire and dam off a certificate, or import an association page and get thirty at once."
+            action={
+              <Button variant="primary" onClick={() => setImporting(true)}>
+                Import from Digital Beef
+              </Button>
+            }
+          />
+        ) : shown.length === 0 ? (
+          <EmptyState
+            title="Nothing matches"
+            action={<Button onClick={() => setFilter(NO_FILTER)}>Clear filters</Button>}
+          />
+        ) : (
+          <>
+            <Group
+              title="Bulls"
+              rows={bulls}
+              lineFor={lineFor}
+              chipFor={chipFor}
+              onOpen={setTrail}
+            />
+            <Group title="Cows" rows={cows} lineFor={lineFor} chipFor={chipFor} onOpen={setTrail} />
+            <Group
+              title="Not yet placed"
+              rows={unplaced}
+              lineFor={lineFor}
+              chipFor={chipFor}
+              onOpen={setTrail}
+              note="Nothing names these as a sire or a dam yet. They show in both parent lists until something does."
+            />
+          </>
+        )}
+
+        {/*
+          The two whole-list operations, at the foot of the list rather than
+          beside the title: both are rare, one is destructive, and neither is
+          the reason anybody opened the page.
+        */}
+        {outsiders.length === 0 ? null : (
+          <div className="flex flex-wrap items-center gap-2 border-t border-rule pt-density">
             {checkable(outsiders).length === 0 ? null : (
               <Button variant="ghost" onClick={() => setCheckingAll(true)}>
                 Check all against the associations
               </Button>
             )}
-            {outsiders.length === 0 ? null : (
-              <Button variant="danger" onClick={() => void clearAll()} disabled={busy}>
-                Clear all
-              </Button>
-            )}
-            <Button variant="primary" onClick={startCreate}>
-              Add an ancestor
-            </Button>
-          </span>
-        }
-      />
-
-      {loose.length === 0 ? null : (
-        <Callout tone="neutral" title={`${loose.length} on file that nothing here descends from`}>
-          <p>
-            Imported or entered but not yet set as anybody&apos;s sire or dam. They are kept — an
-            animal added five minutes ago should not vanish because it has not been wired up yet —
-            but they are out of the way, because this list is the pedigree behind these cattle
-            rather than a directory of the breed.
-          </p>
-          <div className="mt-2">
-            <Button variant="ghost" onClick={() => setShowLoose(!showLoose)}>
-              {showLoose ? "Hide them again" : "Show them with the rest"}
+            <span className="text-sm text-muted">
+              {outsiders.length - referenced} unused — safe to delete
+            </span>
+            <Button
+              variant="ghost"
+              className="ml-auto text-danger"
+              onClick={() => void clearAll()}
+              disabled={busy}
+            >
+              Clear all
             </Button>
           </div>
-        </Callout>
-      )}
+        )}
+
+        <button
+          type="button"
+          onClick={startCreate}
+          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
+        >
+          <span aria-hidden="true" className="text-xl leading-none">
+            +
+          </span>
+          Add an ancestor
+        </button>
+      </div>
+
+      {filtersOpen ? (
+        <Modal
+          title="Filters"
+          placement="side"
+          onClose={() => setFiltersOpen(false)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => setFiltersOpen(false)}>
+                Show {shown.length}
+              </Button>
+              {panelFilters === 0 ? null : (
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    setFilter({
+                      ...filter,
+                      association: NO_FILTER.association,
+                      breed: NO_FILTER.breed,
+                      usage: NO_FILTER.usage,
+                      papers: NO_FILTER.papers,
+                    })
+                  }
+                >
+                  Clear filters
+                </Button>
+              )}
+            </>
+          }
+        >
+          <Select
+            label="Association"
+            hint="Matches any number the animal holds."
+            value={filter.association}
+            placeholder="Any"
+            options={ASSOCIATIONS.map((value) => ({ value, label: value }))}
+            onChange={(event) => setFilter({ ...filter, association: event.target.value })}
+          />
+          <Select
+            label="Breed"
+            value={filter.breed}
+            placeholder="Any"
+            options={breedsInUse(outsiders).map((value) => ({ value, label: value }))}
+            onChange={(event) => setFilter({ ...filter, breed: event.target.value })}
+          />
+          <Select
+            label="Used"
+            value={filter.usage}
+            options={[
+              { value: "all", label: "Any" },
+              { value: "used", label: "Named by a pedigree" },
+              { value: "unused", label: "Nothing points at it" },
+            ]}
+            onChange={(event) =>
+              setFilter({ ...filter, usage: event.target.value as AncestorFilter["usage"] })
+            }
+          />
+          <Select
+            label="Papers"
+            value={filter.papers}
+            options={[
+              { value: "all", label: "Any" },
+              { value: "registered", label: "Has a number" },
+              { value: "multiple", label: "In two registries" },
+              { value: "unregistered", label: "Name only" },
+            ]}
+            onChange={(event) =>
+              setFilter({ ...filter, papers: event.target.value as AncestorFilter["papers"] })
+            }
+          />
+        </Modal>
+      ) : null}
+
+      {importing ? (
+        <Modal
+          size="wide"
+          title="Import from Digital Beef"
+          description="Reads the page a person would read. Nothing is saved until you approve it."
+          onClose={() => setImporting(false)}
+        >
+          <DigitalBeefImport existing={outsiders} propertyId={propertyId} actorId={actorId} />
+        </Modal>
+      ) : null}
 
       {checking === undefined ? null : (
         <Modal
@@ -757,7 +946,7 @@ export function AncestorsScreen({
           key={checking.id}
           size="wide"
           title={`Check ${checking.name} against the association`}
-          description="A registry is not a snapshot. This reads the page again and shows what has moved."
+          description="Reads the page again and shows what has moved."
           onClose={() => setChecking(undefined)}
         >
           <RefreshFromAssociation
@@ -822,7 +1011,7 @@ export function AncestorsScreen({
         <Modal
           size="wide"
           title="Check every papered ancestor"
-          description="For a herd whose papers were read months ago and have been quietly going stale since."
+          description="For papers read months ago and quietly going stale since."
           onClose={() => setCheckingAll(false)}
         >
           <RefreshAllAncestors
@@ -840,7 +1029,7 @@ export function AncestorsScreen({
           key={merging.id}
           size="wide"
           title={`Merge another record into ${merging.name}`}
-          description="For when one animal was imported from two associations before anything could join them — two records, two numbers, half the descendants on each."
+          description="For one animal imported from two associations — two records, two numbers, half the descendants on each."
           onClose={() => setMerging(undefined)}
         >
           <MergeAncestors
@@ -855,42 +1044,36 @@ export function AncestorsScreen({
         </Modal>
       )}
 
-      <div className="gf-stat-row">
-        <Tile label="On file" value={outsiders.length} tone="identity" />
-        <Tile label="Bulls" value={sireCount} />
-        <Tile label="Cows" value={damCount} />
-        <Tile
-          label="Unused"
-          value={outsiders.length - referenced}
-          hint={outsiders.length - referenced > 0 ? "Safe to delete" : undefined}
-        />
-      </div>
-
-      {conflicted.length === 0 ? null : (
-        <Callout tone="danger" title={`${conflicted.length} used as both a sire and a dam`}>
-          {conflicted.map((animal) => animal.name).join(", ")} — one record names each of these as a
-          sire and another as a dam. They cannot be both, so one of the pedigrees hanging off them
-          is wrong. Set the sex by hand to say which, then fix the record that disagrees.
-        </Callout>
-      )}
-
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
-          size="wide"
+          placement="side"
           title={editing === undefined ? "New ancestor" : `Editing ${editing.name}`}
-          description="Off the certificate. Everything here is optional except the name."
+          description="Off the certificate. Only the name is required."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              {/* Tied to the form by `form`, so it stays pinned while fields scroll. */}
+              <Button type="submit" form={formId} variant="primary" busy={busy}>
+                {editing === undefined ? "Add ancestor" : "Save ancestor"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+            </>
+          }
         >
-          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
+          <form
+            id={formId}
+            onSubmit={(event) => void submit(event)}
+            className="flex flex-col gap-density"
+          >
+            <TextInput
+              label="Name"
+              hint="As it reads on the certificate."
+              value={draft.name}
+              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              required
+            />
             <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
-              <TextInput
-                label="Name"
-                hint="As it reads on the certificate."
-                value={draft.name}
-                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                required
-              />
               <TextInput
                 label="Registration number"
                 numeric
@@ -904,69 +1087,71 @@ export function AncestorsScreen({
                 options={ASSOCIATIONS.map((value) => ({ value, label: value }))}
                 onChange={(event) => setDraft({ ...draft, association: event.target.value })}
               />
-              <Select
-                label="Bull or cow"
-                hint="Usually left alone — it follows from where the animal sits in a pedigree. Set it when nothing places them yet, or to settle a disagreement."
-                value={draft.sex}
-                placeholder="Work it out from the pedigree"
-                options={[
-                  { value: "male", label: "Bull" },
-                  { value: "female", label: "Cow" },
-                ]}
-                onChange={(event) => setDraft({ ...draft, sex: event.target.value })}
+            </div>
+            <SearchSelect
+              label="Sire"
+              hint="Bulls only."
+              value={draft.sire}
+              placeholder="Unknown"
+              clearLabel="Unknown"
+              options={parentOptions.male.filter(
+                (option) => option.value !== `external:${editing?.id ?? ""}`,
+              )}
+              onChange={(next) => setDraft({ ...draft, sire: next })}
+            />
+            <SearchSelect
+              label="Dam"
+              hint="Cows only."
+              value={draft.dam}
+              placeholder="Unknown"
+              clearLabel="Unknown"
+              options={parentOptions.female.filter(
+                (option) => option.value !== `external:${editing?.id ?? ""}`,
+              )}
+              onChange={(next) => setDraft({ ...draft, dam: next })}
+            />
+            <Select
+              label="Bull or cow"
+              hint="Usually left to the pedigree. Set it to settle a disagreement."
+              value={draft.sex}
+              placeholder="Work it out from the pedigree"
+              options={[
+                { value: "male", label: "Bull" },
+                { value: "female", label: "Cow" },
+              ]}
+              onChange={(event) => setDraft({ ...draft, sex: event.target.value })}
+            />
+            <TagInput
+              label="Breed"
+              hint="More than one for a cross. Empty follows the makeup on its papers."
+              value={draft.breed}
+              placeholder="Maine-Anjou"
+              suggestions={breedSuggestions}
+              onChange={(next) => setDraft({ ...draft, breed: next })}
+            />
+            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+              <TextInput
+                label="Color"
+                hint="Feeds the calf-color prediction."
+                value={draft.colour}
+                onChange={(event) => setDraft({ ...draft, colour: event.target.value })}
+              />
+              <TextInput
+                label="Horns"
+                hint="Polled, horned, scurred."
+                value={draft.hornStatus}
+                onChange={(event) => setDraft({ ...draft, hornStatus: event.target.value })}
               />
               <TextInput
                 label="Tattoo"
                 value={draft.tattoo}
                 onChange={(event) => setDraft({ ...draft, tattoo: event.target.value })}
               />
-              <TagInput
-                label="Breed"
-                hint="What it is, in words — more than one for a cross. Left empty, it follows from the breed makeup on its papers."
-                value={draft.breed}
-                placeholder="Maine-Anjou"
-                suggestions={breedSuggestions}
-                onChange={(next) => setDraft({ ...draft, breed: next })}
-              />
-              <TextInput
-                label="Color"
-                hint="Feeds the calf-color prediction, which is the only reason it is worth typing."
-                value={draft.colour}
-                onChange={(event) => setDraft({ ...draft, colour: event.target.value })}
-              />
               <TextInput
                 label="Date of birth"
                 type="date"
                 value={draft.dob}
                 onChange={(event) => setDraft({ ...draft, dob: event.target.value })}
-              />
-              <TextInput
-                label="Horns"
-                hint="As the association prints it — polled, horned, scurred."
-                value={draft.hornStatus}
-                onChange={(event) => setDraft({ ...draft, hornStatus: event.target.value })}
-              />
-              <SearchSelect
-                label="Sire"
-                hint="Bulls only. Type any part of a name or a registration number."
-                value={draft.sire}
-                placeholder="Unknown"
-                clearLabel="Unknown"
-                options={parentOptions.male.filter(
-                  (option) => option.value !== `external:${editing?.id ?? ""}`,
-                )}
-                onChange={(next) => setDraft({ ...draft, sire: next })}
-              />
-              <SearchSelect
-                label="Dam"
-                hint="Cows only."
-                value={draft.dam}
-                placeholder="Unknown"
-                clearLabel="Unknown"
-                options={parentOptions.female.filter(
-                  (option) => option.value !== `external:${editing?.id ?? ""}`,
-                )}
-                onChange={(next) => setDraft({ ...draft, dam: next })}
               />
             </div>
             <TextArea
@@ -981,135 +1166,9 @@ export function AncestorsScreen({
                 {error}
               </p>
             )}
-
-            <div className="flex flex-wrap gap-2 border-t border-edge pt-density">
-              <Button type="submit" busy={busy}>
-                {editing === undefined ? "Add ancestor" : "Save ancestor"}
-              </Button>
-              <Button variant="ghost" onClick={() => setDraft(undefined)}>
-                Cancel
-              </Button>
-            </div>
           </form>
         </Modal>
       )}
-
-      <DigitalBeefImport existing={outsiders} propertyId={propertyId} actorId={actorId} />
-
-      <Section
-        title="On file"
-        description="Bulls and cows kept apart, because that is the distinction every question on this page turns on."
-      >
-        <Card>
-          <div className="flex flex-col gap-density">
-            <TextInput
-              label="Search"
-              hint="Name, registration number, tattoo, color or breeder. Any part, in any order."
-              value={filter.search}
-              onChange={(event) => setFilter({ ...filter, search: event.target.value })}
-              placeholder="sull tina, or 4157771"
-            />
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-4">
-              <Select
-                label="Bull or cow"
-                value={filter.sex}
-                options={[
-                  { value: "all", label: "Both" },
-                  { value: "male", label: "Bulls" },
-                  { value: "female", label: "Cows" },
-                  { value: "unknown", label: "Not yet placed" },
-                ]}
-                onChange={(event) =>
-                  setFilter({ ...filter, sex: event.target.value as AncestorFilter["sex"] })
-                }
-              />
-              <Select
-                label="Association"
-                hint="Matches any number the animal holds."
-                value={filter.association}
-                placeholder="Any"
-                options={ASSOCIATIONS.map((value) => ({ value, label: value }))}
-                onChange={(event) => setFilter({ ...filter, association: event.target.value })}
-              />
-              <Select
-                label="Breed"
-                hint="Typed on the record, or worked out from its makeup."
-                value={filter.breed}
-                placeholder="Any"
-                options={breedsInUse(outsiders).map((value) => ({ value, label: value }))}
-                onChange={(event) => setFilter({ ...filter, breed: event.target.value })}
-              />
-              <Select
-                label="Used"
-                value={filter.usage}
-                options={[
-                  { value: "all", label: "Any" },
-                  { value: "used", label: "Named by a pedigree" },
-                  { value: "unused", label: "Nothing points at it" },
-                ]}
-                onChange={(event) =>
-                  setFilter({ ...filter, usage: event.target.value as AncestorFilter["usage"] })
-                }
-              />
-              <Select
-                label="Papers"
-                value={filter.papers}
-                options={[
-                  { value: "all", label: "Any" },
-                  { value: "registered", label: "Has a number" },
-                  { value: "multiple", label: "In two registries" },
-                  { value: "unregistered", label: "Name only" },
-                ]}
-                onChange={(event) =>
-                  setFilter({ ...filter, papers: event.target.value as AncestorFilter["papers"] })
-                }
-              />
-            </div>
-
-            <p className="text-sm text-muted">
-              Showing {shown.length} of {outsiders.length}.{" "}
-              {shown.length === outsiders.length ? null : (
-                <button
-                  type="button"
-                  onClick={() => setFilter(NO_FILTER)}
-                  className="text-action underline underline-offset-2"
-                >
-                  Clear the filters
-                </button>
-              )}
-            </p>
-          </div>
-        </Card>
-
-        {loading ? (
-          <p className="text-muted">Looking…</p>
-        ) : outsiders.length === 0 ? (
-          <Card>
-            <EmptyState
-              title="No ancestors on file"
-              detail="Add the sire and dam off a certificate, then their parents, and the tree goes back as far as the papers do. Or import a Digital Beef page above and get thirty at once."
-            />
-          </Card>
-        ) : shown.length === 0 ? (
-          <Card>
-            <EmptyState
-              title="Nothing matches"
-              detail="Every ancestor is filtered out. Widen the search or clear the filters above."
-            />
-          </Card>
-        ) : (
-          <>
-            <Group title="Bulls" rows={bulls} columns={columns} />
-            <Group title="Cows" rows={cows} columns={columns} />
-            <Group
-              title="Not yet placed"
-              rows={unplaced}
-              columns={columns}
-              note="Nothing names these as a sire or a dam yet, so which they are is unknown. They show in both parent lists until something places them."
-            />
-          </>
-        )}
-      </Section>
     </PageBody>
   );
 }
@@ -1122,32 +1181,57 @@ export function AncestorsScreen({
  * was that", and two shorter lists answer it faster than one long one sorted
  * the right way. An empty group is not drawn at all — a heading over nothing
  * reads as a loading failure.
+ *
+ * Each row is the name, one line and at most one chip, and the whole row
+ * opens the record — which is where everything that used to be four buttons
+ * on every row now lives.
  */
 function Group({
   title,
   rows,
-  columns,
+  lineFor,
+  chipFor,
+  onOpen,
   note,
 }: {
   readonly title: string;
   readonly rows: readonly ExternalAnimal[];
-  readonly columns: readonly Column<ExternalAnimal>[];
+  readonly lineFor: (row: ExternalAnimal) => string;
+  readonly chipFor: (row: ExternalAnimal) => ReactNode;
+  readonly onOpen: (trail: readonly Ulid[]) => void;
   readonly note?: string;
 }) {
   if (rows.length === 0) return null;
 
   return (
-    <Card title={`${title} — ${rows.length}`}>
-      <div className="flex flex-col gap-density">
-        {note === undefined ? null : <p className="text-sm text-muted">{note}</p>}
-        <DataTable
-          caption={title}
-          columns={columns}
-          rows={rows}
-          rowKey={(row) => row.id}
-          empty={null}
-        />
-      </div>
-    </Card>
+    <Section
+      title={`${title} · ${rows.length}`}
+      {...(note === undefined ? {} : { description: note })}
+    >
+      <ul
+        aria-label={title}
+        className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
+      >
+        {rows.map((row) => {
+          const line = lineFor(row);
+          const chip = chipFor(row);
+          return (
+            <li key={row.id}>
+              <button
+                type="button"
+                onClick={() => onOpen([row.id])}
+                className="flex min-h-[60px] w-full items-center gap-3 px-density py-2 text-left hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
+              >
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate font-semibold text-ink">{row.name}</span>
+                  {line === "" ? null : <span className="truncate text-sm text-muted">{line}</span>}
+                </span>
+                {chip === undefined ? null : <span className="shrink-0">{chip}</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </Section>
   );
 }
