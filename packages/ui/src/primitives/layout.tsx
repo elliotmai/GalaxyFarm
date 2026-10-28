@@ -70,7 +70,12 @@ export function HelpToggle({
       </summary>
       <div
         className={[
-          "absolute left-0 top-9 z-30 w-[min(22rem,calc(100vw-2rem))] rounded-density",
+          // Not drawn at all while closed: a closed `<details>` still lays its
+          // content out in Chromium, and a 22rem box beside a ? near the edge
+          // of a phone widened the page. Open, it is pinned inside the
+          // viewport on a phone and hangs off the ? on anything wider.
+          "fixed inset-x-4 top-24 z-30 hidden group-open:block rounded-density",
+          "md:absolute md:inset-x-auto md:left-0 md:top-9 md:w-[22rem]",
           "border border-rule bg-panel p-density text-sm font-normal leading-relaxed text-ink",
           "shadow-[0_12px_32px_-12px_rgba(20,23,27,0.35)]",
         ].join(" ")}
