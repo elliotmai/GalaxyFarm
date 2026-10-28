@@ -1,13 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 
-import { Button, PageBody, Tabs } from "@galaxy-farm/ui";
+import { PageBody, Tabs, useToast } from "@galaxy-farm/ui";
 import {
+  choreDaySheet,
   openAssignments,
+  startOfDay,
+  taskSchema,
   type Animal,
+  type ChoreEntry,
   type FeedingPlan,
+  type Task,
   type Ulid,
   type Zone,
   type ZoneAssignment,
@@ -16,76 +20,104 @@ import { penAssignments } from "@galaxy-farm/module-pets";
 import {
   herdDemand,
   projectFeed,
-  resolvedDemandFor,
   type ConsumptionKind,
   type FeedConsumption,
   type FeedPurchase,
   type FeedType,
 } from "@galaxy-farm/module-feed";
 
+import {
+  PlanForm,
+  usePlanActions,
+} from "@/app/(admin)/admin/cattle/feed/_components/cattle-feed-screen";
+import { toggleChore } from "@/lib/chores";
+import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
+import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
 import { AddFab, KitHeader } from "../../equipment/_components/kit-controls";
-import { feedUsage, line, money } from "./feed-format";
+import { feedUsage, line } from "./feed-format";
 import { PurchaseForm, TypeForm, UseForm, useFeedRemovals } from "./feed-forms";
-import { BarnTab, CostPerHeadTab, PurchasesTab, TypesTab, UsedTab } from "./feed-views";
+import { PlanView } from "./feed-plan";
+import { isLow, ShedView } from "./feed-shed";
+import { TodayView } from "./feed-today";
+import { CostPerHeadTab, PurchasesTab, TypesTab, UsedTab } from "./feed-views";
 
 /**
- * The barn, and when it runs out (spec §5.3, issue #18).
+ * Farm › Feed (spec §5.3, issue #18): Today, Plan and Shed.
  *
- * The thing this screen exists to say is a date: when does the hay run out,
- * and when do I have to order to still have some. §5.3 is explicit that daily
- * demand is **derived from the active feeding plans and never typed in** — so
- * there is no "how much do you feed a day" field anywhere here. Type one and
- * it would be wrong the day a plan changed, and nobody would know which of the
- * two numbers was the real one.
+ * Feeding is three jobs, and each segment is one of them — tick off a
+ * feeding, adjust who gets what, restock the shed. They share a screen
+ * because they are one subject: the plans make today's feedings and eat the
+ * shed down, so a change on Plan shows up on the other two at once.
  *
- * The consequence is that ordinary feeding is never logged. Nobody records
- * forty pounds a head twice a day; the plans already say so. What does get
- * logged is what the plans do not know about — a torn bag, an extra bale in a
- * cold snap, or somebody counting the barn and finding it does not match.
- * On-hand is purchases, less those entries, less what the plans imply since
- * the last count.
+ * §5.3 is explicit that daily demand is **derived from the active feeding
+ * plans and never typed in** — so there is no "how much do you feed a day"
+ * field anywhere here. Type one and it would be wrong the day a plan changed,
+ * and nobody would know which of the two numbers was the real one. The
+ * consequence is that ordinary feeding is never logged as feed used; what is
+ * logged is what the plans do not know about (a torn bag, a count of the
+ * shed), and on-hand is purchases, less those entries, less what the plans
+ * imply since the last count.
  *
- * This file is the frame — the facts, the two lines worth interrupting for,
- * the tabs, and which side panel is open. The tabs are lists
- * (`feed-views.tsx`) and every write is a panel (`feed-forms.tsx`).
+ * Nothing here has a write path of its own. The tick is `toggleChore`, the one
+ * the kiosk and the dashboard use; the plan editor is Cattle › Feed plans'
+ * own; the purchase, count and feed-type panels are `feed-forms.tsx`.
  */
+
+export type FeedView = "today" | "plan" | "shed";
+
+const VIEWS: readonly { id: FeedView; label: string }[] = [
+  { id: "today", label: "Today" },
+  { id: "plan", label: "Plan" },
+  { id: "shed", label: "Shed" },
+];
+
+const HISTORY_TABS = [
+  { id: "purchases", label: "Purchases" },
+  { id: "used", label: "Used and counted" },
+  { id: "types", label: "Feed types" },
+  { id: "cost", label: "Cost per head" },
+] as const;
 
 /** Which side panel is open, and on what. */
 type Panel =
-  | { readonly kind: "purchase"; readonly purchase?: FeedPurchase }
+  | {
+      readonly kind: "purchase";
+      readonly purchase?: FeedPurchase;
+      readonly start?: { readonly feedTypeId?: Ulid };
+    }
   | {
       readonly kind: "use";
       readonly entry?: FeedConsumption;
       readonly start?: { readonly feedTypeId?: Ulid; readonly kind?: ConsumptionKind };
     }
-  | { readonly kind: "type"; readonly feed?: FeedType };
-
-const TABS = [
-  { id: "barn", label: "In the barn" },
-  { id: "types", label: "Feed types" },
-  { id: "purchases", label: "Purchases" },
-  { id: "used", label: "Used and counted" },
-  { id: "cost", label: "Cost per head" },
-] as const;
+  | { readonly kind: "type"; readonly feed?: FeedType }
+  // Held by id, not the record: the list is a live query and a sync pull
+  // mid-edit replaces every object in it.
+  | { readonly kind: "plan"; readonly planId: Ulid | "new" };
 
 export function FeedScreen({
   propertyId,
   actorId,
+  initialView = "today",
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /** `?view=plan` — how Cattle › Feed plans links straight to the plans. */
+  readonly initialView?: FeedView | undefined;
 }) {
   const query = { propertyId };
   const { records: feeds, loading } = useRecords<FeedType>("feedTypes", query);
   const { records: purchases } = useRecords<FeedPurchase>("feedPurchases", query);
   const { records: consumption } = useRecords<FeedConsumption>("feedConsumption", query);
-  const { records: plans } = useRecords<FeedingPlan>("feedingPlans", query);
+  const { records: plans, loading: plansLoading } = useRecords<FeedingPlan>("feedingPlans", query);
   const { records: animals } = useRecords<Animal>("animals", query);
   const { records: zones } = useRecords<Zone>("zones", query);
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
+  const { records: tasks } = useRecords<Task>("tasks", query);
 
+  const [view, setView] = useState<FeedView>(initialView);
   const [panel, setPanel] = useState<Panel | undefined>();
 
   const now = new Date();
@@ -117,22 +149,21 @@ export function FeedScreen({
    * Derived, never entered. Each animal resolves its own plans — animal over
    * zone over group — and the herd's demand is the sum of what each one is
    * actually on. Two cows on the same pen plan contribute twice, which is what
-   * makes a pen of forty run the barn down forty times as fast.
+   * makes a pen of forty run the shed down forty times as fast.
    */
   const demand = useMemo(
     () => herdDemand({ plans: activePlans, feeds, animals: animalScopes, propertyId }),
     [animalScopes, activePlans, feeds, propertyId],
   );
-  const demandByFeedType = demand.perDay;
 
   // Not memoised. It depends on `now`, which is a new object every render, so
   // a memo would recompute anyway while looking as though it did not. This is
   // a dozen feed types over a few hundred purchases — the honest cheap thing.
-  const projections = feeds
+  const shed = feeds
     .filter((feed) => feed.active)
     .map((feed) => ({
       feed,
-      projection: projectFeed(feed, purchases, consumption, demandByFeedType, now),
+      projection: projectFeed(feed, purchases, consumption, demand.perDay, now),
     }))
     .sort((left, right) => {
       // Soonest problem first: something to order today outranks a bale count
@@ -141,15 +172,58 @@ export function FeedScreen({
       const r = right.projection.orderBy?.getTime() ?? Number.POSITIVE_INFINITY;
       return l - r;
     });
+  const low = shed.filter((row) => isLow(row, now));
 
-  const toOrder = projections.filter(
-    ({ projection }) => projection.orderNow || projection.belowThreshold,
-  );
+  /* ------------------------------------------------------------- today */
 
-  const spend = purchases.reduce(
-    (total, purchase) => total + purchase.unitCost.cents * purchase.quantity,
-    0,
+  /**
+   * Today's feedings: the kiosk's day sheet, narrowed to feeding.
+   *
+   * Built the way the kiosk and the dashboard build it — the trips the plans
+   * add up to, merged by `choreDaySheet` with the rows ticks have written — so
+   * all three agree. A ticked trip is a stored row carrying the trip's id as
+   * its `sourceKey`, which is how it is told apart from a template's chore.
+   */
+  const today = startOfDay(now);
+  const derived = feedingChoresFor(
+    plans,
+    feedingChoreText({ zones, feeds, propertyId }),
+    today,
+    now,
   );
+  const feedingRows = new Set(
+    tasks.filter((task) => task.sourceKey?.startsWith("feeding:")).map((task) => task.id),
+  );
+  const feedings = choreDaySheet({ tasks, templates: [], derived }, today, now).filter(
+    (entry) =>
+      entry.id.startsWith("feeding:") ||
+      (entry.taskId !== undefined && feedingRows.has(entry.taskId)),
+  );
+  const fed = feedings.filter((entry) => entry.completedAt !== undefined).length;
+
+  const tasksApi = useMutations<Task>("tasks", "tasks", taskSchema, propertyId, actorId);
+  const { show } = useToast();
+  const [ticking, setTicking] = useState<string | undefined>();
+
+  async function tick(entry: ChoreEntry) {
+    setTicking(entry.id);
+    try {
+      // A feeding trip has no template behind it; `toggleChore` writes the
+      // row already complete, or un-ticks the row a tick wrote.
+      const result = await toggleChore(tasksApi, {
+        entry,
+        template: undefined,
+        date: today,
+        at: new Date(),
+        actorId,
+      });
+      if (!result.ok) show({ message: "Could not tick that off", tone: "danger" });
+    } finally {
+      setTicking(undefined);
+    }
+  }
+
+  /* ------------------------------------------------------------- panels */
 
   const usage = useMemo(
     () => feedUsage(purchases, consumption, plans),
@@ -161,12 +235,13 @@ export function FeedScreen({
     propertyId,
     actorId,
   });
+  const planActions = usePlanActions(propertyId, actorId);
 
   const close = () => setPanel(undefined);
 
   /**
    * Delete from inside a panel: the panel closes first, so the removal's own
-   * confirmation (in the forms file, through `useConfirmDelete`) is the only dialog.
+   * confirmation (through `useConfirmDelete`) is the only dialog.
    */
   function closeThenRun<T>(entry: T | undefined, run: (entry: T) => Promise<void>) {
     return entry === undefined
@@ -177,127 +252,229 @@ export function FeedScreen({
         };
   }
 
-  const headFed = animalScopes.filter(
-    (scope) => resolvedDemandFor(activePlans, scope.id, scope.zoneIds, [propertyId]).size > 0,
-  ).length;
+  const restock = (feed?: FeedType) =>
+    setPanel({
+      kind: "purchase",
+      ...(feed === undefined ? {} : { start: { feedTypeId: feed.id } }),
+    });
+  const addPlan = () => setPanel({ kind: "plan", planId: "new" });
 
-  /** The tiles, said once beside the title. */
+  /** One line beside the title: what each segment adds up to. */
   const facts = line(
-    `${feeds.filter((feed) => feed.active).length} feeds`,
-    `${headFed} head fed`,
-    spend > 0 ? `${money({ cents: Math.round(spend) })} spent` : undefined,
+    feedings.length > 0 && `${fed} of ${feedings.length} fed`,
+    `${activePlans.length} plan${activePlans.length === 1 ? "" : "s"}`,
+    low.length > 0 && `${low.length} low`,
   );
 
-  const addPurchase = () => setPanel({ kind: "purchase" });
+  /* ---------------------------------------------------- segmented control */
+
+  const segmentRefs = useRef(new Map<FeedView, HTMLButtonElement>());
+
+  function choose(next: FeedView) {
+    setView(next);
+    // Kept in the address so a reload, or a link sent from a phone, lands on
+    // the same segment. Best effort: nothing depends on it.
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("view", next);
+      window.history.replaceState(window.history.state, "", url);
+    } catch {
+      /* no history to write to */
+    }
+  }
+
+  function onSegmentKey(event: KeyboardEvent<HTMLDivElement>) {
+    const index = VIEWS.findIndex((entry) => entry.id === view);
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    const next = VIEWS[(index + step + VIEWS.length) % VIEWS.length];
+    if (next === undefined) return;
+    choose(next.id);
+    segmentRefs.current.get(next.id)?.focus();
+  }
+
+  const editingPlan =
+    panel?.kind === "plan" && panel.planId !== "new"
+      ? plans.find((plan) => plan.id === panel.planId)
+      : undefined;
 
   return (
     <PageBody>
       {/* Bottom clearance on a phone for the floating add button. */}
       <div className="flex flex-col gap-density pb-20 sm:pb-0">
-        <KitHeader
-          eyebrow="Kit"
-          title="Feed inventory"
-          facts={loading ? undefined : facts}
-          action={
-            <Button variant="primary" onClick={addPurchase}>
-              <span aria-hidden="true">+</span> Record purchase
-            </Button>
-          }
-        />
+        <KitHeader title="Feed" facts={loading ? undefined : facts} />
 
-        {/*
-          The two things worth interrupting for, one line each. The order-by
-          date is the run-out date less the lead time — ordering on the run-out
-          date is ordering a week late — so that is the date the line names.
-        */}
-        {toOrder.length === 0 ? null : (
-          <p className="text-sm text-danger">
-            To order: {toOrder.map(({ feed }) => feed.name).join(", ")}
-          </p>
-        )}
-        {demand.unconvertible.length === 0 ? null : (
-          // A plan written in one unit for a feed counted in another, with
-          // nothing saying what one weighs. Left out of the run-out date rather
-          // than counted wrongly; the fix is the feed's "lb each".
-          <p className="text-sm text-danger">
-            Not counted against the barn:{" "}
-            {demand.unconvertible
-              .map((feedTypeId) => feeds.find((feed) => feed.id === feedTypeId)?.name ?? "a feed")
-              .join(", ")}
-            . Give {demand.unconvertible.length === 1 ? "it" : "each"} a weight per unit on{" "}
-            <Link href="/admin/cattle/feed" className="font-semibold underline underline-offset-2">
-              Feed plans
-            </Link>
-            .
-          </p>
-        )}
+        <div
+          role="tablist"
+          aria-label="Feed"
+          onKeyDown={onSegmentKey}
+          className="flex gap-0.5 rounded-density bg-raised p-1 sm:max-w-md"
+        >
+          {VIEWS.map((entry) => {
+            const selected = entry.id === view;
+            return (
+              <button
+                key={entry.id}
+                ref={(node) => {
+                  // crud-guard: allow-unconfirmed — a ref map of DOM nodes, nothing persisted
+                  if (node === null) segmentRefs.current.delete(entry.id);
+                  else segmentRefs.current.set(entry.id, node);
+                }}
+                type="button"
+                role="tab"
+                id={`feed-segment-${entry.id}`}
+                aria-selected={selected}
+                aria-controls="feed-segment-panel"
+                tabIndex={selected ? 0 : -1}
+                onClick={() => choose(entry.id)}
+                className={[
+                  "min-h-target flex-1 rounded-density text-density",
+                  "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-action",
+                  selected
+                    ? "bg-panel font-semibold text-ink shadow-sm"
+                    : "font-medium text-muted hover:text-ink",
+                ].join(" ")}
+              >
+                {entry.label}
+              </button>
+            );
+          })}
+        </div>
 
-        <Tabs tabs={TABS} label="Feed">
-          {(active) => (
-            <div className="pt-density">
-              {active === "barn" ? (
-                loading ? (
-                  <p className="text-muted">Looking…</p>
-                ) : (
-                  <BarnTab
-                    projections={projections}
-                    now={now}
-                    onCount={(feed) =>
-                      setPanel({
-                        kind: "use",
-                        start: {
-                          kind: "correction",
-                          ...(feed === undefined ? {} : { feedTypeId: feed.id }),
-                        },
-                      })
-                    }
-                  />
-                )
-              ) : active === "types" ? (
-                <TypesTab
-                  feeds={feeds}
-                  usage={usage}
-                  onAdd={() => setPanel({ kind: "type" })}
-                  onEdit={(feed) => setPanel({ kind: "type", feed })}
-                />
-              ) : active === "purchases" ? (
-                <PurchasesTab
-                  feeds={feeds}
-                  purchases={purchases}
-                  onAdd={addPurchase}
-                  onEdit={(purchase) => setPanel({ kind: "purchase", purchase })}
-                />
-              ) : active === "used" ? (
-                <UsedTab
-                  feeds={feeds}
-                  consumption={consumption}
-                  animals={animals}
-                  zones={zones}
-                  onAdd={() => setPanel({ kind: "use" })}
-                  onEdit={(entry) => setPanel({ kind: "use", entry })}
-                />
-              ) : (
-                <CostPerHeadTab
-                  feeds={feeds}
-                  plans={activePlans}
-                  purchases={purchases}
-                  animals={liveAnimals}
-                  scopes={animalScopes}
-                  propertyId={propertyId}
-                />
+        <div
+          role="tabpanel"
+          id="feed-segment-panel"
+          aria-labelledby={`feed-segment-${view}`}
+          className="flex flex-col gap-density"
+        >
+          {view === "today" ? (
+            <>
+              <TodayView
+                entries={feedings}
+                actorId={actorId}
+                busy={ticking}
+                onTick={(entry) => void tick(entry)}
+              />
+              {feedings.length === 0 ? null : (
+                <p className="text-sm text-muted">The same ticks as the barn kiosk.</p>
               )}
-            </div>
+            </>
+          ) : view === "plan" ? (
+            <PlanView
+              plans={plans}
+              feeds={feeds}
+              animals={animals}
+              zones={zones}
+              scopes={animalScopes}
+              loading={plansLoading}
+              onAdd={addPlan}
+              onAdjust={(plan) => setPanel({ kind: "plan", planId: plan.id })}
+            />
+          ) : (
+            <>
+              {/*
+                Worth interrupting for: a plan written in one unit for a feed
+                counted in another, with nothing saying what one weighs. Left
+                out of the run-out date rather than counted wrongly; the fix is
+                the feed's "lb each", which the feed's own panel holds.
+              */}
+              {demand.unconvertible.length === 0 ? null : (
+                <p className="text-sm text-danger">
+                  Not counted against the shed:{" "}
+                  {demand.unconvertible.map((feedTypeId, index) => {
+                    const feed = feeds.find((candidate) => candidate.id === feedTypeId);
+                    return (
+                      <span key={feedTypeId}>
+                        {index === 0 ? "" : ", "}
+                        {feed === undefined ? (
+                          "a feed"
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setPanel({ kind: "type", feed })}
+                            className="inline-flex min-h-target items-center font-semibold underline underline-offset-2"
+                          >
+                            {feed.name}
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
+                  . Give {demand.unconvertible.length === 1 ? "it" : "each"} its lb each.
+                </p>
+              )}
+              <ShedView
+                rows={shed}
+                now={now}
+                loading={loading}
+                onRestock={restock}
+                onCount={(feed) =>
+                  setPanel({
+                    kind: "use",
+                    start: {
+                      kind: "correction",
+                      ...(feed === undefined ? {} : { feedTypeId: feed.id }),
+                    },
+                  })
+                }
+                history={
+                  <Tabs tabs={HISTORY_TABS} label="Feed history">
+                    {(active) =>
+                      active === "purchases" ? (
+                        <PurchasesTab
+                          feeds={feeds}
+                          purchases={purchases}
+                          onAdd={() => restock()}
+                          onEdit={(purchase) => setPanel({ kind: "purchase", purchase })}
+                        />
+                      ) : active === "used" ? (
+                        <UsedTab
+                          feeds={feeds}
+                          consumption={consumption}
+                          animals={animals}
+                          zones={zones}
+                          onAdd={() => setPanel({ kind: "use" })}
+                          onEdit={(entry) => setPanel({ kind: "use", entry })}
+                        />
+                      ) : active === "types" ? (
+                        <TypesTab
+                          feeds={feeds}
+                          usage={usage}
+                          onAdd={() => setPanel({ kind: "type" })}
+                          onEdit={(feed) => setPanel({ kind: "type", feed })}
+                        />
+                      ) : (
+                        <CostPerHeadTab
+                          feeds={feeds}
+                          plans={activePlans}
+                          purchases={purchases}
+                          animals={liveAnimals}
+                          scopes={animalScopes}
+                          propertyId={propertyId}
+                        />
+                      )
+                    }
+                  </Tabs>
+                }
+              />
+            </>
           )}
-        </Tabs>
+        </div>
 
-        <AddFab label="Record purchase" onClick={addPurchase} />
+        {view === "plan" ? (
+          <AddFab label="Add plan" onClick={addPlan} />
+        ) : view === "shed" ? (
+          <AddFab label="Record purchase" onClick={() => restock()} />
+        ) : null}
       </div>
 
       {panel?.kind === "purchase" ? (
         <PurchaseForm
-          key={panel.purchase?.id ?? "new"}
+          key={panel.purchase?.id ?? `new-${panel.start?.feedTypeId ?? ""}`}
           feeds={feeds}
           editing={panel.purchase}
+          start={panel.start}
           propertyId={propertyId}
           actorId={actorId}
           onClose={close}
@@ -324,6 +501,25 @@ export function FeedScreen({
           actorId={actorId}
           onClose={close}
           onDelete={closeThenRun(panel.feed, removeType)}
+        />
+      ) : panel?.kind === "plan" && (panel.planId === "new" || editingPlan !== undefined) ? (
+        // The editor Cattle › Feed plans opens, against every species here.
+        <PlanForm
+          key={editingPlan?.id ?? "new"}
+          plan={editingPlan}
+          animals={animals}
+          zones={zones}
+          feeds={feeds}
+          api={planActions.api}
+          propertyId={propertyId}
+          anySpecies
+          onClose={close}
+          onToggle={(plan) => void planActions.toggle(plan)}
+          onDelete={(plan) => {
+            // The panel closes first, so the confirmation is the only dialog.
+            close();
+            void planActions.remove(plan);
+          }}
         />
       ) : null}
     </PageBody>

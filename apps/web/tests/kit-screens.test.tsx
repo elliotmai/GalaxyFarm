@@ -227,7 +227,7 @@ describe("The feed shed", () => {
         },
       ],
     };
-    wrap(<FeedScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    wrap(<FeedScreen propertyId={PROPERTY} actorId={ACTOR} initialView="shed" />);
 
     await user.click(screen.getAllByRole("button", { name: /Record purchase/ })[0] as HTMLElement);
     const panel = screen.getByRole("dialog", { name: "Record a purchase" });

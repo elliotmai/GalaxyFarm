@@ -63,9 +63,12 @@ export function PurchaseForm({
   actorId,
   onClose,
   onDelete,
+  start,
 }: Common & {
   readonly feeds: readonly FeedType[];
   readonly editing?: FeedPurchase | undefined;
+  /** Where a new purchase starts — "Restock" from a feed's row in the shed. */
+  readonly start?: { readonly feedTypeId?: Ulid } | undefined;
 }) {
   const api = useMutations<FeedPurchase>(
     "feedPurchases",
@@ -76,7 +79,9 @@ export function PurchaseForm({
   );
   const { show } = useToast();
 
-  const [feedTypeId, setFeedTypeId] = useState<string>(editing?.feedTypeId ?? "");
+  const [feedTypeId, setFeedTypeId] = useState<string>(
+    editing?.feedTypeId ?? start?.feedTypeId ?? "",
+  );
   const [quantity, setQuantity] = useState(editing === undefined ? "" : String(editing.quantity));
   const [unitCost, setUnitCost] = useState(
     editing === undefined ? "" : (editing.unitCost.cents / 100).toFixed(2),

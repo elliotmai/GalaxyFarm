@@ -15,12 +15,11 @@ import {
   costPerHead,
   weightedAverageCost,
   type FeedConsumption,
-  type FeedProjection,
   type FeedPurchase,
   type FeedType,
 } from "@galaxy-farm/module-feed";
 
-import { KitGauge as Gauge, KitList, KitRow } from "../../equipment/_components/kit-controls";
+import { KitList, KitRow } from "../../equipment/_components/kit-controls";
 import { formatDate, line, money, qty, unitLabel } from "./feed-format";
 
 /**
@@ -37,107 +36,6 @@ function TabHead({ facts, action }: { readonly facts: ReactNode; readonly action
     <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="text-sm text-muted">{facts}</p>
       {action}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------- barn */
-
-export function BarnTab({
-  projections,
-  now,
-  onCount,
-}: {
-  readonly projections: readonly { feed: FeedType; projection: FeedProjection }[];
-  readonly now: Date;
-  /** Count one feed — a correction, which is where the projection restarts. */
-  readonly onCount: (feed?: FeedType) => void;
-}) {
-  if (projections.length === 0) {
-    return (
-      <EmptyState
-        title="No feed on file"
-        detail="Add a feed type, then record what you bought. The run-out date follows from the plans."
-      />
-    );
-  }
-
-  /**
-   * The one chip: the thing to do about this feed, if anything. Order now
-   * outranks low stock; a feed no plan is eating says so, quietly; a feed
-   * that is fine says nothing.
-   */
-  function chipFor(projection: FeedProjection) {
-    if (projection.onHand < 0) return <Pill tone="danger">Count it</Pill>;
-    if (projection.orderNow)
-      return (
-        <Pill tone="danger" dot>
-          Order now
-        </Pill>
-      );
-    if (projection.belowThreshold) return <Pill tone="action">Below reorder</Pill>;
-    if (projection.dailyDemand === 0) return <Pill>No plan</Pill>;
-    return null;
-  }
-
-  return (
-    <div className="flex flex-col gap-density">
-      <TabHead
-        // On hand is what was bought, less what was logged, less what the plans
-        // say has gone out since the last count.
-        facts="Bought, less logged, less what the plans ate since the last count"
-        action={<Button onClick={() => onCount()}>Count the barn</Button>}
-      />
-      <KitList label="In the barn">
-        {projections.map(({ feed, projection }) => {
-          const days =
-            projection.runsOutOn === undefined
-              ? undefined
-              : Math.ceil((projection.runsOutOn.getTime() - now.getTime()) / 86_400_000);
-          return (
-            <KitRow
-              key={feed.id}
-              title={feed.name}
-              lead={
-                <Gauge
-                  value={
-                    feed.reorderThreshold === undefined || feed.reorderThreshold <= 0
-                      ? 0
-                      : projection.onHand / (feed.reorderThreshold * 3)
-                  }
-                  danger={projection.orderNow || projection.onHand < 0}
-                />
-              }
-              line={line(
-                // Deliberately not clamped at zero. A negative count means the
-                // records disagree with the barn, which is worth seeing.
-                `${qty(projection.onHand)} ${unitLabel(feed.unit)}`,
-                projection.dailyDemand === 0 ? undefined : `${qty(projection.dailyDemand)} a day`,
-                projection.runsOutOn === undefined
-                  ? undefined
-                  : `runs out ${formatDate(projection.runsOutOn)}${
-                      days !== undefined && days <= 7 ? ` (${Math.max(0, days)} d)` : ""
-                    }`,
-                projection.orderBy === undefined
-                  ? undefined
-                  : `order by ${formatDate(projection.orderBy)}`,
-                projection.reconciledOn === undefined
-                  ? "never counted"
-                  : `counted ${formatDate(projection.reconciledOn)}`,
-              )}
-              chip={chipFor(projection)}
-              onOpen={() => onCount(feed)}
-              openLabel={`Count ${feed.name}`}
-            />
-          );
-        })}
-      </KitList>
-      {projections.some(({ projection }) => projection.onHand < 0) ? (
-        <p className="text-sm text-danger">
-          Below zero means the records disagree with the barn. Count it and log a correction — that
-          keeps the discrepancy rather than papering over it.
-        </p>
-      ) : null}
     </div>
   );
 }

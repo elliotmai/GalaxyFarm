@@ -77,6 +77,58 @@ import { useRecords } from "@/lib/local/use-records";
  * and is not.
  */
 
+/**
+ * The plan writes and the two that need saying out loud — switching a plan
+ * off, and deleting one behind its confirmation.
+ *
+ * A hook so Farm › Feed › Plan opens the same editor against the same write
+ * path rather than a second copy of the delete rule.
+ */
+export function usePlanActions(propertyId: Ulid, actorId: Ulid) {
+  const api = useMutations<FeedingPlan>(
+    "feedingPlans",
+    "feedingPlans",
+    feedingPlanSchema,
+    propertyId,
+    actorId,
+  );
+  const confirmDelete = useConfirmDelete();
+  const { show } = useToast();
+
+  async function toggle(plan: FeedingPlan) {
+    await api.update(plan.id, { active: !plan.active } as Partial<FeedingPlan>);
+    show({
+      message: plan.active ? `${plan.name} switched off` : `${plan.name} switched on`,
+      tone: plan.active ? "warning" : "success",
+    });
+  }
+
+  async function remove(plan: FeedingPlan) {
+    const confirmed = await confirmDelete({
+      tier: "standard",
+      recordName: plan.name,
+      entity: "feeding plan",
+      dependents: [
+        {
+          entity: "Daily demand",
+          label: "for the feed it names",
+          effect: "deleted" as const,
+        },
+      ],
+      // Switching off is nearly always what somebody means out of season, and
+      // it keeps the plan for next year.
+      consequence: "To stop feeding it for a season, switch it off instead — that keeps the plan.",
+      action: "Delete",
+    });
+    if (!confirmed) return;
+
+    await api.remove(plan.id, "Removed from the feeding plans");
+    show({ message: "Plan deleted", tone: "danger" });
+  }
+
+  return { api, toggle, remove };
+}
+
 export function CattleFeedScreen({
   propertyId,
   actorId,
@@ -91,15 +143,7 @@ export function CattleFeedScreen({
   const { records: plans, loading } = useRecords<FeedingPlan>("feedingPlans", query);
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
 
-  const plansApi = useMutations<FeedingPlan>(
-    "feedingPlans",
-    "feedingPlans",
-    feedingPlanSchema,
-    propertyId,
-    actorId,
-  );
-  const confirmDelete = useConfirmDelete();
-  const { show } = useToast();
+  const { api: plansApi, toggle, remove } = usePlanActions(propertyId, actorId);
 
   /**
    * Held by id rather than as the record itself.
@@ -176,37 +220,6 @@ export function CattleFeedScreen({
     return "the group";
   }
 
-  async function toggle(plan: FeedingPlan) {
-    await plansApi.update(plan.id, { active: !plan.active } as Partial<FeedingPlan>);
-    show({
-      message: plan.active ? `${plan.name} switched off` : `${plan.name} switched on`,
-      tone: plan.active ? "warning" : "success",
-    });
-  }
-
-  async function remove(plan: FeedingPlan) {
-    const confirmed = await confirmDelete({
-      tier: "standard",
-      recordName: plan.name,
-      entity: "feeding plan",
-      dependents: [
-        {
-          entity: "Daily demand",
-          label: "for the feed it names",
-          effect: "deleted" as const,
-        },
-      ],
-      // Switching off is nearly always what somebody means out of season, and
-      // it keeps the plan for next year.
-      consequence: "To stop feeding it for a season, switch it off instead — that keeps the plan.",
-      action: "Delete",
-    });
-    if (!confirmed) return;
-
-    await plansApi.remove(plan.id, "Removed from the feeding plans");
-    show({ message: "Plan deleted", tone: "danger" });
-  }
-
   const active = plans.filter((plan) => plan.active);
   const nameOfFeed = (id: Ulid) => feedById.get(id)?.name ?? "feed";
 
@@ -280,6 +293,15 @@ export function CattleFeedScreen({
             <span className="gf-numeric text-xs opacity-80">{feeds.length}</span>
           </Chip>
         </ChipRow>
+
+        {/* Every species' rations, the shed and today's feedings live on
+            Farm › Feed; this screen stays the cattle view of the same plans. */}
+        <Link
+          href="/admin/feed?view=plan"
+          className="inline-flex min-h-target items-center self-start text-sm font-medium text-action underline-offset-2 hover:underline"
+        >
+          All species: Farm › Feed › Plan
+        </Link>
 
         {view === "plans" ? (
           loading ? (
@@ -449,7 +471,7 @@ export function CattleFeedScreen({
  * pounds — it is the number most likely to be wrong at first and most worth
  * being able to put right.
  */
-function FeedTypeForm({
+export function FeedTypeForm({
   feed,
   propertyId,
   actorId,
@@ -603,7 +625,7 @@ const draftFrom = (plan: FeedingPlan): LineDraft[] =>
  * takes the history of what was being fed with it. §4.5 clause 1 asks for the
  * full four operations on everything, and this is the U.
  */
-function PlanForm({
+export function PlanForm({
   plan,
   animals,
   zones,
@@ -613,6 +635,7 @@ function PlanForm({
   onClose,
   onToggle,
   onDelete,
+  anySpecies = false,
 }: {
   readonly plan?: FeedingPlan | undefined;
   readonly animals: readonly Animal[];
@@ -625,6 +648,8 @@ function PlanForm({
   /** Switching a plan off for the season, which keeps it for next year. */
   readonly onToggle: (plan: FeedingPlan) => void;
   readonly onDelete: (plan: FeedingPlan) => void;
+  /** Offer every species as a target — Farm › Feed rations the whole place. */
+  readonly anySpecies?: boolean;
 }) {
   const { show } = useToast();
   const editing = plan !== undefined;
@@ -653,11 +678,14 @@ function PlanForm({
    * the screen that rations the herd. The plan being edited keeps its own
    * target whatever species it is — otherwise opening a plan written on
    * another screen would blank the field it came in with, and saving would
-   * quietly move the plan onto somebody else.
+   * quietly move the plan onto somebody else. Farm › Feed, which rations
+   * every species, lifts the filter with `anySpecies`.
    */
   const targets =
     target === "animal"
-      ? animals.filter((entry) => entry.species === "cattle" || entry.id === plan?.targetId)
+      ? animals.filter(
+          (entry) => anySpecies || entry.species === "cattle" || entry.id === plan?.targetId,
+        )
       : target === "zone"
         ? zones
         : [];
