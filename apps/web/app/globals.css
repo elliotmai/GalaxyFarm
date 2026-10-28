@@ -90,6 +90,11 @@ html {
   }
 }
 
+/* A surface someone switched to dark in Settings, whatever the device says. */
+html:has([data-theme="flying-night"]) {
+  background-color: #0f1419;
+}
+
 body {
   margin: 0;
   /*

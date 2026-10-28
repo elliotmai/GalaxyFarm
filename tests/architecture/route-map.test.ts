@@ -121,7 +121,6 @@ describe("route implementation hygiene", () => {
    * phone and getting the barn theme is not a bug that announces itself.
    */
   const FOLLOWS_THE_DEVICE = new Set([
-    "apps/web/app/(admin)/layout.tsx",
     "apps/web/app/(kiosk)/layout.tsx",
     "apps/web/app/(sitter)/layout.tsx",
   ]);
@@ -130,6 +129,27 @@ describe("route implementation hygiene", () => {
     "apps/web/app/(account)/layout.tsx",
     "apps/web/app/(public)/layout.tsx",
   ]);
+
+  /**
+   * The admin is the exception the owners asked for: light unless a device
+   * chooses dark or "match device" in Settings. It renders in daylight and a
+   * boot script applies a stored choice before paint, so it is pinned to
+   * daylight in its source and must carry that script.
+   */
+  const CHOSEN_PER_DEVICE = new Set(["apps/web/app/(admin)/layout.tsx"]);
+
+  it("starts the admin in daylight and lets each device choose", () => {
+    for (const file of CHOSEN_PER_DEVICE) {
+      const source = readText(file);
+      expect(source, `${file} renders light until a device chooses`).toContain(
+        'data-theme="flying-day"',
+      );
+      expect(source, `${file} applies a stored choice before paint`).toContain(
+        "APPEARANCE_BOOT_SCRIPT",
+      );
+      expect(source, `${file} follows a change made after load`).toContain("<ThemeSync");
+    }
+  });
 
   it("lets the working surfaces follow the device, and only those", () => {
     for (const file of FOLLOWS_THE_DEVICE) {
@@ -173,7 +193,9 @@ describe("route implementation hygiene", () => {
 
     for (const layout of layouts) {
       expect(
-        FOLLOWS_THE_DEVICE.has(layout) || PINNED_TO_DAYLIGHT.has(layout),
+        FOLLOWS_THE_DEVICE.has(layout) ||
+          PINNED_TO_DAYLIGHT.has(layout) ||
+          CHOSEN_PER_DEVICE.has(layout),
         `${layout} is a surface nobody has decided the theme rule for`,
       ).toBe(true);
     }

@@ -67,16 +67,20 @@ test.describe("admin surface", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 
-  test("follows the device, per spec §8", async ({ page }) => {
+  test("starts light, and takes a device's own choice from Settings", async ({ page }) => {
+    // Light by default — the owners' choice, overriding §8 decision 37's
+    // follow-the-device — with dark and "match device" per device.
     await page.goto("/admin");
-
-    // `flying-auto`, not `flying-day`: §8 decision 37 puts the three worked
-    // surfaces on the device's setting, because a barn screen at four in the
-    // morning during calving is the one place a white page is a torch in the
-    // face. The presented surfaces stay in daylight — asserted below.
     await expect(page.locator('[data-surface="admin"]')).toHaveAttribute(
       "data-theme",
-      "flying-auto",
+      "flying-day",
+    );
+
+    await page.evaluate(() => window.localStorage.setItem("gf-appearance", "dark"));
+    await page.reload();
+    await expect(page.locator('[data-surface="admin"]')).toHaveAttribute(
+      "data-theme",
+      "flying-night",
     );
   });
 

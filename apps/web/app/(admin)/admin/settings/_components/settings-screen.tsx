@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import type { NotificationSetting, Ulid } from "@galaxy-farm/core";
 
+import { AppearanceSetting } from "@/app/(admin)/admin/settings/_components/appearance-setting";
 import { BrandingScreen } from "@/app/(admin)/admin/settings/_components/branding-screen";
 import { DevicesScreen } from "@/app/(admin)/admin/settings/_components/devices-screen";
 import { NotificationsScreen } from "@/app/(admin)/admin/settings/_components/notifications-screen";
@@ -132,6 +133,10 @@ export function SettingsScreen({
           </Link>
         }
       />
+
+      {/* Above the tabs because it is the one setting every person changes
+          for themselves, and it should not hide behind a farm-level tab. */}
+      <AppearanceSetting />
 
       <Tabs tabs={tabs} label="Settings">
         {(active) => (
