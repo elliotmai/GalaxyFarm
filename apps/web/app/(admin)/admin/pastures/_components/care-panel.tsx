@@ -1,23 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import {
-  Badge,
   Button,
-  Card,
-  CardGrid,
-  DataTable,
   EmptyState,
   Modal,
-  Pill,
   Section,
   Select,
   TextArea,
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import {
   careHistoryFor,
@@ -34,12 +28,13 @@ import {
   type PastureCareAction,
   type PastureCareLog,
   type PastureRateUnit,
-  type SeasonalCareItem,
   type Ulid,
   type Zone,
 } from "@galaxy-farm/core";
 
 import { useMutations } from "@/lib/local/mutations";
+
+import { AddAction, FilteredLine, LandRow, RowList, StatusLine } from "./land-kit";
 
 /**
  * Pasture care — what has been put on the ground, when, and what it cost
@@ -50,6 +45,10 @@ import { useMutations } from "@/lib/local/mutations";
  * is derived rather than typed — "overseed rye every fall" is answerable only
  * against the date it was last overseeded, and a reminder that has to be
  * ticked off by hand is a reminder that stays ticked the year somebody forgets.
+ *
+ * Logging is a side panel opened from the history, not a form standing open
+ * above it: the panel stays up between entries so a run of them goes in one
+ * after another, and the list it adds to never moves while it does.
  */
 
 function formatDate(value: Date | undefined): string {
@@ -135,6 +134,9 @@ export function CarePanel({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState<string>("all");
+  /** Whether the log panel is open. The draft outlives it, on purpose — see `record`. */
+  const [logging, setLogging] = useState(false);
+  const formId = useId();
 
   const zoneName = (id: Ulid) => zones.find((zone) => zone.id === id)?.name ?? "Unknown zone";
 
@@ -245,6 +247,23 @@ export function CarePanel({
     }
   }
 
+  /**
+   * Open the log panel — on a pasture and a job, when it was opened from a
+   * window that is due, so the entry that closes it is one tap from the row.
+   */
+  function startLog(zoneId?: Ulid, action?: PastureCareAction) {
+    setErrors({});
+    if (zoneId !== undefined) {
+      setDraft({ ...draft, zoneId, ...(action === undefined ? {} : { action }) });
+    }
+    setLogging(true);
+  }
+
+  function closeLog() {
+    setLogging(false);
+    setErrors({});
+  }
+
   function startEdit(log: PastureCareLog) {
     setEditing(log);
     setEditDraft({
@@ -307,356 +326,253 @@ export function CarePanel({
     });
   }
 
-  const columns: readonly Column<PastureCareLog>[] = [
-    { key: "date", header: "Date", render: (log) => formatDate(log.performedOn) },
-    { key: "zone", header: "Zone", render: (log) => zoneName(log.zoneId) },
-    {
-      key: "action",
-      header: "Action",
-      render: (log) => <Badge tone="neutral">{ACTION_LABEL[log.action]}</Badge>,
-    },
-    { key: "product", header: "Product", render: (log) => log.product ?? "—" },
-    {
-      key: "rate",
-      header: "Rate / acre",
-      render: (log) =>
-        log.ratePerAcre === undefined
-          ? "—"
-          : `${log.ratePerAcre.amount} ${log.ratePerAcre.unit.replace(/_/g, " ")}`,
-    },
-    { key: "acres", header: "Acres", render: (log) => log.acres ?? "—" },
-    {
-      key: "cost",
-      header: "Cost",
-      render: (log) => {
-        const each = costPerAcre(log);
-        return (
-          <span className="flex flex-col">
-            <span>{log.cost === undefined ? "—" : formatMoney(log.cost)}</span>
-            {each === undefined ? null : (
-              <span className="text-sm text-muted">{formatMoney(each)}/acre</span>
-            )}
-          </span>
-        );
-      },
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (log) => (
-        <span className="flex gap-2">
-          <Button variant="ghost" onClick={() => startEdit(log)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void removeLog(log)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
+  /** The one line under an entry: when, what went on, how much, what it cost. */
+  function lineFor(log: PastureCareLog): string {
+    const each = costPerAcre(log);
+    return [
+      formatDate(log.performedOn),
+      log.product,
+      log.ratePerAcre === undefined
+        ? undefined
+        : `${log.ratePerAcre.amount} ${log.ratePerAcre.unit.replace(/_/g, " ")}/acre`,
+      log.acres === undefined ? undefined : `${log.acres} ac`,
+      log.cost === undefined
+        ? undefined
+        : `${formatMoney(log.cost)}${each === undefined ? "" : ` (${formatMoney(each)}/acre)`}`,
+    ]
+      .filter((part) => part !== undefined && part !== "")
+      .join(" · ");
+  }
 
   if (loading) return <p className="text-muted">Loading care logs…</p>;
 
+  const filterLabel =
+    filter === "all" ? [] : [zones.find((zone) => zone.id === filter)?.name ?? "A zone"];
+
   return (
-    <div className="flex flex-col gap-density">
-      <Section
-        title="This season"
-        description="Derived from what was last done, not from a list somebody keeps ticking."
-      >
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
+      {/*
+        What the season is asking for, by exception. The windows that are open
+        are rows, because each is a job; the ones ahead or already done are a
+        single count that opens into the list, because nobody acts on them
+        today. Derived from what was last done, not from a list somebody keeps
+        ticking.
+      */}
+      <Section title="This season">
         {seasonal.length === 0 ? (
-          <EmptyState
-            title="No pastures to work"
-            detail="Seasonal work is asked of grazable ground. Add a zone of type pasture and its windows appear here."
-          />
+          <p className="text-sm text-muted">
+            No pastures to work yet — seasonal windows appear for zones of type pasture.
+          </p>
         ) : (
-          <div className="flex flex-col gap-density">
+          <div className="flex flex-col gap-2">
             {due.length === 0 ? (
-              <p className="text-density text-ink">
-                Nothing is due today. {soon.length} window{soon.length === 1 ? "" : "s"} ahead.
-              </p>
+              <StatusLine tone="calm">Nothing is due today.</StatusLine>
             ) : (
-              <CardGrid columns={3}>
+              <RowList label="Seasonal work due now">
                 {due.map((item) => (
-                  <SeasonCard key={`${item.zoneId}-${item.job.action}`} item={item} />
+                  <LandRow
+                    key={`${item.zoneId}-${item.job.action}`}
+                    title={`${item.job.label} · ${item.zoneName}`}
+                    line={`Window closes ${formatDate(item.closesOn)} · ${
+                      item.lastPerformed === undefined
+                        ? "never recorded here"
+                        : `last done ${formatDate(item.lastPerformed)}`
+                    }`}
+                    chip={{ tone: "danger", label: "Due" }}
+                    onOpen={() => startLog(item.zoneId, item.job.action)}
+                    openLabel={`Log ${item.job.label} for ${item.zoneName}`}
+                  />
                 ))}
-              </CardGrid>
+              </RowList>
             )}
 
-            <ul className="flex flex-col gap-1">
-              {soon.map((item) => (
-                <li
-                  key={`${item.zoneId}-${item.job.action}`}
-                  className="flex flex-wrap items-center gap-2 text-sm text-muted"
-                >
-                  <Pill tone={item.status === "done" ? "calm" : "neutral"}>
-                    {item.status === "done" ? "done" : "from " + formatMonth(item.opensOn)}
-                  </Pill>
-                  <span className="text-ink">{item.zoneName}</span>
-                  <span>{item.job.label}</span>
-                  {item.lastPerformed === undefined ? (
-                    <span>never recorded</span>
-                  ) : (
-                    <span>last {formatDate(item.lastPerformed)}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
+            {soon.length === 0 ? null : (
+              <details className="group">
+                <summary className="inline-flex min-h-target cursor-pointer list-none items-center gap-1 text-sm font-semibold text-action [&::-webkit-details-marker]:hidden">
+                  {soon.length} window{soon.length === 1 ? "" : "s"} ahead or done
+                  <span aria-hidden="true" className="transition-transform group-open:rotate-90">
+                    ›
+                  </span>
+                </summary>
+                <ul className="flex flex-col gap-1 pt-1">
+                  {soon.map((item) => (
+                    <li key={`${item.zoneId}-${item.job.action}`} className="text-sm text-muted">
+                      <span className="font-medium text-ink">{item.zoneName}</span> ·{" "}
+                      {item.job.label} ·{" "}
+                      {item.status === "done" ? "done" : `from ${formatMonth(item.opensOn)}`} ·{" "}
+                      {item.lastPerformed === undefined
+                        ? "never recorded"
+                        : `last ${formatDate(item.lastPerformed)}`}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </div>
-        )}
-      </Section>
-
-      <Section
-        title="Record what was done"
-        description="Rate and acres are separate on purpose — the rate is what next year gets compared against, and half a pasture is a common thing to treat."
-      >
-        {workable.length === 0 ? (
-          <EmptyState title="No zones yet" detail="Add a zone before logging work against it." />
-        ) : (
-          <form onSubmit={(event) => void record(event)} className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
-              <Select
-                label="Zone"
-                value={chosenZone}
-                error={errors["zoneId"]}
-                options={workable.map((zone) => ({ value: zone.id, label: zone.name }))}
-                onChange={(event) => setDraft({ ...draft, zoneId: event.target.value })}
-              />
-              <Select
-                label="Action"
-                value={draft.action}
-                options={ACTION_OPTIONS}
-                onChange={(event) =>
-                  setDraft({ ...draft, action: event.target.value as PastureCareAction })
-                }
-              />
-              <TextInput
-                label="Date"
-                type="date"
-                required
-                value={draft.performedOn}
-                error={errors["performedOn"]}
-                onChange={(event) => setDraft({ ...draft, performedOn: event.target.value })}
-              />
-              <TextInput
-                label="Product"
-                hint="Winter rye, 13-13-13, 2,4-D."
-                value={draft.product}
-                error={errors["product"]}
-                onChange={(event) => setDraft({ ...draft, product: event.target.value })}
-              />
-              <TextInput
-                label="Rate per acre"
-                type="number"
-                inputMode="decimal"
-                step="any"
-                value={draft.rateAmount}
-                error={errors["ratePerAcre"]}
-                onChange={(event) => setDraft({ ...draft, rateAmount: event.target.value })}
-              />
-              <Select
-                label="Rate unit"
-                value={draft.rateUnit}
-                options={PASTURE_RATE_UNITS.map((unit) => ({ value: unit, label: unit }))}
-                onChange={(event) =>
-                  setDraft({ ...draft, rateUnit: event.target.value as PastureRateUnit })
-                }
-              />
-              <TextInput
-                label="Acres treated"
-                type="number"
-                inputMode="decimal"
-                step="any"
-                hint="Leave blank if it was the whole place and you have not measured it."
-                value={draft.acres}
-                error={errors["acres"]}
-                onChange={(event) => setDraft({ ...draft, acres: event.target.value })}
-              />
-              <TextInput
-                label="Cost ($)"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                value={draft.cost}
-                error={errors["cost"]}
-                onChange={(event) => setDraft({ ...draft, cost: event.target.value })}
-              />
-            </div>
-            <TextArea
-              label="Notes"
-              rows={2}
-              value={draft.notes}
-              error={errors["notes"]}
-              onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-            />
-            <div>
-              <Button type="submit" variant="primary" busy={busy}>
-                Log it
-              </Button>
-            </div>
-          </form>
-        )}
-      </Section>
-
-      <Section
-        title="Per pasture"
-        description="What each one has cost, and when it was last worked."
-      >
-        {pastures.length === 0 ? (
-          <EmptyState title="No pastures" detail="Zones of type pasture show their history here." />
-        ) : (
-          <CardGrid columns={3}>
-            {pastures.map((zone) => {
-              const spend = careSpendFor(logs, zone.id);
-              const worked = careHistoryFor(logs, zone.id)[0];
-
-              return (
-                <Card key={zone.id} title={zone.name}>
-                  <p className="gf-numeric text-[1.35em] font-semibold text-ink">
-                    {formatMoney(spend.total)}
-                  </p>
-                  <p className="text-sm text-muted">
-                    {spend.entries} entr{spend.entries === 1 ? "y" : "ies"}
-                    {spend.withoutCost === 0
-                      ? ""
-                      : ` · ${spend.withoutCost} with no cost recorded, so this is a floor`}
-                  </p>
-                  <ul className="mt-density flex flex-col gap-1 text-sm text-muted">
-                    <li>
-                      Last worked: {worked === undefined ? "never" : formatDate(worked.performedOn)}
-                    </li>
-                    <li>Last overseeded: {formatDate(lastPerformed(logs, zone.id, "overseed"))}</li>
-                    <li>
-                      Last fertilised: {formatDate(lastPerformed(logs, zone.id, "fertilize"))}
-                    </li>
-                  </ul>
-                </Card>
-              );
-            })}
-          </CardGrid>
         )}
       </Section>
 
       <Section
         title="Everything logged"
         actions={
-          <Select
-            label="Zone"
-            hideLabel
-            value={filter}
-            options={[
-              { value: "all", label: "Every zone" },
-              ...zones.map((zone) => ({ value: zone.id, label: zone.name })),
-            ]}
-            onChange={(event) => setFilter(event.target.value)}
-          />
+          workable.length === 0 ? undefined : (
+            <div className="flex items-center gap-2">
+              <Select
+                label="Zone"
+                hideLabel
+                value={filter}
+                options={[
+                  { value: "all", label: "Every zone" },
+                  ...zones.map((zone) => ({ value: zone.id, label: zone.name })),
+                ]}
+                onChange={(event) => setFilter(event.target.value)}
+              />
+              <AddAction label="Log work" onClick={() => startLog()} />
+            </div>
+          )
         }
       >
-        <Card>
-          <DataTable
-            caption="Pasture care history"
-            columns={columns}
-            rows={history}
-            rowKey={(log) => log.id}
-            empty={
-              <EmptyState
-                title="Nothing logged yet"
-                detail="Seeding, fertiliser, spray, mowing and soil tests all land here, with what they cost."
-              />
+        <FilteredLine
+          shown={history.length}
+          total={logs.length}
+          labels={filterLabel}
+          onClear={() => setFilter("all")}
+        />
+        {workable.length === 0 ? (
+          <EmptyState title="No zones yet" detail="Add a zone before logging work against it." />
+        ) : history.length === 0 ? (
+          <EmptyState
+            title="Nothing logged yet"
+            detail="Seeding, fertiliser, spray, mowing and soil tests all land here, with what they cost."
+            action={
+              <Button variant="primary" onClick={() => startLog()}>
+                Log the first job
+              </Button>
             }
           />
-        </Card>
+        ) : (
+          <RowList label="Pasture care history">
+            {history.map((log) => (
+              <LandRow
+                key={log.id}
+                title={`${ACTION_LABEL[log.action]} · ${zoneName(log.zoneId)}`}
+                openLabel={`Edit ${ACTION_LABEL[log.action]} — ${zoneName(log.zoneId)}, ${formatDate(log.performedOn)}`}
+                line={lineFor(log)}
+                onOpen={() => startEdit(log)}
+              />
+            ))}
+          </RowList>
+        )}
       </Section>
+
+      <Section title="Per pasture">
+        {pastures.length === 0 ? (
+          <p className="text-sm text-muted">Zones of type pasture show their history here.</p>
+        ) : (
+          // A pasture's row narrows the history above to it — the next thing
+          // somebody looking at what one has cost wants to see is why.
+          <RowList label="Spend per pasture">
+            {pastures.map((zone) => {
+              const spend = careSpendFor(logs, zone.id);
+              const worked = careHistoryFor(logs, zone.id)[0];
+              return (
+                <LandRow
+                  key={zone.id}
+                  title={
+                    <>
+                      {zone.name}{" "}
+                      <span className="gf-numeric font-normal text-muted">
+                        {/* A trailing + where entries carry no cost, because
+                            then the total is a floor, not a figure. */}
+                        {formatMoney(spend.total)}
+                        {spend.withoutCost === 0 ? "" : "+"}
+                      </span>
+                    </>
+                  }
+                  openLabel={`Show ${zone.name} in the history`}
+                  line={[
+                    `${spend.entries} entr${spend.entries === 1 ? "y" : "ies"}`,
+                    spend.withoutCost === 0 ? undefined : `${spend.withoutCost} with no cost`,
+                    `worked ${worked === undefined ? "never" : formatDate(worked.performedOn)}`,
+                    `overseeded ${formatDate(lastPerformed(logs, zone.id, "overseed"))}`,
+                    `fertilised ${formatDate(lastPerformed(logs, zone.id, "fertilize"))}`,
+                  ]
+                    .filter((part) => part !== undefined)
+                    .join(" · ")}
+                  onOpen={() => setFilter(zone.id)}
+                />
+              );
+            })}
+          </RowList>
+        )}
+      </Section>
+
+      {!logging ? null : (
+        <Modal
+          placement="side"
+          title="Log pasture work"
+          description="Rate and acres are separate: half a pasture is a common thing to treat."
+          onClose={closeLog}
+          footer={
+            <>
+              <Button type="submit" form={formId} variant="primary" busy={busy}>
+                Log it
+              </Button>
+              {/* Done, not Cancel: the panel stays open after each entry so
+                  fall overseeding can go in as a run, and closing it
+                  discards nothing that was logged. */}
+              <Button onClick={closeLog}>Done</Button>
+            </>
+          }
+        >
+          <form
+            id={formId}
+            onSubmit={(event) => void record(event)}
+            className="flex flex-col gap-density"
+          >
+            <CareFields
+              draft={{ ...draft, zoneId: chosenZone }}
+              errors={errors}
+              zoneOptions={workable.map((zone) => ({ value: zone.id, label: zone.name }))}
+              onChange={setDraft}
+            />
+          </form>
+        </Modal>
+      )}
 
       {editDraft === undefined || editing === undefined ? null : (
         <Modal
           key={editing.id}
-          size="wide"
+          placement="side"
           title={`Editing ${ACTION_LABEL[editing.action]} — ${zoneName(editing.zoneId)}`}
-          description="Correct what went on the ground, what it covered, and what it cost."
           onClose={closeEdit}
-        >
-          <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
-              <Select
-                label="Zone"
-                value={editDraft.zoneId}
-                error={errors["zoneId"]}
-                options={zones.map((zone) => ({ value: zone.id, label: zone.name }))}
-                onChange={(event) => setEditDraft({ ...editDraft, zoneId: event.target.value })}
-              />
-              <Select
-                label="Action"
-                value={editDraft.action}
-                options={ACTION_OPTIONS}
-                onChange={(event) =>
-                  setEditDraft({ ...editDraft, action: event.target.value as PastureCareAction })
-                }
-              />
-              <TextInput
-                label="Date"
-                type="date"
-                value={editDraft.performedOn}
-                error={errors["performedOn"]}
-                onChange={(event) =>
-                  setEditDraft({ ...editDraft, performedOn: event.target.value })
-                }
-              />
-              <TextInput
-                label="Product"
-                value={editDraft.product}
-                error={errors["product"]}
-                onChange={(event) => setEditDraft({ ...editDraft, product: event.target.value })}
-              />
-              <TextInput
-                label="Rate per acre"
-                type="number"
-                inputMode="decimal"
-                step="any"
-                value={editDraft.rateAmount}
-                error={errors["ratePerAcre"]}
-                onChange={(event) => setEditDraft({ ...editDraft, rateAmount: event.target.value })}
-              />
-              <Select
-                label="Rate unit"
-                value={editDraft.rateUnit}
-                options={PASTURE_RATE_UNITS.map((unit) => ({ value: unit, label: unit }))}
-                onChange={(event) =>
-                  setEditDraft({ ...editDraft, rateUnit: event.target.value as PastureRateUnit })
-                }
-              />
-              <TextInput
-                label="Acres treated"
-                type="number"
-                inputMode="decimal"
-                step="any"
-                value={editDraft.acres}
-                error={errors["acres"]}
-                onChange={(event) => setEditDraft({ ...editDraft, acres: event.target.value })}
-              />
-              <TextInput
-                label="Cost ($)"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                value={editDraft.cost}
-                error={errors["cost"]}
-                onChange={(event) => setEditDraft({ ...editDraft, cost: event.target.value })}
-              />
-            </div>
-            <TextArea
-              label="Notes"
-              rows={3}
-              value={editDraft.notes}
-              error={errors["notes"]}
-              onChange={(event) => setEditDraft({ ...editDraft, notes: event.target.value })}
-            />
-            <div className="flex gap-2">
+          footer={
+            <>
               <Button variant="primary" onClick={() => void saveEdit()}>
                 Save changes
               </Button>
               <Button onClick={closeEdit}>Cancel</Button>
-            </div>
+              <Button
+                variant="danger"
+                className="ml-auto"
+                onClick={() => {
+                  const log = editing;
+                  closeEdit();
+                  void removeLog(log);
+                }}
+              >
+                Delete
+              </Button>
+            </>
+          }
+        >
+          <div className="flex flex-col gap-density">
+            <CareFields
+              draft={editDraft}
+              errors={errors}
+              zoneOptions={zones.map((zone) => ({ value: zone.id, label: zone.name }))}
+              onChange={setEditDraft}
+            />
           </div>
         </Modal>
       )}
@@ -664,24 +580,99 @@ export function CarePanel({
   );
 }
 
-/** One pasture, one job, due now. */
-function SeasonCard({ item }: { readonly item: SeasonalCareItem }) {
-  const closes = formatDate(item.closesOn);
-
+/**
+ * The fields of one entry, shared by logging and editing so the two forms
+ * cannot drift — a unit offered on one and not the other is an entry that can
+ * be made and never corrected.
+ */
+function CareFields({
+  draft,
+  errors,
+  zoneOptions,
+  onChange,
+}: {
+  readonly draft: Draft;
+  readonly errors: Record<string, string>;
+  readonly zoneOptions: readonly { value: string; label: string }[];
+  readonly onChange: (next: Draft) => void;
+}) {
   return (
-    <Card title={item.zoneName}>
-      <p className="flex flex-wrap items-center gap-2">
-        <Pill tone="danger" dot>
-          due
-        </Pill>
-        <span className="text-density text-ink">{item.job.label}</span>
-      </p>
-      <p className="mt-density text-sm text-muted">
-        Window closes {closes}.{" "}
-        {item.lastPerformed === undefined
-          ? "Never recorded here."
-          : `Last done ${formatDate(item.lastPerformed)}.`}
-      </p>
-    </Card>
+    <>
+      <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
+        <Select
+          label="Zone"
+          value={draft.zoneId}
+          error={errors["zoneId"]}
+          options={zoneOptions}
+          onChange={(event) => onChange({ ...draft, zoneId: event.target.value })}
+        />
+        <Select
+          label="Action"
+          value={draft.action}
+          options={ACTION_OPTIONS}
+          onChange={(event) =>
+            onChange({ ...draft, action: event.target.value as PastureCareAction })
+          }
+        />
+        <TextInput
+          label="Date"
+          type="date"
+          required
+          value={draft.performedOn}
+          error={errors["performedOn"]}
+          onChange={(event) => onChange({ ...draft, performedOn: event.target.value })}
+        />
+        <TextInput
+          label="Product"
+          placeholder="Winter rye, 13-13-13"
+          value={draft.product}
+          error={errors["product"]}
+          onChange={(event) => onChange({ ...draft, product: event.target.value })}
+        />
+        <TextInput
+          label="Rate per acre"
+          type="number"
+          inputMode="decimal"
+          step="any"
+          value={draft.rateAmount}
+          error={errors["ratePerAcre"]}
+          onChange={(event) => onChange({ ...draft, rateAmount: event.target.value })}
+        />
+        <Select
+          label="Rate unit"
+          value={draft.rateUnit}
+          options={PASTURE_RATE_UNITS.map((unit) => ({ value: unit, label: unit }))}
+          onChange={(event) =>
+            onChange({ ...draft, rateUnit: event.target.value as PastureRateUnit })
+          }
+        />
+        <TextInput
+          label="Acres treated"
+          type="number"
+          inputMode="decimal"
+          step="any"
+          hint="Blank if it was the whole place, unmeasured."
+          value={draft.acres}
+          error={errors["acres"]}
+          onChange={(event) => onChange({ ...draft, acres: event.target.value })}
+        />
+        <TextInput
+          label="Cost ($)"
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          value={draft.cost}
+          error={errors["cost"]}
+          onChange={(event) => onChange({ ...draft, cost: event.target.value })}
+        />
+      </div>
+      <TextArea
+        label="Notes"
+        rows={2}
+        value={draft.notes}
+        error={errors["notes"]}
+        onChange={(event) => onChange({ ...draft, notes: event.target.value })}
+      />
+    </>
   );
 }

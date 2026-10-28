@@ -228,9 +228,9 @@ describe("bed geometry", () => {
     // corner.
     view();
 
-    // Scoped to the table: the plan draws the same size under the bed's name,
+    // Scoped to the list: the plan draws the same size under the bed's name,
     // which is the point — one number, two places, no chance to disagree.
-    const table = within(screen.getByRole("table"));
+    const table = within(screen.getByRole("list", { name: "Beds and where they sit" }));
     expect(table.getByText("12′ × 3′")).toBeInTheDocument();
     expect(table.getByText("10′ east, 4′ south")).toBeInTheDocument();
   });
@@ -242,7 +242,7 @@ describe("bed geometry", () => {
     // bed that nobody touched.
     view();
 
-    await userEvent.click(screen.getAllByRole("button", { name: "Adjust" })[0] as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: "Adjust The long bed" }));
     await userEvent.click(screen.getByRole("button", { name: "Save the bed" }));
 
     expect(writes.beds).toHaveLength(1);
@@ -258,7 +258,7 @@ describe("bed geometry", () => {
   it("will not save an outline that encloses no ground", async () => {
     view();
 
-    await userEvent.click(screen.getAllByRole("button", { name: "Adjust" })[0] as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: "Adjust The long bed" }));
     await userEvent.click(screen.getByRole("button", { name: "Start over" }));
 
     // Three corners is the fewest that enclose anything, and the editor says so

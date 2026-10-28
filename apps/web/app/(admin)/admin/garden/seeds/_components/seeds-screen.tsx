@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { PageBody, PageHeader, Tabs, Tile } from "@galaxy-farm/ui";
+import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import type { Ulid } from "@galaxy-farm/core";
 import {
   isStaleSeed,
@@ -15,12 +15,13 @@ import {
 
 import { CatalogPanel } from "@/app/(admin)/admin/garden/seeds/_components/catalog-panel";
 import { SeedBoxPanel } from "@/app/(admin)/admin/garden/seeds/_components/seed-box-panel";
+import { StatusLine } from "@/app/(admin)/admin/pastures/_components/land-kit";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
  * Seed (spec §5.5, §7 `/admin/garden/seeds`).
  *
- * The number that earns the top of this screen is the stale one. Everything
+ * The number that earns a line at the top of this screen is the stale one. Everything
  * else here is a list somebody browses in January; "nine of these want a
  * germination test before you count on them" is the fact that changes what
  * gets ordered, and it is invisible unless something works it out — a packet
@@ -52,42 +53,32 @@ export function SeedsScreen({
   const now = new Date();
   const stale = seed.filter((entry) => isStaleSeed(entry, now));
   const withSeed = new Set(seed.map((entry) => entry.varietyId));
+  // What four tiles used to say, as facts beside the title — kept short, so
+  // a big seed box does not push the line past a fact into an explanation.
+  const facts = [
+    `${seed.length} in the box`,
+    `${withSeed.size} of ${varieties.length} varieties`,
+    `${crops.length} crop${crops.length === 1 ? "" : "s"}`,
+  ].join(" · ");
 
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Land"
-        title="Seed"
-        subtitle="What is in the box, and the crops and varieties it is seed for."
-      />
+      <PageHeader eyebrow="Land" title="Seed" subtitle={facts} />
 
-      <div className="gf-stat-row">
-        <Tile
-          label="Seed entries"
-          value={seed.length}
-          tone="identity"
-          emphasis
-          hint={seed.length === 0 ? "Nothing recorded yet" : `${withSeed.size} varieties covered`}
-        />
-        <Tile
-          label="Worth testing"
-          value={stale.length}
-          tone={stale.length > 0 ? "danger" : "calm"}
-          emphasis={stale.length > 0}
-          hint={
-            stale.length === 0
-              ? "Nothing is two seasons past its year"
-              : "Two seasons past the packed-for year"
-          }
-        />
-        <Tile label="Varieties" value={varieties.length} tone="action" hint="In the catalogue" />
-        <Tile
-          label="Crops"
-          value={crops.length}
-          tone="neutral"
-          hint={`${new Set(crops.map((crop) => crop.family)).size} botanical families`}
-        />
-      </div>
+      {/* The stale count earns its line everywhere but the box, which says
+          it again with the packets beside it. */}
+      {stale.length === 0 || tab === "box" ? null : (
+        <StatusLine tone="danger">
+          {stale.length} worth a germination test.{" "}
+          <button
+            type="button"
+            onClick={() => setTab("box")}
+            className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
+          >
+            See the box
+          </button>
+        </StatusLine>
+      )}
 
       <Tabs
         label="Seed"

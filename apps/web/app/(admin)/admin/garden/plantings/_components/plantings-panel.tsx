@@ -4,12 +4,8 @@ import { useMemo, useState } from "react";
 
 import {
   Button,
-  CardGrid,
   EmptyState,
   Modal,
-  Pill,
-  RecordCard,
-  Section,
   Select,
   TextArea,
   TextInput,
@@ -45,6 +41,14 @@ import {
   quantityLabel,
 } from "@/app/(admin)/admin/garden/_components/labels";
 import { RotationCallout } from "@/app/(admin)/admin/garden/_components/rotation-callout";
+import {
+  AddAction,
+  ChipGroup,
+  FilteredLine,
+  LandRow,
+  RowList,
+  type RowChip,
+} from "@/app/(admin)/admin/pastures/_components/land-kit";
 import { familyHistory, familyOf, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
@@ -89,9 +93,6 @@ const BLANK: Draft = {
   quantity: "",
   notes: "",
 };
-
-/** The statuses that mean something is standing in that ground right now. */
-const LIVE_STATUSES: readonly PlantingStatus[] = ["growing", "harvesting"];
 
 export function PlantingsPanel({
   plantings,
@@ -142,7 +143,8 @@ export function PlantingsPanel({
   const [editing, setEditing] = useState<Planting | undefined>();
   const [draft, setDraft] = useState<Draft | undefined>();
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showFinished, setShowFinished] = useState(false);
+  /** A chip from the row above the list; "" is everything not finished or failed. */
+  const [filter, setFilter] = useState("");
 
   const bedName = (id: Ulid) => beds.find((bed) => bed.id === id)?.name ?? "Unknown bed";
   const varietyOf = (id: Ulid) => varieties.find((variety) => variety.id === id);
@@ -320,138 +322,195 @@ export function PlantingsPanel({
 
   if (loading) return <p className="text-muted">Loading plantings…</p>;
 
-  const shown = plantings.filter(
-    (planting) => showFinished || !["finished", "failed"].includes(planting.status),
-  );
+  const closedOf = (planting: Planting) => ["finished", "failed"].includes(planting.status);
+  const inGroup = (planting: Planting, key: string) =>
+    key === ""
+      ? !closedOf(planting)
+      : key === "planned"
+        ? planting.status === "planned" || planting.status === "started"
+        : key === "closed"
+          ? closedOf(planting)
+          : planting.status === key;
+
+  // Counted over every planting, not the shown ones: these are what the
+  // filter is chosen from.
+  const chips = [
+    { key: "", label: "Current", count: plantings.filter((p) => inGroup(p, "")).length },
+    {
+      key: "planned",
+      label: "Planned",
+      count: plantings.filter((p) => inGroup(p, "planned")).length,
+    },
+    {
+      key: "growing",
+      label: "Growing",
+      count: plantings.filter((p) => inGroup(p, "growing")).length,
+    },
+    {
+      key: "harvesting",
+      label: "Harvesting",
+      count: plantings.filter((p) => inGroup(p, "harvesting")).length,
+    },
+    {
+      key: "closed",
+      label: "Finished",
+      count: plantings.filter((p) => inGroup(p, "closed")).length,
+    },
+  ].filter((chip) => chip.key === "" || chip.count > 0);
+
+  const shown = plantings.filter((planting) => inGroup(planting, filter));
   const sorted = [...shown].sort(
     (left, right) =>
       (right.plantedOn?.getTime() ?? right.createdAt.getTime()) -
       (left.plantedOn?.getTime() ?? left.createdAt.getTime()),
   );
-  const closed = plantings.length - plantings.filter((planting) => shown.includes(planting)).length;
+  const canPlant = openBeds.length > 0 && varieties.length > 0;
+
+  /** The one line: where, how, when it went in, when to expect it, how much came off. */
+  function lineFor(planting: Planting): string {
+    const variety = varietyOf(planting.varietyId);
+    const expected = variety === undefined ? undefined : expectedHarvestDate(planting, variety);
+    const harvest = totalHarvest(harvests, planting.id);
+    return [
+      bedName(planting.bedId),
+      METHOD_LABEL[planting.method],
+      planting.plantedOn === undefined
+        ? "not in the ground yet"
+        : `planted ${formatDate(planting.plantedOn)}`,
+      // Only while something is still to come: an expected date on a
+      // finished row is a forecast about the past.
+      expected === undefined || closedOf(planting) ? undefined : `expect ${formatDate(expected)}`,
+      planting.quantity === undefined ? undefined : `${planting.quantity} in`,
+      ...[...harvest.entries()].map(([unit, amount]) => `${quantityLabel(amount, unit)} picked`),
+    ]
+      .filter((part) => part !== undefined)
+      .join(" · ");
+  }
+
+  /** Growing is the normal state and goes unsaid; everything else is the chip. */
+  function chipFor(planting: Planting): RowChip | undefined {
+    if (planting.status === "growing") return undefined;
+    return {
+      tone:
+        planting.status === "failed"
+          ? "danger"
+          : planting.status === "harvesting"
+            ? "calm"
+            : "neutral",
+      label: STATUS_LABEL[planting.status],
+    };
+  }
 
   return (
-    <div className="flex flex-col gap-density">
-      <Section
-        title="In the ground"
-        description="One record per variety per bed per go. The expected harvest is worked out from the variety's days to maturity, so correcting the planting date moves it."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {closed === 0 ? null : (
-              <Button variant="ghost" onClick={() => setShowFinished(!showFinished)}>
-                {showFinished ? "Hide finished" : `Show ${closed} finished`}
-              </Button>
-            )}
-            <Button
-              variant="primary"
-              onClick={startCreate}
-              disabled={openBeds.length === 0 || varieties.length === 0}
-            >
-              Plant something
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
+      {openBeds.length === 0 ? (
+        <EmptyState
+          title="No beds to plant in"
+          detail="A planting names the ground it is in. Add a bed first."
+          action={
+            <Button variant="primary" onClick={onNeedsBeds}>
+              Go to beds
             </Button>
+          }
+        />
+      ) : (
+        <>
+          {/*
+            One record per variety per bed per go. The expected harvest is
+            worked out from the variety's days to maturity, so correcting the
+            planting date moves it.
+          */}
+          <div className="flex items-center justify-between gap-density">
+            <div className="min-w-0 flex-1">
+              <ChipGroup
+                label="Filter plantings"
+                chips={chips}
+                value={filter}
+                onChange={setFilter}
+              />
+            </div>
+            <AddAction label="Plant something" onClick={startCreate} disabled={!canPlant} />
           </div>
-        }
-      >
-        {openBeds.length === 0 ? (
-          <EmptyState
-            title="No beds to plant in"
-            detail="A planting names the ground it is in. Add a bed first."
-            action={
-              <Button variant="primary" onClick={onNeedsBeds}>
-                Go to beds
-              </Button>
-            }
-          />
-        ) : sorted.length === 0 ? (
-          <EmptyState
-            title={plantings.length === 0 ? "Nothing planted yet" : "Nothing growing"}
-            detail={
-              plantings.length === 0
-                ? "Record what is in the ground. The rotation guard reads these, so it is worth entering the old ones too."
-                : "Everything on record is finished or failed."
-            }
-            action={
-              <Button variant="primary" onClick={startCreate} disabled={varieties.length === 0}>
-                Plant something
-              </Button>
-            }
-          />
-        ) : (
-          <CardGrid columns={3}>
-            {sorted.map((planting) => {
-              const variety = varietyOf(planting.varietyId);
-              const harvest = totalHarvest(harvests, planting.id);
-              const expected =
-                variety === undefined ? undefined : expectedHarvestDate(planting, variety);
-              const live = LIVE_STATUSES.includes(planting.status);
 
-              return (
-                <RecordCard
+          <FilteredLine
+            shown={sorted.length}
+            total={plantings.length}
+            labels={filter === "" ? [] : [chips.find((chip) => chip.key === filter)?.label ?? ""]}
+            onClear={() => setFilter("")}
+          />
+
+          {sorted.length === 0 ? (
+            <EmptyState
+              title={plantings.length === 0 ? "Nothing planted yet" : "Nothing here"}
+              detail={
+                plantings.length === 0
+                  ? "Record what is in the ground. The rotation guard reads these, so enter the old ones too."
+                  : filter === ""
+                    ? "Everything on record is finished or failed."
+                    : undefined
+              }
+              {...(plantings.length === 0
+                ? {
+                    action: (
+                      <Button variant="primary" onClick={startCreate} disabled={!canPlant}>
+                        Plant something
+                      </Button>
+                    ),
+                  }
+                : {})}
+            />
+          ) : (
+            <RowList label="Plantings">
+              {sorted.map((planting) => (
+                <LandRow
                   key={planting.id}
-                  tone={
-                    planting.status === "failed"
-                      ? "danger"
-                      : planting.status === "finished"
-                        ? "neutral"
-                        : planting.status === "harvesting"
-                          ? "calm"
-                          : "identity"
-                  }
                   title={nameOf(planting.varietyId)}
-                  subtitle={`${bedName(planting.bedId)} · ${METHOD_LABEL[planting.method]}`}
-                  actions={
-                    <Pill tone={live ? "calm" : "neutral"} dot={!live}>
-                      {STATUS_LABEL[planting.status]}
-                    </Pill>
-                  }
-                  meta={
-                    <>
-                      {planting.plantedOn === undefined ? (
-                        <Pill tone="neutral">not in the ground yet</Pill>
-                      ) : (
-                        <Pill tone="neutral">planted {formatDate(planting.plantedOn)}</Pill>
-                      )}
-                      {expected === undefined ? (
-                        <Pill tone="neutral">no days-to-maturity on the variety</Pill>
-                      ) : (
-                        <Pill tone="action">expect {formatDate(expected)}</Pill>
-                      )}
-                      {planting.quantity === undefined ? null : (
-                        <Pill tone="neutral">{planting.quantity} in</Pill>
-                      )}
-                      {[...harvest.entries()].map(([unit, amount]) => (
-                        <Pill key={unit} tone="calm">
-                          {quantityLabel(amount, unit)} picked
-                        </Pill>
-                      ))}
-                    </>
-                  }
-                >
-                  {planting.notes === undefined ? null : (
-                    <p className="text-sm text-muted">{planting.notes}</p>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="ghost" onClick={() => startEdit(planting)}>
-                      Edit
-                    </Button>
-                    <Button variant="ghost" onClick={() => void remove(planting)}>
-                      Delete
-                    </Button>
-                  </div>
-                </RecordCard>
-              );
-            })}
-          </CardGrid>
-        )}
-      </Section>
+                  openLabel={`Edit ${nameOf(planting.varietyId)} in ${bedName(planting.bedId)}`}
+                  line={lineFor(planting)}
+                  chip={chipFor(planting)}
+                  quiet={closedOf(planting)}
+                  onOpen={() => startEdit(planting)}
+                />
+              ))}
+            </RowList>
+          )}
+        </>
+      )}
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
-          size="wide"
+          placement="side"
           title={editing === undefined ? "New planting" : "Editing a planting"}
-          description="Which variety, which bed, and when it went in."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined
+                  ? warning === undefined
+                    ? "Record planting"
+                    : "Plant it anyway"
+                  : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                // Delete lives here now the row has no room for it. The editor
+                // closes first, so the confirmation is the only dialog open.
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const planting = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(planting);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
             {/*
@@ -461,12 +520,11 @@ export function PlantingsPanel({
             */}
             {warning === undefined ? null : (
               <RotationCallout warning={warning} bedName={bedName(warning.bedId)}>
-                This does not stop you. If you know why you are doing it, say so in the notes and
-                save.
+                A warning, not a block. Say why in the notes and save.
               </RotationCallout>
             )}
 
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+            <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <Select
                 label="Bed"
                 required
@@ -507,7 +565,7 @@ export function PlantingsPanel({
               <TextInput
                 label="Started indoors"
                 type="date"
-                hint="Only for something started in a tray. Days to maturity is counted from the transplant, not from this."
+                hint="Only for a tray start. Maturity counts from the transplant."
                 value={draft.indoorStartedOn}
                 error={errors["indoorStartedOn"]}
                 onChange={(event) => setDraft({ ...draft, indoorStartedOn: event.target.value })}
@@ -515,7 +573,7 @@ export function PlantingsPanel({
               <TextInput
                 label="Went in the ground"
                 type="date"
-                hint="The date the expected harvest is counted from."
+                hint="The expected harvest counts from this."
                 value={draft.plantedOn}
                 error={errors["plantedOn"]}
                 onChange={(event) => setDraft({ ...draft, plantedOn: event.target.value })}
@@ -527,7 +585,7 @@ export function PlantingsPanel({
                 min={0}
                 step="any"
                 numeric
-                hint="Plants, or feet of row. Whatever you would count."
+                hint="Plants, or feet of row."
                 value={draft.quantity}
                 error={errors["quantity"]}
                 onChange={(event) => setDraft({ ...draft, quantity: event.target.value })}
@@ -537,22 +595,11 @@ export function PlantingsPanel({
             <TextArea
               label="Notes"
               rows={3}
-              hint="How it was spaced, what it followed, why — including why you planted against a rotation warning."
+              hint="Spacing, what it followed — and why, if against a rotation warning."
               value={draft.notes}
               error={errors["notes"]}
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined
-                  ? warning === undefined
-                    ? "Record planting"
-                    : "Plant it anyway"
-                  : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}

@@ -6,19 +6,16 @@ import {
   Button,
   Callout,
   Card,
-  DataTable,
   EmptyState,
   Modal,
   PageBody,
   PageHeader,
-  Pill,
   Section,
   Select,
   SpatialEditor,
   gardenPalette,
   rankOf,
   useToast,
-  type Column,
   type SpatialDraft,
   type SpatialReassignment,
 } from "@galaxy-farm/ui";
@@ -35,6 +32,7 @@ import {
 
 import { METHOD_OPTIONS, formatDate } from "@/app/(admin)/admin/garden/_components/labels";
 import { RotationCallout } from "@/app/(admin)/admin/garden/_components/rotation-callout";
+import { LandRow, RowAction, RowList } from "@/app/(admin)/admin/pastures/_components/land-kit";
 import { familyOf, varietyLabel } from "@/lib/garden";
 import {
   ROTATION_CLEAR,
@@ -345,63 +343,34 @@ export function GardenLayoutScreen({
     [varieties, crops],
   );
 
-  const columns = useMemo<Column<Bed>[]>(
-    () => [
-      { key: "name", header: "Bed", primary: true, render: (bed) => bed.name },
-      {
-        key: "size",
-        header: "Size",
-        render: (bed) =>
-          bed.lengthFt === undefined || bed.widthFt === undefined
-            ? "—"
-            : `${bed.lengthFt}′ × ${bed.widthFt}′`,
-      },
-      {
-        key: "drawn",
-        header: "On the plan",
-        // Drawn means all four numbers, which is what `bedBoundary` needs — a
-        // pill saying "drawn" over a bed the plan leaves out would be the one
-        // place the two views disagree.
-        render: (bed) =>
-          isDrawn(bed) ? (
-            <Pill tone="calm">
-              {bed.x}′ east, {bed.y}′ south
-            </Pill>
-          ) : (
-            <Pill tone="neutral">Not drawn</Pill>
-          ),
-      },
-      {
-        key: "draw",
-        header: "",
-        render: (bed) =>
-          draft?.shapeId === bed.id ? (
-            <Button variant="ghost" onClick={() => setDraft(undefined)}>
-              Cancel
-            </Button>
-          ) : (
-            <Button
-              variant="secondary"
-              onClick={() =>
-                // Adjusting starts from the rectangle that is already there;
-                // drawing starts empty. Throwing away a drawn bed is "Start
-                // over", where its corners are on screen to be looked at first.
-                setDraft({
-                  shapeId: bed.id,
-                  boundary:
-                    origin === undefined
-                      ? []
-                      : (shapes.find((shape) => shape.id === bed.id)?.boundary ?? []).slice(),
-                })
-              }
-            >
-              {isDrawn(bed) ? "Adjust" : "Draw"}
-            </Button>
-          ),
-      },
-    ],
-    [draft, origin, shapes],
-  );
+  /**
+   * Start drawing a bed, or stop.
+   *
+   * Adjusting starts from the rectangle that is already there; drawing starts
+   * empty. Throwing away a drawn bed is "Start over", where its corners are on
+   * screen to be looked at first.
+   */
+  const drawAction = (bed: Bed) =>
+    draft?.shapeId === bed.id ? (
+      <RowAction label={`Stop drawing ${bed.name}`} onClick={() => setDraft(undefined)}>
+        Cancel
+      </RowAction>
+    ) : (
+      <RowAction
+        label={`${isDrawn(bed) ? "Adjust" : "Draw"} ${bed.name}`}
+        onClick={() =>
+          setDraft({
+            shapeId: bed.id,
+            boundary:
+              origin === undefined
+                ? []
+                : (shapes.find((shape) => shape.id === bed.id)?.boundary ?? []).slice(),
+          })
+        }
+      >
+        {isDrawn(bed) ? "Adjust" : "Draw"}
+      </RowAction>
+    );
 
   const drawn = inZone.filter(isDrawn).length;
 
@@ -412,31 +381,24 @@ export function GardenLayoutScreen({
       <PageHeader
         eyebrow="Land"
         title="Garden layout"
-        subtitle="The beds as they sit on the ground, with what is growing in them. The same editor as the property map, wearing the garden's palette."
-        meta={
-          <Pill tone="neutral">
-            {drawn} of {inZone.length} drawn
-          </Pill>
-        }
+        subtitle={`${drawn} of ${inZone.length} bed${inZone.length === 1 ? "" : "s"} drawn`}
       />
 
       {places.length === 0 ? (
         <EmptyState
           title="No garden zone yet"
-          detail="A bed sits inside a zone — the garden area it is part of. Add one under Settings → Property, then record the beds under Plantings → Beds and come back to draw them."
+          detail="Beds sit inside a garden zone. Add one under Settings → Property, record the beds under Plantings → Beds, then draw them here."
         />
       ) : origin === undefined ? (
         <Callout tone="action" title="The garden has nowhere to hang">
-          A plan is drawn against real ground. Either trace {zone?.name ?? "the garden"} on the
-          property map, or set the property&rsquo;s coordinates under Settings → Property — either
-          one gives the beds a corner to be measured from.
+          Trace {zone?.name ?? "the garden"} on the property map, or set the property&rsquo;s
+          coordinates under Settings → Property, so the beds have a corner to measure from.
         </Callout>
       ) : (
         <>
           {places.length === 1 ? null : (
             <Select
               label="Garden"
-              hint="Beds are children of a zone, so this plan and the property map are two drawings of the same tree."
               options={places.map((entry) => ({ value: entry.id, label: entry.name }))}
               value={zone?.id ?? ""}
               onChange={(event) => {
@@ -452,7 +414,7 @@ export function GardenLayoutScreen({
             description={
               draft === undefined
                 ? "Tap a bed or a planting for its notes. Drag a planting to move it to another bed."
-                : "Click the corners of the bed. Three is enough — a bed is the rectangle around them — and corners snap to the foot."
+                : "Tap three corners; they snap to the foot"
             }
             actions={
               draft === undefined ? undefined : (
@@ -476,7 +438,11 @@ export function GardenLayoutScreen({
                   <Button variant="ghost" onClick={() => setDraft(undefined)} disabled={saving}>
                     Cancel
                   </Button>
-                  <Button onClick={saveDraft} disabled={draft.boundary.length < 3 || saving}>
+                  <Button
+                    variant="primary"
+                    onClick={saveDraft}
+                    disabled={draft.boundary.length < 3 || saving}
+                  >
                     {saving ? "Saving…" : "Save the bed"}
                   </Button>
                 </span>
@@ -502,21 +468,20 @@ export function GardenLayoutScreen({
             </Card>
           </Section>
 
-          <Section
-            title="Planting"
-            description="Choose what is going in and every bed colours itself by the rotation guard — before a bed has been picked, which is the only moment the warning can still change the answer."
-          >
+          {/* Choosing what goes in colours every bed by the rotation guard
+              before one is picked — the only moment the warning can still
+              change the answer rather than be regretted. */}
+          <Section title="Plant">
             {varietyOptions.length === 0 ? (
               <EmptyState
                 title="No varieties yet"
-                detail="Rotation runs on the botanical family, which lives on the crop. Add the crops and varieties under Garden → Seeds and the plan will colour itself."
+                detail="Add crops and varieties under Garden → Seeds and the plan colours itself by rotation."
               />
             ) : (
               <div className="flex flex-col gap-density">
                 <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
                   <Select
                     label="Variety"
-                    hint="What you are about to put in the ground."
                     options={[{ value: "", label: "Nothing chosen" }, ...varietyOptions]}
                     value={varietyId}
                     onChange={(event) => setVarietyId(event.target.value)}
@@ -530,14 +495,14 @@ export function GardenLayoutScreen({
                 </div>
 
                 {family === undefined ? (
-                  <p className="m-0 text-density text-muted">
+                  <p className="m-0 text-sm text-muted">
                     {varietyId === ""
-                      ? "Nothing chosen, so the beds are drawn plain — whether a bed is clear is not a question it can answer on its own."
-                      : "That variety has no crop behind it, so there is no family to check the rotation on."}
+                      ? "Choose a variety to colour the beds by rotation."
+                      : "That variety has no crop, so there is no family to check."}
                   </p>
                 ) : (
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-density text-muted">
+                    <span className="text-sm text-muted">
                       {gardenPalette.rankTitle} for {family}:
                     </span>
                     {[ROTATION_CLEAR, 2, 3].map((step) => {
@@ -557,15 +522,12 @@ export function GardenLayoutScreen({
                 )}
 
                 {selectedBed === undefined ? (
-                  <p className="m-0 text-density text-muted">
-                    Tap a bed on the plan to plant in it.
-                  </p>
+                  <p className="m-0 text-sm text-muted">Tap a bed on the plan to plant in it.</p>
                 ) : (
                   <>
                     {warning === undefined ? null : (
                       <RotationCallout warning={warning} bedName={selectedBed.name}>
-                        This does not stop you. Another bed is one tap away, and if you know why you
-                        are doing it, plant it and say so in the notes on the plantings screen.
+                        A warning, not a block — another bed is one tap away.
                       </RotationCallout>
                     )}
                     <div className="flex flex-wrap items-center gap-2">
@@ -577,9 +539,8 @@ export function GardenLayoutScreen({
                         Plant it in {selectedBed.name}
                       </Button>
                       {selectedBed.active ? null : (
-                        <span className="text-density text-muted">
-                          {selectedBed.name} is switched off. Turn it back on under Plantings → Beds
-                          to plant in it.
+                        <span className="text-sm text-muted">
+                          {selectedBed.name} is switched off — turn it on under Plantings → Beds.
                         </span>
                       )}
                     </div>
@@ -589,22 +550,49 @@ export function GardenLayoutScreen({
             )}
           </Section>
 
-          <Section
-            title="Beds"
-            description="Everything in this garden, and whether it has been drawn yet. Position is measured in feet from the garden's north-west corner."
-          >
+          {/* Position is measured in feet from the garden's north-west
+              corner, east then south — the same numbers the plan draws. */}
+          <Section title="Beds">
             {inZone.length === 0 ? (
               <EmptyState
                 title="No beds in this garden yet"
-                detail="Add them under Plantings → Beds. A bed is a record before it is a rectangle — this screen draws the ones that already exist."
+                detail="Add them under Plantings → Beds. This screen draws the beds that already exist."
               />
             ) : (
-              <DataTable
-                caption="Beds and where they sit"
-                columns={columns}
-                rows={inZone}
-                rowKey={(bed) => bed.id}
-              />
+              <RowList label="Beds and where they sit">
+                {inZone.map((bed) => (
+                  <LandRow
+                    key={bed.id}
+                    title={bed.name}
+                    // Drawn means all four numbers, which is what
+                    // `bedBoundary` needs — a row saying "drawn" over a bed
+                    // the plan leaves out would be the one place the two
+                    // views disagree.
+                    line={
+                      <>
+                        {bed.lengthFt === undefined || bed.widthFt === undefined ? (
+                          "No size"
+                        ) : (
+                          <span>
+                            {bed.lengthFt}′ × {bed.widthFt}′
+                          </span>
+                        )}
+                        {isDrawn(bed) ? (
+                          <>
+                            {" · "}
+                            <span>
+                              {bed.x}′ east, {bed.y}′ south
+                            </span>
+                          </>
+                        ) : null}
+                      </>
+                    }
+                    chip={isDrawn(bed) ? undefined : { tone: "neutral", label: "Not drawn" }}
+                    quiet={!bed.active}
+                    action={drawAction(bed)}
+                  />
+                ))}
+              </RowList>
             )}
           </Section>
         </>

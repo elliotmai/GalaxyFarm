@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-import { PageBody, PageHeader, Tabs, Tile } from "@galaxy-farm/ui";
-import { addCalendarDays, startOfDay, type Ulid, type Zone } from "@galaxy-farm/core";
+import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
+import type { Ulid, Zone } from "@galaxy-farm/core";
 import {
   plantingWindows,
   type Bed,
@@ -20,6 +20,7 @@ import { BedsPanel } from "@/app/(admin)/admin/garden/plantings/_components/beds
 import { CareLogPanel } from "@/app/(admin)/admin/garden/plantings/_components/care-log-panel";
 import { PlantingsPanel } from "@/app/(admin)/admin/garden/plantings/_components/plantings-panel";
 import { SeasonPlanPanel } from "@/app/(admin)/admin/garden/plantings/_components/season-plan-panel";
+import { StatusLine } from "@/app/(admin)/admin/pastures/_components/land-kit";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -34,15 +35,12 @@ import { useRecords } from "@/lib/local/use-records";
  *
  * Every read happens once here. Four panels each opening their own live query
  * over `plantings` would give the rotation guard a different history from the
- * one the cards are drawn from, which is the worst possible place for a
+ * one the rows are drawn from, which is the worst possible place for a
  * disagreement.
  */
 
 /** How far ahead the season-plan tab counts a window as news. */
 const WINDOW_LEAD_DAYS = 7;
-
-/** The window the care-log tile looks back over. */
-const RECENT_DAYS = 30;
 
 export function PlantingsScreen({
   propertyId,
@@ -73,7 +71,6 @@ export function PlantingsScreen({
   const [focusedBed, setFocusedBed] = useState<Ulid | undefined>();
 
   const now = new Date();
-  const since = startOfDay(addCalendarDays(now, -RECENT_DAYS));
 
   const live = plantings.filter(
     (planting) => planting.status === "growing" || planting.status === "harvesting",
@@ -81,56 +78,35 @@ export function PlantingsScreen({
   const bedsInUse = new Set(live.map((planting) => planting.bedId));
   const windows = plantingWindows(planned, now, WINDOW_LEAD_DAYS);
   const openNow = windows.filter((window) => window.open);
-  const recentCare = care.filter((entry) => entry.performedOn >= since);
+  const activeBeds = beds.filter((bed) => bed.active).length;
+
+  // The facts, beside the title — what four tiles used to say, minus the
+  // ones that were zero or "From the season plan" most days.
+  const facts =
+    beds.length === 0
+      ? "No beds yet"
+      : `${live.length} in the ground · ${bedsInUse.size} of ${activeBeds} beds in use`;
 
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Land"
-        title="Plantings"
-        subtitle="The beds, what is in them, what has been done to it, and what the season plan says goes in next."
-      />
+      <PageHeader eyebrow="Land" title="Plantings" subtitle={facts} />
 
-      <div className="gf-stat-row">
-        <Tile
-          label="In the ground"
-          value={live.length}
-          tone="identity"
-          emphasis
-          hint={
-            beds.length === 0
-              ? "No beds yet"
-              : `${bedsInUse.size} of ${beds.filter((bed) => bed.active).length} beds in use`
-          }
-        />
-        <Tile
-          label="Windows open"
-          value={openNow.length}
-          tone={openNow.length > 0 ? "action" : "neutral"}
-          emphasis={openNow.length > 0}
-          hint={
-            windows.length === openNow.length
-              ? "From the season plan"
-              : `${windows.length - openNow.length} more inside ${WINDOW_LEAD_DAYS} days`
-          }
-        />
-        <Tile
-          label={`Care in ${RECENT_DAYS} days`}
-          value={recentCare.length}
-          tone="calm"
-          hint="Water, weeding, feeding, spray"
-        />
-        <Tile
-          label="Beds"
-          value={beds.filter((bed) => bed.active).length}
-          tone="neutral"
-          hint={
-            beds.length === beds.filter((bed) => bed.active).length
-              ? undefined
-              : `${beds.length - beds.filter((bed) => bed.active).length} switched off`
-          }
-        />
-      </div>
+      {/*
+        Status by exception: the one thing on this screen with a deadline. Not
+        drawn on the plan tab, which lists the same windows by name.
+      */}
+      {openNow.length === 0 || tab === "plan" ? null : (
+        <StatusLine tone="action">
+          {openNow.length} planting window{openNow.length === 1 ? "" : "s"} open now.{" "}
+          <button
+            type="button"
+            onClick={() => setTab("plan")}
+            className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
+          >
+            See the plan
+          </button>
+        </StatusLine>
+      )}
 
       <Tabs
         label="Plantings"
@@ -150,8 +126,8 @@ export function PlantingsScreen({
         {(active) =>
           active === "plantings" ? (
             <PlantingsPanel
-              // Remounted when a bed card sends us here, so the form opens on
-              // the bed whose card was tapped rather than on whatever was
+              // Remounted when a bed row sends us here, so the form opens on
+              // the bed whose row was tapped rather than on whatever was
               // chosen last.
               key={focusedBed ?? "any"}
               plantings={plantings}

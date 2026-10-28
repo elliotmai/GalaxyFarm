@@ -3,21 +3,15 @@
 import { useState } from "react";
 
 import {
-  Badge,
   Button,
-  Card,
   Checkbox,
-  DataTable,
   EmptyState,
   Modal,
-  Pill,
-  SafetyBadge,
   Select,
   TextArea,
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import {
   groupedZones,
@@ -39,6 +33,16 @@ import { penAssignments } from "@galaxy-farm/module-pets";
 
 import { useMutations } from "@/lib/local/mutations";
 
+import {
+  AddAction,
+  ChipGroup,
+  FilteredLine,
+  LandRow,
+  RowAction,
+  RowList,
+  type RowChip,
+} from "./land-kit";
+
 /**
  * Zones — the full §4.5 surface (list, create, edit, delete, restore).
  *
@@ -50,6 +54,11 @@ import { useMutations } from "@/lib/local/mutations";
  * clause 3 puts it at the Typed tier — you type its name — and the dialog
  * names the animals standing in it, because "delete North Trap?" and "delete
  * North Trap, 4 animals are assigned to it" are different questions.
+ *
+ * Each zone is one row — name, one line of facts, at most one chip — with the
+ * one-tap rest toggle beside it. Everything else, delete included, is in the
+ * editor, a side panel on a laptop and a bottom sheet on a phone. The groups
+ * double as the filter chips, because "what is in North" is the question.
  */
 
 const TYPE_OPTIONS = ZONE_TYPES.map((type) => ({
@@ -267,105 +276,206 @@ export function ZonesPanel({
     });
   }
 
-  const columns: readonly Column<Zone>[] = [
-    {
-      key: "name",
-      header: "Zone",
-      render: (zone) => (
-        <span className="flex flex-wrap items-center gap-2">
-          {zone.name}
-          {zone.resting ? <Pill tone="action">resting</Pill> : null}
-        </span>
-      ),
-    },
-    {
-      key: "type",
-      header: "Type",
-      render: (zone) => (
-        <span className="flex flex-wrap items-center gap-2">
-          <Badge tone="neutral">{zone.type.replace(/_/g, " ")}</Badge>
-          {/*
-            Inside or outside, on every row.
-            An animal holds one of each at once — a stall in the barn and a
-            pasture to go out in — and which slot a zone fills is read straight
-            off this. Left as a tickbox nobody sees, a stall marked outside
-            quietly takes the pasture's place and the horse looks like it has
-            no turnout.
-          */}
-          <Badge tone={zone.indoor ? "identity" : "calm"}>
-            {slotForZone(zone) === "inside" ? "inside" : "outside"}
-          </Badge>
-        </span>
-      ),
-    },
-    {
-      key: "occupancy",
-      header: "In it",
-      render: (zone) => {
-        const count = occupantsOf(zone).length;
-        const over = isOverCapacity(zone, count);
-        return (
-          <span className={over ? "text-danger" : undefined}>
-            {count}
-            {zone.capacity === undefined ? "" : ` / ${zone.capacity}`}
-            {over ? " — over" : ""}
-          </span>
-        );
-      },
-    },
-    {
-      key: "water",
-      header: "Water",
-      render: (zone) =>
-        zone.waterSourceIds.length === 0 ? (
-          <span className="text-muted">None</span>
-        ) : (
-          zone.waterSourceIds
-            .map((id) => water.find((source) => source.id === id)?.name ?? "Unknown")
-            .join(", ")
-        ),
-    },
-    {
-      key: "safety",
-      header: "Baseline care",
-      render: (zone) => <SafetyBadge level={zone.baselineSafetyLevel} size="compact" />,
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (zone) => (
-        <span className="flex gap-2">
-          <Button variant="ghost" onClick={() => void toggleResting(zone)}>
-            {zone.resting ? "Graze" : "Rest"}
-          </Button>
-          <Button variant="ghost" onClick={() => startEdit(zone)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void remove(zone)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
+  const [filter, setFilter] = useState("");
+
+  const typeLabel = (zone: Pick<Zone, "type">) => zone.type.replace(/_/g, " ");
+
+  /** The one line under a zone's name: what it is, which slot, who, what water. */
+  function lineFor(zone: Zone): string {
+    const count = occupantsOf(zone).length;
+    const drinksFrom = zone.waterSourceIds
+      .map((id) => water.find((source) => source.id === id)?.name ?? "Unknown")
+      .join(", ");
+    return [
+      capitalise(typeLabel(zone)),
+      /*
+        Inside or outside, on every row.
+        An animal holds one of each at once — a stall in the barn and a
+        pasture to go out in — and which slot a zone fills is read straight
+        off this. Left as a tickbox nobody sees, a stall marked outside
+        quietly takes the pasture's place and the horse looks like it has
+        no turnout.
+      */
+      slotForZone(zone) === "inside" ? "inside" : "outside",
+      `${count}${zone.capacity === undefined ? "" : ` / ${zone.capacity}`} head`,
+      zone.waterSourceIds.length === 0 ? "no water" : drinksFrom,
+      // Only the levels that change how somebody walks in; a column of 2s is
+      // a column nobody reads, and the level is in the editor either way.
+      zone.baselineSafetyLevel >= 3 ? `care level ${zone.baselineSafetyLevel}` : undefined,
+    ]
+      .filter((part) => part !== undefined)
+      .join(" · ");
+  }
+
+  /** The one chip: over capacity before resting, because it is a problem. */
+  function chipFor(zone: Zone): RowChip | undefined {
+    if (isOverCapacity(zone, occupantsOf(zone).length)) {
+      return { tone: "danger", label: "Over capacity" };
+    }
+    if (zone.resting) return { tone: "neutral", label: "Resting" };
+    return undefined;
+  }
 
   if (loading) return <p className="text-muted">Loading zones…</p>;
 
+  /*
+   * One list per group, rather than one list with a group column. The place
+   * is read as North, South and the barn — a flat list of nine sorted by name
+   * is a list somebody has to re-sort in their head every time they open it.
+   *
+   * The ungrouped come last under their own heading. A zone in no group is
+   * its own group, so they are collected rather than flagged.
+   */
+  const grouping = groupedZones(zones);
+  const restingCount = zones.filter((zone) => zone.resting).length;
+  const chips = [
+    { key: "", label: "All" },
+    ...grouping.map((entry) => ({
+      key: entry.group?.id ?? "alone",
+      label: entry.group?.name ?? "On their own",
+      count: entry.members.length,
+    })),
+    ...(restingCount === 0 ? [] : [{ key: "resting", label: "Resting", count: restingCount }]),
+  ];
+  const shownGroups = grouping
+    .filter(
+      (entry) => filter === "" || filter === "resting" || (entry.group?.id ?? "alone") === filter,
+    )
+    .map((entry) => ({
+      ...entry,
+      members: filter === "resting" ? entry.members.filter((zone) => zone.resting) : entry.members,
+    }))
+    .filter((entry) => filter !== "resting" || entry.members.length > 0);
+  const shownCount = shownGroups.reduce((sum, entry) => sum + entry.members.length, 0);
+  const totalCount = grouping.reduce((sum, entry) => sum + entry.members.length, 0);
+
   return (
-    <div className="flex flex-col gap-density">
-      <div className="flex items-center justify-end">
-        <Button variant="primary" onClick={startCreate}>
-          Add a zone
-        </Button>
-      </div>
+    // Bottom clearance on a phone, so the floating add button never sits on
+    // the last row.
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
+      {zones.length === 0 ? null : (
+        <div className="flex items-center justify-between gap-density">
+          <div className="min-w-0 flex-1">
+            <ChipGroup label="Filter zones" chips={chips} value={filter} onChange={setFilter} />
+          </div>
+          <AddAction label="Add zone" onClick={startCreate} />
+        </div>
+      )}
+
+      <FilteredLine
+        shown={shownCount}
+        total={totalCount}
+        labels={filter === "" ? [] : [chips.find((chip) => chip.key === filter)?.label ?? ""]}
+        onClear={() => setFilter("")}
+      />
+
+      {zones.length === 0 ? (
+        <EmptyState
+          title="No zones yet"
+          detail="Pens, pastures, and working facilities go here. Everything else hangs off them."
+          action={
+            <Button variant="primary" onClick={startCreate}>
+              Add the first zone
+            </Button>
+          }
+        />
+      ) : (
+        shownGroups.map((entry) => {
+          const heading = entry.group?.name ?? "On their own";
+          return (
+            <section
+              key={entry.group?.id ?? "on-their-own"}
+              aria-label={heading}
+              className="flex flex-col gap-2"
+            >
+              <div className="flex min-h-target items-center justify-between gap-2">
+                <h3 className="flex min-w-0 items-baseline gap-2 text-sm font-semibold text-ink">
+                  <span className="truncate">{heading}</span>
+                  <span className="shrink-0 font-normal text-muted">
+                    {entry.group === undefined
+                      ? "in no group"
+                      : `${typeLabel(entry.group)} · ${entry.members.length} zone${entry.members.length === 1 ? "" : "s"}`}
+                  </span>
+                </h3>
+                {/* The group is a zone too — an area or a barn — and editing
+                    or deleting it starts here, since it heads its own list
+                    rather than sitting in one. */}
+                {entry.group === undefined ? null : (
+                  <RowAction
+                    label={`Edit ${entry.group.name}`}
+                    onClick={() => startEdit(entry.group as Zone)}
+                  >
+                    Edit
+                  </RowAction>
+                )}
+              </div>
+
+              {entry.members.length === 0 ? (
+                // Made this morning, filled this afternoon. A group that
+                // disappeared while empty would read as one the app lost.
+                <p className="text-sm text-muted">
+                  Nothing in it yet. Set a zone&rsquo;s &ldquo;Part of&rdquo; to {heading}.
+                </p>
+              ) : (
+                <RowList label={`Zones in ${entry.group?.name ?? "no group"}`}>
+                  {entry.members.map((zone) => (
+                    <LandRow
+                      key={zone.id}
+                      title={zone.name}
+                      openLabel={`Edit ${zone.name}`}
+                      line={lineFor(zone)}
+                      chip={chipFor(zone)}
+                      quiet={zone.resting}
+                      onOpen={() => startEdit(zone)}
+                      action={
+                        <RowAction
+                          label={zone.resting ? `Graze ${zone.name}` : `Rest ${zone.name}`}
+                          onClick={() => void toggleResting(zone)}
+                        >
+                          {zone.resting ? "Graze" : "Rest"}
+                        </RowAction>
+                      }
+                    />
+                  ))}
+                </RowList>
+              )}
+            </section>
+          );
+        })
+      )}
 
       {draft !== undefined ? (
         <Modal
           key={editing?.id ?? "new"}
-          size="wide"
+          placement="side"
           title={editing === undefined ? "New zone" : `Editing ${editing.name}`}
           description="A pen, a trap, a pasture — anywhere an animal can be."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Add zone" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                // Delete lives here now the row has no room for it. The editor
+                // closes first, so the typed confirmation is the only dialog
+                // on screen rather than a second one stacked on this.
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const zone = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(zone);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
             <TextInput
@@ -379,7 +489,7 @@ export function ZonesPanel({
               label="Type"
               options={TYPE_OPTIONS}
               value={draft.type}
-              hint="An area is a named part of the place — North, South — that pens and pastures group into. A working facility holds cattle under handling but nothing lives there."
+              hint="Area: a named part of the place that pens group into. Working facility: nothing lives there."
               onChange={(event) => setDraft({ ...draft, type: event.target.value as ZoneType })}
             />
 
@@ -392,16 +502,14 @@ export function ZonesPanel({
             <Select
               label="Part of"
               value={draft.parentZoneId}
-              hint={
-                groupOptions.length === 0
-                  ? "Nothing can hold this yet — add an area (North, South) or a barn first."
-                  : "Leave it on its own if it belongs to nothing. That is a state, not a gap."
-              }
+              {...(groupOptions.length === 0
+                ? { hint: "Nothing can hold this yet — add an area or a barn first." }
+                : {})}
               options={[
                 { value: "", label: "On its own" },
                 ...groupOptions.map((group) => ({
                   value: group.id,
-                  label: `${group.name} (${group.type.replace(/_/g, " ")})`,
+                  label: `${group.name} (${typeLabel(group)})`,
                 })),
               ]}
               onChange={(event) => setDraft({ ...draft, parentZoneId: event.target.value })}
@@ -417,7 +525,7 @@ export function ZonesPanel({
             <Select
               label="Inside or outside"
               value={draft.indoor ? "inside" : "outside"}
-              hint="An animal holds one of each at once: a stall in the barn and a pasture to go out in."
+              hint="An animal holds one of each: a stall and a pasture."
               options={[
                 { value: "outside", label: "Outside — pasture, trap, lot" },
                 { value: "inside", label: "Inside — stall, barn pen, coop" },
@@ -429,7 +537,7 @@ export function ZonesPanel({
               type="number"
               inputMode="numeric"
               min={1}
-              hint="Head this place holds. Leave blank if it is not a number worth guessing."
+              hint="Head it holds. Blank if not worth guessing."
               value={draft.capacity}
               error={errors["capacity"]}
               onChange={(event) => setDraft({ ...draft, capacity: event.target.value })}
@@ -438,7 +546,7 @@ export function ZonesPanel({
               label="Baseline care level"
               options={SAFETY_OPTIONS}
               value={String(draft.baselineSafetyLevel)}
-              hint="Hazards of the place itself. Occupants can raise it, never lower it."
+              hint="Hazards of the place. Occupants can raise it, never lower it."
               onChange={(event) =>
                 setDraft({
                   ...draft,
@@ -449,13 +557,8 @@ export function ZonesPanel({
 
             <fieldset className="flex flex-col gap-1">
               <legend className="text-density font-medium text-ink">Water</legend>
-              <p className="text-sm text-muted">
-                Tanks are shared. Tick every source this zone drinks from.
-              </p>
               {water.length === 0 ? (
-                <p className="text-sm text-muted">
-                  No tanks yet — add them on the Water tab, then tick them here.
-                </p>
+                <p className="text-sm text-muted">No tanks yet — add them on the Water tab.</p>
               ) : (
                 water.map((source) => (
                   <Checkbox
@@ -477,7 +580,7 @@ export function ZonesPanel({
 
             <Checkbox
               label="Resting"
-              hint="Out of rotation — no animals should be assigned here."
+              hint="Out of rotation — no animals should be here."
               checked={draft.resting}
               onChange={(event) => setDraft({ ...draft, resting: event.target.checked })}
             />
@@ -485,79 +588,17 @@ export function ZonesPanel({
             <TextArea
               label="Care instructions"
               rows={3}
-              hint="Anything a housesitter needs to know about this place."
+              hint="What a housesitter needs to know."
               value={draft.customInstructions}
               onChange={(event) => setDraft({ ...draft, customInstructions: event.target.value })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Add zone" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       ) : null}
-
-      {zones.length === 0 ? (
-        <Card>
-          <EmptyState
-            title="No zones yet"
-            detail="Pens, pastures, and working facilities go here. Everything else hangs off them."
-            action={
-              <Button variant="primary" onClick={startCreate}>
-                Add the first zone
-              </Button>
-            }
-          />
-        </Card>
-      ) : (
-        /*
-         * One table per group, rather than one table with a group column and
-         * nothing else to say. The place is read as North, South and the barn
-         * — a flat list of nine sorted by name is a list somebody has to
-         * re-sort in their head every time they open it.
-         *
-         * The ungrouped come last under their own heading. A zone in no group
-         * is its own group, so they are collected rather than flagged.
-         */
-        groupedZones(zones).map((entry) => (
-          <Card key={entry.group?.id ?? "on-their-own"}>
-            <div className="flex flex-wrap items-baseline justify-between gap-2 pb-density">
-              <h3 className="font-heading text-lg font-semibold text-ink">
-                {entry.group?.name ?? "On their own"}
-              </h3>
-              <span className="flex flex-wrap items-center gap-2">
-                {entry.group === undefined ? (
-                  <span className="text-sm text-muted">In no group — each its own</span>
-                ) : (
-                  <Badge tone="neutral">{entry.group.type.replace(/_/g, " ")}</Badge>
-                )}
-                <Pill>
-                  {entry.members.length} zone{entry.members.length === 1 ? "" : "s"}
-                </Pill>
-              </span>
-            </div>
-
-            {entry.members.length === 0 ? (
-              // Made this morning, filled this afternoon. A group that
-              // disappeared while empty would read as one the app lost.
-              <EmptyState
-                title="Nothing in it yet"
-                detail={`Set a zone's "Part of" to ${entry.group?.name ?? "this"} and it appears here.`}
-              />
-            ) : (
-              <DataTable
-                caption={`Zones in ${entry.group?.name ?? "no group"}`}
-                columns={columns}
-                rows={entry.members}
-                rowKey={(zone) => zone.id}
-              />
-            )}
-          </Card>
-        ))
-      )}
     </div>
   );
+}
+
+function capitalise(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

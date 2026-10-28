@@ -4,11 +4,8 @@ import { useState } from "react";
 
 import {
   Button,
-  CardGrid,
   EmptyState,
   Modal,
-  Pill,
-  RecordCard,
   Section,
   Select,
   TextArea,
@@ -37,6 +34,13 @@ import {
   formatDate,
   quantityLabel,
 } from "@/app/(admin)/admin/garden/_components/labels";
+import {
+  AddAction,
+  ChipGroup,
+  FilteredLine,
+  LandRow,
+  RowList,
+} from "@/app/(admin)/admin/pastures/_components/land-kit";
 import { pantryByMethod, pantryShelf, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
@@ -44,7 +48,7 @@ import { useMutations } from "@/lib/local/mutations";
  * The pantry (spec §5.5).
  *
  * §5.5 calls this "your pantry inventory", and an inventory is not a log. The
- * shelf above is folded on label, method and unit, because twelve entries of
+ * shelf is folded on label, method and unit, because twelve entries of
  * six jars across a summer is seventy-two jars of salsa and reading it as
  * twelve rows is reading it wrong. Method stays in the key — canned green
  * beans and frozen green beans are different food in different places — and so
@@ -218,128 +222,138 @@ export function PantryPanel({
 
   if (loading) return <p className="text-muted">Loading the pantry…</p>;
 
-  return (
-    <div className="flex flex-col gap-density">
-      <Section
-        title="On the shelf"
-        description="Everything put by, folded together by label. This is the inventory — the batches that made it up are below."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              label="Method"
-              hideLabel
-              options={[{ value: "all", label: "Everything" }, ...PRESERVATION_OPTIONS]}
-              value={method}
-              onChange={(event) => setMethod(event.target.value as PreservationMethod | "all")}
-            />
-            <Button variant="primary" onClick={startCreate}>
-              Put something by
-            </Button>
-          </div>
-        }
-      >
-        {pantry.length === 0 ? (
-          <EmptyState
-            title="Nothing put by yet"
-            detail="Record a batch as it comes out of the canner. The label and where it is stored are what turn this into something you can stand in a doorway and read."
-            action={
-              <Button variant="primary" onClick={startCreate}>
-                Record the first batch
-              </Button>
-            }
-          />
-        ) : (
-          <>
-            <div className="mb-density flex flex-wrap gap-2">
-              {PRESERVATION_METHODS.map((each) => (
-                <Pill key={each} tone={byMethod.get(each) === undefined ? "neutral" : "calm"}>
-                  {PRESERVATION_LABEL[each]}: {byMethod.get(each) ?? 0}
-                </Pill>
-              ))}
-            </div>
+  // The methods in use, as chips carrying what the old row of pills counted.
+  const chips = [
+    { key: "all", label: "All" },
+    ...PRESERVATION_METHODS.filter((each) => byMethod.get(each) !== undefined).map((each) => ({
+      key: each,
+      label: PRESERVATION_LABEL[each],
+      count: byMethod.get(each),
+    })),
+  ];
 
-            {shelf.length === 0 ? (
-              <EmptyState
-                title="Nothing under that method"
-                detail="Switch the filter back to everything."
+  return (
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
+      {pantry.length === 0 ? (
+        <EmptyState
+          title="Nothing put by yet"
+          detail="Record a batch as it comes out of the canner. The label and where it is kept make it readable from a doorway."
+          action={
+            <Button variant="primary" onClick={startCreate}>
+              Record the first batch
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-density">
+            <div className="min-w-0 flex-1">
+              <ChipGroup
+                label="Filter by method"
+                chips={chips}
+                value={method}
+                // The chip row's "off" is "", which here means everything.
+                onChange={(key) => setMethod(key === "" ? "all" : (key as PreservationMethod))}
               />
-            ) : (
-              <CardGrid columns={3}>
-                {shelf.map((line) => (
-                  <RecordCard
-                    key={`${line.label}-${line.method}-${line.unit}`}
-                    tone="calm"
-                    title={line.label}
-                    subtitle={
-                      line.locations.length === 0
-                        ? "No storage place recorded"
-                        : line.locations.join(" · ")
-                    }
-                    meta={
-                      <>
-                        <Pill tone="identity">{quantityLabel(line.quantity, line.unit)}</Pill>
-                        <Pill tone="neutral">{PRESERVATION_LABEL[line.method]}</Pill>
-                        <Pill tone="neutral">last put by {formatDate(line.latest)}</Pill>
-                      </>
-                    }
+            </div>
+            <AddAction label="Put something by" onClick={startCreate} />
+          </div>
+
+          <FilteredLine
+            shown={shown.length}
+            total={pantry.length}
+            labels={method === "all" ? [] : [PRESERVATION_LABEL[method]]}
+            onClear={() => setMethod("all")}
+          />
+
+          {/* The inventory: everything put by, folded together by label. The
+              batches that made it up are below. */}
+          <Section title="On the shelf">
+            <RowList label="On the shelf">
+              {shelf.map((line) => (
+                <LandRow
+                  key={`${line.label}-${line.method}-${line.unit}`}
+                  title={
+                    <>
+                      {line.label}{" "}
+                      <span className="gf-numeric font-normal text-muted">
+                        {quantityLabel(line.quantity, line.unit)}
+                      </span>
+                    </>
+                  }
+                  line={[
+                    PRESERVATION_LABEL[line.method],
+                    line.locations.length === 0 ? "no storage place" : line.locations.join(", "),
+                    `last put by ${formatDate(line.latest)}`,
+                  ].join(" · ")}
+                />
+              ))}
+            </RowList>
+          </Section>
+
+          {/* Each run through the canner, the freezer or the dehydrator. Edit
+              the count down as jars are eaten — that keeps the batch. */}
+          <Section title="Batches">
+            <RowList label="Pantry batches">
+              {[...shown]
+                .sort((left, right) => right.preservedOn.getTime() - left.preservedOn.getTime())
+                .map((entry) => (
+                  <LandRow
+                    key={entry.id}
+                    title={entry.label}
+                    openLabel={`Edit ${entry.label}, ${formatDate(entry.preservedOn)}`}
+                    line={[
+                      quantityLabel(entry.quantity, entry.unit),
+                      PRESERVATION_LABEL[entry.method],
+                      formatDate(entry.preservedOn),
+                      entry.storageLocation,
+                    ]
+                      .filter((part) => part !== undefined)
+                      .join(" · ")}
+                    quiet={entry.quantity === 0}
+                    onOpen={() => startEdit(entry)}
                   />
                 ))}
-              </CardGrid>
-            )}
-          </>
-        )}
-      </Section>
-
-      {pantry.length === 0 ? null : (
-        <Section
-          title="Batches"
-          description="Each run through the canner, the freezer or the dehydrator. Edit the count down as jars are eaten — that keeps the record of the batch."
-        >
-          <div className="flex flex-col divide-y divide-rule">
-            {[...pantry]
-              .sort((left, right) => right.preservedOn.getTime() - left.preservedOn.getTime())
-              .map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex flex-wrap items-center justify-between gap-3 py-2"
-                >
-                  <span className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="text-density text-ink">{entry.label}</span>
-                    <Pill tone="identity">{quantityLabel(entry.quantity, entry.unit)}</Pill>
-                    <Pill tone="neutral">{PRESERVATION_LABEL[entry.method]}</Pill>
-                    <span className="text-sm text-muted">{formatDate(entry.preservedOn)}</span>
-                    {entry.storageLocation === undefined ? null : (
-                      <span className="text-sm text-muted">· {entry.storageLocation}</span>
-                    )}
-                  </span>
-                  <span className="flex flex-wrap gap-2">
-                    <Button variant="ghost" onClick={() => startEdit(entry)}>
-                      Edit
-                    </Button>
-                    <Button variant="ghost" onClick={() => void remove(entry)}>
-                      Delete
-                    </Button>
-                  </span>
-                </div>
-              ))}
-          </div>
-        </Section>
+            </RowList>
+          </Section>
+        </>
       )}
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
-          size="wide"
+          placement="side"
           title={editing === undefined ? "Put something by" : `Editing ${editing.label}`}
-          description="What is written on the jar, how much of it there is, and where it went."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Put it by" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const entry = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(entry);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+            <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <TextInput
                 label="Label"
                 required
-                hint="What you would write on the lid — &ldquo;Salsa, medium&rdquo;, &ldquo;Green beans&rdquo;."
+                placeholder="Salsa, medium"
                 value={draft.label}
                 error={errors["label"]}
                 onChange={(event) => setDraft({ ...draft, label: event.target.value })}
@@ -384,7 +398,7 @@ export function PantryPanel({
               />
               <TextInput
                 label="Where it is kept"
-                hint="&ldquo;Pantry shelf 2&rdquo;, &ldquo;chest freezer&rdquo;, &ldquo;cellar&rdquo;."
+                placeholder="Pantry shelf 2"
                 value={draft.storageLocation}
                 error={errors["storageLocation"]}
                 onChange={(event) => setDraft({ ...draft, storageLocation: event.target.value })}
@@ -393,7 +407,7 @@ export function PantryPanel({
 
             <Select
               label="From which harvest"
-              hint="Optional — plenty of what gets put by never came off these beds."
+              hint="Optional — not everything came off these beds."
               options={[
                 { value: "", label: "Not from a recorded harvest" },
                 ...[...harvests]
@@ -408,18 +422,11 @@ export function PantryPanel({
             <TextArea
               label="Notes"
               rows={3}
-              hint="The recipe, the processing time, how it turned out."
+              placeholder="Recipe, processing time, how it turned out"
               value={draft.notes}
               error={errors["notes"]}
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Put it by" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}

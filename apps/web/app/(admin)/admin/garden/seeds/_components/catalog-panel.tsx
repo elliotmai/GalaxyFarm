@@ -4,17 +4,13 @@ import { useMemo, useState } from "react";
 
 import {
   Button,
-  Callout,
-  DataTable,
   Modal,
-  Pill,
   Section,
   Select,
   TextArea,
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import type { CrudError, Ulid } from "@galaxy-farm/core";
 import {
@@ -29,6 +25,15 @@ import {
 } from "@galaxy-farm/module-garden";
 
 import { quantityLabel } from "@/app/(admin)/admin/garden/_components/labels";
+import {
+  AddAction,
+  ChipGroup,
+  FilteredLine,
+  LandRow,
+  RowAction,
+  RowList,
+  StatusLine,
+} from "@/app/(admin)/admin/pastures/_components/land-kit";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -114,8 +119,9 @@ export function CatalogPanel({
   if (loading) return <p className="text-muted">Loading the catalogue…</p>;
 
   return (
-    <div className="flex flex-col gap-density">
-      <Crops crops={crops} varieties={varieties} propertyId={propertyId} actorId={actorId} />
+    // Varieties lead: they are what gets looked up and added to. Crops are
+    // the short list behind them, changed a few times a year.
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
       <Varieties
         crops={crops}
         varieties={varieties}
@@ -125,6 +131,7 @@ export function CatalogPanel({
         propertyId={propertyId}
         actorId={actorId}
       />
+      <Crops crops={crops} varieties={varieties} propertyId={propertyId} actorId={actorId} />
     </div>
   );
 }
@@ -223,78 +230,82 @@ function Crops({
     });
   }
 
-  const columns: readonly Column<Crop>[] = [
-    { key: "name", header: "Crop", primary: true, render: (row) => row.name },
-    {
-      key: "family",
-      header: "Family",
-      render: (row) => <Pill tone="identity">{row.family}</Pill>,
-    },
-    {
-      key: "varieties",
-      header: "Varieties",
-      numeric: true,
-      render: (row) => varietiesOf(row.id).length,
-    },
-    {
-      key: "notes",
-      header: "Notes",
-      render: (row) =>
-        row.notes === undefined ? <span className="text-muted">—</span> : row.notes,
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (row) => (
-        <span className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => startEdit(row)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void remove(row)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
-
   return (
+    // The family is what the rotation guard checks, so two nightshades filed
+    // under the same family is the point rather than an accident.
     <Section
       title="Crops"
-      description="A crop and the botanical family it belongs to. The family is what the rotation guard checks, so two nightshades filed under the same family is the point rather than an accident."
       actions={
-        <Button
-          variant="primary"
+        <RowAction
           onClick={() => {
             setEditing(undefined);
             setDraft(BLANK_CROP);
             setErrors({});
           }}
         >
-          Add a crop
-        </Button>
+          + Add crop
+        </RowAction>
       }
     >
-      <DataTable
-        rows={[...crops].sort((left, right) => left.name.localeCompare(right.name))}
-        columns={columns}
-        rowKey={(row) => row.id}
-        caption="Crops"
-        empty="No crops yet. Add tomatoes, then the varieties under them."
-      />
+      {crops.length === 0 ? (
+        <p className="text-sm text-muted">
+          No crops yet. Add tomatoes, then the varieties under them.
+        </p>
+      ) : (
+        <RowList label="Crops">
+          {[...crops]
+            .sort((left, right) => left.name.localeCompare(right.name))
+            .map((crop) => {
+              const count = varietiesOf(crop.id).length;
+              return (
+                <LandRow
+                  key={crop.id}
+                  title={crop.name}
+                  openLabel={`Edit ${crop.name}`}
+                  line={[crop.family, `${count} variet${count === 1 ? "y" : "ies"}`, crop.notes]
+                    .filter((part) => part !== undefined)
+                    .join(" · ")}
+                  onOpen={() => startEdit(crop)}
+                />
+              );
+            })}
+        </RowList>
+      )}
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new-crop"}
+          placement="side"
           title={editing === undefined ? "New crop" : `Editing ${editing.name}`}
-          description="What it is, and what family it is in."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Add crop" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const crop = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(crop);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
             <TextInput
               label="Name"
               required
-              hint="&ldquo;Tomato&rdquo;, &ldquo;Okra&rdquo;, &ldquo;Sweet corn&rdquo;."
+              placeholder="Tomato"
               value={draft.name}
               error={errors["name"]}
               onChange={(event) => setDraft({ ...draft, name: event.target.value })}
@@ -303,7 +314,7 @@ function Crops({
               label="Botanical family"
               required
               list="garden-families"
-              hint="Tomatoes, peppers, potatoes and aubergines are all Solanaceae — which is exactly why rotation is checked on this and not on the name."
+              hint="Rotation is checked on this, not the name — tomatoes and peppers are both Solanaceae."
               value={draft.family}
               error={errors["family"]}
               onChange={(event) => setDraft({ ...draft, family: event.target.value })}
@@ -320,12 +331,6 @@ function Crops({
               error={errors["notes"]}
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Add crop" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}
@@ -500,120 +505,130 @@ function Varieties({
     });
   }
 
-  const columns: readonly Column<Variety>[] = [
-    { key: "name", header: "Variety", primary: true, render: (row) => row.name },
-    {
-      key: "crop",
-      header: "Crop",
-      render: (row) => cropName(row.cropId) ?? <span className="text-muted">unfiled</span>,
-    },
-    {
-      key: "dtm",
-      header: "Days to maturity",
-      numeric: true,
-      render: (row) =>
-        row.daysToMaturity === undefined ? (
-          <span className="text-muted">—</span>
-        ) : (
-          row.daysToMaturity
-        ),
-    },
-    {
-      key: "spacing",
-      header: "Spacing",
-      numeric: true,
-      render: (row) =>
-        row.spacingInches === undefined ? (
-          <span className="text-muted">—</span>
-        ) : (
-          `${row.spacingInches}"`
-        ),
-    },
-    {
-      key: "used",
-      header: "Named by",
-      render: (row) => {
-        const found = usage.get(row.id);
-        const blocking = [...new Set(found?.blocking ?? [])];
-        const packets = found?.seed.length ?? 0;
+  const [cropFilter, setCropFilter] = useState("");
 
-        if (blocking.length === 0 && packets === 0) {
-          return <span className="text-muted">nothing yet</span>;
-        }
+  /** The one line: what crop, how long, how far apart, what uses it. */
+  function lineFor(variety: Variety): string {
+    const found = usage.get(variety.id);
+    const packets = found?.seed.length ?? 0;
+    return [
+      cropName(variety.cropId) ?? "unfiled",
+      variety.daysToMaturity === undefined ? undefined : `${variety.daysToMaturity} days`,
+      variety.spacingInches === undefined ? undefined : `${variety.spacingInches}" apart`,
+      packets === 0 ? undefined : `${packets} in the box`,
+      ...new Set(found?.blocking ?? []),
+    ]
+      .filter((part) => part !== undefined)
+      .join(" · ");
+  }
 
-        return (
-          <span className="flex flex-wrap gap-1.5">
-            {blocking.map((label) => (
-              <Pill key={label}>{label}</Pill>
-            ))}
-            {packets === 0 ? null : <Pill tone="calm">{packets} in the box</Pill>}
-          </span>
-        );
-      },
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (row) => (
-        <span className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => startEdit(row)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void remove(row)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
+  const sorted = [...varieties].sort(
+    (left, right) =>
+      (cropName(left.cropId) ?? "").localeCompare(cropName(right.cropId) ?? "") ||
+      left.name.localeCompare(right.name),
+  );
+  // The crops that have varieties, as the chips — the filter is "which
+  // tomato", and a crop with nothing under it has nothing to show.
+  const chips = [
+    { key: "", label: "All", count: varieties.length },
+    ...[...crops]
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((crop) => ({
+        key: crop.id,
+        label: crop.name,
+        count: varieties.filter((variety) => variety.cropId === crop.id).length,
+      }))
+      .filter((chip) => chip.count > 0),
   ];
+  const shown = sorted.filter((variety) => cropFilter === "" || variety.cropId === cropFilter);
 
   return (
+    // Days to maturity is what the expected harvest date is worked out from,
+    // so it is the field worth copying off the packet.
     <Section
       title="Varieties"
-      description="Which tomato. Days to maturity is what the expected harvest date is worked out from, so it is the field worth copying off the packet."
       actions={
-        <Button
-          variant="primary"
+        <AddAction
+          label="Add variety"
           disabled={crops.length === 0}
           onClick={() => {
             setEditing(undefined);
             setDraft(BLANK_VARIETY);
             setErrors({});
           }}
-        >
-          Add a variety
-        </Button>
+        />
       }
     >
       {crops.length === 0 ? (
-        <Callout tone="action" title="Add a crop first">
-          A variety is a variety of something, and the crop is what carries the botanical family the
-          rotation guard reads.
-        </Callout>
+        <StatusLine tone="action">
+          Add a crop first — it carries the botanical family the rotation guard reads.
+        </StatusLine>
       ) : null}
 
-      <DataTable
-        rows={[...varieties].sort(
-          (left, right) =>
-            (cropName(left.cropId) ?? "").localeCompare(cropName(right.cropId) ?? "") ||
-            left.name.localeCompare(right.name),
-        )}
-        columns={columns}
-        rowKey={(row) => row.id}
-        caption="Varieties"
-        empty="No varieties yet."
-      />
+      {varieties.length === 0 ? (
+        <p className="text-sm text-muted">No varieties yet.</p>
+      ) : (
+        <>
+          {chips.length <= 2 ? null : (
+            <ChipGroup
+              label="Filter by crop"
+              chips={chips}
+              value={cropFilter}
+              onChange={setCropFilter}
+            />
+          )}
+          <FilteredLine
+            shown={shown.length}
+            total={varieties.length}
+            labels={cropFilter === "" ? [] : [cropName(cropFilter as Ulid) ?? "A crop"]}
+            onClear={() => setCropFilter("")}
+          />
+          <RowList label="Varieties">
+            {shown.map((variety) => (
+              <LandRow
+                key={variety.id}
+                title={variety.name}
+                openLabel={`Edit ${variety.name}`}
+                line={lineFor(variety)}
+                onOpen={() => startEdit(variety)}
+              />
+            ))}
+          </RowList>
+        </>
+      )}
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new-variety"}
-          size="wide"
+          placement="side"
           title={editing === undefined ? "New variety" : `Editing ${editing.name}`}
-          description="Off the packet: what it is called, how long it takes, and how far apart it goes."
+          description="Off the packet: name, days to maturity, spacing."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Add variety" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const variety = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(variety);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+            <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <Select
                 label="Crop"
                 required
@@ -630,7 +645,7 @@ function Varieties({
               <TextInput
                 label="Name"
                 required
-                hint="&ldquo;Cherokee Purple&rdquo;, &ldquo;Clemson Spineless&rdquo;."
+                placeholder="Cherokee Purple"
                 value={draft.name}
                 error={errors["name"]}
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
@@ -642,7 +657,7 @@ function Varieties({
                 min={1}
                 step={1}
                 numeric
-                hint="Counted from transplant for a transplanted crop, which is what the expected harvest date assumes."
+                hint="From transplant, for a transplanted crop."
                 value={draft.daysToMaturity}
                 error={errors["daysToMaturity"]}
                 onChange={(event) => setDraft({ ...draft, daysToMaturity: event.target.value })}
@@ -660,7 +675,6 @@ function Varieties({
               />
               <TextInput
                 label="Source"
-                hint="Who it came from, so re-ordering does not need a search."
                 value={draft.source}
                 error={errors["source"]}
                 onChange={(event) => setDraft({ ...draft, source: event.target.value })}
@@ -670,18 +684,11 @@ function Varieties({
             <TextArea
               label="Notes"
               rows={3}
-              hint="How it did, what it tasted like, whether it cracked."
+              placeholder="How it did, how it tasted, whether it cracked"
               value={draft.notes}
               error={errors["notes"]}
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Add variety" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}

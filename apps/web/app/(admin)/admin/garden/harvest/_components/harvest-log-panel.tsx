@@ -4,17 +4,13 @@ import { useState } from "react";
 
 import {
   Button,
-  DataTable,
   EmptyState,
   Modal,
-  Pill,
-  Section,
   Select,
   TextArea,
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import type { CrudError, Ulid } from "@galaxy-farm/core";
 import {
@@ -36,6 +32,7 @@ import {
   formatDate,
   quantityLabel,
 } from "@/app/(admin)/admin/garden/_components/labels";
+import { AddAction, LandRow, RowList } from "@/app/(admin)/admin/pastures/_components/land-kit";
 import { varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
@@ -239,63 +236,9 @@ export function HarvestLogPanel({
     });
   }
 
-  const columns: readonly Column<HarvestLog>[] = [
-    {
-      key: "harvestedOn",
-      header: "Picked",
-      primary: true,
-      render: (row) => formatDate(row.harvestedOn),
-    },
-    { key: "planting", header: "From", render: (row) => plantingLabel(row.plantingId) },
-    {
-      key: "quantity",
-      header: "How much",
-      numeric: true,
-      render: (row) => quantityLabel(row.quantity, row.unit),
-    },
-    {
-      key: "preserved",
-      header: "Put by",
-      render: (row) => {
-        const jars = pantry.filter((entry) => entry.harvestLogId === row.id);
-        return jars.length === 0 ? (
-          <span className="text-muted">—</span>
-        ) : (
-          <span className="flex flex-wrap gap-1.5">
-            {jars.map((entry) => (
-              <Pill key={entry.id} tone="calm">
-                {entry.label}
-              </Pill>
-            ))}
-          </span>
-        );
-      },
-    },
-    {
-      key: "notes",
-      header: "Notes",
-      render: (row) =>
-        row.notes === undefined ? <span className="text-muted">—</span> : row.notes,
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (row) => (
-        <span className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => startEdit(row)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void remove(row)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
-
   if (loading) return <p className="text-muted">Loading the harvest log…</p>;
 
-  /** What each planting has given in total, for the summary above the table. */
+  /** What each planting has given in total, for the summary under the list. */
   const yields = pickable
     .map((planting) => ({ planting, totals: totalHarvest(harvests, planting.id) }))
     .filter((row) => row.totals.size > 0)
@@ -303,76 +246,121 @@ export function HarvestLogPanel({
       plantingLabel(left.planting.id).localeCompare(plantingLabel(right.planting.id)),
     );
 
+  /** The one line: when, how much, what it became, anything noted. */
+  function lineFor(log: HarvestLog): string {
+    const jars = pantry.filter((entry) => entry.harvestLogId === log.id);
+    return [
+      formatDate(log.harvestedOn),
+      quantityLabel(log.quantity, log.unit),
+      jars.length === 0 ? undefined : `put by: ${jars.map((entry) => entry.label).join(", ")}`,
+      log.notes,
+    ]
+      .filter((part) => part !== undefined)
+      .join(" · ");
+  }
+
   return (
-    <div className="flex flex-col gap-density">
-      <Section
-        title="Harvest log"
-        description="One entry per picking. Kept as a log rather than a total because the dates are what tell you how long a variety kept giving."
-        actions={
-          <Button variant="primary" onClick={startCreate} disabled={pickable.length === 0}>
-            Record a harvest
-          </Button>
-        }
-      >
-        {pickable.length === 0 ? (
-          <EmptyState
-            title="Nothing to harvest from"
-            detail="A harvest is a harvest of a planting. Record what is in the ground first."
-          />
-        ) : harvests.length === 0 ? (
-          <EmptyState
-            title="Nothing picked yet"
-            detail="Record what comes off as it comes off — a weight and a date is enough."
-            action={
-              <Button variant="primary" onClick={startCreate}>
-                Record the first harvest
-              </Button>
-            }
-          />
-        ) : (
-          <>
-            {yields.length === 0 ? null : (
-              <div className="mb-density flex flex-wrap gap-2">
+    // One entry per picking — a log rather than a total, because the dates
+    // are what tell you how long a variety kept giving.
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
+      {pickable.length === 0 ? (
+        <EmptyState
+          title="Nothing to harvest from"
+          detail="A harvest is a harvest of a planting. Record what is in the ground first."
+        />
+      ) : harvests.length === 0 ? (
+        <EmptyState
+          title="Nothing picked yet"
+          detail="Record what comes off as it comes off — a weight and a date is enough."
+          action={
+            <Button variant="primary" onClick={startCreate}>
+              Record the first harvest
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-density">
+            <button
+              type="button"
+              onClick={onPreserve}
+              className="inline-flex min-h-target items-center text-sm font-semibold text-action underline-offset-2 hover:underline"
+            >
+              Put some of it by →
+            </button>
+            <AddAction label="Record harvest" onClick={startCreate} />
+          </div>
+
+          <RowList label="Harvest log">
+            {[...harvests]
+              .sort((left, right) => right.harvestedOn.getTime() - left.harvestedOn.getTime())
+              .map((log) => (
+                <LandRow
+                  key={log.id}
+                  title={plantingLabel(log.plantingId)}
+                  openLabel={`Edit ${quantityLabel(log.quantity, log.unit)} of ${plantingLabel(log.plantingId)}, ${formatDate(log.harvestedOn)}`}
+                  line={lineFor(log)}
+                  onOpen={() => startEdit(log)}
+                />
+              ))}
+          </RowList>
+
+          {/* Totals per planting, folded: read at the end of a season, not
+              every time somebody records a picking. Units never add across. */}
+          {yields.length === 0 ? null : (
+            <details className="group text-sm">
+              <summary className="inline-flex min-h-target cursor-pointer list-none items-center gap-1 font-semibold text-action [&::-webkit-details-marker]:hidden">
+                Totals by planting
+                <span aria-hidden="true" className="transition-transform group-open:rotate-90">
+                  ›
+                </span>
+              </summary>
+              <ul className="flex flex-col gap-1 pt-1 text-muted">
                 {yields.map(({ planting, totals }) => (
-                  <Pill key={planting.id} tone="identity">
-                    {plantingLabel(planting.id)}:{" "}
+                  <li key={planting.id}>
+                    <span className="font-medium text-ink">{plantingLabel(planting.id)}</span> ·{" "}
                     {[...totals.entries()]
                       .map(([unit, amount]) => quantityLabel(amount, unit))
                       .join(", ")}
-                  </Pill>
+                  </li>
                 ))}
-              </div>
-            )}
-
-            <DataTable
-              rows={[...harvests].sort(
-                (left, right) => right.harvestedOn.getTime() - left.harvestedOn.getTime(),
-              )}
-              columns={columns}
-              rowKey={(row) => row.id}
-              caption="Harvest log"
-              empty="Nothing picked yet."
-            />
-
-            <div className="mt-density">
-              <Button variant="ghost" onClick={onPreserve}>
-                Put some of it by →
-              </Button>
-            </div>
-          </>
-        )}
-      </Section>
+              </ul>
+            </details>
+          )}
+        </>
+      )}
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
-          size="wide"
+          placement="side"
           title={editing === undefined ? "Record a harvest" : "Editing a harvest entry"}
-          description="What came off, from what, and when."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Record it" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const log = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(log);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+            <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <Select
                 label="From"
                 required
@@ -409,7 +397,7 @@ export function HarvestLogPanel({
               />
               <Select
                 label="Unit"
-                hint="Whatever you actually measured in. Units are never added together."
+                hint="What you measured in. Units are never added together."
                 options={HARVEST_UNIT_OPTIONS}
                 value={draft.unit}
                 error={errors["unit"]}
@@ -422,18 +410,11 @@ export function HarvestLogPanel({
             <TextArea
               label="Notes"
               rows={3}
-              hint="Size, quality, whether it split — what you would want to read next January."
+              placeholder="Size, quality, whether it split"
               value={draft.notes}
               error={errors["notes"]}
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Record it" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}

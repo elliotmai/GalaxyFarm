@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { PageBody, PageHeader, Tabs, Tile } from "@galaxy-farm/ui";
+import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import { addCalendarDays, startOfDay, type Ulid } from "@galaxy-farm/core";
 import type {
   Bed,
@@ -25,11 +25,11 @@ import { useRecords } from "@/lib/local/use-records";
  * gets read once; a pantry is an inventory and gets read every time somebody
  * plans a week of meals or wonders whether to can more tomatoes. So the shelf
  * is folded into lines — twelve entries of six jars is seventy-two jars of
- * salsa, not twelve things to scroll past — and the tiles above it count what
- * is on the shelf rather than what happened this month.
+ * salsa, not twelve things to scroll past — and the facts beside the title
+ * lead with what is on the shelf rather than what happened this month.
  */
 
-/** How far back the "picked recently" tile looks. */
+/** How far back the "picked recently" fact looks. */
 const RECENT_DAYS = 30;
 
 export function HarvestScreen({
@@ -61,49 +61,23 @@ export function HarvestScreen({
   const jars = pantry
     .filter((log) => log.unit === "jar" || log.unit === "quart" || log.unit === "pint")
     .reduce((total, log) => total + log.quantity, 0);
-  const places = new Set(
-    pantry
-      .map((log) => log.storageLocation?.trim())
-      .filter((place): place is string => place !== undefined && place !== ""),
-  );
+
+  // What the tiles used to count, as facts beside the title: what is on the
+  // shelf first, because that is what gets read.
+  const facts =
+    shelf.length === 0 && harvests.length === 0
+      ? "Nothing put by yet"
+      : [
+          `${shelf.length} on the shelf`,
+          jars === 0 ? undefined : `${Number.isInteger(jars) ? jars : jars.toFixed(1)} jars`,
+          `${recent.length} picked in ${RECENT_DAYS} days`,
+        ]
+          .filter((part) => part !== undefined)
+          .join(" · ");
 
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Land"
-        title="Harvest & pantry"
-        subtitle="What came off the beds, and what is on the shelf because of it."
-      />
-
-      <div className="gf-stat-row">
-        <Tile
-          label="On the shelf"
-          value={shelf.length}
-          tone="identity"
-          emphasis
-          hint={shelf.length === 0 ? "Nothing put by yet" : "Distinct labels"}
-        />
-        <Tile
-          label="Jars & bottles"
-          value={Number.isInteger(jars) ? jars : jars.toFixed(1)}
-          tone="calm"
-          hint="Anything counted in jars, quarts or pints"
-        />
-        <Tile
-          label={`Picked in ${RECENT_DAYS} days`}
-          value={recent.length}
-          tone="action"
-          hint={
-            harvests.length === recent.length ? "Harvest entries" : `${harvests.length} in total`
-          }
-        />
-        <Tile
-          label="Storage places"
-          value={places.size}
-          tone="neutral"
-          hint={places.size === 0 ? "None named yet" : [...places].slice(0, 2).join(", ")}
-        />
-      </div>
+      <PageHeader eyebrow="Land" title="Harvest & pantry" subtitle={facts} />
 
       <Tabs
         label="Harvest"
