@@ -15,12 +15,17 @@ import {
   Tile,
 } from "@galaxy-farm/ui";
 import {
+  addCalendarDays,
   coversToFit,
   effectiveSafetyLevel,
   freezeCheckTargets,
+  frostRisk,
+  isSameDay,
+  type Forecast,
   type Animal,
   type FreezeCheckTarget,
   type SafetyLevel,
+  type WatchSettings,
   type Ulid,
   type WaterSource,
   type Zone,
@@ -35,11 +40,13 @@ import {
   type CalvingWatch,
 } from "@/app/(admin)/admin/_components/calving-watch-card";
 import {
-  ChoresChecklist,
+  DayProgress,
+  TickList,
   useChoreSheet,
   type ChoreSheet,
+  type PeopleNames,
 } from "@/app/(admin)/admin/_components/chores-card";
-import { NeedsYou, type Need } from "@/app/(admin)/admin/_components/needs-you";
+import { AllClear, NeedsYou, type Need } from "@/app/(admin)/admin/_components/needs-you";
 import {
   WeaningPanel,
   useWeaningWatch,
@@ -50,11 +57,13 @@ import { useRecords } from "@/lib/local/use-records";
 /**
  * The admin dashboard — "Today".
  *
- * Status by exception. The screen leads with what needs somebody — a cow in
- * her window, calves to wean, a cover off a tank, a chore gone overdue — and
- * everything that is fine collapses into one green line instead of a card
- * apiece saying so. A dashboard where every card always has something on it
- * is one people stop reading.
+ * The day's one weekly-shaped job first: how far through feeding and chores
+ * the place is, on the same list the barn kiosk ticks, so somebody away from
+ * the farm can see what got done and by whom. Then status by exception — a
+ * cow in her window, calves to wean, a cover off a tank, a chore gone overdue
+ * — and everything that is fine collapses into one green line instead of a
+ * card apiece saying so. A dashboard where every card always has something on
+ * it is one people stop reading.
  *
  * Everything here is derived from records rather than entered — the pen board
  * from assignments, the effective safety level from the animals standing in a
@@ -68,9 +77,12 @@ import { useRecords } from "@/lib/local/use-records";
 export function Dashboard({
   propertyId,
   actorId,
+  names,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /** Who ticked what, resolved on the server; never rejects. */
+  readonly names?: Promise<PeopleNames> | undefined;
 }) {
   const query = { propertyId };
   const { records: zones, loading: zonesLoading } = useRecords<Zone>("zones", query);
@@ -104,6 +116,7 @@ export function Dashboard({
     <Today
       propertyId={propertyId}
       actorId={actorId}
+      names={names}
       zones={zones}
       animals={animals}
       assignments={assignments}
@@ -116,6 +129,46 @@ export function Dashboard({
 function names(list: readonly string[], max = 2): string {
   if (list.length <= max) return list.join(" · ");
   return `${list.slice(0, max).join(" · ")} +${list.length - max} more`;
+}
+
+/**
+ * One fact about the weather, for the header: "41°, dry, frost tonight".
+ *
+ * The temperature nearest now, whether today is wet, and the night only when
+ * it matters — the same frost threshold the watch settings use, read off the
+ * coming night's low. Nothing at all without a forecast: offline is the
+ * ordinary case in a barn, and the date stands on its own.
+ */
+function weatherFact(
+  forecast: Forecast | undefined,
+  settings: WatchSettings,
+  now: Date,
+): string | undefined {
+  if (forecast === undefined) return undefined;
+
+  const nearest = [...forecast.hourly].sort(
+    (left, right) =>
+      Math.abs(left.at.getTime() - now.getTime()) - Math.abs(right.at.getTime() - now.getTime()),
+  )[0];
+  const today = forecast.daily.find((day) => isSameDay(day.date, now));
+  // A day's low lands in its small hours, so tonight is tomorrow's low.
+  const tonight = forecast.daily.find((day) => isSameDay(day.date, addCalendarDays(now, 1)));
+  const frost =
+    tonight === undefined
+      ? undefined
+      : frostRisk([tonight], { frostF: settings.frostF, hardFreezeF: settings.hardFreezeF })[0];
+
+  const parts = [
+    nearest === undefined ? undefined : `${Math.round(nearest.temperatureF)}°`,
+    today?.precipitationChance === undefined
+      ? undefined
+      : today.precipitationChance >= 50
+        ? "rain likely"
+        : "dry",
+    frost === undefined ? undefined : frost.hardFreeze ? "hard freeze tonight" : "frost tonight",
+  ].filter((part): part is string => part !== undefined);
+
+  return parts.length === 0 ? undefined : parts.join(", ");
 }
 
 function shortDate(date: Date): string {
@@ -214,6 +267,7 @@ function choresNeed(chores: ChoreSheet): Need | undefined {
 function Today({
   propertyId,
   actorId,
+  names,
   zones,
   animals,
   assignments,
@@ -221,6 +275,7 @@ function Today({
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  readonly names: Promise<PeopleNames> | undefined;
   readonly zones: readonly Zone[];
   readonly animals: readonly Animal[];
   readonly assignments: readonly ZoneAssignment[];
@@ -234,8 +289,6 @@ function Today({
   // mis-drag on the property map writes one — must not put a pen "in use" or
   // hand it his handling level on the board below.
   const placements = penAssignments(assignments, animals);
-  const inUse = new Set(placements.filter((a) => a.periodTo === undefined).map((a) => a.zoneId))
-    .size;
 
   // One check per tank, not per zone: four tanks serve eight zones here, and a
   // per-zone list sends somebody to the same trough three times.
@@ -266,7 +319,7 @@ function Today({
   ];
 
   // What was looked at and found fine. Chores are left out: they have their
-  // own list beside this one, which already says how the day is going.
+  // own lists above, which already say how the day is going.
   const fine = [
     calving.cards.length === 0 ? "calving" : undefined,
     weaning.batches.length === 0 ? "weaning" : undefined,
@@ -275,85 +328,140 @@ function Today({
   const clear = fine.length === 0 ? undefined : `${listed(fine)}: nothing due.`;
   const allClear = clear === undefined ? undefined : clear.charAt(0).toUpperCase() + clear.slice(1);
 
-  const date = new Date().toLocaleDateString(undefined, {
-    weekday: "long",
+  const now = new Date();
+  const date = now.toLocaleDateString(undefined, {
+    weekday: "short",
     day: "numeric",
-    month: "long",
+    month: "short",
   });
-  const count =
-    needs.length === 0
-      ? "nothing needs you"
-      : `${needs.length} ${needs.length === 1 ? "thing needs" : "things need"} you`;
+  const weather = weatherFact(calving.forecast, calving.settings, now);
 
   return (
     <PageBody>
-      <PageHeader title="Today" subtitle={`${date} · ${count}`} />
+      <PageHeader title="Today" subtitle={weather === undefined ? date : `${date} · ${weather}`} />
 
-      {/*
-        Side by side on a laptop, Needs you the wider; stacked on a phone, Needs
-        you first. Flex-wrap rather than a breakpoint grid, so the pair breaks
-        onto two rows wherever the column gets too narrow for both — a side
-        panel open beside it included.
-      */}
-      <div className="flex flex-wrap items-start gap-6">
-        <div className="min-w-0 flex-[3_1_420px]">
-          <NeedsYou needs={needs} allClear={allClear} />
-        </div>
-        <div className="min-w-0 flex-[2_1_320px]">
-          <ChoresChecklist chores={chores} />
-        </div>
-      </div>
+      <DayProgress chores={chores} />
 
-      <AroundThePlace zones={zones} animals={animals} placements={placements} inUse={inUse} />
+      {needs.length === 0 ? null : <NeedsYou needs={needs} />}
+
+      {chores.progress.total === 0 ? (
+        <p className="rounded-density border border-rule bg-panel px-4 py-3 text-sm text-muted">
+          Nothing on today&apos;s list.{" "}
+          <Link href="/admin/chores" className="text-action underline underline-offset-2">
+            Chores
+          </Link>
+        </p>
+      ) : (
+        /*
+          Side by side on a laptop, stacked on a phone with feeding first.
+          Flex-wrap rather than a breakpoint grid, so the pair breaks onto two
+          rows wherever the column gets too narrow for both — a side panel open
+          beside it included.
+        */
+        <div className="flex flex-wrap items-start gap-6">
+          {chores.feeding.length === 0 ? null : (
+            <div className="min-w-0 flex-[1_1_320px]">
+              <TickList
+                id="today-feeding"
+                title="Feeding"
+                entries={chores.feeding}
+                chores={chores}
+                animals={animals}
+                zones={zones}
+                actorId={actorId}
+                names={names}
+                action={{ href: "/admin/feed", label: "Feed" }}
+              />
+            </div>
+          )}
+          {chores.chores.length === 0 ? null : (
+            <div className="min-w-0 flex-[1_1_320px]">
+              <TickList
+                id="today-chores"
+                title="Chores"
+                entries={chores.chores}
+                chores={chores}
+                animals={animals}
+                zones={zones}
+                actorId={actorId}
+                names={names}
+                action={{ href: "/admin/chores", label: "All chores" }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {allClear === undefined ? null : <AllClear>{allClear}</AllClear>}
+
+      <AroundThePlace zones={zones} animals={animals} placements={placements} />
     </PageBody>
   );
 }
 
 /**
- * Standing facts, below the things to do.
+ * Standing facts, folded shut at the foot of the page.
  *
- * Not exceptions, so they sit last and quiet: the counts somebody repeats on
- * the phone, and the pen board folded shut until it is wanted.
+ * Not today's work, so not on today's screen unless asked for: the counts
+ * somebody repeats on the phone and who is standing in which pen. Kept as one
+ * quiet fold rather than dropped, because nothing else in the app puts the
+ * pen board's effective safety levels side by side.
  */
 function AroundThePlace({
   zones,
   animals,
   placements,
-  inUse,
 }: {
   readonly zones: readonly Zone[];
   readonly animals: readonly Animal[];
   readonly placements: readonly ZoneAssignment[];
-  readonly inUse: number;
 }) {
+  const inUse = new Set(placements.filter((a) => a.periodTo === undefined).map((a) => a.zoneId))
+    .size;
+
   return (
-    <section aria-labelledby="today-place" className="flex flex-col gap-2.5">
-      <h2 id="today-place" className="text-xs font-semibold uppercase tracking-wide text-muted">
-        Around the place
-      </h2>
+    <details className="group rounded-density border border-rule bg-panel">
+      <summary className="flex min-h-target cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2 font-semibold text-ink">
+          <svg
+            aria-hidden
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            className="text-muted transition-transform group-open:rotate-90"
+          >
+            <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          Around the place
+        </span>
+        <span className="text-sm text-muted">{inUse} in use</span>
+      </summary>
 
-      <StatRow>
-        {/*
-          Cattle, not every animal on the place. One Animal model serves every
-          species (§2), so the unfiltered list is the herd plus the flock, the
-          dogs and the horses — and a tile labelled "Cattle" that counts the
-          hens is wrong in the quietest possible way.
-        */}
-        <Tile
-          label="Cattle"
-          value={animals.filter((a) => a.species === "cattle" && a.status === "active").length}
-          tone="identity"
-        />
-        <Tile
-          label="Pens in use"
-          value={inUse}
-          hint={`of ${zones.filter((z) => z.active).length} active`}
-        />
-        <Tile label="Zones resting" value={zones.filter((z) => z.resting).length} tone="calm" />
-      </StatRow>
+      <div className="flex flex-col gap-density border-t border-rule p-density">
+        <StatRow>
+          {/*
+            Cattle, not every animal on the place. One Animal model serves every
+            species (§2), so the unfiltered list is the herd plus the flock, the
+            dogs and the horses — and a tile labelled "Cattle" that counts the
+            hens is wrong in the quietest possible way.
+          */}
+          <Tile
+            label="Cattle"
+            value={animals.filter((a) => a.species === "cattle" && a.status === "active").length}
+            tone="identity"
+          />
+          <Tile
+            label="Pens in use"
+            value={inUse}
+            hint={`of ${zones.filter((z) => z.active).length} active`}
+          />
+          <Tile label="Zones resting" value={zones.filter((z) => z.resting).length} tone="calm" />
+        </StatRow>
 
-      <PenBoard zones={zones} animals={animals} assignments={placements} />
-    </section>
+        <PenBoard zones={zones} animals={animals} assignments={placements} />
+      </div>
+    </details>
   );
 }
 
@@ -411,73 +519,43 @@ function PenBoard({
       };
     });
 
-  const occupied = rows.filter((row) => row.occupants.length > 0);
-
   return (
-    // Folded by default. It answers "where is everything", which is asked a
-    // few times a week; the rows above answer what is asked every morning.
-    <details className="group rounded-density border border-rule bg-panel">
-      <summary className="flex min-h-target cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center gap-2 font-semibold text-ink">
-          <svg
-            aria-hidden
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            className="text-muted transition-transform group-open:rotate-90"
-          >
-            <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          Pen board
-        </span>
-        <span className="flex gap-1.5">
-          <Pill tone="action" dot>
-            {occupied.length} in use
-          </Pill>
-          <Pill>{rows.length - occupied.length} empty</Pill>
-        </span>
-      </summary>
+    <CardGrid columns={3}>
+      {rows.map((row) => {
+        const raised = row.safety > row.zone.baselineSafetyLevel;
 
-      <div className="border-t border-rule p-density">
-        <CardGrid columns={3}>
-          {rows.map((row) => {
-            const raised = row.safety > row.zone.baselineSafetyLevel;
-
-            return (
-              <RecordCard
-                key={row.zone.id}
-                title={row.zone.name}
-                subtitle={row.zone.resting ? "Resting" : row.zone.indoor ? "Indoor" : undefined}
-                // Level 3 and up is the point at which somebody should not walk
-                // in without thinking, so that is where the card turns.
-                tone={row.safety >= 4 ? "danger" : row.safety >= 3 ? "identity" : "calm"}
-                actions={
-                  <SafetyBadge
-                    level={row.safety}
-                    size="compact"
-                    {...(raised
-                      ? { raisedBy: row.occupants.map((a) => a.name ?? "an occupant").join(", ") }
-                      : {})}
-                  />
-                }
-                meta={
-                  row.occupants.length === 0 ? (
-                    <Pill>Empty</Pill>
-                  ) : (
-                    row.occupants.map((animal) => (
-                      <Pill key={animal.id} tone={animal.safetyLevel >= 3 ? "danger" : "neutral"}>
-                        {animal.name ?? animal.tagNumber ?? "Untagged"}
-                      </Pill>
-                    ))
-                  )
-                }
+        return (
+          <RecordCard
+            key={row.zone.id}
+            title={row.zone.name}
+            subtitle={row.zone.resting ? "Resting" : row.zone.indoor ? "Indoor" : undefined}
+            // Level 3 and up is the point at which somebody should not walk
+            // in without thinking, so that is where the card turns.
+            tone={row.safety >= 4 ? "danger" : row.safety >= 3 ? "identity" : "calm"}
+            actions={
+              <SafetyBadge
+                level={row.safety}
+                size="compact"
+                {...(raised
+                  ? { raisedBy: row.occupants.map((a) => a.name ?? "an occupant").join(", ") }
+                  : {})}
               />
-            );
-          })}
-        </CardGrid>
-      </div>
-    </details>
+            }
+            meta={
+              row.occupants.length === 0 ? (
+                <Pill>Empty</Pill>
+              ) : (
+                row.occupants.map((animal) => (
+                  <Pill key={animal.id} tone={animal.safetyLevel >= 3 ? "danger" : "neutral"}>
+                    {animal.name ?? animal.tagNumber ?? "Untagged"}
+                  </Pill>
+                ))
+              )
+            }
+          />
+        );
+      })}
+    </CardGrid>
   );
 }
 

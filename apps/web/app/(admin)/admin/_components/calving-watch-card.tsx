@@ -81,6 +81,8 @@ export interface CalvingWatch {
   readonly settings: WatchSettings;
   /** Why there is no forecast, when there is none. */
   readonly unavailable?: string | undefined;
+  /** The forecast itself, so the Today header can say one fact about the weather. */
+  readonly forecast?: Forecast | undefined;
   /** The forecast has been asked for, whichever way it answered. */
   readonly asked: boolean;
   /** Something in the forecast is worth acting on tonight. */
@@ -172,6 +174,7 @@ export function useCalvingWatch(propertyId: Ulid): CalvingWatch {
     byId,
     settings,
     unavailable: snapshot.unavailable,
+    forecast: snapshot.forecast,
     asked,
     urgent: cards.some((card) => card.urgent),
     now,
