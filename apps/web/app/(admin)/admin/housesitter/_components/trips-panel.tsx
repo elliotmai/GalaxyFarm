@@ -6,6 +6,7 @@ import {
   Button,
   EmptyState,
   Modal,
+  Pill,
   Select,
   TextArea,
   TextInput,
@@ -140,15 +141,25 @@ function legsFrom(drafts: readonly LegDraft[]): TripLeg[] {
     }));
 }
 
-function windowLabel(trip: Trip, now: Date): string {
+/**
+ * The row's one chip: away now, or how long until they go. A trip that is
+ * over gets none — it is history, and a chip on every old trip is a column of
+ * noise above the one that matters.
+ */
+function windowChip(
+  trip: Trip,
+  now: Date,
+): { label: string; tone: "action" | "neutral" } | undefined {
   const window = awayWindow(trip, now);
   if (window.status === "away") {
-    return window.daysUntilReturn === 0
-      ? "Away · back today"
-      : `Away · ${window.daysUntilReturn}d left`;
+    return {
+      tone: "action",
+      label: window.daysUntilReturn === 0 ? "Back today" : `Away · ${window.daysUntilReturn}d left`,
+    };
   }
-  if (window.status === "upcoming") return `In ${window.daysUntilDeparture}d`;
-  return "Over";
+  if (window.status === "upcoming")
+    return { tone: "neutral", label: `In ${window.daysUntilDeparture}d` };
+  return undefined;
 }
 
 export function TripsPanel({
@@ -263,62 +274,98 @@ export function TripsPanel({
 
   return (
     <div className="flex flex-col gap-density">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted">
-          What the housesitter board leads with: when you are away, and how to reach you.
-        </p>
+      {/* What the housesitter board leads with: when you are away, and how
+          to reach you. */}
+      <div className="flex justify-end">
         <Button variant="primary" onClick={() => start()}>
-          Add a trip
+          <span aria-hidden="true">+</span> Add trip
         </Button>
       </div>
 
       {ordered.length === 0 ? (
         <EmptyState
           title="No trips"
-          detail="Add one and the housesitter board starts saying when you are back. Later this is filled from Wander instead of typed here."
+          detail="Add one and the housesitter board says when you are back."
         />
       ) : (
-        <ul className="flex flex-col gap-2">
-          {ordered.map((trip) => (
-            <li
-              key={trip.id}
-              className="flex flex-wrap items-baseline justify-between gap-2 border border-edge bg-panel p-density"
-            >
-              <span className="min-w-0">
-                <strong>{trip.name}</strong>
-                {trip.destination === undefined ? null : (
-                  <span className="text-muted"> · {trip.destination}</span>
-                )}
-                <span className="block text-sm text-muted">
-                  {trip.whoIsAway} · {toDateInput(trip.startDate)} → {toDateInput(trip.endDate)} ·{" "}
-                  {windowLabel(trip, now)}
-                  {trip.legs.length === 0 ? null : ` · ${trip.legs.length} legs`}
-                  {trip.source === "wander" ? " · from Wander" : ""}
-                </span>
-              </span>
-              <span className="flex gap-2">
-                <Button onClick={() => start(trip)}>
-                  {trip.source === "wander" ? "View" : "Edit"}
-                </Button>
-                <Button variant="danger" onClick={() => void remove(trip)}>
-                  Delete
-                </Button>
-              </span>
-            </li>
-          ))}
+        <ul
+          aria-label="Trips"
+          className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
+        >
+          {ordered.map((trip) => {
+            const chip = windowChip(trip, now);
+            return (
+              <li key={trip.id}>
+                {/* The whole row opens it; delete is in the panel. */}
+                <button
+                  type="button"
+                  onClick={() => start(trip)}
+                  aria-label={`${trip.source === "wander" ? "View" : "Edit"} ${trip.name}`}
+                  className="flex min-h-[60px] w-full min-w-0 items-center gap-3 py-2 pl-4 pr-3 text-left text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
+                >
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate font-semibold">
+                      {trip.name}
+                      {trip.destination === undefined ? null : (
+                        <span className="font-normal text-muted"> · {trip.destination}</span>
+                      )}
+                    </span>
+                    <span className="truncate text-sm text-muted">
+                      {[
+                        trip.whoIsAway,
+                        `${toDateInput(trip.startDate)} → ${toDateInput(trip.endDate)}`,
+                        trip.legs.length === 0 ? undefined : `${trip.legs.length} legs`,
+                        trip.source === "wander" ? "from Wander" : undefined,
+                      ]
+                        .filter((part) => part !== undefined)
+                        .join(" · ")}
+                    </span>
+                  </span>
+                  {chip === undefined ? null : <Pill tone={chip.tone}>{chip.label}</Pill>}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
       {draft === undefined ? null : (
         <Modal
+          placement="side"
           title={editing === undefined ? "Add a trip" : locked ? "Trip from Wander" : "Edit trip"}
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              {locked ? null : (
+                <Button variant="primary" busy={busy} onClick={() => void save()}>
+                  Save
+                </Button>
+              )}
+              <Button onClick={() => setDraft(undefined)}>{locked ? "Close" : "Cancel"}</Button>
+              {editing === undefined ? null : (
+                // Allowed on a Wander trip too: unlinking one the farm should
+                // not be showing is this app's call. Closed first, so the
+                // confirmation is the only dialog on screen.
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const trip = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(trip);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
             {!locked ? null : (
               <p className="text-sm text-muted">
-                Wander owns this trip, so the next pull would overwrite anything changed here. Edit
-                it in Wander instead — it arrives back on its own.
+                Wander owns this trip — edit it there, or the next pull overwrites the change.
               </p>
             )}
 
@@ -385,7 +432,7 @@ export function TripsPanel({
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
 
-            <fieldset className="flex flex-col gap-2 border border-edge p-density">
+            <fieldset className="flex flex-col gap-2 rounded-density border border-rule p-density">
               <legend className="px-1 text-sm text-muted">The journey</legend>
 
               {draft.legs.map((leg, index) => (
@@ -514,15 +561,6 @@ export function TripsPanel({
                 </Button>
               )}
             </fieldset>
-
-            <div className="flex gap-2">
-              {locked ? null : (
-                <Button variant="primary" busy={busy} onClick={() => void save()}>
-                  Save
-                </Button>
-              )}
-              <Button onClick={() => setDraft(undefined)}>{locked ? "Close" : "Cancel"}</Button>
-            </div>
           </div>
         </Modal>
       )}

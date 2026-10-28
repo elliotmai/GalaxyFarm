@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Button, Card, Meter, PageBody, PageHeader, Pill, Tabs, Tile } from "@galaxy-farm/ui";
+import { Button, PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import {
   addCalendarDays,
   choreDaySheet,
@@ -89,14 +89,24 @@ export function ChoresScreen({
     { id: "templates", label: "Templates" },
   ];
 
+  // The tiles and the progress bar this used to carry, said as the header's
+  // one line of facts. Overdue only when there is some: "0 overdue" on a
+  // good day is a number that teaches people to skip the line.
+  const facts = [
+    date.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }),
+    progress.total === 0 ? "Nothing on the list" : `${progress.done} of ${progress.total} done`,
+    progress.overdue === 0 ? undefined : `${progress.overdue} overdue`,
+  ]
+    .filter((part) => part !== undefined)
+    .join(" · ");
+
   return (
     <PageBody>
       <PageHeader
-        eyebrow="Today"
         title="Chores"
-        subtitle="What the farm is asking for, from the templates that repeat and the jobs somebody wrote down."
+        subtitle={facts}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button
               aria-label="Previous day"
               onClick={() => setOffset(offset - 1)}
@@ -104,11 +114,7 @@ export function ChoresScreen({
             >
               ‹
             </Button>
-            <Button
-              variant={offset === 0 ? "primary" : "secondary"}
-              onClick={() => setOffset(0)}
-              disabled={offset === 0}
-            >
+            <Button onClick={() => setOffset(0)} disabled={offset === 0}>
               Today
             </Button>
             <Button aria-label="Next day" onClick={() => setOffset(offset + 1)} disabled={loading}>
@@ -116,58 +122,7 @@ export function ChoresScreen({
             </Button>
           </div>
         }
-        meta={
-          <>
-            <Pill tone="identity">{day}</Pill>
-            <Pill>
-              {date.toLocaleDateString(undefined, {
-                weekday: "short",
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}
-            </Pill>
-          </>
-        }
       />
-
-      <div className="gf-stat-row">
-        <Tile
-          label="To do"
-          value={progress.open}
-          tone={progress.open === 0 ? "calm" : "action"}
-          emphasis={progress.open > 0}
-          hint={progress.total === 0 ? "Nothing on the list" : `of ${progress.total}`}
-        />
-        <Tile label="Done" value={progress.done} tone="calm" />
-        <Tile
-          label="Overdue"
-          value={progress.overdue}
-          tone={progress.overdue > 0 ? "danger" : "calm"}
-          emphasis={progress.overdue > 0}
-          hint={progress.overdue > 0 ? "Owed from earlier" : "Nothing late"}
-        />
-        <Tile
-          label="Templates"
-          value={templates.filter((template) => template.active).length}
-          hint={`${templates.length} in total`}
-        />
-      </div>
-
-      {progress.total === 0 ? null : (
-        <Card>
-          <Meter
-            value={progress.fraction}
-            tone={progress.overdue > 0 ? "danger" : progress.open === 0 ? "calm" : "action"}
-            label={day}
-            detail={
-              progress.open === 0
-                ? "Everything on the list is done."
-                : `${progress.done} of ${progress.total} done`
-            }
-          />
-        </Card>
-      )}
 
       <Tabs tabs={tabs} label="Chores">
         {(active) => (

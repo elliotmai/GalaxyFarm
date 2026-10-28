@@ -3,11 +3,9 @@
 import { useState, useTransition } from "react";
 
 import {
-  Badge,
   Button,
   Callout,
   Card,
-  DataTable,
   EmptyState,
   Modal,
   Pill,
@@ -16,7 +14,6 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import {
   INVITATION_DAYS,
@@ -58,6 +55,11 @@ import {
  * unverified, an address can be wrong by a letter — and in every one of those
  * cases the account has already been created and somebody still has to be able
  * to get in. So the box says which of the two happened.
+ *
+ * One row per person — name, one line, one chip — and every action on them
+ * (edit, reset, test email, switch off, delete) in the side panel the row
+ * opens. Five buttons on every row was a wall of "ghost" text on a laptop and
+ * a stack of them on a phone.
  */
 
 const ROLE_LABELS: Readonly<Record<Role, string>> = {
@@ -322,104 +324,31 @@ export function PeopleScreen({
     run(() => resendInvitation(row.user.id));
   }
 
-  const columns: readonly Column<PersonRow>[] = [
-    {
-      key: "person",
-      header: "Person",
-      render: (row) => (
-        <span className="flex flex-col gap-0.5">
-          <span className="text-ink">
-            {row.user.name}
-            {row.user.id === actorId ? (
-              <span className="ml-2 text-sm text-muted">(you)</span>
-            ) : null}
-          </span>
-          <span className="text-sm text-muted">{row.user.email}</span>
-        </span>
-      ),
-    },
-    {
-      key: "role",
-      header: "Role",
-      render: (row) => <Badge tone="neutral">{ROLE_SHORT[row.user.role]}</Badge>,
-    },
-    {
-      key: "state",
-      header: "Account",
-      render: (row) => (
-        <span className="flex flex-col gap-1">
-          <Pill tone={STATE_TONES[row.state]} dot={row.state === "invitation-expired"}>
-            {STATE_LABELS[row.state]}
-          </Pill>
-          {row.state === "invited" && row.user.inviteExpiresAt !== undefined ? (
-            <span className="text-sm text-muted">
-              Link good until {formatDate(row.user.inviteExpiresAt)}
-            </span>
-          ) : null}
-          {row.state === "active" ? (
-            <span className="text-sm text-muted">
-              {row.user.lastSignedInAt === undefined
-                ? "Never signed in"
-                : `Last in ${formatDate(row.user.lastSignedInAt)}`}
-            </span>
-          ) : null}
-        </span>
-      ),
-    },
-    {
-      key: "window",
-      header: "Access window",
-      render: (row) =>
-        row.user.role !== "housesitter" ? (
-          <span className="text-muted">—</span>
-        ) : (
-          <span className="text-sm text-ink">
-            {formatDate(row.user.accessFrom)} → {formatDate(row.user.accessTo)}
-          </span>
-        ),
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (row) => (
-        <span className="flex flex-wrap gap-2">
-          <Button variant="ghost" disabled={pending} onClick={() => void reissue(row)}>
-            {row.state === "active" ? "Reset password" : "New link"}
-          </Button>
-          {/*
-            Sends a real email to a real address. Safe to press twice and safe
-            to press on anybody — it says what it is in the subject line — so
-            it stays a plain button with no confirmation in front of it.
-          */}
-          <Button
-            variant="ghost"
-            disabled={pending}
-            title={`Send a test email to ${row.user.email}`}
-            onClick={() => testEmail(row)}
-          >
-            Test email
-          </Button>
-          <Button variant="ghost" disabled={pending} onClick={() => startEdit(row)}>
-            Edit
-          </Button>
-          <Button
-            variant="ghost"
-            disabled={pending || row.user.id === actorId}
-            onClick={() => run(() => setPersonActive(row.user.id, !row.user.active))}
-          >
-            {row.user.active ? "Switch off" : "Switch on"}
-          </Button>
-          <Button
-            variant="ghost"
-            disabled={pending || row.user.id === actorId}
-            onClick={() => void remove(row)}
-          >
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
+  /** The one muted line under a name: role, address, and the one date that matters. */
+  function lineFor(row: PersonRow): string {
+    return [
+      ROLE_SHORT[row.user.role],
+      row.user.email,
+      row.user.role === "housesitter"
+        ? `${formatDate(row.user.accessFrom)} → ${formatDate(row.user.accessTo)}`
+        : row.state === "invited" && row.user.inviteExpiresAt !== undefined
+          ? `Link good until ${formatDate(row.user.inviteExpiresAt)}`
+          : row.state === "active"
+            ? row.user.lastSignedInAt === undefined
+              ? "Never signed in"
+              : `Last in ${formatDate(row.user.lastSignedInAt)}`
+            : undefined,
+    ]
+      .filter((part) => part !== undefined)
+      .join(" · ");
+  }
+
+  /** Close the panel, then act — so a confirmation or a link box is never under it. */
+  function fromPanel(act: () => void) {
+    setDraft(undefined);
+    setEditing(undefined);
+    act();
+  }
 
   const housesitting = draft?.role === "housesitter";
 
@@ -427,39 +356,40 @@ export function PeopleScreen({
     <div className="flex flex-col gap-density">
       <Section
         title="People"
-        description="Everyone who can sign in. Adding somebody emails them a single-use link to choose their own password — and shows you the same link once, to hand over yourself if the email does not land."
+        description="Everyone who can sign in. Adding somebody emails them a single-use link to choose their own password, and shows you the link once in case the email does not land."
         actions={
           <Button
             variant="primary"
             disabled={pending || unavailable !== undefined}
             onClick={startInvite}
           >
-            Add someone
+            <span aria-hidden="true">+</span> Add person
           </Button>
         }
       >
-        {unavailable === undefined ? null : (
-          <Callout tone="danger" title="The list of people is not here">
-            {/*
-              Empty and "could not be read" look identical, and one of them
-              would have somebody adding an account that already exists. Said
-              plainly, and every button that would act on the list is off.
-            */}
-            <p>{unavailable}</p>
-          </Callout>
-        )}
+        {/*
+          Empty and "could not be read" look identical, and one of them would
+          have somebody adding an account that already exists. Said plainly,
+          and every button that would act on the list is off.
+        */}
+        {unavailable === undefined ? null : <p className="text-sm text-danger">{unavailable}</p>}
         {note === undefined ? null : (
-          <Callout
-            tone={note.tone}
-            title={note.title}
-            actions={<Button onClick={() => setNote(undefined)}>Dismiss</Button>}
+          // `break-words`: a Resend failure quotes its own JSON body, and one
+          // long unbroken token would push the line past the width of a phone.
+          <p
+            className={`flex flex-wrap items-center gap-x-2 break-words text-sm ${note.tone === "danger" ? "text-danger" : "text-action"}`}
           >
-            {/*
-              `break-words`: a Resend failure quotes its own JSON body, and one
-              long unbroken token would push the box past the width of a phone.
-            */}
-            <p className="break-words">{note.detail}</p>
-          </Callout>
+            <span className="min-w-0 break-words">
+              <strong>{note.title}.</strong> {note.detail}
+            </span>
+            <button
+              type="button"
+              onClick={() => setNote(undefined)}
+              className="inline-flex min-h-target items-center font-semibold underline underline-offset-2"
+            >
+              Dismiss
+            </button>
+          </p>
         )}
         {link === undefined ? null : (
           <Callout
@@ -499,46 +429,69 @@ export function PeopleScreen({
               {link.url}
             </code>
             <p className="mt-2">
-              It works once and lapses after {INVITATION_DAYS} days. We keep only a hash of it, so
-              this is the only time it can be read — if it goes astray, issue a new one and the old
-              one stops working.
+              Works once, lapses in {INVITATION_DAYS} days, and is shown only now. Lost it? Issue a
+              new one.
             </p>
           </Callout>
         )}
 
-        <Card>
-          <DataTable
-            caption="People who can sign in"
-            columns={columns}
-            rows={[...people]}
-            rowKey={(row) => row.user.id}
-            empty={
-              <EmptyState
-                title="Nobody but you"
-                detail="Add the people who help with the place. Everyone gets a role, and a housesitter gets a window as well."
-                action={
-                  <Button variant="primary" onClick={startInvite}>
-                    Add the first person
-                  </Button>
-                }
-              />
+        {people.length === 0 ? (
+          <EmptyState
+            title="Nobody but you"
+            detail="Everyone gets a role; a housesitter gets a window as well."
+            action={
+              <Button variant="primary" onClick={startInvite}>
+                Add the first person
+              </Button>
             }
           />
-        </Card>
+        ) : (
+          <ul
+            aria-label="People who can sign in"
+            className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
+          >
+            {people.map((row) => (
+              <li key={row.user.id}>
+                <button
+                  type="button"
+                  onClick={() => startEdit(row)}
+                  aria-label={`Manage ${row.user.name}`}
+                  className="flex min-h-[60px] w-full min-w-0 items-center gap-3 py-2 pl-4 pr-3 text-left text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
+                >
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate font-semibold">
+                      {row.user.name}
+                      {row.user.id === actorId ? (
+                        <span className="ml-2 text-sm font-normal text-muted">(you)</span>
+                      ) : null}
+                    </span>
+                    <span className="truncate text-sm text-muted">{lineFor(row)}</span>
+                  </span>
+                  {/* By exception: a signed-up account is the ordinary case. */}
+                  {row.state === "active" ? null : (
+                    <Pill tone={STATE_TONES[row.state]} dot={row.state === "invitation-expired"}>
+                      {STATE_LABELS[row.state]}
+                    </Pill>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </Section>
 
       {deleted.length === 0 ? null : (
         <Section
           title="Deleted accounts"
-          description="Tombstoned rather than removed, so what they recorded still has a name on it."
+          description="Kept so what they recorded still has a name on it."
         >
           <Card>
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col divide-y divide-rule">
               {deleted.map((row) => (
-                <li key={row.user.id} className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="flex flex-col">
-                    <span className="text-ink">{row.user.name}</span>
-                    <span className="text-sm text-muted">{row.user.email}</span>
+                <li key={row.user.id} className="flex items-center justify-between gap-2 py-2">
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate font-semibold text-ink">{row.user.name}</span>
+                    <span className="truncate text-sm text-muted">{row.user.email}</span>
                   </span>
                   <Button
                     variant="ghost"
@@ -557,14 +510,22 @@ export function PeopleScreen({
       {draft === undefined ? null : (
         <Modal
           key={editing?.user.id ?? "new"}
-          size="wide"
-          title={editing === undefined ? "Add someone" : `Editing ${editing.user.name}`}
+          placement="side"
+          title={editing === undefined ? "Add a person" : editing.user.name}
           description={
             editing === undefined
-              ? "They are emailed a link, not a password. Nobody here ever knows anybody else's."
-              : "Changing a role takes effect the next time they sign in."
+              ? "They are emailed a link, never a password."
+              : "A role change takes effect at their next sign-in."
           }
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" busy={pending} onClick={save}>
+                {editing === undefined ? "Add and email a link" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
             <TextInput
@@ -602,11 +563,9 @@ export function PeopleScreen({
             {housesitting ? (
               <>
                 <p className="text-sm text-muted">
-                  A housesitter has no access outside these dates — not to the guide, not to the
-                  chores, not at all. Both ends are required, because a window with one end is not a
-                  window.
+                  No access at all outside these dates. Both are required.
                 </p>
-                <div className="grid gap-density md:grid-cols-2">
+                <div className="grid gap-density sm:grid-cols-2">
                   <TextInput
                     label="From"
                     type="date"
@@ -626,12 +585,50 @@ export function PeopleScreen({
               </>
             ) : null}
 
-            <div className="flex gap-2">
-              <Button variant="primary" busy={pending} onClick={save}>
-                {editing === undefined ? "Add and email a link" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
+            {/*
+              Everything else that can be done to an account, here rather than
+              on its row. Each closes the panel first, so a confirmation or the
+              link box it produces is never hidden under it.
+            */}
+            {editing === undefined ? null : (
+              <div className="flex flex-col gap-2 border-t border-rule pt-density">
+                <h3 className="text-sm font-semibold text-ink">Account</h3>
+                <div className="flex flex-wrap gap-2">
+                  <Button disabled={pending} onClick={() => fromPanel(() => void reissue(editing))}>
+                    {editing.state === "active" ? "Reset password" : "New link"}
+                  </Button>
+                  {/*
+                    Sends a real email to a real address. Safe to press twice
+                    and safe to press on anybody — it says what it is in the
+                    subject line — so there is no confirmation in front of it.
+                  */}
+                  <Button
+                    disabled={pending}
+                    title={`Send a test email to ${editing.user.email}`}
+                    onClick={() => fromPanel(() => testEmail(editing))}
+                  >
+                    Test email
+                  </Button>
+                  <Button
+                    disabled={pending || editing.user.id === actorId}
+                    onClick={() =>
+                      fromPanel(() =>
+                        run(() => setPersonActive(editing.user.id, !editing.user.active)),
+                      )
+                    }
+                  >
+                    {editing.user.active ? "Switch off" : "Switch on"}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    disabled={pending || editing.user.id === actorId}
+                    onClick={() => fromPanel(() => void remove(editing))}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </Modal>
       )}

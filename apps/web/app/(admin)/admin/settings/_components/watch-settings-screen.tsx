@@ -1,19 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 
-import {
-  Badge,
-  Button,
-  Callout,
-  Card,
-  Checkbox,
-  DetailList,
-  Section,
-  TextInput,
-  useToast,
-} from "@galaxy-farm/ui";
+import { Button, Checkbox, Section, TextInput, useToast } from "@galaxy-farm/ui";
 import {
   DEFAULT_WATCH_SETTINGS,
   propertySchema,
@@ -140,60 +129,51 @@ export function WatchSettingsScreen({
         title="Calving watch"
         description="What the forecast has to do before anybody hears about it."
         actions={
-          <span className="flex items-center gap-2">
-            {located ? (
-              <Badge tone="calm">Located</Badge>
-            ) : (
-              <Badge tone="danger">No coordinates — no forecast</Badge>
-            )}
-            <Button onClick={() => void save()} busy={busy} disabled={!dirty}>
-              {dirty ? "Save" : "Saved"}
-            </Button>
-          </span>
+          <Button variant="primary" onClick={() => void save()} busy={busy} disabled={!dirty}>
+            {dirty ? "Save" : "Saved"}
+          </Button>
         }
       >
         <span className="sr-only">Calving watch settings</span>
-      </Section>
-
-      {located ? null : (
-        <Card title="This property has no coordinates">
-          <p className="text-density text-muted">
-            The forecast is fetched for a latitude and longitude, so without them the watch card
-            still counts the days but shows no weather. Set the address on the{" "}
-            <strong>Property</strong> tab and both are worked out from it.
+        {/* By exception: located is the ordinary case and says nothing. The
+            watch still counts the days without coordinates, but shows no
+            weather. */}
+        {located ? null : (
+          <p className="text-sm text-danger">
+            No coordinates, so no forecast. Set the address on the Farm tab.
           </p>
-        </Card>
-      )}
+        )}
+      </Section>
 
       <Section
         title="Weaning"
-        description="A window, not a birthday. Calves may come off from the first age and must be off by the second — everything between is a judgement about what else is on that week. Not to be confused with the 205-day figure used to adjust weaning weights for comparison, which is a measurement and not an instruction."
+        description="A window, not a birthday: calves may come off from the first age and must be off by the second. Not the 205-day adjusted weaning weight, which is a measurement."
       >
         <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
           <TextInput
             label="May be weaned from (days)"
-            hint={`Default ${DEFAULT_WATCH_SETTINGS.weaningEarliestDays}. A group waits for its youngest to reach this.`}
+            hint={`Default ${DEFAULT_WATCH_SETTINGS.weaningEarliestDays}. Read off the youngest.`}
             type="number"
             value={String(settings.weaningEarliestDays)}
             onChange={(event) => change({ weaningEarliestDays: Number(event.target.value) })}
           />
           <TextInput
             label="Must be weaned by (days)"
-            hint={`Default ${DEFAULT_WATCH_SETTINGS.weaningLatestDays}. Set by the oldest calf, who runs out first.`}
+            hint={`Default ${DEFAULT_WATCH_SETTINGS.weaningLatestDays}. Read off the oldest.`}
             type="number"
             value={String(settings.weaningLatestDays)}
             onChange={(event) => change({ weaningLatestDays: Number(event.target.value) })}
           />
           <TextInput
             label="Warning (days ahead)"
-            hint={`Default ${DEFAULT_WATCH_SETTINGS.weaningLeadDays}. Time to get a pen and water ready.`}
+            hint={`Default ${DEFAULT_WATCH_SETTINGS.weaningLeadDays}.`}
             type="number"
             value={String(settings.weaningLeadDays)}
             onChange={(event) => change({ weaningLeadDays: Number(event.target.value) })}
           />
           <TextInput
             label="Group calves born within (days)"
-            hint={`Default ${DEFAULT_WATCH_SETTINGS.weaningBatchWindowDays}, about one heat cycle. Contemporaries come off together.`}
+            hint={`Default ${DEFAULT_WATCH_SETTINGS.weaningBatchWindowDays}, about one heat cycle.`}
             type="number"
             value={String(settings.weaningBatchWindowDays)}
             onChange={(event) => change({ weaningBatchWindowDays: Number(event.target.value) })}
@@ -209,12 +189,11 @@ export function WatchSettingsScreen({
         */}
         {settings.weaningBatchWindowDays >
         settings.weaningLatestDays - settings.weaningEarliestDays ? (
-          <Callout tone="danger" title="Groups wider than the window they have to fit in">
-            Calves grouped up to {settings.weaningBatchWindowDays} days apart, but only{" "}
-            {settings.weaningLatestDays - settings.weaningEarliestDays} days between the earliest
-            they may come off and the day they must. A group spread wider than that has its oldest
-            calf run out before its youngest is old enough, and cannot be weaned in one piece.
-          </Callout>
+          <p className="text-sm text-danger">
+            Groups span up to {settings.weaningBatchWindowDays} days but the window is only{" "}
+            {settings.weaningLatestDays - settings.weaningEarliestDays} — a group that wide cannot
+            be weaned in one piece.
+          </p>
         ) : null}
       </Section>
 
@@ -273,12 +252,12 @@ export function WatchSettingsScreen({
         title="Which signals speak up"
         description="Off means it is never computed. Lead time is how far ahead you hear about it."
       >
-        <div className="flex flex-col gap-density">
+        <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
           {WATCH_SIGNALS.map((signal) => (
-            <Card key={signal}>
+            <li key={signal} className="px-4 py-3">
               <div className="flex flex-wrap items-end justify-between gap-density">
-                <div className="flex flex-col gap-1">
-                  <span className="font-medium text-ink">{SIGNAL_LABELS[signal].title}</span>
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="font-semibold text-ink">{SIGNAL_LABELS[signal].title}</span>
                   <span className="max-w-prose text-sm text-muted">
                     {SIGNAL_LABELS[signal].detail}
                   </span>
@@ -300,9 +279,9 @@ export function WatchSettingsScreen({
                   />
                 </div>
               </div>
-            </Card>
+            </li>
           ))}
-        </div>
+        </ul>
       </Section>
 
       {error === undefined ? null : (
@@ -310,28 +289,6 @@ export function WatchSettingsScreen({
           {error}
         </p>
       )}
-
-      <Section title="Everything else">
-        <DetailList
-          columns={2}
-          items={[
-            { label: "Property", value: property.name },
-            { label: "Timezone", value: property.timezone },
-            { label: "Growing zone", value: property.growingZone },
-            {
-              label: "Trash",
-              value: (
-                <Link
-                  href="/admin/settings/trash"
-                  className="text-action underline underline-offset-2"
-                >
-                  Deleted records
-                </Link>
-              ),
-            },
-          ]}
-        />
-      </Section>
     </div>
   );
 }

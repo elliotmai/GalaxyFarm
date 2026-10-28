@@ -4,18 +4,13 @@ import { useState } from "react";
 
 import {
   Button,
-  Callout,
-  CardGrid,
   EmptyState,
   Modal,
   PageBody,
   PageHeader,
   Pill,
-  RecordCard,
-  Section,
   Select,
   TextInput,
-  Tile,
   useConfirmDelete,
   useToast,
 } from "@galaxy-farm/ui";
@@ -60,10 +55,21 @@ import { useRecords } from "@/lib/local/use-records";
  * hauler is often also the neighbour who buys a steer, and three tables lose
  * that connection the moment somebody is entered twice.
  *
- * Cards rather than a table. The question this screen answers is almost always
- * "what is the vet's number", which wants a name, a tag, and a tappable phone
- * number in one glance — not eleven columns of which nine are empty.
+ * A list of rows rather than cards or a table. The question this screen
+ * answers is almost always "what is the vet's number", which wants a name, one
+ * line, and a phone button in one glance — not eleven columns of which nine are
+ * empty, nor a card of labelled pairs per person. Everything else about them,
+ * including edit and delete, is in the panel the row opens.
  */
+
+/**
+ * The tags people actually filter by, as chips. The rest are one Filters
+ * press away — eleven chips in a row is a second list to scan before the first.
+ */
+const CHIP_TAGS: readonly ContactTag[] = ["vet", "emergency", "ai_tech", "hauler", "buyer"];
+
+/** The filter value for "nobody has tagged them yet". */
+const UNTAGGED = "untagged";
 
 /** Everything that points at a contact, for the delete dialog. */
 function useReferences(propertyId: Ulid) {
@@ -108,8 +114,15 @@ export function ContactsScreen({
   const [busy, setBusy] = useState(false);
 
   const needle = search.trim().toLowerCase();
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const shown = contacts
-    .filter((contact) => tagFilter === "" || contact.tags.includes(tagFilter as ContactTag))
+    .filter((contact) =>
+      tagFilter === ""
+        ? true
+        : tagFilter === UNTAGGED
+          ? contact.tags.length === 0
+          : contact.tags.includes(tagFilter as ContactTag),
+    )
     .filter(
       (contact) =>
         needle === "" ||
@@ -227,53 +240,81 @@ export function ContactsScreen({
     });
   }
 
+  /** What the list is narrowed to, in words — said above the list whenever it is. */
+  const filterLabel =
+    tagFilter === ""
+      ? undefined
+      : tagFilter === UNTAGGED
+        ? "Untagged"
+        : TAG_LABELS[tagFilter as ContactTag];
+  const narrowed = filterLabel !== undefined || needle !== "";
+
+  function clearFilters() {
+    setTagFilter("");
+    setSearch("");
+  }
+
+  /** The one muted line under a name: who they are with, what they are, how to reach them. */
+  function lineFor(contact: Contact): string {
+    return [
+      contact.company,
+      // Emergency is the row's chip, so it is not said twice.
+      contact.tags
+        .filter((tag) => tag !== "emergency")
+        .map((tag) => TAG_LABELS[tag])
+        .join(", "),
+      primaryPhone(contact),
+    ]
+      .filter((part) => part !== undefined && part !== "")
+      .join(" · ");
+  }
+
+  const chips = [
+    { key: "", label: "All" },
+    ...CHIP_TAGS.map((tag) => ({ key: tag as string, label: TAG_LABELS[tag] })),
+    // Only offered while somebody is untagged: a chip that always finds no one
+    // is a control that teaches people to ignore the row.
+    ...(untagged.length === 0 ? [] : [{ key: UNTAGGED, label: `Untagged ${untagged.length}` }]),
+  ];
+
   return (
-    <PageBody>
-      <PageHeader
-        title="Contacts"
-        subtitle="Vets, techs, haulers, buyers, vendors and neighbours — one list, tagged by what they are to the farm."
-        actions={
-          <Button variant="primary" onClick={startAdd}>
-            Add somebody
-          </Button>
-        }
-      />
-
-      <div className="gf-stat-row">
-        <Tile label="Contacts" value={contacts.length} tone="identity" />
-        <Tile
-          label="Vets"
-          value={vets.length}
-          tone={vets.length === 0 ? "danger" : "neutral"}
-          hint={vets.length === 0 ? "Nobody to call" : undefined}
+    // Bottom clearance on a phone, so the floating add button never sits on
+    // the last row.
+    <div className="pb-20 sm:pb-0">
+      <PageBody>
+        <PageHeader
+          title="Contacts"
+          subtitle={`${contacts.length} ${contacts.length === 1 ? "person" : "people"} · ${vets.length} ${vets.length === 1 ? "vet" : "vets"} · ${emergency.length} emergency`}
+          actions={
+            // Hidden on a phone by a wrapper, not a class on the button: the
+            // button's own `inline-flex` wins over a `hidden` passed in.
+            <span className="hidden sm:block">
+              <Button variant="primary" onClick={startAdd}>
+                <span aria-hidden="true">+</span> Add contact
+              </Button>
+            </span>
+          }
         />
-        <Tile
-          label="Emergency"
-          value={emergency.length}
-          tone={emergency.length === 0 ? "danger" : "calm"}
-          emphasis={emergency.length === 0}
-          hint="On the housesitter guide"
-        />
-        <Tile
-          label="Untagged"
-          value={untagged.length}
-          tone={untagged.length > 0 ? "action" : "neutral"}
-          hint={untagged.length > 0 ? "No filter will find them" : "All filed"}
-        />
-      </div>
 
-      {emergency.length > 0 || contacts.length === 0 ? null : (
-        <Callout tone="danger" title="No emergency contact">
-          The housesitter guide takes its emergency numbers from this list. Until somebody here is
-          tagged <em>Emergency</em>, that section of the guide is empty — which is the one section
-          nobody can afford to be looking for.
-        </Callout>
-      )}
+        {/*
+          The two gaps worth saying, one line each, and only when they are
+          true. The housesitter guide takes its emergency numbers from this
+          list, so an empty Emergency tag is an empty section in the one place
+          nobody can afford to be looking for a number.
+        */}
+        {contacts.length === 0 ? null : (
+          <>
+            {emergency.length > 0 ? null : (
+              <p className="text-sm text-danger">
+                No emergency contact — the housesitter guide has no numbers to call.
+              </p>
+            )}
+            {vets.length > 0 ? null : <p className="text-sm text-danger">No vet on the list.</p>}
+          </>
+        )}
 
-      <Section
-        title="Everyone"
-        actions={
-          <div className="flex flex-wrap items-end gap-2">
+        <div className="flex items-end gap-2">
+          <div className="min-w-0 flex-1">
             <TextInput
               label="Search"
               hideLabel
@@ -282,19 +323,63 @@ export function ContactsScreen({
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            <Select
-              label="Tag"
-              hideLabel
-              value={tagFilter}
-              options={[
-                { value: "", label: "Every tag" },
-                ...CONTACT_TAGS.map((tag) => ({ value: tag, label: TAG_LABELS[tag] })),
-              ]}
-              onChange={(event) => setTagFilter(event.target.value)}
-            />
           </div>
-        }
-      >
+          <Button aria-haspopup="dialog" onClick={() => setFiltersOpen(true)}>
+            Filters
+          </Button>
+        </div>
+
+        {/* One row that scrolls sideways on a phone, because a row that wraps
+            pushes the list down. Pressing the chip already on clears it. */}
+        <div
+          role="group"
+          aria-label="Filter by tag"
+          className="-mx-1 flex items-center gap-1 overflow-x-auto px-1"
+        >
+          {chips.map((chip) => {
+            const on = tagFilter === chip.key;
+            return (
+              <button
+                key={chip.key === "" ? "all" : chip.key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setTagFilter(on ? "" : chip.key)}
+                className={[
+                  "inline-flex min-h-target shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-sm",
+                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action",
+                  on
+                    ? "bg-action/15 font-semibold text-action"
+                    : "font-medium text-muted hover:bg-raised hover:text-ink",
+                ].join(" ")}
+              >
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* A narrowed list that does not say so is a vet who seems not to exist. */}
+        {!narrowed ? null : (
+          <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted" aria-live="polite">
+            <span>
+              Showing {shown.length} of {contacts.length}
+            </span>
+            {filterLabel === undefined ? null : (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{filterLabel}</span>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
+            >
+              Clear
+            </button>
+          </p>
+        )}
+
         {loading ? (
           <p className="text-muted">Loading contacts…</p>
         ) : shown.length === 0 ? (
@@ -302,89 +387,152 @@ export function ContactsScreen({
             title={contacts.length === 0 ? "Nobody yet" : "Nobody matches"}
             detail={
               contacts.length === 0
-                ? "The vet, the AI tech, the feed store, the hauler, the neighbour who takes half a steer. Everything else in the app points at this list by name."
-                : "Try a different tag, or clear the search."
+                ? "The vet, the AI tech, the feed store, the hauler. Everything else in the app points at this list."
+                : undefined
             }
-            {...(contacts.length === 0
-              ? { action: <Button onClick={startAdd}>Add the first one</Button> }
-              : {})}
+            action={
+              contacts.length === 0 ? (
+                <Button variant="primary" onClick={startAdd}>
+                  Add the first one
+                </Button>
+              ) : (
+                <Button onClick={clearFilters}>Clear filters</Button>
+              )
+            }
           />
         ) : (
-          <CardGrid columns={3}>
-            {shown.map((contact) => (
-              <RecordCard
-                key={contact.id}
-                title={contact.name}
-                subtitle={contact.company}
-                tone={contact.tags.includes("emergency") ? "danger" : "neutral"}
-                meta={
-                  contact.tags.length === 0 ? (
-                    <Pill tone="action">untagged</Pill>
+          <ul
+            aria-label="Contacts"
+            className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
+          >
+            {shown.map((contact) => {
+              const phone = primaryPhone(contact);
+              const line = lineFor(contact);
+              return (
+                <li key={contact.id} className="flex items-center bg-panel">
+                  {/* The whole row opens them: the name alone is too small a
+                      target for a thumb in a glove. */}
+                  <button
+                    type="button"
+                    onClick={() => setOpened(contact)}
+                    className="flex min-h-[60px] min-w-0 flex-1 items-center gap-3 py-2 pl-4 pr-2 text-left text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate font-semibold">{contact.name}</span>
+                      {line === "" ? null : (
+                        <span className="truncate text-sm text-muted">{line}</span>
+                      )}
+                    </span>
+                    {contact.tags.includes("emergency") ? (
+                      <Pill tone="danger">Emergency</Pill>
+                    ) : contact.tags.length === 0 ? (
+                      <Pill tone="action">Untagged</Pill>
+                    ) : null}
+                  </button>
+                  {/* Beside the row rather than inside it — a link nested in a
+                      button is two targets the browser has to guess between.
+                      Calling is the job this screen exists for. */}
+                  {phone === undefined ? (
+                    <span aria-hidden="true" className="mr-1 min-w-target" />
                   ) : (
-                    contact.tags.map((tag) => (
-                      <Pill key={tag} tone={tag === "emergency" ? "danger" : "neutral"}>
-                        {TAG_LABELS[tag]}
-                      </Pill>
-                    ))
-                  )
-                }
-                actions={
-                  <span className="flex gap-1">
-                    <Button variant="ghost" onClick={() => setOpened(contact)}>
-                      Open
-                    </Button>
-                    <Button variant="ghost" onClick={() => startEdit(contact)}>
-                      Edit
-                    </Button>
-                    <Button variant="ghost" onClick={() => void remove(contact)}>
-                      Delete
-                    </Button>
-                  </span>
-                }
-              >
-                <ul className="flex flex-col gap-1 text-sm">
-                  <li>
-                    {primaryPhone(contact) === undefined ? (
-                      <span className="text-muted">No number</span>
-                    ) : (
-                      <a className="text-action underline" href={`tel:${primaryPhone(contact)}`}>
-                        {primaryPhone(contact)}
-                      </a>
-                    )}
-                  </li>
-                  {contact.emails[0] === undefined ? null : (
-                    <li>
-                      <a
-                        className="text-action underline"
-                        href={`mailto:${contact.emails[0].address}`}
+                    <a
+                      href={`tel:${phone}`}
+                      aria-label={`Call ${contact.name}`}
+                      className="mr-1 inline-flex min-h-target min-w-target shrink-0 items-center justify-center rounded-full text-action hover:bg-raised focus-visible:outline-2 focus-visible:outline-action"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        {contact.emails[0].address}
-                      </a>
-                    </li>
+                        <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" />
+                      </svg>
+                    </a>
                   )}
-                  {contact.notes === undefined ? null : (
-                    <li className="line-clamp-2 text-muted">{contact.notes}</li>
-                  )}
-                </ul>
-              </RecordCard>
-            ))}
-          </CardGrid>
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </Section>
+      </PageBody>
+
+      {/* On a phone the add button floats where a thumb already is, clear of
+          the tab bar. A plain button: its shape and shadow are its own. */}
+      <button
+        type="button"
+        onClick={startAdd}
+        className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
+      >
+        <span aria-hidden="true" className="text-xl leading-none">
+          +
+        </span>
+        Add contact
+      </button>
+
+      {filtersOpen ? (
+        <Modal
+          title="Filters"
+          placement="side"
+          onClose={() => setFiltersOpen(false)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => setFiltersOpen(false)}>
+                Show {shown.length}
+              </Button>
+              {tagFilter === "" ? null : (
+                <Button variant="ghost" onClick={() => setTagFilter("")}>
+                  Clear filters
+                </Button>
+              )}
+            </>
+          }
+        >
+          <Select
+            label="Tag"
+            value={tagFilter}
+            options={[
+              { value: "", label: "Every tag" },
+              ...CONTACT_TAGS.map((tag) => ({ value: tag, label: TAG_LABELS[tag] })),
+              { value: UNTAGGED, label: "Untagged" },
+            ]}
+            onChange={(event) => setTagFilter(event.target.value)}
+          />
+        </Modal>
+      ) : null}
 
       {draft === undefined ? null : (
         <Modal
-          size="wide"
-          title={editing === undefined ? "Add somebody" : `Editing ${editing.name}`}
-          description="One record per person, however many ways the farm deals with them."
+          placement="side"
+          title={editing === undefined ? "Add a contact" : `Editing ${editing.name}`}
           onClose={closeForm}
           footer={
-            <div className="flex gap-2">
+            <>
               <Button variant="primary" busy={busy} onClick={() => void save()}>
                 {editing === undefined ? "Add them" : "Save changes"}
               </Button>
               <Button onClick={closeForm}>Cancel</Button>
-            </div>
+              {editing === undefined ? null : (
+                // The form closes first, so the typed confirmation is the only
+                // dialog on screen rather than a second one stacked on this.
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const contact = editing;
+                    closeForm();
+                    void remove(contact);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
           }
         >
           <ContactForm draft={draft} errors={errors} onChange={setDraft} />
@@ -394,13 +542,14 @@ export function ContactsScreen({
       {current === undefined ? null : (
         <Modal
           key={current.id}
-          size="wide"
+          placement="side"
           title={current.name}
-          description={current.company ?? "Everything the farm has recorded with them."}
+          description={current.company}
           onClose={() => setOpened(undefined)}
           footer={
-            <div className="flex gap-2">
+            <>
               <Button
+                variant="primary"
                 onClick={() => {
                   setOpened(undefined);
                   startEdit(current);
@@ -409,12 +558,23 @@ export function ContactsScreen({
                 Edit
               </Button>
               <Button onClick={() => setOpened(undefined)}>Close</Button>
-            </div>
+              <Button
+                variant="danger"
+                className="ml-auto"
+                onClick={() => {
+                  // Closed first, so the confirmation is not stacked on it.
+                  setOpened(undefined);
+                  void remove(current);
+                }}
+              >
+                Delete
+              </Button>
+            </>
           }
         >
           <ContactDetail contact={current} propertyId={propertyId} />
         </Modal>
       )}
-    </PageBody>
+    </div>
   );
 }

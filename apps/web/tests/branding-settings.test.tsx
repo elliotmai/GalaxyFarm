@@ -12,7 +12,7 @@ import type { BrandingConfig, Ulid } from "@galaxy-farm/core";
  * 1. **An owner can rename the farm and the app shows it.** The name is a
  *    stored value, not a string in code, so the payoff is that the navigation
  *    picks it up from the device rather than waiting for a deploy.
- * 2. **The tab is absent for anybody else.** Worth testing, and worth being
+ * 2. **The form is absent for anybody else.** Worth testing, and worth being
  *    clear that it proves nothing about permission. §4.3 is explicit that a
  *    hidden tab is not a check, and the check that matters lives in the push
  *    handler — `capabilities.test.ts` covers that, and `local-schema.test.ts`
@@ -151,11 +151,15 @@ beforeEach(() => {
   written.updated = [];
 });
 
-describe("the Branding tab", () => {
+describe("the farm name, on the Farm tab", () => {
+  // Branding was a tab of its own; it is now the top of Farm, beside the
+  // property's facts, so the strip stays at five. The gate is unchanged: the
+  // form is there for an owner and absent for anybody else.
   it("is there for an owner", () => {
     settings(true);
 
-    expect(screen.getByRole("tab", { name: /Branding/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Farm/ })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Farm name/)).toBeInTheDocument();
   });
 
   it("is absent for anybody else", () => {
@@ -164,11 +168,12 @@ describe("the Branding tab", () => {
     expect(screen.queryByRole("tab", { name: /Branding/ })).not.toBeInTheDocument();
   });
 
-  it("does not render the farm name field when the tab is absent", () => {
-    // The tab strip falls through to Calving watch, rather than rendering the
-    // branding panel with no tab pointing at it.
+  it("does not render the farm name field for anybody else", () => {
+    // The Farm tab still opens — the property is a member's business too —
+    // but without the form that renames the farm to everyone.
     settings(false);
 
+    expect(screen.getByRole("tab", { name: /Farm/ })).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Farm name/)).not.toBeInTheDocument();
   });
 });
@@ -177,12 +182,12 @@ describe("naming the farm", () => {
   it("creates the config the first time, since there is none to update", async () => {
     const user = userEvent.setup();
     settings(true);
-    await user.click(screen.getByRole("tab", { name: /Branding/ }));
+    await user.click(screen.getByRole("tab", { name: /Farm/ }));
 
     const field = screen.getByLabelText(/^Farm name/);
     await user.clear(field);
     await user.type(field, "Rocking M Cattle");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save farm name" }));
 
     await waitFor(() => expect(written.created).toHaveLength(1));
     expect(written.created[0]).toEqual({ farmName: "Rocking M Cattle" });
@@ -193,12 +198,12 @@ describe("naming the farm", () => {
     stored.current = { brandingConfigs: [config("Flying Double M")] };
     const user = userEvent.setup();
     settings(true);
-    await user.click(screen.getByRole("tab", { name: /Branding/ }));
+    await user.click(screen.getByRole("tab", { name: /Farm/ }));
 
     const field = screen.getByLabelText(/^Farm name/);
     await user.clear(field);
     await user.type(field, "Home Place");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save farm name" }));
 
     await waitFor(() => expect(written.updated).toHaveLength(1));
     expect(written.updated[0]?.patch).toEqual({ farmName: "Home Place" });
@@ -209,7 +214,7 @@ describe("naming the farm", () => {
     stored.current = { brandingConfigs: [config("Home Place")] };
     const user = userEvent.setup();
     settings(true);
-    await user.click(screen.getByRole("tab", { name: /Branding/ }));
+    await user.click(screen.getByRole("tab", { name: /Farm/ }));
 
     expect(screen.getByLabelText(/^Farm name/)).toHaveValue("Home Place");
   });
@@ -221,12 +226,12 @@ describe("naming the farm", () => {
     stored.current = { brandingConfigs: [config("Home Place")] };
     const user = userEvent.setup();
     settings(true);
-    await user.click(screen.getByRole("tab", { name: /Branding/ }));
+    await user.click(screen.getByRole("tab", { name: /Farm/ }));
 
     const field = screen.getByLabelText(/^Farm name/);
     await user.clear(field);
     await user.type(field, "   ");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save farm name" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The farm needs a name");
     expect(written.created).toHaveLength(0);
@@ -237,9 +242,9 @@ describe("naming the farm", () => {
     stored.current = { brandingConfigs: [config("Home Place")] };
     const user = userEvent.setup();
     settings(true);
-    await user.click(screen.getByRole("tab", { name: /Branding/ }));
+    await user.click(screen.getByRole("tab", { name: /Farm/ }));
 
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save farm name" })).toBeDisabled();
   });
 });
 

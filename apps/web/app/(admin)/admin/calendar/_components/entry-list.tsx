@@ -1,6 +1,6 @@
 "use client";
 
-import { EmptyState, Pill, RecordCard } from "@galaxy-farm/ui";
+import { EmptyState, Pill } from "@galaxy-farm/ui";
 import type { CalendarEntry } from "@galaxy-farm/core";
 
 import { MODULE_LABELS, MODULE_TONES } from "@/lib/calendar-view";
@@ -11,7 +11,11 @@ import { MODULE_LABELS, MODULE_TONES } from "@/lib/calendar-view";
  * The agenda view and the day panel under the grid are the same list, so they
  * are the same component. What a row has to carry is where it came from: a
  * projected row is derived from a record somewhere else, and one that cannot
- * say which module produced it is a row nobody can act on.
+ * say which module produced it is a row nobody can act on — so the module is
+ * the row's one chip, and "Derived" is said in its line of facts.
+ *
+ * Only a manual row has an edit button, and delete lives in the panel it
+ * opens: two text links on every row was most of the row.
  */
 
 export function EntryList({
@@ -19,62 +23,75 @@ export function EntryList({
   emptyTitle,
   emptyDetail,
   onEdit,
-  onDelete,
 }: {
   readonly entries: readonly CalendarEntry[];
   readonly emptyTitle: string;
-  readonly emptyDetail: string;
+  readonly emptyDetail?: string | undefined;
   /** Manual rows only — a projected row has no copy of its own to edit. */
   readonly onEdit?: ((entry: CalendarEntry) => void) | undefined;
-  readonly onDelete?: ((entry: CalendarEntry) => void) | undefined;
 }) {
   if (entries.length === 0) {
-    return <EmptyState title={emptyTitle} detail={emptyDetail} />;
+    return (
+      <EmptyState
+        title={emptyTitle}
+        {...(emptyDetail === undefined ? {} : { detail: emptyDetail })}
+      />
+    );
   }
 
   return (
-    <div className="flex flex-col gap-density">
+    <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
       {entries.map((entry) => (
-        <RecordCard
-          key={entry.id}
-          tone={MODULE_TONES[entry.module]}
-          title={entry.title}
-          subtitle={entry.detail}
-          meta={
-            <>
-              <Pill tone={MODULE_TONES[entry.module]}>{MODULE_LABELS[entry.module]}</Pill>
-              <Pill>{timeLabel(entry)}</Pill>
+        <li key={entry.id} className="flex min-h-[60px] items-center gap-3 py-2 pl-4 pr-2">
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate font-semibold text-ink">{entry.title}</span>
+            <span className="truncate text-sm text-muted">
+              {timeLabel(entry)}
               {entry.kind === "manual" ? null : (
-                // §4.5: the projected half is a read model. Saying so on the
-                // row is what stops somebody hunting for an edit button that
-                // would be a second source of truth if it existed.
-                <Pill tone="neutral">Derived</Pill>
+                <>
+                  {" · "}
+                  {/*
+                    §4.5: the projected half is a read model. Saying so on the
+                    row is what stops somebody hunting for an edit button that
+                    would be a second source of truth if it existed.
+                  */}
+                  <span>Derived</span>
+                </>
               )}
-            </>
-          }
-          actions={
-            entry.kind === "manual" && onEdit !== undefined && onDelete !== undefined ? (
-              <>
-                <button
-                  type="button"
-                  className="min-h-target cursor-pointer px-2 text-density text-action underline-offset-2 hover:underline"
-                  onClick={() => onEdit(entry)}
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="min-h-target cursor-pointer px-2 text-density text-action underline-offset-2 hover:underline"
-                  onClick={() => onDelete(entry)}
-                >
-                  Delete
-                </button>
-              </>
-            ) : undefined
-          }
-        />
+              {entry.detail === undefined || entry.detail === "" ? null : ` · ${entry.detail}`}
+            </span>
+          </span>
+          <Pill tone={MODULE_TONES[entry.module]}>{MODULE_LABELS[entry.module]}</Pill>
+          {entry.kind === "manual" && onEdit !== undefined ? (
+            <button
+              type="button"
+              aria-label="Edit"
+              title={`Edit ${entry.title}`}
+              onClick={() => onEdit(entry)}
+              className="inline-flex min-h-target min-w-target shrink-0 items-center justify-center rounded-full text-muted hover:bg-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-action"
+            >
+              <svg
+                aria-hidden="true"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4 20h4L19 9l-4-4L4 16z" />
+                <path d="M13.5 6.5l4 4" />
+              </svg>
+            </button>
+          ) : (
+            // Holds the column, so manual and derived rows line their chips up.
+            <span aria-hidden="true" className="min-w-target shrink-0" />
+          )}
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 

@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import {
   Button,
-  Callout,
   Card,
   DetailList,
   EmptyState,
@@ -61,9 +60,9 @@ export function PropertyScreen({
   if (loading) return <p className="text-muted">Loading…</p>;
   if (property === undefined) {
     return (
-      <Callout tone="danger" title="This property is not on the device yet">
-        Nothing has synced for it. If this is a new device, give the first pull a moment.
-      </Callout>
+      <p className="text-sm text-danger">
+        This property is not on the device yet — give a new device&rsquo;s first sync a moment.
+      </p>
     );
   }
 
@@ -73,7 +72,7 @@ export function PropertyScreen({
 
       <Section
         title="Where the farm is"
-        description="Type the address. The coordinates and the growing zone are worked out from it — and the forecast and the calving watch read them from here."
+        description="Type the address. The coordinates and the growing zone are worked out from it, and the forecast and calving watch read them."
       >
         <AddressLookup property={property} api={api} />
       </Section>
@@ -149,14 +148,14 @@ function GrowingZone({
   return (
     <Section
       title="Growing zone"
-      description="The USDA hardiness zone. The garden's frost dates, its growing season and every planting window derive from it."
+      description="USDA hardiness zone — the garden's frost dates and planting windows."
     >
       <Card>
         <form onSubmit={(event) => void save(event)} className="flex flex-col gap-density">
           <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
             <TextInput
               label="Zone"
-              hint="Looks like 8b. The address lookup fills this in; change it if you know better."
+              hint="Like 8b. Filled in from the address."
               value={shown}
               maxLength={4}
               onChange={(event) => {
@@ -182,8 +181,7 @@ function GrowingZone({
 
           {shown.trim() !== "" && dates === undefined ? (
             <p className="text-sm text-muted">
-              No frost dates are known for that zone, so the garden will not guess a season. Frost
-              warnings still fire; the growing-season filter simply lets them all through.
+              No frost dates for that zone — the garden will not guess a season.
             </p>
           ) : null}
 
@@ -271,7 +269,7 @@ function Identity({
   return (
     <Section
       title="The place"
-      description="What this property is called on pen boards, reports and the housesitter guide. Not the farm's name — that is on the Branding tab."
+      description="This property's name on pen boards, reports and the guide."
     >
       <Card>
         <form onSubmit={(event) => void save(event)} className="flex flex-col gap-density">
@@ -413,7 +411,7 @@ function OfflineBackground({
   return (
     <Section
       title="Offline aerial"
-      description="What the map draws pens over when there is no signal. Google&rsquo;s imagery cannot be stored, so this one is ours."
+      description="What the map draws pens over with no signal. Google's imagery cannot be stored, so this one is ours."
     >
       <Card>
         <form onSubmit={(event) => void save(event)} className="flex flex-col gap-density">
@@ -500,7 +498,7 @@ function GroundThatDidNotMove({
   return (
     <Section
       title="Ground"
-      description="Pens, traps and water sources are physical: they stay behind when you move. Retire the ones that did — they leave every picker and keep their history."
+      description="Pens, traps and water stay behind when you move. Retire the ones that did — they leave every picker and keep their history."
     >
       <Card>
         {working.length === 0 ? (
@@ -509,10 +507,15 @@ function GroundThatDidNotMove({
           <ul className="flex flex-col divide-y divide-rule">
             {working.map((zone) => (
               <li key={zone.id} className="flex items-center justify-between gap-3 py-2">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="truncate text-density text-ink">{zone.name}</span>
-                  <Pill>{zone.type}</Pill>
-                  {zone.resting ? <Pill tone="action">resting</Pill> : null}
+                {/* Name, one muted fact, at most one chip. */}
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate font-semibold text-ink">{zone.name}</span>
+                    <span className="truncate text-sm text-muted">
+                      {zone.type.replace(/_/g, " ")}
+                    </span>
+                  </span>
+                  {zone.resting ? <Pill tone="action">Resting</Pill> : null}
                 </span>
                 <Button
                   variant="ghost"
@@ -527,9 +530,9 @@ function GroundThatDidNotMove({
         )}
 
         {retired.length === 0 ? null : (
-          <div className="mt-density border-t border-edge pt-density">
+          <div className="mt-density border-t border-rule pt-density">
             <p className="mb-2 text-sm text-muted">
-              Retired — still readable everywhere they appear in the record, offered nowhere.
+              Retired — kept in the record, offered nowhere.
             </p>
             <ul className="flex flex-col divide-y divide-rule">
               {retired.map((zone) => (

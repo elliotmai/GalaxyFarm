@@ -101,7 +101,6 @@ export function AddressLookup({
         <div className="min-w-0 flex-1">
           <TextInput
             label="Address"
-            hint="Street, town, state and ZIP."
             value={address}
             onChange={(event) => setAddress(event.target.value)}
             autoComplete="street-address"
@@ -141,7 +140,7 @@ export function AddressLookup({
               },
             ]}
           />
-          <div className="mt-density flex flex-wrap gap-3 border-t border-edge pt-density">
+          <div className="mt-density flex flex-wrap gap-3 border-t border-rule pt-density">
             <Button onClick={() => void accept(match)}>Use this</Button>
             <Button variant="ghost" onClick={() => setMatch(undefined)}>
               No, let me edit the address
@@ -159,19 +158,12 @@ export function AddressLookup({
         </Card>
       )}
 
-      <DetailList
-        columns={2}
-        items={[
-          {
-            label: "Latitude",
-            value: property.latitude === undefined ? undefined : property.latitude.toFixed(5),
-          },
-          {
-            label: "Longitude",
-            value: property.longitude === undefined ? undefined : property.longitude.toFixed(5),
-          },
-        ]}
-      />
+      {/* One line of fact rather than two labelled pairs. */}
+      <p className="gf-numeric text-sm text-muted">
+        {property.latitude === undefined || property.longitude === undefined
+          ? "No coordinates yet"
+          : `Coordinates ${property.latitude.toFixed(5)}, ${property.longitude.toFixed(5)}`}
+      </p>
 
       {/*
         The escape hatch, not the front door. A farm at the end of a road the
@@ -183,7 +175,7 @@ export function AddressLookup({
         <button
           type="button"
           onClick={() => setManual(true)}
-          className="self-start text-sm text-muted underline underline-offset-2 hover:text-ink"
+          className="inline-flex min-h-target items-center self-start text-sm text-muted underline underline-offset-2 hover:text-ink"
         >
           Set the coordinates by hand instead
         </button>

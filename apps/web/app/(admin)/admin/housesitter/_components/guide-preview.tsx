@@ -164,7 +164,10 @@ export function GuidePreview({
           </Button>
         }
       >
-        <article data-print="guide" className="rounded-density bg-panel p-6">
+        <article
+          data-print="guide"
+          className="rounded-density border border-rule bg-panel p-4 sm:p-6"
+        >
           {/*
             A table, and a real one.
 

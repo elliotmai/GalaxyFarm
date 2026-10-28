@@ -3,11 +3,8 @@
 import { useEffect, useState, useTransition } from "react";
 
 import {
-  Badge,
   Button,
-  Callout,
   Card,
-  DataTable,
   EmptyState,
   Modal,
   Pill,
@@ -16,7 +13,6 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 
 import {
@@ -45,6 +41,10 @@ import type { KioskDevice } from "@/lib/device-store";
  * pairing yet, or has just had a fresh one issued — never once a token
  * exists. That is enforced by the store, not by this screen: `KioskDevice`
  * simply carries an absent code once one is not live.
+ *
+ * One row per screen — its name, one line, a chip only when it is not simply
+ * paired — and everything that can be done to it in the side panel the row
+ * opens: rename, lock to a board, show or reissue the code, revoke, delete.
  */
 
 function formatCountdown(ms: number): string {
@@ -129,8 +129,10 @@ export function DevicesScreen({
   const [pending, startTransition] = useTransition();
 
   const [addingName, setAddingName] = useState<string | undefined>();
-  const [renamingId, setRenamingId] = useState<string | undefined>();
+  /** The screen whose panel is open, by id — read back from the live list. */
+  const [managingId, setManagingId] = useState<string | undefined>();
   const [renameDraft, setRenameDraft] = useState("");
+  const managing = devices.find((held) => held.id === managingId);
   const [codeFor, setCodeFor] = useState<KioskDevice | undefined>();
   const [pinDraft, setPinDraft] = useState("");
   const [pinError, setPinError] = useState<string | undefined>();
@@ -158,11 +160,22 @@ export function DevicesScreen({
     );
   }
 
+  function open(device: KioskDevice) {
+    setManagingId(device.id);
+    setRenameDraft(device.name);
+  }
+
   function submitRename(id: string) {
     run(
       () => renameDeviceAction(id, renameDraft),
-      () => setRenamingId(undefined),
+      () => setManagingId(undefined),
     );
+  }
+
+  /** Close the panel, then act — so a confirmation or the code is never under it. */
+  function fromPanel(act: () => void) {
+    setManagingId(undefined);
+    act();
   }
 
   async function revoke(device: KioskDevice) {
@@ -230,181 +243,90 @@ export function DevicesScreen({
     run(() => clearKioskPinAction());
   }
 
-  const columns: readonly Column<KioskDevice>[] = [
-    {
-      key: "name",
-      header: "Screen",
-      render: (device) =>
-        renamingId === device.id ? (
-          <span className="flex items-center gap-2">
-            <TextInput
-              label="Name"
-              hideLabel
-              value={renameDraft}
-              onChange={(event) => setRenameDraft(event.target.value)}
-              onKeyDown={(event) => {
-                // A rename is one field. Reaching for the mouse to commit it
-                // is the kind of friction that stops people fixing a typo.
-                if (event.key === "Enter") submitRename(device.id);
-                if (event.key === "Escape") setRenamingId(undefined);
-              }}
-              autoFocus
-            />
-            <Button variant="primary" disabled={pending} onClick={() => submitRename(device.id)}>
-              Save
-            </Button>
-            <Button disabled={pending} onClick={() => setRenamingId(undefined)}>
-              Cancel
-            </Button>
-          </span>
-        ) : (
-          <span className="text-ink">{device.name}</span>
-        ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      render: (device) => {
-        const status = statusOf(device);
-        return (
-          <span className="flex flex-col gap-1">
-            <Pill tone={status.tone}>{status.label}</Pill>
-            {device.lastSeenAt !== undefined ? (
-              <span className="text-sm text-muted">Last seen {formatDate(device.lastSeenAt)}</span>
-            ) : null}
-          </span>
-        );
-      },
-    },
-    {
-      key: "board",
-      header: "Locked to",
-      render: (device) =>
-        device.revokedAt !== undefined ? (
-          <span className="text-muted">—</span>
-        ) : (
-          <Select
-            label="Locked board"
-            hideLabel
-            value={device.lockedToBoard ?? ""}
-            disabled={pending}
-            options={[
-              { value: "", label: "Board picker (unlocked)" },
-              ...KIOSK_BOARDS.map((board) => ({ value: board.slug, label: board.label })),
-            ]}
-            onChange={(event) =>
-              run(() =>
-                lockDeviceAction(device.id, event.target.value === "" ? null : event.target.value),
-              )
-            }
-          />
-        ),
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (device) => (
-        <span className="flex flex-wrap gap-2">
-          {device.revokedAt !== undefined ? null : (
-            <>
-              <Button
-                variant="ghost"
-                disabled={pending}
-                onClick={() => {
-                  setRenamingId(device.id);
-                  setRenameDraft(device.name);
-                }}
-              >
-                Rename
-              </Button>
-              {device.pairedAt === undefined ? (
-                <Button variant="ghost" disabled={pending} onClick={() => setCodeFor(device)}>
-                  Show code
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  disabled={pending}
-                  onClick={() =>
-                    run(
-                      () => reissueDeviceAction(device.id),
-                      (result) => {
-                        if (result.ok && result.device !== undefined) setCodeFor(result.device);
-                      },
-                    )
-                  }
-                >
-                  Re-pair
-                </Button>
-              )}
-              <Button variant="ghost" disabled={pending} onClick={() => void revoke(device)}>
-                Revoke
-              </Button>
-            </>
-          )}
-          {/* Outside the guard above: a revoked screen has no other action
-              left, and clearing it out of the list is the whole reason it is
-              here. */}
-          <Button variant="ghost" disabled={pending} onClick={() => void remove(device)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
+  /** The one muted line under a name: what it shows, and when it was last heard from. */
+  function lineFor(device: KioskDevice): string {
+    const board = KIOSK_BOARDS.find((entry) => entry.slug === device.lockedToBoard);
+    return [
+      device.revokedAt !== undefined
+        ? undefined
+        : board === undefined
+          ? "Board picker"
+          : `Locked to ${board.label}`,
+      device.lastSeenAt === undefined ? undefined : `Last seen ${formatDate(device.lastSeenAt)}`,
+    ]
+      .filter((part) => part !== undefined)
+      .join(" · ");
+  }
 
   return (
     <div className="flex flex-col gap-density">
       <Section
         title="Kiosk devices"
-        description="Barn screens, paired once and trusted from then on. Each holds a whitelist — logging eggs, completing chores, moving animals between pens — and nothing else."
+        description="Barn screens, paired once and trusted from then on. Each may log eggs, complete chores and move animals between pens — nothing else."
         actions={
           <Button
             variant="primary"
             disabled={pending || unavailable !== undefined}
             onClick={() => setAddingName("")}
           >
-            Add a screen
+            <span aria-hidden="true">+</span> Add screen
           </Button>
         }
       >
-        {unavailable === undefined ? null : (
-          <Callout tone="danger" title="The list of devices is not here">
-            <p>{unavailable}</p>
-          </Callout>
-        )}
+        {unavailable === undefined ? null : <p className="text-sm text-danger">{unavailable}</p>}
 
-        <Card>
-          <DataTable
-            caption="Paired and pairing barn screens"
-            columns={columns}
-            rows={[...devices]}
-            rowKey={(device) => device.id}
-            empty={
-              <EmptyState
-                title="No screens yet"
-                detail="Add one, then walk the code over to the barn and type it in at /kiosk/pair."
-                action={
-                  <Button variant="primary" onClick={() => setAddingName("")}>
-                    Add the first screen
-                  </Button>
-                }
-              />
+        {devices.length === 0 ? (
+          <EmptyState
+            title="No screens yet"
+            detail="Add one, then type its code in at /kiosk/pair on the barn screen."
+            action={
+              <Button variant="primary" onClick={() => setAddingName("")}>
+                Add the first screen
+              </Button>
             }
           />
-        </Card>
+        ) : (
+          <ul
+            aria-label="Paired and pairing barn screens"
+            className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
+          >
+            {devices.map((device) => {
+              const status = statusOf(device);
+              const line = lineFor(device);
+              return (
+                <li key={device.id}>
+                  <button
+                    type="button"
+                    onClick={() => open(device)}
+                    aria-label={`Manage ${device.name}`}
+                    className="flex min-h-[60px] w-full min-w-0 items-center gap-3 py-2 pl-4 pr-3 text-left text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate font-semibold">{device.name}</span>
+                      {line === "" ? null : (
+                        <span className="truncate text-sm text-muted">{line}</span>
+                      )}
+                    </span>
+                    {/* By exception: a paired screen is the ordinary case. */}
+                    {device.pairedAt !== undefined && device.revokedAt === undefined ? null : (
+                      <Pill tone={status.tone}>{status.label}</Pill>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </Section>
 
       <Section
         title="Kiosk PIN"
-        description={
-          "Shared across every screen — the same code the whole household uses. It never widens what a barn screen may do on its own; it only gates the one thing a screen can do to itself (unpairing), and any Elevated-tier action taken by a person using /kiosk as themselves."
-        }
+        description="One code for every screen. It never widens what a screen may do; it gates unpairing, and any Elevated-tier action a person takes at /kiosk as themselves."
       >
         <Card>
           {pinSet ? (
             <div className="flex flex-col gap-density">
-              <Badge tone="calm">PIN is set</Badge>
+              <p className="text-sm text-muted">A PIN is set.</p>
               <div className="flex flex-wrap items-end gap-2">
                 <TextInput
                   label="New PIN"
@@ -445,14 +367,14 @@ export function DevicesScreen({
       {deleted.length === 0 ? null : (
         <Section
           title="Deleted screens"
-          description="Tombstoned rather than removed, so a screen deleted by mistake comes back as it was rather than as a walk out to the barn with a fresh code."
+          description="Restore one and it comes back paired — no walk to the barn with a new code."
         >
           <Card>
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col divide-y divide-rule">
               {deleted.map((device) => (
-                <li key={device.id} className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="flex flex-col">
-                    <span className="text-ink">{device.name}</span>
+                <li key={device.id} className="flex items-center justify-between gap-2 py-2">
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate font-semibold text-ink">{device.name}</span>
                     <span className="text-sm text-muted">
                       Deleted {formatDate(device.deletedAt)}
                     </span>
@@ -472,22 +394,125 @@ export function DevicesScreen({
       )}
 
       {addingName === undefined ? null : (
-        <Modal title="Add a screen" onClose={() => setAddingName(undefined)}>
-          <div className="flex flex-col gap-density">
-            <TextInput
-              label="Name"
-              hint='What it is mounted as — "Barn TV", "Coop tablet".'
-              value={addingName}
-              autoFocus
-              onChange={(event) => setAddingName(event.target.value)}
-            />
-            <div className="flex gap-2">
+        <Modal
+          placement="side"
+          title="Add a screen"
+          onClose={() => setAddingName(undefined)}
+          footer={
+            <>
               <Button variant="primary" busy={pending} onClick={submitAdd}>
                 Add and get a code
               </Button>
               <Button onClick={() => setAddingName(undefined)}>Cancel</Button>
-            </div>
-          </div>
+            </>
+          }
+        >
+          <TextInput
+            label="Name"
+            hint='"Barn TV", "Coop tablet".'
+            value={addingName}
+            autoFocus
+            onChange={(event) => setAddingName(event.target.value)}
+          />
+        </Modal>
+      )}
+
+      {managing === undefined ? null : (
+        <Modal
+          key={managing.id}
+          placement="side"
+          title={managing.name}
+          description={statusOf(managing).label}
+          onClose={() => setManagingId(undefined)}
+          footer={
+            <>
+              {managing.revokedAt !== undefined ? null : (
+                <Button
+                  variant="primary"
+                  disabled={pending}
+                  onClick={() => submitRename(managing.id)}
+                >
+                  Save
+                </Button>
+              )}
+              <Button disabled={pending} onClick={() => setManagingId(undefined)}>
+                Cancel
+              </Button>
+              {/* Outside every guard: a revoked screen has no other action
+                  left, and clearing it out of the list is the whole reason it
+                  is here. */}
+              <Button
+                variant="danger"
+                className="ml-auto"
+                disabled={pending}
+                onClick={() => fromPanel(() => void remove(managing))}
+              >
+                Delete
+              </Button>
+            </>
+          }
+        >
+          {managing.revokedAt !== undefined ? (
+            <p className="text-sm text-muted">Revoked — it no longer syncs.</p>
+          ) : (
+            <>
+              <TextInput
+                label="Name"
+                value={renameDraft}
+                onChange={(event) => setRenameDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  // A rename is one field. Reaching for the mouse to commit it
+                  // is the kind of friction that stops people fixing a typo.
+                  if (event.key === "Enter") submitRename(managing.id);
+                }}
+              />
+              <Select
+                label="Locked to"
+                value={managing.lockedToBoard ?? ""}
+                disabled={pending}
+                options={[
+                  { value: "", label: "Board picker (unlocked)" },
+                  ...KIOSK_BOARDS.map((board) => ({ value: board.slug, label: board.label })),
+                ]}
+                onChange={(event) =>
+                  run(() =>
+                    lockDeviceAction(
+                      managing.id,
+                      event.target.value === "" ? null : event.target.value,
+                    ),
+                  )
+                }
+              />
+              <div className="flex flex-wrap gap-2 border-t border-rule pt-density">
+                {managing.pairedAt === undefined ? (
+                  <Button disabled={pending} onClick={() => fromPanel(() => setCodeFor(managing))}>
+                    Show code
+                  </Button>
+                ) : (
+                  <Button
+                    disabled={pending}
+                    onClick={() =>
+                      fromPanel(() =>
+                        run(
+                          () => reissueDeviceAction(managing.id),
+                          (result) => {
+                            if (result.ok && result.device !== undefined) {
+                              setCodeFor(result.device);
+                            }
+                          },
+                        ),
+                      )
+                    }
+                  >
+                    Re-pair
+                  </Button>
+                )}
+                <Button disabled={pending} onClick={() => fromPanel(() => void revoke(managing))}>
+                  Revoke
+                </Button>
+              </div>
+            </>
+          )}
         </Modal>
       )}
 

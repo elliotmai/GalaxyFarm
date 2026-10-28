@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-import { Button, Callout, TextInput, useConfirmDelete, useToast } from "@galaxy-farm/ui";
+import { Button, Modal, TextInput, useConfirmDelete, useToast } from "@galaxy-farm/ui";
 
 import {
   connect,
@@ -23,6 +23,10 @@ import type { WanderConnection } from "@/lib/wander-store";
  * different — paste a credential, choose from a list, decide whether to
  * refresh — and a single form would ask all three at once on a screen where
  * two of them are not yet answerable.
+ *
+ * Collapsed to one row until it is used: most visits to Travel are to type a
+ * trip, not to wire up a connector, so the token form waits in a side panel
+ * behind Connect rather than sitting open above the trips.
  *
  * **The token is typed once and never shown again.** It is not held in state
  * after the action returns, and nothing the server sends back contains it;
@@ -49,6 +53,7 @@ export function WanderPanel({ connection }: { readonly connection: WanderConnect
   const [baseUrl, setBaseUrl] = useState("https://us-central1-wander-f10b1.cloudfunctions.net");
   const [error, setError] = useState<string | undefined>();
   const [choices, setChoices] = useState<readonly WanderTripSummary[] | undefined>();
+  const [connecting, setConnecting] = useState(false);
 
   function run(action: () => Promise<{ ok: boolean; message?: string; error?: string }>) {
     setError(undefined);
@@ -71,6 +76,7 @@ export function WanderPanel({ connection }: { readonly connection: WanderConnect
         return;
       }
       setToken("");
+      setConnecting(false);
       show({ message: result.message, tone: "success" });
       await loadTrips();
     });
@@ -106,78 +112,58 @@ export function WanderPanel({ connection }: { readonly connection: WanderConnect
   }
 
   return (
-    <div className="flex flex-col gap-density border border-edge bg-panel p-density">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="font-medium text-ink">Wander</h3>
-        {connection === undefined ? null : (
+    <div className="flex flex-col gap-3 rounded-density border border-rule bg-panel p-density">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h3 className="font-semibold text-ink">Wander</h3>
           <span className="text-sm text-muted">
-            {connection.tripName === undefined
-              ? "connected · no trip followed"
-              : `following ${connection.tripName} · pulled ${when(connection.lastPulledAt)}`}
+            {connection === undefined
+              ? "Not connected"
+              : connection.tripName === undefined
+                ? "Connected · no trip followed"
+                : `Following ${connection.tripName} · pulled ${when(connection.lastPulledAt)}`}
           </span>
-        )}
+        </div>
+        {connection === undefined ? (
+          <Button aria-haspopup="dialog" onClick={() => setConnecting(true)}>
+            Connect
+          </Button>
+        ) : null}
       </div>
 
-      {error === undefined ? null : (
-        <Callout tone="danger" title="Wander said no">
-          {error}
-        </Callout>
+      {/* One line each, not boxes: the error is the whole message. */}
+      {error === undefined || connecting ? null : (
+        <p className="text-sm text-danger">Wander said no: {error}</p>
       )}
-
       {connection?.lastError === undefined || error !== undefined ? null : (
-        <Callout tone="danger" title="The last pull failed">
-          {connection.lastError}
-        </Callout>
+        <p className="text-sm text-danger">The last pull failed: {connection.lastError}</p>
       )}
 
-      {connection === undefined ? (
-        <>
-          <p className="text-sm text-muted">
-            Mint a token in Wander under Account → Connected Apps, then paste it here. The farm will
-            read your trips and the flights on them — it cannot change anything in Wander.
-          </p>
-          <TextInput
-            label="Token from Wander"
-            type="password"
-            autoComplete="off"
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-          />
-          <TextInput
-            label="Wander functions URL"
-            hint="Only change this if Wander runs in a different Firebase project"
-            value={baseUrl}
-            onChange={(event) => setBaseUrl(event.target.value)}
-          />
-          <div>
-            <Button variant="primary" busy={pending} onClick={begin}>
-              Connect
-            </Button>
-          </div>
-        </>
-      ) : (
+      {connection === undefined ? null : (
         <>
           {choices === undefined ? null : choices.length === 0 ? (
             <p className="text-sm text-muted">Wander has no trips that have not already ended.</p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul
+              aria-label="Trips in Wander"
+              className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule"
+            >
               {choices.map((trip) => (
-                <li
-                  key={trip.id}
-                  className="flex flex-wrap items-baseline justify-between gap-2 border border-edge p-2"
-                >
-                  <span className="min-w-0">
-                    <strong>{trip.name}</strong>
-                    {trip.destination === undefined ? null : (
-                      <span className="text-muted"> · {trip.destination}</span>
-                    )}
-                    <span className="block text-sm text-muted">
+                <li key={trip.id} className="flex items-center gap-3 py-2 pl-4 pr-2">
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate font-semibold text-ink">
+                      {trip.name}
+                      {trip.destination === undefined ? null : (
+                        <span className="font-normal text-muted"> · {trip.destination}</span>
+                      )}
+                    </span>
+                    <span className="truncate text-sm text-muted">
                       {trip.startDate} → {trip.endDate}
                       {trip.isCurrent ? " · on now" : ""}
                     </span>
                   </span>
                   <Button busy={pending} onClick={() => choose(trip)}>
-                    Follow this one
+                    Follow
                   </Button>
                 </li>
               ))}
@@ -185,25 +171,63 @@ export function WanderPanel({ connection }: { readonly connection: WanderConnect
           )}
 
           <div className="flex flex-wrap gap-2">
-            <Button busy={pending} onClick={() => void loadTrips()}>
-              {connection.tripId === undefined ? "Pick a trip" : "Follow a different trip"}
-            </Button>
             {connection.tripId === undefined ? null : (
               <Button variant="primary" busy={pending} onClick={() => run(pull)}>
                 Refresh now
               </Button>
             )}
+            <Button busy={pending} onClick={() => void loadTrips()}>
+              {connection.tripId === undefined ? "Pick a trip" : "Follow a different trip"}
+            </Button>
             <Button variant="ghost" busy={pending} onClick={() => void cut()}>
               Disconnect
             </Button>
           </div>
 
           <p className="text-xs text-muted">
-            Pulled trips are read-only on the farm — edit them in Wander and refresh. The one
-            exception is who is away, which keeps whatever you write here.
+            Pulled trips are read-only here — edit them in Wander, then refresh. Who is away keeps
+            what you write.
           </p>
         </>
       )}
+
+      {connecting ? (
+        <Modal
+          placement="side"
+          title="Connect Wander"
+          description="Read-only: the farm reads your trips and flights, and changes nothing in Wander."
+          onClose={() => {
+            setConnecting(false);
+            setError(undefined);
+          }}
+          footer={
+            <>
+              <Button variant="primary" busy={pending} onClick={begin}>
+                Connect
+              </Button>
+              <Button onClick={() => setConnecting(false)}>Cancel</Button>
+            </>
+          }
+        >
+          {error === undefined ? null : (
+            <p className="text-sm text-danger">Wander said no: {error}</p>
+          )}
+          <TextInput
+            label="Token from Wander"
+            hint="Account → Connected Apps in Wander."
+            type="password"
+            autoComplete="off"
+            value={token}
+            onChange={(event) => setToken(event.target.value)}
+          />
+          <TextInput
+            label="Wander functions URL"
+            hint="Only change this if Wander runs in a different Firebase project."
+            value={baseUrl}
+            onChange={(event) => setBaseUrl(event.target.value)}
+          />
+        </Modal>
+      ) : null}
     </div>
   );
 }
