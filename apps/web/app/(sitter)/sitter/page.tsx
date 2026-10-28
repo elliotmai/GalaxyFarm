@@ -5,6 +5,7 @@ import { can, choreDaySheet, FALLBACK_FARM_NAME, startOfDay } from "@galaxy-farm
 import { SitterScreen } from "@/app/(sitter)/sitter/_components/sitter-screen";
 import { currentActor } from "@/lib/auth";
 import { withDeadline } from "@/lib/deadline";
+import { peopleNames } from "@/lib/people-names";
 import { EMPTY_SITTER_VIEW, sitterView } from "@/lib/sitter-store";
 
 export const metadata = { title: "Care Guide" };
@@ -77,6 +78,10 @@ export default async function SitterPage() {
       chores={chores}
       day={now}
       mayTick={can(actor, "chores.complete", now)}
+      actorId={actor.id}
+      // Unawaited: the guide streams without the names, and each "Done by"
+      // fills in when they land. Never rejects.
+      names={peopleNames(actor.propertyId)}
       {...(unavailable === undefined ? {} : { unavailable })}
     />
   );

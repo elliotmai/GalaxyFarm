@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { Logomark } from "@galaxy-farm/ui";
+
 /**
  * The offline fallback (spec §3, §7).
  *
@@ -26,26 +28,33 @@ export const metadata = { title: "Offline" };
 
 export default function OfflinePage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-density p-6 text-center">
-      <h1 className="text-ink">No signal, and this screen is not on the device yet</h1>
-      <p className="max-w-prose text-muted">
-        The app itself is installed and works without a connection — but this particular screen has
-        not been opened on this device before, so there is no copy of it here to show you.
-      </p>
-      <p className="max-w-prose text-muted">
-        Anything logged while offline is saved on the device and sent up on its own once there is
-        signal again. Nothing is waiting on this page.
-      </p>
-      <div className="flex flex-wrap items-center justify-center gap-density">
-        {/* Both entry points, because the two screens most likely to land here
-            are a phone in a pasture and a barn kiosk, and each has a home the
-            other does not. `prefetch={false}`: there is nothing to prefetch
-            with — the network is down, which is why this page is on screen. */}
-        <Link className="text-action underline" href="/admin" prefetch={false}>
-          Open the dashboard
+    <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-6 px-4 py-10 text-center">
+      <div className="flex max-w-md flex-col items-center gap-3">
+        <Logomark size="large" decorative />
+        <h1 className="text-ink">No signal, and this screen is not on the device yet</h1>
+        <p className="text-muted">
+          The app works offline, but this screen has never been opened here. Anything logged offline
+          is saved and sent once there is signal.
+        </p>
+      </div>
+      {/* Both entry points, because the two screens most likely to land here
+          are a phone in a pasture and a barn kiosk, and each has a home the
+          other does not. `prefetch={false}`: there is nothing to prefetch
+          with — the network is down, which is why this page is on screen. */}
+      <div className="flex w-full max-w-sm flex-col gap-2 sm:flex-row">
+        <Link
+          className="inline-flex min-h-target flex-1 items-center justify-center rounded-density bg-action px-4 font-semibold text-action-ink"
+          href="/admin"
+          prefetch={false}
+        >
+          Open Today
         </Link>
-        <Link className="text-action underline" href="/kiosk" prefetch={false}>
-          Open the kiosk boards
+        <Link
+          className="inline-flex min-h-target flex-1 items-center justify-center rounded-density border border-edge bg-panel px-4 font-semibold text-ink hover:bg-raised"
+          href="/kiosk"
+          prefetch={false}
+        >
+          Kiosk boards
         </Link>
       </div>
     </main>

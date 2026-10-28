@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
 
-import { PageBody, PageHeader } from "@galaxy-farm/ui";
+import { PageBody } from "@galaxy-farm/ui";
 import {
   choreDaySheet,
   type Animal,
@@ -16,23 +15,30 @@ import {
 import type { FeedType } from "@galaxy-farm/module-feed";
 
 import { ChoreBoard } from "@/app/(kiosk)/kiosk/_components/chore-board";
+import { KioskHeader, KioskQuiet, kioskDate } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
+import type { PeopleNames } from "@/lib/people-names";
 
 /**
  * Today's Chores (spec §4.4, §5.1) — the same day sheet the admin app and
  * `/sitter` derive, `choreDaySheet` run against what this device has already
  * pulled.
  *
- * Laid out by `ChoreBoard`, the same compact board the housesitter screen
- * shows: the parts of the day side by side, one row per chore. A card and a
- * full-width button each read well on their own, but a real day is a dozen
- * chores and the feeding rounds, and at that length the button that was easy
- * to hit was three screens below the one somebody was looking for. A 44px row
- * is still honest to a gloved hand, and it puts the whole day in one glance.
+ * Laid out by `ChoreBoard`, the same board the housesitter screen shows: the
+ * parts of the day side by side, one big tick row per chore, and one green
+ * panel once nothing is left. The header is the title and the date and
+ * nothing else — the count lives on the board, beside the list it counts.
  */
-export function ChoresBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
+export function ChoresBoardScreen({
+  propertyId,
+  names,
+}: {
+  readonly propertyId: Ulid;
+  /** Who ticked what, resolved on the server; never rejects. */
+  readonly names?: Promise<PeopleNames> | undefined;
+}) {
   const { store } = useSyncEngine();
 
   const query = useMemo(() => ({ propertyId }), [propertyId]);
@@ -60,16 +66,12 @@ export function ChoresBoardScreen({ propertyId }: { readonly propertyId: Ulid })
 
   return (
     <PageBody>
-      <PageHeader
-        eyebrow={<Link href="/kiosk">← Kiosk</Link>}
-        title="Today's Chores"
-        subtitle="Tick each one off as it happens."
-      />
+      <KioskHeader title="Today's Chores" fact={kioskDate(today)} />
 
       {loading || store === undefined ? (
-        <p className="text-muted">Loading…</p>
+        <KioskQuiet>Loading…</KioskQuiet>
       ) : (
-        <ChoreBoard entries={entries} animals={animals} zones={zones} day={today} />
+        <ChoreBoard entries={entries} animals={animals} zones={zones} day={today} names={names} />
       )}
     </PageBody>
   );

@@ -115,8 +115,21 @@ export function SectionStrip() {
   const section = sectionFor(pathname);
   const subs = section === undefined ? undefined : SUB_SECTIONS[section.href];
 
+  // A record's own page — an animal, a machine — is reached from a list and
+  // carries its own way back. Tab strips above it were two rows of somewhere
+  // else between the person and the record they opened.
+  const isRecordPage =
+    section !== undefined &&
+    pathname !== section.href &&
+    !(subs ?? []).some((sub) => sub.href === pathname);
+  if (isRecordPage) return null;
+
+  const groups = section === undefined ? undefined : VIEW_GROUPS[section.href];
+
   // A single-section destination needs no strip — one tab is not a choice.
-  const showPrimary = destination.sections.length > 1;
+  // Nor does a grouped section's parent: Cattle's own four groups say where you
+  // are, and switching species is what the Animals tab is for.
+  const showPrimary = destination.sections.length > 1 && groups === undefined;
   if (!showPrimary && subs === undefined) return null;
 
   // The sub-view being looked at, if any. These carry no `owns`, so an exact
@@ -128,7 +141,6 @@ export function SectionStrip() {
   // Grouped views: the groups as a segmented control, then the chosen group's
   // own views. A detail page sits in no group, so nothing is lit and no second
   // row is drawn — the same rule the flat strip keeps for it.
-  const groups = section === undefined ? undefined : VIEW_GROUPS[section.href];
   const group = groups?.find((candidate) => candidate.views.some((v) => v.href === pathname));
 
   return (

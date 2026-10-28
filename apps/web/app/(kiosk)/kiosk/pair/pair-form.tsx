@@ -61,11 +61,11 @@ export function PairForm() {
   return (
     <Card title="Enter the pairing code" className="w-full max-w-sm">
       {pairedBefore ? (
-        <p className="mb-density text-sm text-muted">
-          This screen was paired before, and everything it saved is still here except the credential
-          itself — so something cleared this browser&rsquo;s cookies and left the rest. The app does
-          not do that. If it keeps happening on a schedule, the kiosk launcher&rsquo;s &ldquo;clear
-          cookies on restart&rdquo; setting is where to look.
+        // A hint printed where somebody is already standing — see
+        // `usePairedBefore` for what it can and cannot tell.
+        <p className="mb-density text-base text-muted">
+          Paired before, but something cleared this browser&rsquo;s cookies. If it keeps happening,
+          check the kiosk launcher&rsquo;s &ldquo;clear cookies on restart&rdquo; setting.
         </p>
       ) : null}
 

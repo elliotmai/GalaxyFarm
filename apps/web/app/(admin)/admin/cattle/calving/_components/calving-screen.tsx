@@ -19,6 +19,7 @@ import {
   useConfirmDelete,
   useToast,
   type Column,
+  toOptions,
 } from "@galaxy-farm/ui";
 import {
   animalSchema,
@@ -613,7 +614,7 @@ function RecordCalving({
             label="Vigour"
             value={vigour}
             onChange={(event) => setVigour(event.target.value as CalfVigour)}
-            options={CALF_VIGOUR.map((value) => ({ value, label: value }))}
+            options={toOptions(CALF_VIGOUR)}
           />
           {vigour === "stillborn" ? null : (
             <>

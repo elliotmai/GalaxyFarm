@@ -78,8 +78,8 @@ export function ResumeScreen({ next }: { readonly next: string }) {
         >
           <p className="text-muted">
             {failure === "unpaired"
-              ? "It has been taken out of service from Settings, so it needs a new code to come back."
-              : "This screen signed itself back in and was signed out again straight away, so it has stopped trying. A fresh code will reset it."}
+              ? "Taken out of service from Settings. A new code brings it back."
+              : "It kept being signed straight back out, so it stopped trying. A fresh code resets it."}
           </p>
         </Card>
         <PairForm />
@@ -94,8 +94,8 @@ export function ResumeScreen({ next }: { readonly next: string }) {
     >
       <p className="text-muted">
         {failure === "unreachable"
-          ? "This screen is still paired — it just cannot reach the farm's server. It will carry on trying on its own."
-          : "Signing back in with the code this screen was paired with. Nothing to do."}
+          ? "Still paired, just no connection to the farm. It keeps trying by itself."
+          : "Nothing to do."}
       </p>
 
       {failure === "unreachable" ? (

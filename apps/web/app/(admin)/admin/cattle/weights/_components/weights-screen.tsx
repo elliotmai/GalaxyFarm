@@ -12,6 +12,7 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
+  toOptions,
 } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -398,7 +399,7 @@ function AddWeight({
           hint="Birth, weaning and yearling feed a figure."
           value={context}
           onChange={(event) => setContext(event.target.value as WeightContext)}
-          options={WEIGHT_CONTEXTS.map((value) => ({ value, label: value }))}
+          options={toOptions(WEIGHT_CONTEXTS)}
         />
         <TextInput
           label="Date"

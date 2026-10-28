@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 
-import { Checkbox, Select, TextInput, useConfirmDelete, useToast } from "@galaxy-farm/ui";
+import {
+  Checkbox,
+  Select,
+  TextInput,
+  useConfirmDelete,
+  useToast,
+  toOptions,
+} from "@galaxy-farm/ui";
 import { displayName, fromDollars, type Animal, type Ulid, type Zone } from "@galaxy-farm/core";
 import {
   CONSUMPTION_KINDS,
@@ -289,7 +296,7 @@ export function UseForm({
         // The one easy mistake here: a correction is a count, not a use.
         hint="A correction is a count of the barn; the projection restarts from it."
         value={kind}
-        options={CONSUMPTION_KINDS.map((value) => ({ value, label: value }))}
+        options={toOptions(CONSUMPTION_KINDS)}
         onChange={(event) => setKind(event.target.value as ConsumptionKind)}
       />
       <TextInput
@@ -425,7 +432,7 @@ export function TypeForm({
       <Select
         label="Category"
         value={draft.category}
-        options={FEED_CATEGORIES.map((value) => ({ value, label: value }))}
+        options={toOptions(FEED_CATEGORIES)}
         onChange={(event) => setDraft({ ...draft, category: event.target.value as FeedCategory })}
       />
       <Select

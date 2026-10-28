@@ -3,25 +3,28 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 
-import {
-  Button,
-  Card,
-  Modal,
-  PageBody,
-  PageHeader,
-  TextInput,
-  useConfirmDelete,
-  useToast,
-} from "@galaxy-farm/ui";
+import { Button, Modal, PageBody, TextInput, useConfirmDelete, useToast } from "@galaxy-farm/ui";
 
 import { checkKioskPin, unpairThisDevice } from "@/app/(kiosk)/kiosk/_actions";
+import { KioskHeader } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { KIOSK_BOARDS } from "@/lib/kiosk-boards";
+
+/** Chores first, then the spec's order — a stable sort keeps the rest as they are. */
+const BOARDS = [...KIOSK_BOARDS].sort(
+  (a, b) => Number(b.slug === "chores") - Number(a.slug === "chores"),
+);
 
 /**
  * The board picker (spec §4.4).
  *
  * What a screen shows when it is not locked to one board — six large tiles,
- * nothing to read past arm's length, in the same order the spec names them.
+ * nothing to read past arm's length. Today's Chores is the board somebody
+ * comes to this screen for most days, so it leads and is the only filled
+ * tile; the rest follow in the order the spec names them, as equals.
+ *
+ * Locking a screen to one board is done from Settings → Kiosk devices, and
+ * that is not repeated here: the people who set it up know, and a sentence on
+ * a barn screen is a sentence everybody else skims past every morning.
  */
 export function KioskHome({
   deviceName,
@@ -33,25 +36,42 @@ export function KioskHome({
 }) {
   return (
     <PageBody>
-      <PageHeader
-        eyebrow={deviceName ?? "Kiosk"}
-        title="Pick a board"
-        subtitle="Tap one. Any screen can be locked to a single board from Settings → Kiosk devices."
-      />
+      <KioskHeader back={false} title="Boards" fact={deviceName} />
 
-      <div className="grid grid-cols-2 gap-density md:grid-cols-3">
+      <ul className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
         {/* `prefetch` fetches each board whole rather than as far as its
             loading boundary — see `next.config.ts`. Six tiles on a screen that
             is powered on and then left alone, and the barn is the place most
             likely to be out of signal by the time one of them is pressed. */}
-        {KIOSK_BOARDS.map((board) => (
-          <Link key={board.slug} href={board.route} prefetch className="block">
-            <Card className="flex min-h-[8rem] items-center justify-center text-center">
-              <h2>{board.label}</h2>
-            </Card>
-          </Link>
-        ))}
-      </div>
+        {BOARDS.map((board) => {
+          const lead = board.slug === "chores";
+          return (
+            <li key={board.slug}>
+              <Link
+                href={board.route}
+                prefetch
+                className={[
+                  "flex min-h-[7.5rem] items-center justify-between gap-4 rounded-density border px-6 py-5",
+                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action",
+                  lead
+                    ? "border-action bg-action text-action-ink"
+                    : "border-rule bg-panel text-ink hover:bg-raised",
+                ].join(" ")}
+              >
+                <h2 className="text-[1.6em]">{board.label}</h2>
+                <svg aria-hidden width="32" height="32" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M9 6l6 6-6 6"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
 
       {deviceName === undefined ? null : (
         <div className="flex justify-center pt-density">

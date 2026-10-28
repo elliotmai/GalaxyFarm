@@ -44,7 +44,7 @@ export function TripBanner({ trip, now }: { readonly trip: Trip; readonly now: D
       // Not a `Callout`: that is the shape reserved for something dangerous,
       // and a fortnight in Orlando is not an alert. Bordered and full width so
       // it still reads as the top of the board.
-      className="flex flex-wrap items-baseline justify-between gap-density border border-edge bg-raised p-density"
+      className="flex flex-wrap items-center justify-between gap-x-density gap-y-2 rounded-density border border-rule bg-panel px-5 py-4"
     >
       <div className="flex min-w-0 flex-col">
         <p className="text-density font-semibold text-ink">

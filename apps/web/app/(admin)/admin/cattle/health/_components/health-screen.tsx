@@ -15,6 +15,7 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
+  toOptions,
 } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -601,7 +602,7 @@ function AddHealth({
           label="Type"
           value={type}
           onChange={(event) => setType(event.target.value as HealthRecordType)}
-          options={HEALTH_RECORD_TYPES.map((value) => ({ value, label: value }))}
+          options={toOptions(HEALTH_RECORD_TYPES)}
         />
         <TextInput
           label="Date"
@@ -630,7 +631,7 @@ function AddHealth({
           label="Route"
           value={route}
           onChange={(event) => setRoute(event.target.value as AdministrationRoute)}
-          options={ROUTES.map((value) => ({ value, label: value }))}
+          options={toOptions(ROUTES)}
         />
         <TextInput
           label={chosenMed === undefined ? "Dose" : `Dose (${chosenMed.onHand.unit})`}

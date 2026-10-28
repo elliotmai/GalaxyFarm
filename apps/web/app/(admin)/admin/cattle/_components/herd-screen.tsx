@@ -12,6 +12,7 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
+  toOptions,
 } from "@galaxy-farm/ui";
 import {
   ANIMAL_STATUSES,
@@ -77,8 +78,8 @@ import { ageLabel, flagFor, HerdRow } from "./herd-row";
  * list, so a narrowed herd never looks like a smaller one.
  */
 
-const SEX_OPTIONS = SEXES.map((sex) => ({ value: sex, label: sex }));
-const STATUS_OPTIONS = ANIMAL_STATUSES.map((status) => ({ value: status, label: status }));
+const SEX_OPTIONS = toOptions(SEXES);
+const STATUS_OPTIONS = toOptions(ANIMAL_STATUSES);
 const SAFETY_OPTIONS = Object.values(SAFETY_LEVEL_DEFAULTS).map((level) => ({
   value: String(level.level),
   label: `${level.level} — ${level.label}`,

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { Button, Checkbox, Select, TextInput, useToast } from "@galaxy-farm/ui";
+import { Button, Checkbox, Select, TextInput, useToast, toOptions } from "@galaxy-farm/ui";
 import { animalSchema, displayName, type Animal, type SafetyLevel } from "@galaxy-farm/core";
 import {
   CALF_VIGOUR,
@@ -187,7 +187,7 @@ export function CalvingDetails({ propertyId, actorId, animals, onSaved }: Detail
           label="Vigour"
           value={vigour}
           onChange={(event) => setVigour(event.target.value as CalfVigour)}
-          options={CALF_VIGOUR.map((value) => ({ value, label: value }))}
+          options={toOptions(CALF_VIGOUR)}
         />
         {vigour === "stillborn" ? null : (
           <>

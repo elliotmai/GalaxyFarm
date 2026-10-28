@@ -14,6 +14,7 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
+  toOptions,
 } from "@galaxy-farm/ui";
 import {
   displayName,
@@ -552,7 +553,7 @@ export function FeedTypeForm({
           label="Category"
           value={category}
           onChange={(event) => setCategory(event.target.value as FeedCategory)}
-          options={FEED_CATEGORIES.map((value) => ({ value, label: value }))}
+          options={toOptions(FEED_CATEGORIES)}
         />
         <Select
           label="Sold by the"
@@ -924,7 +925,7 @@ export function PlanForm({
               onChange={(event) =>
                 editLine(line.key, { timeOfDay: event.target.value as TimeOfDay })
               }
-              options={TIMES_OF_DAY.map((value) => ({ value, label: value }))}
+              options={toOptions(TIMES_OF_DAY)}
             />
 
             <div className="col-span-2 flex flex-wrap items-center justify-between gap-2">

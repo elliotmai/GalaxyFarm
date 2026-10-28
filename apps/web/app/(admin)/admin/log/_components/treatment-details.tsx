@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { Select, TextInput } from "@galaxy-farm/ui";
+import { Select, TextInput, toOptions } from "@galaxy-farm/ui";
 import { type Ulid } from "@galaxy-farm/core";
 import {
   drawDose,
@@ -225,7 +225,7 @@ export function TreatmentDetails({ propertyId, actorId, animals, onSaved }: Deta
           label="Route"
           value={route}
           onChange={(event) => setRoute(event.target.value as AdministrationRoute)}
-          options={ROUTES.map((value) => ({ value, label: value }))}
+          options={toOptions(ROUTES)}
         />
       </div>
       <div className="grid grid-cols-2 gap-density">
@@ -233,7 +233,7 @@ export function TreatmentDetails({ propertyId, actorId, animals, onSaved }: Deta
           label="Type"
           value={type}
           onChange={(event) => setType(event.target.value as HealthRecordType)}
-          options={HEALTH_RECORD_TYPES.map((value) => ({ value, label: value }))}
+          options={toOptions(HEALTH_RECORD_TYPES)}
         />
         <TextInput
           label="When"

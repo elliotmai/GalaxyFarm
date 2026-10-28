@@ -15,6 +15,7 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
+  toOptions,
 } from "@galaxy-farm/ui";
 import { displayName, encodeUlid, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -529,7 +530,7 @@ function AddGoal({
           label="Direction"
           value={direction}
           onChange={(event) => setDirection(event.target.value as GeneticDirection)}
-          options={GENETIC_DIRECTIONS.map((value) => ({ value, label: value }))}
+          options={toOptions(GENETIC_DIRECTIONS)}
         />
         <TextInput
           label="Why"
@@ -639,7 +640,7 @@ function AddPlan({
             label="Method"
             value={method}
             onChange={(event) => setMethod(event.target.value as BreedingMethod)}
-            options={BREEDING_METHODS.map((value) => ({ value, label: value }))}
+            options={toOptions(BREEDING_METHODS)}
           />
           <TextInput
             label="Target season"

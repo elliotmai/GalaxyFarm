@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { SearchSelect, Select, TextInput } from "@galaxy-farm/ui";
+import { SearchSelect, Select, TextInput, toOptions } from "@galaxy-farm/ui";
 import { type Animal } from "@galaxy-farm/core";
 import {
   BREEDING_METHODS,
@@ -129,7 +129,7 @@ function HeatForm({ propertyId, actorId, kind, onKind, animals, onSaved }: Detai
         label="How strong"
         value={intensity}
         onChange={(event) => setIntensity(event.target.value as HeatIntensity)}
-        options={HEAT_INTENSITIES.map((value) => ({ value, label: value }))}
+        options={toOptions(HEAT_INTENSITIES)}
       />
       <div className="grid grid-cols-2 gap-density">
         <TextInput
@@ -297,7 +297,7 @@ function ServiceForm({ propertyId, actorId, kind, onKind, animals, onSaved }: De
         label="Method"
         value={method}
         onChange={(event) => setMethod(event.target.value as BreedingMethod)}
-        options={BREEDING_METHODS.map((value) => ({ value, label: value }))}
+        options={toOptions(BREEDING_METHODS)}
       />
       <SearchSelect
         label={method === "natural" ? "Bull" : method === "ET" ? "Sire of the embryo" : "Sire"}

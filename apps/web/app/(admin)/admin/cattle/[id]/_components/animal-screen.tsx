@@ -19,6 +19,7 @@ import {
   TextArea,
   useConfirmDelete,
   useToast,
+  toOptions,
 } from "@galaxy-farm/ui";
 import {
   animalsWithoutOutside,
@@ -1000,7 +1001,7 @@ function Description({
           value={hornStatus}
           placeholder="Not recorded"
           onChange={(event) => setHornStatus(event.target.value as HornStatus | "")}
-          options={HORN_STATUSES.map((value) => ({ value, label: value }))}
+          options={toOptions(HORN_STATUSES)}
         />
         <TextInput
           label="Color"

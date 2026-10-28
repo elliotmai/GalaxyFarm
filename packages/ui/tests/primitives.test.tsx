@@ -335,3 +335,13 @@ describe("Tabs", () => {
     expect(screen.getByText("Panel: health")).toBeInTheDocument();
   });
 });
+
+describe("toOptions", () => {
+  it("labels stored values for people, and leaves cased ones alone", async () => {
+    const { toOptions } = await import("../src/primitives/field.js");
+
+    expect(
+      toOptions(["subcutaneous", "off_site", "AI", "Maine-Anjou"]).map((o) => o.label),
+    ).toEqual(["Subcutaneous", "Off site", "AI", "Maine-Anjou"]);
+  });
+});

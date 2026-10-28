@@ -23,6 +23,7 @@ import {
   useToast,
   type Column,
   type SearchOption,
+  toOptions,
 } from "@galaxy-farm/ui";
 import { asDate, displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -904,7 +905,7 @@ function AddBreeding({
           label="Method"
           value={method}
           onChange={(event) => setMethod(event.target.value as BreedingMethod)}
-          options={BREEDING_METHODS.map((value) => ({ value, label: value }))}
+          options={toOptions(BREEDING_METHODS)}
         />
         <SearchSelect
           label={method === "natural" ? "Bull" : method === "ET" ? "Sire of the embryo" : "Sire"}
@@ -1050,13 +1051,13 @@ function PregCheckPanel({
         label="Result"
         value={result}
         onChange={(event) => setResult(event.target.value as PregCheckResult)}
-        options={PREG_CHECK_RESULTS.map((value) => ({ value, label: value }))}
+        options={toOptions(PREG_CHECK_RESULTS)}
       />
       <Select
         label="Method"
         value={method}
         onChange={(event) => setMethod(event.target.value as PregCheckMethod)}
-        options={PREG_CHECK_METHODS.map((value) => ({ value, label: value }))}
+        options={toOptions(PREG_CHECK_METHODS)}
       />
     </Modal>
   );

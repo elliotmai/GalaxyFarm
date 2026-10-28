@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Select, TextInput, useToast } from "@galaxy-farm/ui";
+import { Select, TextInput, useToast, toOptions } from "@galaxy-farm/ui";
 import {
   choreDaySheet,
   startOfDay,
@@ -212,7 +212,7 @@ export function FeedingDetails({ propertyId, actorId, onSaved }: DetailsProps) {
           <Select
             label="Kind"
             value={kind}
-            options={CONSUMPTION_KINDS.map((value) => ({ value, label: value }))}
+            options={toOptions(CONSUMPTION_KINDS)}
             onChange={(event) => setKind(event.target.value as ConsumptionKind)}
           />
           <TextInput

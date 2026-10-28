@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { Suspense, use, useEffect, useState, useTransition } from "react";
 
 import { useToast } from "@galaxy-farm/ui";
 import {
@@ -12,28 +12,34 @@ import {
 } from "@galaxy-farm/core";
 
 import { setKioskChoreDone } from "@/app/(kiosk)/kiosk/_actions";
+import { KioskQuiet } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { groupChoresForBoard } from "@/lib/chores";
+import type { PeopleNames } from "@/lib/people-names";
 
 /**
  * A day's chores on a kiosk board, checkable in place (spec §4.4, §5.1, §5.10).
  *
  * One component behind both boards that show the day — Today's Chores and the
  * housesitter board — because they are the same list of the same day, and two
- * copies of the tick would be two chances to write the un-tick wrongly.
+ * copies of the tick would be two chances to write the un-tick wrongly. It is
+ * also the list the admin Today screen ticks, off the same `choreDaySheet`, so
+ * the count at the top says the same number on the post and on a phone.
  *
- * Sectioned by the part of the day and flat within it — feeding trips and
- * template chores in one list, in due order, the finished ones sinking to the
- * bottom of their section. Who a chore is about rides the row itself (the
- * ration in a feed's title, the animal or pen as a small tag), because on a
- * one-screen board every heading costs a row.
+ * **Status by exception.** What is left is what the board is for, so open
+ * rows lead each part of the day at full strength and a late one carries a
+ * red edge and the word. A ticked row sinks to the bottom of its part, muted,
+ * and says who and when — the record somebody away from the place is
+ * checking. A part of the day with nothing left folds to one line, and a day
+ * with nothing left is one green panel rather than a wall of struck-through
+ * rows: the good news is the thing to read from across the barn.
  *
- * Built to fit one screen. This is a kiosk on a post, glanced at with an
- * armful of feed, and a day that needs scrolling is a day whose evening half
- * gets forgotten. So the parts of the day sit side by side as columns, and
- * each chore is one row: the row ticks it, and a chore with more to say than
- * its line can hold gets a separate expander that opens the detail without
- * ticking anything.
+ * **Big rows.** Kiosk density, not the 44px the platform guidelines ask of a
+ * phone: this is pressed with a gloved hand, often in the dark, by somebody
+ * glancing over an armful of feed. The parts of the day sit side by side on a
+ * wide screen, so a full day still fits a 1280×800 post-mounted tablet, and
+ * stack on anything narrower. A chore with more to say than its line can hold
+ * gets a separate expander that opens the detail without ticking anything.
  *
  * The tick goes through `setKioskChoreDone` — the kiosk's own server action,
  * with its capability check and its attribution to the screen. It does not
@@ -54,16 +60,81 @@ function dayString(date: Date): string {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0).toISOString();
 }
 
+function timeOf(date: Date): string {
+  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/** "Done by Sam · 6:40", once the server has said who Sam is. */
+function NamedDone({
+  id,
+  at,
+  names,
+}: {
+  readonly id: string;
+  readonly at: string;
+  readonly names: Promise<PeopleNames>;
+}) {
+  const name = use(names)[id];
+  return <>{name === undefined ? `Done · ${at}` : `Done by ${name} · ${at}`}</>;
+}
+
+function DoneLine({
+  entry,
+  names,
+}: {
+  readonly entry: ChoreEntry;
+  readonly names: Promise<PeopleNames> | undefined;
+}) {
+  const at = entry.completedAt === undefined ? "" : timeOf(entry.completedAt);
+  const plain = <>Done · {at}</>;
+  if (entry.completedBy === undefined || names === undefined) return plain;
+
+  // The time stands on its own while the name is on its way, and stays alone
+  // if the server cannot be reached — the round still happened.
+  return (
+    <Suspense fallback={plain}>
+      <NamedDone id={entry.completedBy} at={at} names={names} />
+    </Suspense>
+  );
+}
+
+function Check({ done }: { readonly done: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={[
+        "flex h-10 w-10 shrink-0 items-center justify-center rounded-density border-2",
+        done ? "border-action bg-action text-action-ink" : "border-edge bg-panel",
+      ].join(" ")}
+    >
+      {done ? (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M5 12l5 5 9-10"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ) : null}
+    </span>
+  );
+}
+
 export function ChoreBoard({
   entries,
   animals,
   zones,
   day,
+  names,
 }: {
   readonly entries: readonly ChoreEntry[];
   readonly animals: readonly Animal[];
   readonly zones: readonly Zone[];
   readonly day: Date;
+  /** Who ticked what, resolved on the server; never rejects. */
+  readonly names?: Promise<PeopleNames> | undefined;
 }) {
   const { syncNow } = useSyncEngine();
   const { show } = useToast();
@@ -74,6 +145,14 @@ export function ChoreBoard({
   const [overrides, setOverrides] = useState<ReadonlyMap<string, Date | undefined>>(new Map());
   /** Rows whose detail somebody opened. Opening one ticks nothing. */
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
+  /** Finished parts of the day somebody unfolded to see who did what. */
+  const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(new Set());
+  /**
+   * Parts of the day somebody ticked in on this screen. They stay open once
+   * finished: a row that vanished under the finger that ticked it would leave
+   * nothing to un-tick, and no sign the tap landed.
+   */
+  const [worked, setWorked] = useState<ReadonlySet<string>>(new Set());
 
   /*
    * Drop an override once the store agrees with it — from there the synced
@@ -101,11 +180,17 @@ export function ChoreBoard({
     });
   }, [entries]);
 
+  // An overridden row drops its stored attribution with its stored state: a
+  // tick made a second ago on this screen has nobody to name yet, and an
+  // un-tick has nobody at all.
   const shown = entries.map((entry) =>
-    overrides.has(entry.id) ? { ...entry, completedAt: overrides.get(entry.id) } : entry,
+    overrides.has(entry.id)
+      ? { ...entry, completedAt: overrides.get(entry.id), completedBy: undefined }
+      : entry,
   );
   const sections = groupChoresForBoard(shown);
   const progress = choreProgress(shown);
+  const late = shown.filter((entry) => entry.completedAt === undefined && entry.overdue).length;
 
   const whereLabel = (entry: ChoreEntry): string | undefined => {
     if (entry.animalId !== undefined) {
@@ -123,6 +208,8 @@ export function ChoreBoard({
     // The row moves now; the write follows. Waiting for the round trip and
     // the sync pull is a visible pause between the tap and anything happening,
     // and a button that hesitates gets tapped again.
+    const part = sections.find((section) => section.entries.some((e) => e.id === entry.id));
+    if (part !== undefined) setWorked((current) => new Set(current).add(part.label));
     setBusy((current) => new Set(current).add(entry.id));
     setOverrides((current) => new Map(current).set(entry.id, done ? new Date() : undefined));
 
@@ -161,69 +248,60 @@ export function ChoreBoard({
     });
   }
 
-  function toggleDetail(id: string) {
-    setOpened((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        // crud-guard: allow-unconfirmed — closes an expander, nothing persisted
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
+  /** Flip one id in a set of open things — an expander, a folded part of the day. */
+  const flip = (id: string) => (current: ReadonlySet<string>) => {
+    const next = new Set(current);
+    if (next.has(id)) {
+      // crud-guard: allow-unconfirmed — closes an expander, nothing persisted
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    return next;
+  };
 
-  /*
-   * Deliberately tighter than the kiosk density tokens. The tokens size a
-   * board for a big screen on a post, and at 64px rows and 20px gaps half the
-   * day scrolls off a tablet — and scrolls off the post-mounted screen too,
-   * once the feeding trips are on the sheet beside the chores. Rows hold the
-   * 44px the platform guidelines ask of a touch target — smaller than a kiosk
-   * button, still honest to a glove — and everything a chore has to say fits
-   * one line: title, amounts, where, and whether it is late.
-   */
   const row = (entry: ChoreEntry) => {
     const finished = entry.completedAt !== undefined;
+    const overdue = !finished && entry.overdue;
     const where = whereLabel(entry);
     const open = opened.has(entry.id);
+    const facts = [where, `by ${timeOf(entry.dueAt)}`].filter(
+      (part): part is string => part !== undefined && part !== "",
+    );
 
     return (
-      <div
-        key={entry.id}
-        className={`border ${
-          finished ? "border-edge opacity-60" : entry.overdue ? "border-danger" : "border-edge"
-        }`}
-      >
+      <li key={entry.id} className="relative">
+        {/* The red edge is the exception, findable before a word is read; the
+            word on the row says the same for anyone who cannot see red. */}
+        {overdue ? (
+          <span aria-hidden className="absolute inset-y-0 left-0 w-1.5 bg-danger" />
+        ) : null}
         <div className="flex items-stretch">
           <button
             type="button"
             onClick={() => toggle(entry)}
             disabled={busy.has(entry.id)}
             aria-pressed={finished}
-            className="flex min-h-11 min-w-0 flex-1 items-center gap-1.5 px-2 text-left hover:bg-raised disabled:opacity-40"
+            className="flex min-h-target min-w-0 flex-1 items-center gap-4 px-4 py-2 text-left hover:bg-raised focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action disabled:opacity-60"
           >
-            <span
-              aria-hidden
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border border-edge text-xs ${
-                finished ? "text-muted" : "text-transparent"
-              }`}
-            >
-              ✓
-            </span>
-            <span className="min-w-0 flex-1 truncate text-sm">
-              <span className={finished ? "text-muted line-through" : "text-ink"}>
+            <Check done={finished} />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span
+                className={[
+                  "text-density font-semibold",
+                  finished ? "text-muted line-through" : "text-ink",
+                ].join(" ")}
+              >
                 {entry.title}
               </span>
-              {entry.detail === undefined || finished || open ? null : (
-                <span className="text-muted"> — {entry.detail}</span>
-              )}
+              <span className="truncate text-base text-muted [font-variant-numeric:tabular-nums]">
+                {finished ? <DoneLine entry={entry} names={names} /> : facts.join(" · ")}
+              </span>
             </span>
-            {where === undefined || finished ? null : (
-              <span className="max-w-20 shrink-0 truncate text-xs text-muted">{where}</span>
-            )}
-            {entry.overdue && !finished ? (
-              <span className="shrink-0 text-xs font-medium text-danger">late</span>
+            {overdue ? (
+              <span className="shrink-0 text-base font-semibold uppercase tracking-wide text-danger">
+                late
+              </span>
             ) : null}
           </button>
 
@@ -232,59 +310,131 @@ export function ChoreBoard({
             // the full instruction must never count as doing the chore.
             <button
               type="button"
-              onClick={() => toggleDetail(entry.id)}
+              onClick={() => setOpened(flip(entry.id))}
               aria-expanded={open}
               aria-label={open ? "Hide the detail" : "Show the whole detail"}
-              className="flex w-10 shrink-0 items-center justify-center border-l border-edge text-muted hover:bg-raised"
+              className="flex min-w-target shrink-0 items-center justify-center border-l border-rule text-muted hover:bg-raised"
             >
-              <span aria-hidden className={`transition-transform ${open ? "rotate-90" : ""}`}>
-                ›
-              </span>
+              <svg
+                aria-hidden
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                className={`transition-transform ${open ? "rotate-90" : ""}`}
+              >
+                <path
+                  d="M9 6l6 6-6 6"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                />
+              </svg>
             </button>
           )}
         </div>
 
         {open && entry.detail !== undefined ? (
-          <p className="whitespace-pre-wrap border-t border-edge px-2 py-1.5 text-sm text-muted">
+          <p className="whitespace-pre-wrap border-t border-rule bg-canvas px-4 py-3 text-base text-ink">
             {entry.detail}
           </p>
         ) : null}
-      </div>
+      </li>
     );
   };
 
   if (entries.length === 0) {
-    return <p className="text-muted">Nothing on today's list.</p>;
+    return <KioskQuiet>Nothing on today&rsquo;s list.</KioskQuiet>;
   }
 
-  return (
-    <div className="flex flex-col gap-2">
-      {/* One line of progress; a meter would spend a row saying the same. */}
-      <p className="text-sm text-muted">
-        {progress.done} of {progress.total} done
-        {progress.overdue > 0 ? (
-          <span className="text-danger"> · {progress.overdue} late</span>
-        ) : null}
-      </p>
+  const allDone = progress.open === 0;
 
-      {/* The parts of the day side by side, so the whole day is one glance. */}
-      <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+  return (
+    <div className="flex flex-col gap-density">
+      {allDone ? (
+        <p className="flex items-center gap-4 rounded-density bg-calm/15 px-5 py-5 text-calm">
+          <svg aria-hidden width="40" height="40" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M5 12l5 5 9-10"
+              stroke="currentColor"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="flex flex-col">
+            <span className="font-heading text-3xl font-semibold">All done for today</span>
+            <span className="text-density">
+              {progress.done} of {progress.total} done
+            </span>
+          </span>
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {/* One count, the same one the admin Today shows over the same list. */}
+          <p className="text-density font-semibold text-ink [font-variant-numeric:tabular-nums]">
+            {progress.done} of {progress.total} done
+            {late > 0 ? <span className="text-danger"> · {late} late</span> : null}
+          </p>
+          <div
+            role="progressbar"
+            aria-label="Chores done today"
+            aria-valuemin={0}
+            aria-valuemax={progress.total}
+            aria-valuenow={progress.done}
+            className="h-3 overflow-hidden rounded-full bg-raised"
+          >
+            <div
+              className="h-full rounded-full bg-action transition-[width]"
+              style={{ width: `${Math.round(progress.fraction * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* The parts of the day side by side on a wide screen, stacked on a narrow one. */}
+      <div className="grid grid-cols-1 items-start gap-density lg:grid-cols-2">
         {sections.map((section) => {
           const left = section.entries.filter((entry) => entry.completedAt === undefined).length;
+          const folded = left === 0 && !unfolded.has(section.label) && !worked.has(section.label);
+          const headingId = `chores-${section.label.replace(/\W+/g, "-").toLowerCase()}`;
 
           return (
             <section
               key={section.label}
-              className="flex flex-col gap-1 border border-edge bg-panel p-2"
+              aria-labelledby={headingId}
+              className="flex min-w-0 flex-col gap-2"
             >
-              <header className="flex items-baseline justify-between gap-2">
-                <h3 className="text-xs font-medium uppercase tracking-wide text-ink">
-                  {section.label}
-                </h3>
-                <span className="text-xs text-muted">{left === 0 ? "done" : `${left} to do`}</span>
+              <header className="flex min-h-10 items-center justify-between gap-3">
+                <span className="flex items-baseline gap-3">
+                  <h2 id={headingId} className="text-xl tracking-wide text-ink">
+                    {section.label}
+                  </h2>
+                  <span
+                    className={`text-base ${left === 0 ? "font-semibold text-calm" : "text-muted"}`}
+                  >
+                    {left === 0 ? "done" : `${left} to do`}
+                  </span>
+                </span>
+                {left === 0 && !worked.has(section.label) ? (
+                  // A finished part of the day folds to this line; who did
+                  // each one is a tap away rather than a column of strikes.
+                  <button
+                    type="button"
+                    onClick={() => setUnfolded(flip(section.label))}
+                    aria-expanded={!folded}
+                    className="min-h-10 rounded-density px-3 text-base font-semibold text-action hover:bg-raised"
+                  >
+                    {folded ? `Show ${section.entries.length}` : "Hide"}
+                  </button>
+                ) : null}
               </header>
 
-              {section.entries.map(row)}
+              {folded ? null : (
+                <ul className="divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
+                  {section.entries.map(row)}
+                </ul>
+              )}
             </section>
           );
         })}

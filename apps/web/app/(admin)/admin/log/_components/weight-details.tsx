@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Select, TextInput } from "@galaxy-farm/ui";
+import { Select, TextInput, toOptions } from "@galaxy-farm/ui";
 import { displayName } from "@galaxy-farm/core";
 import {
   weightRecordSchema,
@@ -119,7 +119,7 @@ export function WeightDetails({ propertyId, actorId, animals, onSaved }: Details
           label="Context"
           value={context}
           onChange={(event) => setContext(event.target.value as WeightContext)}
-          options={WEIGHT_CONTEXTS.map((value) => ({ value, label: value }))}
+          options={toOptions(WEIGHT_CONTEXTS)}
         />
       </div>
 

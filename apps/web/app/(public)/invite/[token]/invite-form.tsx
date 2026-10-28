@@ -47,13 +47,13 @@ export function InviteForm({ token, name }: { readonly token: string; readonly n
 
   if (done) {
     return (
-      <Card title="You are set up" className="w-full max-w-sm">
+      <Card title="You are set up" className="w-full">
         <p className="text-density text-ink">
           Your password is saved. Sign in with it and your email address.
         </p>
         <Link
           href="/login"
-          className="mt-density inline-block text-action underline underline-offset-2"
+          className="mt-density inline-flex min-h-target items-center font-semibold text-action underline-offset-4 hover:underline"
         >
           Go to sign in
         </Link>
@@ -62,11 +62,10 @@ export function InviteForm({ token, name }: { readonly token: string; readonly n
   }
 
   return (
-    <Card title={`Welcome, ${name}`} className="w-full max-w-sm">
+    <Card title={`Welcome, ${name}`} className="w-full">
       <form onSubmit={submit} className="flex flex-col gap-density">
         <p className="text-sm text-muted">
-          Choose a password. Nobody at the farm sees it — this link is the only way to set it, and
-          it stops working once you do.
+          Choose a password. Nobody at the farm sees it, and this link stops working once it is set.
         </p>
 
         <TextInput
@@ -75,7 +74,7 @@ export function InviteForm({ token, name }: { readonly token: string; readonly n
           autoComplete="new-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          hint={`At least ${MINIMUM_PASSWORD_LENGTH} characters. A phrase you will remember beats a word you will not.`}
+          hint={`At least ${MINIMUM_PASSWORD_LENGTH} characters.`}
           required
         />
         <TextInput

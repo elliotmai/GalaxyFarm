@@ -54,7 +54,7 @@ export function LoginForm({ next }: { readonly next: string }) {
   }
 
   return (
-    <Card title="Sign in" className="w-full max-w-sm">
+    <Card title="Sign in" className="w-full">
       <form onSubmit={submit} className="flex flex-col gap-density">
         <TextInput
           label="Email"
@@ -80,8 +80,7 @@ export function LoginForm({ next }: { readonly next: string }) {
         ) : null}
         {failed === "unavailable" ? (
           <p role="alert" className="text-sm text-danger">
-            Sign-in is not working right now — this is on our end, not your password. Try again in a
-            few minutes.
+            Sign-in is down on our end — your password is fine. Try again in a few minutes.
           </p>
         ) : null}
 

@@ -77,7 +77,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 on screen forty rows into the herd, rather than back at the top
                 where you would have to scroll to reach it.
               */}
-                <aside className="sticky top-0 z-20 border-b border-edge bg-panel md:h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
+                <aside className="sticky top-0 z-20 border-b border-rule bg-panel md:h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
                   <AdminNav propertyId={actor.propertyId} farmName={farmName} />
                 </aside>
                 {/* Tighter gutters on a phone: 14px of padding either side of a

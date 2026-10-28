@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
 
-import { PageBody, PageHeader } from "@galaxy-farm/ui";
+import { PageBody } from "@galaxy-farm/ui";
 import {
   choreDaySheet,
   choreProgress,
@@ -26,11 +25,13 @@ import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 
 import { ChoreBoard } from "@/app/(kiosk)/kiosk/_components/chore-board";
+import { KioskHeader, KioskQuiet, kioskDate } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { HousesitterGuide } from "@/app/(kiosk)/kiosk/housesitter/housesitter-guide";
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { guideForSitter } from "@/lib/care-guide-selection";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
+import type { PeopleNames } from "@/lib/people-names";
 
 /**
  * Housesitter Mode (spec §4.4, §5.10).
@@ -55,7 +56,14 @@ import { useRecords } from "@/lib/local/use-records";
  * deployment. `currentTrip` picks whoever is away now — the sitter is never
  * asked which trip they are sitting for.
  */
-export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
+export function HousesitterBoardScreen({
+  propertyId,
+  names,
+}: {
+  readonly propertyId: Ulid;
+  /** Who ticked what, resolved on the server; never rejects. */
+  readonly names?: Promise<PeopleNames> | undefined;
+}) {
   const { store, loading } = useHousesitterData(propertyId);
 
   const guide = guideForSitter(store.guides);
@@ -77,14 +85,10 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
 
   return (
     <PageBody>
-      <PageHeader
-        eyebrow={<Link href="/kiosk">← Kiosk</Link>}
-        title="Housesitter Mode"
-        subtitle="Everything a helper needs, read live from the farm's own records."
-      />
+      <KioskHeader title="Housesitter Mode" fact={kioskDate(now)} />
 
       {loading ? (
-        <p className="text-muted">Loading…</p>
+        <KioskQuiet>Loading…</KioskQuiet>
       ) : (
         <HousesitterGuide
           guide={guide}
@@ -100,7 +104,13 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
           trip={trip}
           choresLeft={progress.total - progress.done}
           today={
-            <ChoreBoard entries={today} animals={store.animals} zones={store.zones} day={now} />
+            <ChoreBoard
+              entries={today}
+              animals={store.animals}
+              zones={store.zones}
+              day={now}
+              names={names}
+            />
           }
           now={now}
         />

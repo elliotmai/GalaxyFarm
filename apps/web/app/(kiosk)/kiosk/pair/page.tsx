@@ -47,20 +47,19 @@ export default async function KioskPairPage({
   const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-density p-6">
-      <div className="flex flex-col items-center gap-2">
+    <div className="flex min-h-[calc(100dvh-2*var(--gf-gap))] flex-col items-center justify-center gap-density">
+      <div className="flex flex-col items-center gap-2 text-center">
         <Logomark size="large" decorative />
         <h1 className="text-ink">{farmName}</h1>
-        <p className="text-muted">{paired ? "Reconnecting" : "Pair this screen"}</p>
+        <p className="text-density text-muted">{paired ? "Reconnecting" : "Pair this screen"}</p>
       </div>
 
       {paired ? <ResumeScreen next={next} /> : <PairForm />}
 
       {paired ? null : (
         <>
-          <p className="max-w-sm text-center text-sm text-muted">
-            Get a code from Settings → Kiosk devices on any signed-in phone or laptop, then type it
-            in above. The code is good for fifteen minutes and works once.
+          <p className="max-w-sm text-center text-base text-muted">
+            Codes come from Settings → Kiosk devices. Each works once, for fifteen minutes.
           </p>
 
           {/*
@@ -75,7 +74,7 @@ export default async function KioskPairPage({
            * says the thing asking has a keyboard.
            */}
           <a
-            className="text-sm text-muted underline"
+            className="inline-flex min-h-target items-center px-3 text-base text-muted underline underline-offset-4 hover:text-ink"
             href={`/login?next=${encodeURIComponent(next)}&as=person`}
           >
             Sign in as yourself instead
