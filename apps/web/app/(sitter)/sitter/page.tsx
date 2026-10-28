@@ -51,6 +51,11 @@ export default async function SitterPage() {
     );
   }
 
+  // Started before the guide is read rather than after, so the two lookups
+  // run side by side: on a database that is not answering, each waits out
+  // its own deadline, and one after the other is twice the wait.
+  const names = peopleNames(actor.propertyId);
+
   let view = EMPTY_SITTER_VIEW;
   let unavailable: string | undefined;
 
@@ -80,8 +85,9 @@ export default async function SitterPage() {
       mayTick={can(actor, "chores.complete", now)}
       actorId={actor.id}
       // Unawaited: the guide streams without the names, and each "Done by"
-      // fills in when they land. Never rejects.
-      names={peopleNames(actor.propertyId)}
+      // fills in when they land. Only handed over when a row will read them —
+      // a promise in the stream holds the page open until it settles.
+      names={chores.some((entry) => entry.completedBy !== undefined) ? names : undefined}
       {...(unavailable === undefined ? {} : { unavailable })}
     />
   );
