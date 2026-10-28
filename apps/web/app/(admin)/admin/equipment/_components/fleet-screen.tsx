@@ -1,21 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
 
 import {
   Button,
-  Callout,
-  CardGrid,
   EmptyState,
+  Modal,
   PageBody,
-  PageHeader,
   Pill,
-  RecordCard,
-  Section,
   Select,
   TextInput,
-  Tile,
   useConfirmDelete,
   useToast,
 } from "@galaxy-farm/ui";
@@ -43,6 +38,8 @@ import {
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
+import { AddFab, ChipRow, FilteredLine, KitHeader, KitList, KitRow } from "./kit-controls";
+
 /**
  * The fleet (spec §5.6, §7's `/admin/equipment`).
  *
@@ -56,7 +53,9 @@ import { useRecords } from "@/lib/local/use-records";
  *
  * Everything about one machine — its meters, its rules, its service and its
  * fuel — lives on its own page. This one holds what you need to decide which
- * page to open.
+ * page to open: a row per machine with its next job on the muted line, and
+ * one chip only when something is wrong. Adding a machine is a side panel, so
+ * the form never pushes the fleet down the page.
  */
 
 function formatDate(value: Date | undefined): string {
@@ -75,6 +74,11 @@ function num(value: number | undefined, decimals = 0): string {
 function describe(machine: Equipment): string {
   return [machine.year, machine.make, machine.model].filter(Boolean).join(" ");
 }
+
+const STATUS_OPTIONS = EQUIPMENT_STATUSES.map((value) => ({
+  value,
+  label: value.replace(/_/g, " "),
+}));
 
 const STATUS_TONE: Record<EquipmentStatus, "calm" | "danger" | "neutral"> = {
   in_service: "calm",
@@ -160,6 +164,12 @@ export function FleetScreen({
   const [draft, setDraft] = useState<Draft>(BLANK);
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState(false);
+  /** The machine whose status-and-delete panel is open. */
+  const [managing, setManaging] = useState<Equipment | undefined>();
+  /** The chip that is on: a status, "overdue", "gone", or "" for the lot. */
+  const [view, setView] = useState("");
+  const formId = useId();
 
   const now = new Date();
 
@@ -202,6 +212,11 @@ export function FleetScreen({
     setError(undefined);
   }
 
+  function startCreate() {
+    reset();
+    setCreating(true);
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(undefined);
@@ -237,6 +252,7 @@ export function FleetScreen({
 
       show({ message: `${payload.name} added` });
       reset();
+      setCreating(false);
     } finally {
       setBusy(false);
     }
@@ -325,60 +341,207 @@ export function FleetScreen({
     });
   }
 
-  return (
-    <PageBody>
-      <PageHeader
-        eyebrow="Kit"
-        title="Equipment"
-        subtitle="The fleet, what the meters read, and what each rule says is due. A rule with two triggers comes due at whichever arrives first."
-      />
+  /** The one line under a name: what it is, what the meters read, what is next. */
+  function lineFor(machine: Equipment): string {
+    const hours = currentMeter(readings, machine.id, "hours");
+    const miles = currentMeter(readings, machine.id, "miles");
+    const next = (dueByEquipment.get(machine.id) ?? [])[0];
+    return [
+      describe(machine) === "" ? machine.category : describe(machine),
+      hours === undefined ? undefined : `${num(hours, 1)} hrs`,
+      miles === undefined ? undefined : `${num(miles)} mi`,
+      next === undefined ? "No rules yet" : `${next.rule.task} ${dueWhen(next)}`,
+    ]
+      .filter((part): part is string => part !== undefined)
+      .join(" · ");
+  }
 
-      <div className="gf-stat-row">
-        <Tile label="In service" value={running.length} tone="calm" />
-        <Tile
-          label="Down"
-          value={down.length}
-          tone={down.length > 0 ? "danger" : "neutral"}
-          emphasis={down.length > 0}
-          hint={down.length > 0 ? down.map((machine) => machine.name).join(", ") : undefined}
+  /**
+   * The one chip: down before overdue before anything else, because a machine
+   * that will not start is the news even when its oil is also late. A machine
+   * in service with nothing late says nothing — a row of green is not read.
+   */
+  function chipFor(machine: Equipment) {
+    const late = (dueByEquipment.get(machine.id) ?? []).filter((entry) => entry.overdue).length;
+    if (machine.status === "down")
+      return (
+        <Pill tone="danger" dot>
+          Down
+        </Pill>
+      );
+    if (machine.status !== "in_service")
+      return <Pill tone={STATUS_TONE[machine.status]}>{machine.status.replace(/_/g, " ")}</Pill>;
+    if (late > 0)
+      return (
+        <Pill tone="danger" dot>
+          {late} overdue
+        </Pill>
+      );
+    return null;
+  }
+
+  const isOverdue = (machine: Equipment) =>
+    (dueByEquipment.get(machine.id) ?? []).some((entry) => entry.overdue);
+
+  const chips = [
+    { key: "", label: "All", count: fleet.length },
+    { key: "in_service", label: "In service", count: running.length },
+    { key: "down", label: "Down", count: down.length },
+    { key: "overdue", label: "Overdue", count: fleet.filter(isOverdue).length },
+    {
+      key: "gone",
+      label: "Sold or retired",
+      count: fleet.filter((machine) => machine.status === "sold" || machine.status === "retired")
+        .length,
+    },
+  ].filter((chip) => chip.key === "" || chip.count > 0 || chip.key === view);
+
+  const shown = [...fleet]
+    .filter((machine) =>
+      view === ""
+        ? true
+        : view === "overdue"
+          ? isOverdue(machine)
+          : view === "gone"
+            ? machine.status === "sold" || machine.status === "retired"
+            : machine.status === view,
+    )
+    .sort((left, right) => {
+      // Whatever is down or overdue first — the rest is alphabetical,
+      // because a fleet ordered by id is a fleet nobody can scan.
+      const rank = (machine: Equipment) =>
+        machine.status === "down" ? 0 : isOverdue(machine) ? 1 : 2;
+      return rank(left) - rank(right) || left.name.localeCompare(right.name);
+    });
+
+  /** Facts beside the title — the old tiles, said once and only when not zero. */
+  const facts = [
+    `${fleet.length} machine${fleet.length === 1 ? "" : "s"}`,
+    down.length > 0 ? `${down.length} down` : undefined,
+    overdue.length > 0 ? `${overdue.length} overdue` : undefined,
+    spend.cents > 0 ? `${formatMoney(spend)} fuel and service` : undefined,
+  ]
+    .filter((part): part is string => part !== undefined)
+    .join(" · ");
+
+  const addButton = (
+    <Button variant="primary" onClick={startCreate}>
+      <span aria-hidden="true">+</span> Add machine
+    </Button>
+  );
+
+  return (
+    // Bottom clearance on a phone, so the floating add button and the tab bar
+    // under it never sit on top of the last row.
+    <PageBody>
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <KitHeader
+          eyebrow="Kit"
+          title="Equipment"
+          facts={loading ? undefined : facts}
+          action={addButton}
         />
-        <Tile
-          label="Service overdue"
-          value={overdue.length}
-          tone={overdue.length > 0 ? "danger" : "calm"}
-          emphasis={overdue.length > 0}
+
+        {/*
+          What is late, one line a job, each the way to the machine. The tiles
+          and the callout this replaces said the same thing three times; the
+          trigger that fired stays, because "overdue" with no reason is a badge
+          people learn to scroll past.
+        */}
+        {overdue.length === 0 ? null : (
+          <ul aria-label="Overdue service" className="flex flex-col text-sm">
+            {overdue.slice(0, 4).map(({ equipmentId, entry }) => {
+              const machine = fleet.find((item) => item.id === equipmentId);
+              return (
+                <li key={entry.rule.id}>
+                  <Link
+                    href={`/admin/equipment/${equipmentId}`}
+                    className="inline-flex min-h-target items-center text-danger underline-offset-2 hover:underline"
+                  >
+                    {machine?.name ?? "A machine"} — {entry.rule.task} (on {entry.reason})
+                  </Link>
+                </li>
+              );
+            })}
+            {overdue.length > 4 ? (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setView("overdue")}
+                  className="inline-flex min-h-target items-center font-semibold text-danger underline underline-offset-2"
+                >
+                  and {overdue.length - 4} more
+                </button>
+              </li>
+            ) : null}
+          </ul>
+        )}
+
+        {fleet.length === 0 ? null : (
+          <ChipRow label="Filter the fleet" chips={chips} value={view} onChange={setView} />
+        )}
+
+        <FilteredLine
+          shown={shown.length}
+          total={fleet.length}
+          parts={view === "" ? [] : [chips.find((chip) => chip.key === view)?.label ?? view]}
+          onClear={() => setView("")}
         />
-        <Tile
-          label="Fuel and service"
-          value={formatMoney(spend)}
-          hint="Cost of ownership to date"
-        />
+
+        {loading ? (
+          <p className="text-muted">Looking…</p>
+        ) : fleet.length === 0 ? (
+          <EmptyState
+            title="Nothing on the place yet"
+            detail="Once a machine is here it can carry meter readings and maintenance rules, and the due dates follow from those."
+            action={
+              <Button variant="primary" onClick={startCreate}>
+                Add the first machine
+              </Button>
+            }
+          />
+        ) : (
+          <KitList label="The fleet">
+            {shown.map((machine) => (
+              <KitRow
+                key={machine.id}
+                title={machine.name}
+                href={`/admin/equipment/${machine.id}`}
+                line={lineFor(machine)}
+                chip={chipFor(machine)}
+                onEdit={() => setManaging(machine)}
+                editLabel={`Status or delete ${machine.name}`}
+              />
+            ))}
+          </KitList>
+        )}
+
+        <AddFab label="Add machine" onClick={startCreate} />
       </div>
 
-      {overdue.length === 0 ? null : (
-        <Callout
-          tone="danger"
-          title={`${overdue.length} job${overdue.length === 1 ? "" : "s"} overdue`}
+      {creating ? (
+        <Modal
+          title="Add a machine"
+          placement="side"
+          onClose={() => setCreating(false)}
+          footer={
+            <>
+              <Button type="submit" form={formId} variant="primary" busy={busy}>
+                Add machine
+              </Button>
+              <Button onClick={() => setCreating(false)}>Cancel</Button>
+            </>
+          }
         >
-          {overdue
-            .map(({ equipmentId, entry }) => {
-              const machine = fleet.find((item) => item.id === equipmentId);
-              return `${machine?.name ?? "A machine"} — ${entry.rule.task} (on ${entry.reason})`;
-            })
-            .join("; ")}
-          .
-        </Callout>
-      )}
-
-      <Section
-        title="Add a machine"
-        description="Everything else about one — its meters, its rules, its service and its fuel — lives on its own page."
-      >
-        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+          <form
+            id={formId}
+            onSubmit={(event) => void submit(event)}
+            className="flex flex-col gap-density sm:grid sm:grid-cols-2"
+          >
             <TextInput
               label="Name"
-              hint="What it is called in the barn — &ldquo;the gooseneck&rdquo;, not its model number."
+              hint="What it is called in the barn, not its model number."
+              className="sm:col-span-2"
               value={draft.name}
               onChange={(event) => setDraft({ ...draft, name: event.target.value })}
               required
@@ -397,10 +560,7 @@ export function FleetScreen({
               onChange={(event) =>
                 setDraft({ ...draft, status: event.target.value as EquipmentStatus })
               }
-              options={EQUIPMENT_STATUSES.map((value) => ({
-                value,
-                label: value.replace(/_/g, " "),
-              }))}
+              options={STATUS_OPTIONS}
             />
             <TextInput
               label="Make"
@@ -422,7 +582,6 @@ export function FleetScreen({
             />
             <TextInput
               label="VIN or serial"
-              hint="What a parts counter asks for."
               value={draft.vin}
               onChange={(event) => setDraft({ ...draft, vin: event.target.value })}
             />
@@ -443,145 +602,74 @@ export function FleetScreen({
             />
             <TextInput
               label="Notes"
-              hint="The quirk somebody else needs to know."
+              className="sm:col-span-2"
               value={draft.notes}
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
-          </div>
+            {error === undefined ? null : (
+              <p role="alert" className="text-sm text-danger sm:col-span-2">
+                {error}
+              </p>
+            )}
+          </form>
+        </Modal>
+      ) : null}
 
-          {error === undefined ? null : (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" busy={busy}>
-              Add machine
-            </Button>
-          </div>
-        </form>
-      </Section>
-
-      <Section
-        title="The fleet"
-        description="Open a machine for its meters, its maintenance rules, its service history and its fuel."
-      >
-        {loading ? (
-          <p className="text-muted">Looking…</p>
-        ) : fleet.length === 0 ? (
-          <EmptyState
-            title="Nothing on the place yet"
-            detail="Add the trailer and the bale buggy above. Once a machine is here it can carry meter readings and maintenance rules, and the due dates follow from those."
+      {/*
+        Status and delete, which used to sit on every card. A status change is
+        the only edit the fleet list makes — everything else about a machine is
+        on its own page — so the panel is small, and the delete closes it first
+        so the typed confirmation is the only dialog on screen.
+      */}
+      {managing === undefined ? null : (
+        <Modal
+          title={managing.name}
+          description={describe(managing) === "" ? managing.category : describe(managing)}
+          placement="side"
+          onClose={() => setManaging(undefined)}
+          footer={
+            <>
+              <Button onClick={() => setManaging(undefined)}>Done</Button>
+              <Button
+                variant="danger"
+                className="ml-auto"
+                onClick={() => {
+                  const machine = managing;
+                  setManaging(undefined);
+                  void remove(machine);
+                }}
+              >
+                Delete
+              </Button>
+            </>
+          }
+        >
+          <Select
+            label={`Status for ${managing.name}`}
+            value={managing.status}
+            onChange={(event) => {
+              const status = event.target.value as EquipmentStatus;
+              void setStatus(managing, status);
+              setManaging({ ...managing, status });
+            }}
+            options={STATUS_OPTIONS}
           />
-        ) : (
-          <CardGrid columns={3}>
-            {[...fleet]
-              .sort((left, right) => {
-                // Whatever is down or overdue first — the rest is alphabetical,
-                // because a fleet ordered by id is a fleet nobody can scan.
-                const rank = (machine: Equipment) =>
-                  machine.status === "down"
-                    ? 0
-                    : (dueByEquipment.get(machine.id) ?? []).some((entry) => entry.overdue)
-                      ? 1
-                      : 2;
-                return rank(left) - rank(right) || left.name.localeCompare(right.name);
-              })
-              .map((machine) => {
-                const hours = currentMeter(readings, machine.id, "hours");
-                const miles = currentMeter(readings, machine.id, "miles");
-                const due = dueByEquipment.get(machine.id) ?? [];
-                const machineOverdue = due.filter((entry) => entry.overdue);
-
-                return (
-                  <RecordCard
-                    key={machine.id}
-                    tone={
-                      machine.status === "down"
-                        ? "danger"
-                        : machineOverdue.length > 0
-                          ? "action"
-                          : machine.status === "in_service"
-                            ? "calm"
-                            : "neutral"
-                    }
-                    title={
-                      <Link
-                        href={`/admin/equipment/${machine.id}`}
-                        className="text-ink underline decoration-edge underline-offset-4 hover:decoration-action"
-                      >
-                        {machine.name}
-                      </Link>
-                    }
-                    subtitle={describe(machine) === "" ? machine.category : describe(machine)}
-                    actions={
-                      <Pill tone={STATUS_TONE[machine.status]} dot={machine.status === "down"}>
-                        {machine.status.replace(/_/g, " ")}
-                      </Pill>
-                    }
-                    meta={
-                      <>
-                        <Pill tone="identity">{machine.category}</Pill>
-                        {hours === undefined ? null : <Pill>{num(hours, 1)} hrs</Pill>}
-                        {miles === undefined ? null : <Pill>{num(miles)} mi</Pill>}
-                        {machineOverdue.length === 0 ? null : (
-                          <Pill tone="danger" dot>
-                            {machineOverdue.length} overdue
-                          </Pill>
-                        )}
-                      </>
-                    }
-                  >
-                    {due.length === 0 ? (
-                      <p className="text-sm text-muted">
-                        No maintenance rules yet. Open it to say what it needs and how often.
-                      </p>
-                    ) : (
-                      <ul className="flex flex-col gap-1 text-sm">
-                        {due.slice(0, 3).map((entry) => (
-                          <li key={entry.rule.id} className="flex flex-wrap items-baseline gap-2">
-                            <span className={entry.overdue ? "text-danger" : "text-ink"}>
-                              {entry.rule.task}
-                            </span>
-                            <span className="text-muted">
-                              {entry.reason === "months"
-                                ? `due ${formatDate(entry.dueAt)}`
-                                : entry.reason === "hours"
-                                  ? `at ${num(entry.dueAtHours, 1)} hrs`
-                                  : `at ${num(entry.dueAtMiles)} mi`}
-                            </span>
-                          </li>
-                        ))}
-                        {due.length > 3 ? (
-                          <li className="text-muted">and {due.length - 3} more</li>
-                        ) : null}
-                      </ul>
-                    )}
-
-                    <div className="flex flex-wrap items-end gap-2">
-                      <Select
-                        label={`Status for ${machine.name}`}
-                        hideLabel
-                        value={machine.status}
-                        onChange={(event) =>
-                          void setStatus(machine, event.target.value as EquipmentStatus)
-                        }
-                        options={EQUIPMENT_STATUSES.map((value) => ({
-                          value,
-                          label: value.replace(/_/g, " "),
-                        }))}
-                      />
-                      <Button variant="ghost" onClick={() => void remove(machine)}>
-                        Delete
-                      </Button>
-                    </div>
-                  </RecordCard>
-                );
-              })}
-          </CardGrid>
-        )}
-      </Section>
+          <Link
+            href={`/admin/equipment/${managing.id}`}
+            className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
+          >
+            Meters, rules, service and fuel →
+          </Link>
+        </Modal>
+      )}
     </PageBody>
   );
+}
+
+function dueWhen(entry: ReturnType<typeof maintenanceDue>[number]): string {
+  return entry.reason === "months"
+    ? `due ${formatDate(entry.dueAt)}`
+    : entry.reason === "hours"
+      ? `at ${num(entry.dueAtHours, 1)} hrs`
+      : `at ${num(entry.dueAtMiles)} mi`;
 }

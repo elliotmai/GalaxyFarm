@@ -1,64 +1,49 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import {
   Button,
-  Callout,
-  Card,
-  Checkbox,
   DataTable,
   EmptyState,
+  Modal,
   PageBody,
-  PageHeader,
   Pill,
-  Section,
   Select,
-  TagInput,
-  TextInput,
-  Tile,
   useConfirmDelete,
   useToast,
   type Column,
-  Modal,
 } from "@galaxy-farm/ui";
 import {
-  CANDIDATE_STATUSES,
   compareToBudget,
   daysOnMarket,
   formatMoney,
-  fromDollars,
   isActive,
   isExpiring,
   purchaseCandidateSchema,
   totalAcquisitionCost,
-  type AdditionalCost,
   type CandidateStatus,
   type Contact,
-  type Money,
   type PurchaseCandidate,
   type RoadmapItem,
   type Ulid,
 } from "@galaxy-farm/core";
 import {
   concerns,
-  CONDITIONS,
-  EQUIPMENT_CATEGORIES,
   equipmentSchema,
   pricePerHour,
   pricePerMile,
-  TITLE_STATUSES,
-  type Condition,
   type Equipment,
-  type EquipmentCandidateDetail,
-  type EquipmentCategory,
-  type TitleStatus,
 } from "@galaxy-farm/module-equipment";
 
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
+
+import { AddFab, ChipRow, FilteredLine, KitHeader } from "../../_components/kit-controls";
+import { daysUntil, detailOf, num, rate } from "./candidate-format";
+import { CandidateForm } from "./candidate-form";
+import { CandidatePanel } from "./candidate-panel";
 
 /**
  * Equipment under consideration (spec §5.6, §5.1, §7's
@@ -79,105 +64,18 @@ import { useRecords } from "@/lib/local/use-records";
  * everything the detail knows. Marking one **passed** keeps it, with the
  * reason: what you turned down and why is worth as much next year as what you
  * bought.
+ *
+ * The comparison table stays a table — comparing is reading across — and a
+ * row opens the candidate's panel, which carries what used to be a card per
+ * candidate below the table and the controls that used to fill its last
+ * column. Adding and editing are a side panel of their own.
  */
 
-function formatDate(value: Date | undefined): string {
-  return value === undefined
-    ? "—"
-    : value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-}
-
-function num(value: number | undefined, decimals = 0): string {
-  return value === undefined
-    ? "—"
-    : value.toLocaleString(undefined, { maximumFractionDigits: decimals });
-}
-
-/** Cents to the dollar and a half — $0.34/mi reads better than $0/mi. */
-function rate(value: Money | undefined): string {
-  return value === undefined
-    ? "—"
-    : `$${(value.cents / 100).toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`;
-}
-
-function detailOf(candidate: PurchaseCandidate): Partial<EquipmentCandidateDetail> {
-  return (candidate.domainDetail ?? {}) as Partial<EquipmentCandidateDetail>;
-}
-
-/** How long it has been sitting, which is a negotiating position. */
-function daysUntil(date: Date, now: Date): number {
-  return Math.ceil((date.getTime() - now.getTime()) / 86_400_000);
-}
-
-interface Draft {
-  readonly title: string;
-  readonly roadmapItemId: string;
-  readonly status: CandidateStatus;
-  readonly asking: string;
-  readonly listingUrl: string;
-  readonly sellerId: string;
-  readonly location: string;
-  readonly distanceMiles: string;
-  readonly listedDate: string;
-  readonly expiresAt: string;
-  readonly notes: string;
-  readonly pros: readonly string[];
-  readonly cons: readonly string[];
-  readonly additionalCosts: readonly { label: string; amount: string }[];
-  // The equipment half (§5.6).
-  readonly category: EquipmentCategory;
-  readonly make: string;
-  readonly model: string;
-  readonly year: string;
-  readonly mileage: string;
-  readonly engineHours: string;
-  readonly vin: string;
-  readonly condition: string;
-  readonly titleStatus: string;
-  readonly serviceHistoryAvailable: boolean;
-  readonly warrantyRemaining: string;
-  readonly knownFaults: string;
-  readonly wearCondition: string;
-}
-
-const BLANK: Draft = {
-  title: "",
-  roadmapItemId: "",
-  status: "watching",
-  asking: "",
-  listingUrl: "",
-  sellerId: "",
-  location: "",
-  distanceMiles: "",
-  listedDate: "",
-  expiresAt: "",
-  notes: "",
-  pros: [],
-  cons: [],
-  // The three that turn up on nearly every purchase, offered rather than
-  // typed. §5.1 wants them itemised; blank rows cost nothing and are dropped.
-  additionalCosts: [
-    { label: "Hauling", amount: "" },
-    { label: "Inspection", amount: "" },
-    { label: "Immediate repairs", amount: "" },
-  ],
-  category: "vehicle",
-  make: "",
-  model: "",
-  year: "",
-  mileage: "",
-  engineHours: "",
-  vin: "",
-  condition: "",
-  titleStatus: "",
-  serviceHistoryAvailable: false,
-  warrantyRemaining: "",
-  knownFaults: "",
-  wearCondition: "",
-};
+/** Which side panel is open. */
+type Panel =
+  | { readonly kind: "view"; readonly id: Ulid }
+  | { readonly kind: "edit"; readonly editing?: PurchaseCandidate }
+  | { readonly kind: "filters" };
 
 export function EquipmentCandidatesScreen({
   propertyId,
@@ -213,18 +111,10 @@ export function EquipmentCandidatesScreen({
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
 
-  const [editing, setEditing] = useState<PurchaseCandidate | undefined>();
-  // The editor is a side dialog now, so it needs an open state of its own —
-  // `editing` alone cannot express \"adding a new one\".
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [draft, setDraft] = useState<Draft>(() => ({
-    ...BLANK,
-    roadmapItemId: params.get("item") ?? "",
-  }));
-  const [error, setError] = useState<string | undefined>();
-  const [busy, setBusy] = useState(false);
-  const [showClosed, setShowClosed] = useState(false);
-  // `?item=` arrives from a roadmap card's "Compare" link.
+  const [panel, setPanel] = useState<Panel | undefined>();
+  /** "", "over", "soon" or "closed" — the chip that is on. */
+  const [view, setView] = useState("");
+  // `?item=` arrives from a roadmap row's "Compare" link.
   const [filter, setFilter] = useState(params.get("item") ?? "");
 
   const now = new Date();
@@ -233,161 +123,54 @@ export function EquipmentCandidatesScreen({
   const items = allItems.filter((item) => item.domain === "equipment");
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
-  const shown = candidates
-    .filter((entry) => filter === "" || entry.roadmapItemId === filter)
-    .filter((entry) => showClosed || isActive(entry));
+  const budgetOf = (entry: PurchaseCandidate) =>
+    entry.roadmapItemId === undefined
+      ? undefined
+      : itemById.get(entry.roadmapItemId)?.budgetEstimate;
+
+  const isOver = (entry: PurchaseCandidate) => {
+    const budget = budgetOf(entry);
+    return budget !== undefined && compareToBudget(entry, budget).overBudget;
+  };
 
   const open = candidates.filter(isActive);
   const expiring = open.filter((entry) => isExpiring(entry, now, 14));
+  /** Candidates whose all-in cost has crossed the budget on their own want. */
+  const overBudget = open.filter(isOver);
+  const closed = candidates.filter((entry) => !isActive(entry));
+
+  const againstWant = candidates.filter((entry) => filter === "" || entry.roadmapItemId === filter);
+  const shown = (
+    view === "closed"
+      ? againstWant.filter((entry) => !isActive(entry))
+      : view === "over"
+        ? againstWant.filter((entry) => isActive(entry) && isOver(entry))
+        : view === "soon"
+          ? againstWant.filter((entry) => isExpiring(entry, now, 14))
+          : againstWant.filter(isActive)
+  )
+    .slice()
+    .sort((left, right) => totalAcquisitionCost(left).cents - totalAcquisitionCost(right).cents);
 
   const cheapest = shown
     .filter(isActive)
     .map((entry) => totalAcquisitionCost(entry))
     .sort((left, right) => left.cents - right.cents)[0];
 
-  /** Candidates whose all-in cost has crossed the budget on their own want. */
-  const overBudget = open.filter((entry) => {
-    const budget =
-      entry.roadmapItemId === undefined
-        ? undefined
-        : itemById.get(entry.roadmapItemId)?.budgetEstimate;
-    return budget !== undefined && compareToBudget(entry, budget).overBudget;
-  });
+  const chips = [
+    { key: "", label: "Open", count: open.length },
+    ...(overBudget.length === 0
+      ? []
+      : [{ key: "over", label: "Over budget", count: overBudget.length }]),
+    ...(expiring.length === 0
+      ? []
+      : [{ key: "soon", label: "Closing soon", count: expiring.length }]),
+    ...(closed.length === 0
+      ? []
+      : [{ key: "closed", label: "Bought, passed or gone", count: closed.length }]),
+  ];
 
-  function openEditor(): void {
-    setEditorOpen(true);
-  }
-
-  function reset() {
-    setEditorOpen(false);
-    setEditing(undefined);
-    setDraft({ ...BLANK, roadmapItemId: filter });
-    setError(undefined);
-  }
-
-  function startEdit(candidate: PurchaseCandidate) {
-    setEditorOpen(true);
-    const detail = detailOf(candidate);
-    setEditing(candidate);
-    setDraft({
-      title: candidate.title,
-      roadmapItemId: candidate.roadmapItemId ?? "",
-      status: candidate.status,
-      asking: (candidate.askingPrice.cents / 100).toFixed(2),
-      listingUrl: candidate.listingUrl ?? "",
-      sellerId: candidate.sellerId ?? "",
-      location: candidate.location ?? "",
-      distanceMiles: candidate.distanceMiles === undefined ? "" : String(candidate.distanceMiles),
-      listedDate:
-        candidate.listedDate === undefined ? "" : candidate.listedDate.toISOString().slice(0, 10),
-      expiresAt:
-        candidate.expiresAt === undefined ? "" : candidate.expiresAt.toISOString().slice(0, 10),
-      notes: candidate.notes ?? "",
-      pros: candidate.pros,
-      cons: candidate.cons,
-      additionalCosts:
-        candidate.additionalCosts.length === 0
-          ? BLANK.additionalCosts
-          : candidate.additionalCosts.map((cost) => ({
-              label: cost.label,
-              amount: (cost.amount.cents / 100).toFixed(2),
-            })),
-      category: detail.category ?? "vehicle",
-      make: detail.make ?? "",
-      model: detail.model ?? "",
-      year: detail.year === undefined ? "" : String(detail.year),
-      mileage: detail.mileage === undefined ? "" : String(detail.mileage),
-      engineHours: detail.engineHours === undefined ? "" : String(detail.engineHours),
-      vin: detail.vin ?? "",
-      condition: detail.condition ?? "",
-      titleStatus: detail.titleStatus ?? "",
-      serviceHistoryAvailable: detail.serviceHistoryAvailable ?? false,
-      warrantyRemaining: detail.warrantyRemaining ?? "",
-      knownFaults: detail.knownFaults ?? "",
-      wearCondition: detail.wearCondition ?? "",
-    });
-    setError(undefined);
-    if (typeof globalThis.scrollTo === "function")
-      globalThis.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(undefined);
-    setBusy(true);
-
-    try {
-      const costs: AdditionalCost[] = draft.additionalCosts
-        .filter(
-          (cost) => cost.label.trim() !== "" && cost.amount !== "" && Number(cost.amount) !== 0,
-        )
-        .map((cost) => ({ label: cost.label.trim(), amount: fromDollars(Number(cost.amount)) }));
-
-      const payload = {
-        domain: "equipment" as const,
-        title: draft.title.trim(),
-        status: draft.status,
-        roadmapItemId: draft.roadmapItemId === "" ? undefined : (draft.roadmapItemId as Ulid),
-        askingPrice: fromDollars(Number(draft.asking || "0")),
-        additionalCosts: costs,
-        listingUrl: draft.listingUrl.trim() === "" ? undefined : draft.listingUrl.trim(),
-        sellerId: draft.sellerId === "" ? undefined : (draft.sellerId as Ulid),
-        location: draft.location.trim() === "" ? undefined : draft.location.trim(),
-        distanceMiles: draft.distanceMiles === "" ? undefined : Number(draft.distanceMiles),
-        listedDate: draft.listedDate === "" ? undefined : new Date(`${draft.listedDate}T12:00:00`),
-        firstSeen: editing?.firstSeen ?? new Date(),
-        expiresAt: draft.expiresAt === "" ? undefined : new Date(`${draft.expiresAt}T12:00:00`),
-        photoKeys: editing?.photoKeys ?? [],
-        pros: [...draft.pros],
-        cons: [...draft.cons],
-        notes: draft.notes.trim() === "" ? undefined : draft.notes.trim(),
-        planStatus: editing?.planStatus ?? ("open" as const),
-        // The equipment half rides on the shared aggregate (§5.1). Undefined
-        // keys are dropped so the stored detail says only what is known.
-        domainDetail: Object.fromEntries(
-          Object.entries({
-            category: draft.category,
-            make: draft.make.trim() === "" ? undefined : draft.make.trim(),
-            model: draft.model.trim() === "" ? undefined : draft.model.trim(),
-            year: draft.year === "" ? undefined : Number(draft.year),
-            mileage: draft.mileage === "" ? undefined : Number(draft.mileage),
-            engineHours: draft.engineHours === "" ? undefined : Number(draft.engineHours),
-            vin: draft.vin.trim() === "" ? undefined : draft.vin.trim(),
-            condition: draft.condition === "" ? undefined : draft.condition,
-            titleStatus: draft.titleStatus === "" ? undefined : draft.titleStatus,
-            serviceHistoryAvailable: draft.serviceHistoryAvailable,
-            warrantyRemaining:
-              draft.warrantyRemaining.trim() === "" ? undefined : draft.warrantyRemaining.trim(),
-            knownFaults: draft.knownFaults.trim() === "" ? undefined : draft.knownFaults.trim(),
-            wearCondition:
-              draft.wearCondition.trim() === "" ? undefined : draft.wearCondition.trim(),
-          }).filter(([, value]) => value !== undefined),
-        ),
-      };
-
-      const result =
-        editing === undefined
-          ? await api.create(payload as never)
-          : await api.update(editing.id, payload as Partial<PurchaseCandidate>);
-
-      if (!result.ok) {
-        setError(
-          result.error.kind === "validation"
-            ? (result.error.issues[0]?.message ?? "That is not valid")
-            : "Could not save that",
-        );
-        return;
-      }
-
-      show({
-        message: editing === undefined ? "Added to the comparison" : "Candidate updated",
-        tone: "success",
-      });
-      reset();
-    } finally {
-      setBusy(false);
-    }
-  }
+  const wantName = filter === "" ? undefined : itemById.get(filter as Ulid)?.title;
 
   /**
    * The plan becomes the fact (§5.1).
@@ -474,7 +257,6 @@ export function EquipmentCandidatesScreen({
     });
     if (!confirmed) return;
 
-    if (editing?.id === candidate.id) reset();
     await api.remove(candidate.id, "Removed from the candidates");
     show({
       message: "Candidate deleted",
@@ -483,20 +265,32 @@ export function EquipmentCandidatesScreen({
     });
   }
 
+  const close = () => setPanel(undefined);
+
   const columns: readonly Column<PurchaseCandidate>[] = [
     {
       key: "title",
       header: "Unit",
       primary: true,
+      // The row's way in: the panel with the concerns, the costs and the
+      // status. A real button, so it is reachable from a keyboard.
       render: (row) => {
         const detail = detailOf(row);
+        const sub =
+          [detail.year, detail.make, detail.model].filter(Boolean).join(" ") || row.location;
         return (
-          <span className="flex flex-col gap-0.5">
-            <span className="font-medium text-ink">{row.title}</span>
-            <span className="text-xs text-muted">
-              {[detail.year, detail.make, detail.model].filter(Boolean).join(" ") || row.location}
+          <button
+            type="button"
+            onClick={() => setPanel({ kind: "view", id: row.id })}
+            className="flex min-h-target flex-col items-start justify-center gap-0.5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+          >
+            <span className="font-semibold text-ink underline decoration-edge underline-offset-4 hover:decoration-action">
+              {row.title}
             </span>
-          </span>
+            {sub === undefined || sub === "" ? null : (
+              <span className="text-xs text-muted">{sub}</span>
+            )}
+          </button>
         );
       },
     },
@@ -518,12 +312,6 @@ export function EquipmentCandidatesScreen({
       ),
     },
     {
-      key: "asking",
-      header: "Asking",
-      numeric: true,
-      render: (row) => formatMoney(row.askingPrice),
-    },
-    {
       key: "total",
       header: "All in",
       numeric: true,
@@ -537,10 +325,7 @@ export function EquipmentCandidatesScreen({
       header: "vs budget",
       numeric: true,
       render: (row) => {
-        const budget =
-          row.roadmapItemId === undefined
-            ? undefined
-            : itemById.get(row.roadmapItemId)?.budgetEstimate;
+        const budget = budgetOf(row);
         if (budget === undefined) return <span className="text-muted">—</span>;
         const against = compareToBudget(row, budget);
         return (
@@ -550,18 +335,6 @@ export function EquipmentCandidatesScreen({
           </span>
         );
       },
-    },
-    {
-      key: "miles",
-      header: "Miles",
-      numeric: true,
-      render: (row) => num(detailOf(row).mileage),
-    },
-    {
-      key: "hours",
-      header: "Hours",
-      numeric: true,
-      render: (row) => num(detailOf(row).engineHours, 1),
     },
     {
       key: "permile",
@@ -576,6 +349,18 @@ export function EquipmentCandidatesScreen({
       render: (row) => rate(pricePerHour(row, detailOf(row))),
     },
     {
+      key: "miles",
+      header: "Miles",
+      numeric: true,
+      render: (row) => num(detailOf(row).mileage),
+    },
+    {
+      key: "hours",
+      header: "Hours",
+      numeric: true,
+      render: (row) => num(detailOf(row).engineHours, 1),
+    },
+    {
       key: "distance",
       header: "Away",
       numeric: true,
@@ -588,371 +373,124 @@ export function EquipmentCandidatesScreen({
       render: (row) => `${num(daysOnMarket(row, now))} d`,
     },
     {
-      key: "actions",
-      header: "",
-      render: (row) => (
-        <span className="flex flex-wrap items-end gap-2">
-          <Select
-            label={`Status for ${row.title}`}
-            hideLabel
-            value={row.status}
-            onChange={(event) => void setStatus(row, event.target.value as CandidateStatus)}
-            options={CANDIDATE_STATUSES.map((value) => ({
-              value,
-              label: value.replace(/_/g, " "),
-            }))}
-          />
-          <Button variant="ghost" onClick={() => startEdit(row)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void remove(row)}>
-            Delete
-          </Button>
-        </span>
-      ),
+      key: "flags",
+      header: "Flags",
+      numeric: true,
+      // A count, so the table says which rows are worth opening; the panel
+      // says what they are.
+      render: (row) => {
+        const detail = detailOf(row);
+        const count = concerns({
+          ...detail,
+          candidateId: row.id,
+          category: detail.category ?? "vehicle",
+          serviceHistoryAvailable: detail.serviceHistoryAvailable ?? false,
+        }).length;
+        return count === 0 ? (
+          <span className="text-muted">—</span>
+        ) : (
+          <span className="text-danger">{count}</span>
+        );
+      },
     },
   ];
 
+  const facts = [
+    `${open.length} open`,
+    cheapest === undefined ? undefined : `cheapest ${formatMoney(cheapest)} all in`,
+  ]
+    .filter((part): part is string => part !== undefined)
+    .join(" · ");
+
+  const viewing =
+    panel?.kind === "view" ? candidates.find((entry) => entry.id === panel.id) : undefined;
+
+  const startCreate = () => setPanel({ kind: "edit" });
+
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Kit"
-        title="Equipment candidates"
-        subtitle="What you are actually looking at, compared on what it would cost to get here and keep running — not on the asking price."
-      />
+      {/* Bottom clearance on a phone for the floating add button. */}
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <KitHeader
+          eyebrow="Kit"
+          title="Equipment candidates"
+          facts={loading ? undefined : facts}
+          action={
+            <Button variant="primary" onClick={startCreate}>
+              <span aria-hidden="true">+</span> Add candidate
+            </Button>
+          }
+        />
 
-      <div className="gf-stat-row">
-        <Tile label="Under consideration" value={open.length} tone="identity" />
-        <Tile
-          label="Listing or sale within a fortnight"
-          value={expiring.length}
-          tone={expiring.length > 0 ? "danger" : "neutral"}
-          emphasis={expiring.length > 0}
-        />
-        <Tile
-          label="Cheapest all in"
-          value={cheapest === undefined ? "—" : formatMoney(cheapest)}
-          hint={filter === "" ? "Across everything open" : "Against this want"}
-        />
-        <Tile
-          label="Over budget"
-          value={overBudget.length}
-          tone={overBudget.length > 0 ? "action" : "neutral"}
-          hint={overBudget.length > 0 ? "All-in cost past the roadmap figure" : undefined}
-        />
-      </div>
-
-      {expiring.length === 0 ? null : (
-        <Callout
-          tone="danger"
-          title={`${expiring.length} listing${expiring.length === 1 ? "" : "s"} about to go`}
-        >
-          {expiring
-            .map((entry) => {
+        {/*
+          A sale date is a deadline nobody controls but the seller, so the ones
+          inside a fortnight are said up top — one line each, each the way in.
+        */}
+        {expiring.length === 0 ? null : (
+          <ul aria-label="About to go" className="flex flex-col text-sm">
+            {expiring.map((entry) => {
               const days = entry.expiresAt === undefined ? 0 : daysUntil(entry.expiresAt, now);
-              return `${entry.title} — ${days <= 0 ? "today" : `${days} d`}`;
-            })
-            .join("; ")}
-          . A sale date is a deadline nobody controls but the seller.
-        </Callout>
-      )}
+              return (
+                <li key={entry.id}>
+                  <button
+                    type="button"
+                    onClick={() => setPanel({ kind: "view", id: entry.id })}
+                    className="inline-flex min-h-target items-center text-left text-danger underline-offset-2 hover:underline"
+                  >
+                    {days <= 0 ? "Goes today" : `Goes in ${days} d`}: {entry.title}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
 
-      {editorOpen || editing !== undefined ? (
-        <Modal placement="side" title={"Edit"} onClose={reset}>
-          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-              <TextInput
-                label="What it is"
-                hint="&ldquo;2018 F-250, Weatherford&rdquo;"
-                value={draft.title}
-                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-                required
-              />
-              <Select
-                label="Against which want"
-                value={draft.roadmapItemId}
-                placeholder="Not on the roadmap"
-                onChange={(event) => setDraft({ ...draft, roadmapItemId: event.target.value })}
-                options={items.map((item) => ({
-                  value: item.id,
-                  label:
-                    item.budgetEstimate === undefined
-                      ? item.title
-                      : `${item.title} · ${formatMoney(item.budgetEstimate)}`,
-                }))}
-              />
-              <Select
-                label="Category"
-                value={draft.category}
-                onChange={(event) =>
-                  setDraft({ ...draft, category: event.target.value as EquipmentCategory })
-                }
-                options={EQUIPMENT_CATEGORIES.map((value) => ({ value, label: value }))}
-              />
-              <TextInput
-                label="Asking ($)"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                numeric
-                value={draft.asking}
-                onChange={(event) => setDraft({ ...draft, asking: event.target.value })}
-                required
-              />
-              <TextInput
-                label="Where"
-                value={draft.location}
-                onChange={(event) => setDraft({ ...draft, location: event.target.value })}
-              />
-              <TextInput
-                label="Miles away"
-                hint="One way. It is most of what hauling costs."
-                type="number"
-                inputMode="decimal"
-                numeric
-                value={draft.distanceMiles}
-                onChange={(event) => setDraft({ ...draft, distanceMiles: event.target.value })}
-              />
-              <TextInput
-                label="Make"
-                value={draft.make}
-                onChange={(event) => setDraft({ ...draft, make: event.target.value })}
-              />
-              <TextInput
-                label="Model"
-                value={draft.model}
-                onChange={(event) => setDraft({ ...draft, model: event.target.value })}
-              />
-              <TextInput
-                label="Year"
-                type="number"
-                inputMode="numeric"
-                numeric
-                value={draft.year}
-                onChange={(event) => setDraft({ ...draft, year: event.target.value })}
-              />
-              <TextInput
-                label="Mileage"
-                type="number"
-                inputMode="numeric"
-                numeric
-                value={draft.mileage}
-                onChange={(event) => setDraft({ ...draft, mileage: event.target.value })}
-              />
-              <TextInput
-                label="Engine hours"
-                type="number"
-                inputMode="decimal"
-                step="0.1"
-                numeric
-                value={draft.engineHours}
-                onChange={(event) => setDraft({ ...draft, engineHours: event.target.value })}
-              />
-              <TextInput
-                label="VIN or serial"
-                value={draft.vin}
-                onChange={(event) => setDraft({ ...draft, vin: event.target.value })}
-              />
-              <Select
-                label="Condition"
-                value={draft.condition}
-                placeholder="Not judged yet"
-                onChange={(event) => setDraft({ ...draft, condition: event.target.value })}
-                options={CONDITIONS.map((value: Condition) => ({ value, label: value }))}
-              />
-              <Select
-                label="Title"
-                value={draft.titleStatus}
-                placeholder="Not asked yet"
-                onChange={(event) => setDraft({ ...draft, titleStatus: event.target.value })}
-                options={TITLE_STATUSES.map((value: TitleStatus) => ({
-                  value,
-                  label: value.replace(/_/g, " "),
-                }))}
-              />
-              <Select
-                label="Seller"
-                value={draft.sellerId}
-                placeholder="Not recorded"
-                onChange={(event) => setDraft({ ...draft, sellerId: event.target.value })}
-                options={contacts.map((contact) => ({ value: contact.id, label: contact.name }))}
-              />
-              <TextInput
-                label="Listing link"
-                type="url"
-                value={draft.listingUrl}
-                onChange={(event) => setDraft({ ...draft, listingUrl: event.target.value })}
-              />
-              <TextInput
-                label="Listed on"
-                type="date"
-                value={draft.listedDate}
-                onChange={(event) => setDraft({ ...draft, listedDate: event.target.value })}
-              />
-              <TextInput
-                label="Sale or expiry date"
-                hint="A lot is a deadline. Leave blank for a private treaty."
-                type="date"
-                value={draft.expiresAt}
-                onChange={(event) => setDraft({ ...draft, expiresAt: event.target.value })}
-              />
-              <TextInput
-                label="Warranty left"
-                value={draft.warrantyRemaining}
-                onChange={(event) => setDraft({ ...draft, warrantyRemaining: event.target.value })}
-              />
-              <TextInput
-                label="Known faults"
-                value={draft.knownFaults}
-                onChange={(event) => setDraft({ ...draft, knownFaults: event.target.value })}
-              />
-              <TextInput
-                label="Tyres, tracks or wear"
-                value={draft.wearCondition}
-                onChange={(event) => setDraft({ ...draft, wearCondition: event.target.value })}
-              />
-              <Checkbox
-                label="Service history available"
-                checked={draft.serviceHistoryAvailable}
-                onChange={(event) =>
-                  setDraft({ ...draft, serviceHistoryAvailable: event.target.checked })
-                }
+        {candidates.length === 0 ? null : (
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <ChipRow
+                label="Filter the candidates"
+                chips={chips}
+                value={view}
+                onChange={setView}
               />
             </div>
-
-            <fieldset className="flex flex-col gap-3">
-              <legend className="text-xs font-semibold uppercase tracking-wide text-muted">
-                Costs on top
-              </legend>
-              <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-                {draft.additionalCosts.map((cost, index) => (
-                  <div key={index} className="flex items-end gap-2">
-                    <div className="min-w-0 flex-1">
-                      <TextInput
-                        label={`Cost ${index + 1}`}
-                        hideLabel
-                        placeholder="What for"
-                        value={cost.label}
-                        onChange={(event) =>
-                          setDraft({
-                            ...draft,
-                            additionalCosts: draft.additionalCosts.map((entry, at) =>
-                              at === index ? { ...entry, label: event.target.value } : entry,
-                            ),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="w-32">
-                      <TextInput
-                        label={`Amount ${index + 1}`}
-                        hideLabel
-                        placeholder="$"
-                        type="number"
-                        inputMode="decimal"
-                        step="0.01"
-                        numeric
-                        value={cost.amount}
-                        onChange={(event) =>
-                          setDraft({
-                            ...draft,
-                            additionalCosts: draft.additionalCosts.map((entry, at) =>
-                              at === index ? { ...entry, amount: event.target.value } : entry,
-                            ),
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    setDraft({
-                      ...draft,
-                      additionalCosts: [...draft.additionalCosts, { label: "", amount: "" }],
-                    })
-                  }
-                >
-                  Another cost
-                </Button>
-              </div>
-            </fieldset>
-
-            <div className="grid grid-cols-1 gap-density md:grid-cols-2">
-              <TagInput
-                label="Pros"
-                hint="Your own words. This is what the conversation away from the screen is made of."
-                value={draft.pros}
-                onChange={(pros) => setDraft({ ...draft, pros })}
-              />
-              <TagInput
-                label="Cons"
-                value={draft.cons}
-                onChange={(cons) => setDraft({ ...draft, cons })}
-              />
-            </div>
-
-            <TextInput
-              label="Notes"
-              value={draft.notes}
-              onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-            />
-
-            {error === undefined ? null : (
-              <p role="alert" className="text-sm text-danger">
-                {error}
-              </p>
-            )}
-
-            <div className="flex flex-wrap gap-2">
-              <Button type="submit" busy={busy}>
-                {editing === undefined ? "Add candidate" : "Save candidate"}
+            {items.length === 0 ? null : (
+              <Button aria-haspopup="dialog" onClick={() => setPanel({ kind: "filters" })}>
+                Want{filter === "" ? "" : " (1)"}
               </Button>
-              {editing === undefined ? null : (
-                <Button variant="ghost" onClick={reset}>
-                  Cancel
-                </Button>
-              )}
-            </div>
-          </form>
-        </Modal>
-      ) : null}
-
-      <Section
-        title="Comparison"
-        description="Sorted on total acquisition cost. Price per mile and per hour divide that same figure, which is the only honest way to weigh a low-hour expensive unit against a high-hour cheap one."
-        actions={
-          <div className="flex flex-wrap items-end gap-3">
-            <Button onClick={openEditor}>Add a candidate</Button>
-            <Select
-              label="Want"
-              value={filter}
-              placeholder="Everything"
-              onChange={(event) => setFilter(event.target.value)}
-              options={items.map((item) => ({ value: item.id, label: item.title }))}
-            />
-            <Checkbox
-              label="Show bought, passed and gone"
-              checked={showClosed}
-              onChange={(event) => setShowClosed(event.target.checked)}
-            />
+            )}
           </div>
-        }
-      >
+        )}
+
+        <FilteredLine
+          shown={shown.length}
+          total={candidates.length}
+          parts={[
+            ...(wantName === undefined
+              ? filter === ""
+                ? []
+                : ["Against a deleted want"]
+              : [`Against ${wantName}`]),
+            ...(view === "" ? [] : [chips.find((chip) => chip.key === view)?.label ?? view]),
+          ]}
+          onClear={() => {
+            setFilter("");
+            setView("");
+          }}
+        />
+
         {loading ? (
           <p className="text-muted">Looking…</p>
         ) : (
-          <Card>
+          // Sorted on total acquisition cost. Price per mile and per hour divide
+          // that same figure, the only honest way to weigh a low-hour expensive
+          // unit against a high-hour cheap one.
+          <div className="sm:rounded-density sm:border sm:border-rule sm:bg-panel sm:px-density">
             <DataTable
               caption="Equipment candidates, cheapest all-in first"
               columns={columns}
-              rows={[...shown].sort(
-                (left, right) =>
-                  totalAcquisitionCost(left).cents - totalAcquisitionCost(right).cents,
-              )}
+              rows={shown}
               rowKey={(row) => row.id}
               empty={
                 <EmptyState
@@ -961,114 +499,104 @@ export function EquipmentCandidatesScreen({
                   }
                   detail={
                     candidates.length === 0
-                      ? "Add the truck you keep opening the listing for. Hauling, inspection and the tyres it needs go on the record, so the comparison is on what it would really cost."
-                      : "Everything against this want has been bought, passed or gone. Tick the box to see it."
+                      ? "Add the truck you keep opening the listing for, with hauling, inspection and tyres, so the comparison is on what it would really cost."
+                      : undefined
+                  }
+                  action={
+                    candidates.length === 0 ? (
+                      <Button variant="primary" onClick={startCreate}>
+                        Add the first candidate
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => {
+                          setFilter("");
+                          setView("");
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    )
                   }
                 />
               }
             />
-          </Card>
-        )}
-      </Section>
-
-      {shown.length === 0 ? null : (
-        <Section
-          title="Worth being told"
-          description="Not a score. A decision this size is made by a person weighing these against each other, and a single number would flatten exactly the things worth weighing."
-        >
-          <div className="grid grid-cols-1 gap-density md:grid-cols-2 xl:grid-cols-3">
-            {shown.map((candidate) => {
-              const detail = detailOf(candidate);
-              const flags = concerns({
-                ...detail,
-                candidateId: candidate.id,
-                category: detail.category ?? "vehicle",
-                // Absent reads as "not asked yet", which is itself a concern —
-                // §5.6 flags a missing service history, and a candidate nobody
-                // has asked is exactly the one nobody should assume about.
-                serviceHistoryAvailable: detail.serviceHistoryAvailable ?? false,
-              });
-              const want =
-                candidate.roadmapItemId === undefined
-                  ? undefined
-                  : itemById.get(candidate.roadmapItemId);
-
-              return (
-                <Card
-                  key={candidate.id}
-                  title={candidate.title}
-                  actions={
-                    candidate.listingUrl === undefined ? undefined : (
-                      <Link
-                        href={candidate.listingUrl}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="text-sm text-action underline"
-                      >
-                        Listing
-                      </Link>
-                    )
-                  }
-                >
-                  <div className="flex flex-col gap-3">
-                    {want === undefined ? null : (
-                      <p className="text-sm text-muted">Against &ldquo;{want.title}&rdquo;</p>
-                    )}
-
-                    {flags.length === 0 ? (
-                      <p className="text-sm text-calm">Nothing flagged.</p>
-                    ) : (
-                      <ul className="flex flex-col gap-1 text-sm text-danger">
-                        {flags.map((flag) => (
-                          <li key={flag}>{flag}</li>
-                        ))}
-                      </ul>
-                    )}
-
-                    {candidate.pros.length === 0 && candidate.cons.length === 0 ? null : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {candidate.pros.map((pro) => (
-                          <Pill key={pro} tone="calm">
-                            {pro}
-                          </Pill>
-                        ))}
-                        {candidate.cons.map((con) => (
-                          <Pill key={con} tone="danger">
-                            {con}
-                          </Pill>
-                        ))}
-                      </div>
-                    )}
-
-                    {candidate.additionalCosts.length === 0 ? (
-                      <p className="text-sm text-muted">
-                        No costs on top — asking price is the all-in figure.
-                      </p>
-                    ) : (
-                      <ul className="flex flex-col gap-1 text-sm">
-                        {candidate.additionalCosts.map((cost) => (
-                          <li key={cost.label} className="flex justify-between gap-2">
-                            <span className="text-muted">{cost.label}</span>
-                            <span className="[font-variant-numeric:tabular-nums]">
-                              {formatMoney(cost.amount)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-
-                    {candidate.expiresAt === undefined ? null : (
-                      <p className="text-sm text-muted">
-                        Sale or expiry {formatDate(candidate.expiresAt)}
-                      </p>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
           </div>
-        </Section>
+        )}
+
+        <AddFab label="Add candidate" onClick={startCreate} />
+      </div>
+
+      {viewing === undefined ? null : (
+        <CandidatePanel
+          candidate={viewing}
+          want={
+            viewing.roadmapItemId === undefined ? undefined : itemById.get(viewing.roadmapItemId)
+          }
+          onStatus={(status: CandidateStatus) => {
+            // Buying closes the panel: the toast's "Open it" is the next step,
+            // and the candidate is not the thing to look at any more.
+            if (status === "purchased") close();
+            void setStatus(viewing, status);
+          }}
+          onEdit={() => setPanel({ kind: "edit", editing: viewing })}
+          onDelete={() => {
+            close();
+            void remove(viewing);
+          }}
+          onClose={close}
+        />
       )}
+
+      {panel?.kind === "edit" ? (
+        <CandidateForm
+          key={panel.editing?.id ?? "new"}
+          editing={panel.editing}
+          defaultItemId={filter}
+          items={items}
+          contacts={contacts}
+          propertyId={propertyId}
+          actorId={actorId}
+          onClose={close}
+          onDelete={
+            panel.editing === undefined
+              ? undefined
+              : () => {
+                  const candidate = panel.editing;
+                  close();
+                  if (candidate !== undefined) void remove(candidate);
+                }
+          }
+        />
+      ) : null}
+
+      {panel?.kind === "filters" ? (
+        <Modal
+          title="Which want"
+          placement="side"
+          onClose={close}
+          footer={
+            <>
+              <Button variant="primary" onClick={close}>
+                Show {shown.length}
+              </Button>
+              {filter === "" ? null : (
+                <Button variant="ghost" onClick={() => setFilter("")}>
+                  Clear
+                </Button>
+              )}
+            </>
+          }
+        >
+          <Select
+            label="Want"
+            value={filter}
+            placeholder="Everything"
+            onChange={(event) => setFilter(event.target.value)}
+            options={items.map((item) => ({ value: item.id, label: item.title }))}
+          />
+        </Modal>
+      ) : null}
     </PageBody>
   );
 }

@@ -38,39 +38,48 @@ test.describe("kit", () => {
   test("a rule comes due against the meter, and the work clears it", async ({ page }) => {
     await page.goto("/admin/equipment");
 
-    await page.getByLabel("Name").fill("Gooseneck trailer");
-    await page.getByLabel("Make").fill("Titan");
-    await page.getByLabel("Year").fill("2019");
+    // Every Kit form is a side panel behind its button, so adding a machine
+    // never pushes the fleet down the page.
     await page.getByRole("button", { name: "Add machine" }).click();
+    const machine = page.getByRole("dialog");
+    await machine.getByLabel("Name").fill("Gooseneck trailer");
+    await machine.getByLabel("Make").fill("Titan");
+    await machine.getByLabel("Year").fill("2019");
+    await machine.getByRole("button", { name: "Add machine" }).click();
     await expect(page.getByText("2019 Titan")).toBeVisible();
 
     await page.getByRole("link", { name: "Gooseneck trailer" }).click();
     await expect(page.getByRole("heading", { name: "Gooseneck trailer" })).toBeVisible();
 
-    await page.getByLabel("Meter", { exact: true }).selectOption("miles");
-    await page.getByLabel("Reading").fill("40000");
-    await page.getByRole("button", { name: "Record reading" }).click();
-    await expect(page.getByRole("cell", { name: "40,000" })).toBeVisible();
+    await page.getByRole("button", { name: "Read meter" }).click();
+    const reading = page.getByRole("dialog");
+    await reading.getByLabel("Meter", { exact: true }).selectOption("miles");
+    await reading.getByLabel("Reading").fill("40000");
+    await reading.getByRole("button", { name: "Record reading" }).click();
+    await expect(page.getByText("40,000 miles")).toBeVisible();
 
     // A rule the meter has already blown past: 40,000 miles against a 10,000
     // mile interval that has never been done.
     await page.getByRole("tab", { name: "Maintenance" }).click();
-    await page.getByLabel("Job").fill("Repack wheel bearings");
-    await page.getByLabel("Every N miles").fill("10000");
     await page.getByRole("button", { name: "Add rule" }).click();
+    const rule = page.getByRole("dialog");
+    await rule.getByLabel("Job").fill("Repack wheel bearings");
+    await rule.getByLabel("Every N miles").fill("10000");
+    await rule.getByRole("button", { name: "Add rule" }).click();
 
-    await expect(page.getByText("1 job overdue")).toBeVisible();
     // The trigger that fired is named, not just the fact that one did.
-    await expect(page.getByText("Repack wheel bearings (on miles)")).toBeVisible();
+    const overdue = page.getByText("Overdue: Repack wheel bearings (on miles)");
+    await expect(overdue).toBeVisible();
 
     // Recording it carries the meter across, and the next interval counts from
     // there — so the rule stops asking.
-    await page.getByRole("button", { name: "Record this job" }).click();
-    await expect(page.getByLabel("Job")).toHaveValue("Repack wheel bearings");
-    await page.getByLabel("Cost ($)").fill("180");
-    await page.getByRole("button", { name: "Record service" }).click();
+    await page.getByRole("button", { name: "Record it" }).click();
+    const service = page.getByRole("dialog");
+    await expect(service.getByLabel("Job")).toHaveValue("Repack wheel bearings");
+    await service.getByLabel("Cost ($)").fill("180");
+    await service.getByRole("button", { name: "Record service" }).click();
 
-    await expect(page.getByText("1 job overdue")).toBeHidden();
+    await expect(overdue).toBeHidden();
     await expect(page.getByText("$180.00").first()).toBeVisible();
   });
 
@@ -88,7 +97,7 @@ test.describe("kit", () => {
     await item.getByLabel("Opening count").fill("10");
     await item.getByLabel("Reorder at").fill("4");
     await item.getByRole("button", { name: "Add item" }).click();
-    await expect(page.getByRole("cell", { name: "Pine shavings" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit Pine shavings" })).toBeVisible();
 
     await page.getByRole("tab", { name: "Used" }).click();
     // Behind a button, like the item form: the tab is for the log, not the
@@ -101,8 +110,7 @@ test.describe("kit", () => {
 
     // Ten less seven is three, which is under the reorder point of four. The
     // count is derived — nothing anywhere stores it.
-    await expect(page.getByText("1 to reorder")).toBeVisible();
-    await expect(page.getByText("Pine shavings — 3 bag")).toBeVisible();
+    await expect(page.getByText("To reorder: Pine shavings (3 bag)")).toBeVisible();
   });
 
   test("a candidate's all-in cost crosses the budget, and buying it makes a machine", async ({
@@ -111,7 +119,7 @@ test.describe("kit", () => {
     await page.goto("/admin/equipment/roadmap");
 
     // Behind a button now, like the rest of the Kit forms.
-    await page.getByRole("button", { name: "Add to the roadmap" }).click();
+    await page.getByRole("button", { name: "Add to roadmap" }).click();
     const wish = page.getByRole("dialog");
     await wish.getByLabel("What").fill("Three-quarter-ton truck");
     await wish.getByLabel("Priority").selectOption("need");
@@ -122,7 +130,7 @@ test.describe("kit", () => {
     await page.getByRole("link", { name: "Find one" }).click();
     await expect(page).toHaveURL(/\/admin\/equipment\/candidates\?item=/);
 
-    await page.getByRole("button", { name: "Add a candidate" }).click();
+    await page.getByRole("button", { name: "Add candidate" }).click();
     const candidate = page.getByRole("dialog");
     await candidate.getByLabel("What it is").fill("2018 F-250");
     await candidate.getByLabel("Asking ($)").fill("34500");
@@ -137,7 +145,9 @@ test.describe("kit", () => {
     await expect(page.getByRole("cell", { name: "$0.37" })).toBeVisible();
     await expect(page.getByRole("cell", { name: "+$400.00" })).toBeVisible();
 
-    await page.getByRole("table").getByLabel("Status for 2018 F-250").selectOption("purchased");
+    // The row opens the candidate's panel, which is where its status lives.
+    await page.getByRole("table").getByRole("button", { name: "2018 F-250" }).click();
+    await page.getByRole("dialog").getByLabel("Status").selectOption("purchased");
     await expect(page.getByText("2018 F-250 is in the fleet.")).toBeVisible();
 
     // The plan became the fact: the machine exists, and nothing was typed twice.
