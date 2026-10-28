@@ -63,7 +63,7 @@ export function SeedsScreen({
 
   return (
     <PageBody>
-      <PageHeader eyebrow="Land" title="Seed" subtitle={facts} />
+      <PageHeader eyebrow="Farm" title="Seed" subtitle={facts} />
 
       {/* The stale count earns its line everywhere but the box, which says
           it again with the packets beside it. */}

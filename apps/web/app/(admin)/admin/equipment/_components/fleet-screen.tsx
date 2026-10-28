@@ -436,7 +436,7 @@ export function FleetScreen({
     <PageBody>
       <div className="flex flex-col gap-density pb-20 sm:pb-0">
         <KitHeader
-          eyebrow="Kit"
+          eyebrow="Farm"
           title="Equipment"
           facts={loading ? undefined : facts}
           action={addButton}

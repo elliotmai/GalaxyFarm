@@ -77,7 +77,7 @@ export function HarvestScreen({
 
   return (
     <PageBody>
-      <PageHeader eyebrow="Land" title="Harvest & pantry" subtitle={facts} />
+      <PageHeader eyebrow="Farm" title="Harvest & pantry" subtitle={facts} />
 
       <Tabs
         label="Harvest"

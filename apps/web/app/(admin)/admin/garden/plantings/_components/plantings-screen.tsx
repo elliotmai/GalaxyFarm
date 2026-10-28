@@ -89,7 +89,7 @@ export function PlantingsScreen({
 
   return (
     <PageBody>
-      <PageHeader eyebrow="Land" title="Plantings" subtitle={facts} />
+      <PageHeader eyebrow="Farm" title="Plantings" subtitle={facts} />
 
       {/*
         Status by exception: the one thing on this screen with a deadline. Not

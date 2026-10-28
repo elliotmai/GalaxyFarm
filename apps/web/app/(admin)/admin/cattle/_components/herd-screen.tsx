@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Button,
@@ -382,6 +382,24 @@ export function HerdScreen({
     setDraft(BLANK);
     setErrors({});
   }
+
+  // `?add=1` lands on the add form — the Animals list's "+ Add animal" comes
+  // here rather than keeping a second add form. Read once, off `window`
+  // rather than `useSearchParams`, so the page needs no Suspense boundary;
+  // the flag is then dropped from the address so a reload does not reopen it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("add") !== "1") return;
+    startCreate();
+    params.delete("add");
+    const rest = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${rest === "" ? "" : `?${rest}`}`,
+    );
+    // Mount only: this is a way in, not a state to keep in step with.
+  }, []);
 
   function startEdit(animal: Animal) {
     setEditing(animal);

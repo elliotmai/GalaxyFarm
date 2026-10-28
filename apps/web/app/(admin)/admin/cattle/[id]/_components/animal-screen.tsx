@@ -7,7 +7,6 @@ import type { ReactNode } from "react";
 
 import {
   Button,
-  Callout,
   DetailList,
   EmptyState,
   Modal,
@@ -18,7 +17,6 @@ import {
   SafetyBadge,
   Section,
   TextArea,
-  Tabs,
   useConfirmDelete,
   useToast,
 } from "@galaxy-farm/ui";
@@ -51,42 +49,56 @@ import {
   type ExternalAnimal,
   type ResolvedComposition,
   type HealthRecord,
+  type HeatRecord,
   type HornStatus,
   type Registration,
+  type WeightRecord,
 } from "@galaxy-farm/module-cattle";
 
+import { AnimalActions } from "@/app/(admin)/admin/cattle/[id]/_components/animal-actions";
+import {
+  comingUp,
+  history,
+  type TimelineInputs,
+  type TimelineRow,
+} from "@/app/(admin)/admin/cattle/[id]/_components/animal-history";
 import {
   BreedComposition,
   BreedField,
   BreedingTab,
   FinanceTab,
-  HealthTab,
   Pedigree,
   WeightsTab,
 } from "@/app/(admin)/admin/cattle/[id]/_components/animal-tabs";
-import { Chip, ChipRow } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
+import { Chip, ChipRow, Row, Rows } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
 import { GeneticsPanel } from "@/app/(admin)/admin/cattle/[id]/_components/genetics-panel";
 import { ageLabel, flagFor } from "@/app/(admin)/admin/cattle/_components/herd-row";
-import { PhotoPanel, PhotoQuickCapture } from "@/app/_components/photo-panel";
+import { PhotoPanel } from "@/app/_components/photo-panel";
 import { animalSlug, animalTitle, resolveAnimalSlug } from "@/lib/animal-slug";
 import { compositionLookup, compositionOfAnimal } from "@/lib/composition";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
- * One animal, everything about her (spec §7, §5.2).
+ * One animal (spec §7, §5.2; V2 Animal).
  *
- * The top of the page is who she is, said once: the tag, the name, one line of
- * facts and at most one chip — the same anatomy as her row in the herd, so the
- * page reads as that row opened rather than as a different screen. The old
- * header carried six badges and a rank of tiles repeating them, and the one
- * badge that mattered looked like the other five.
+ * Read top to bottom it answers, in order: who is she, what do I want to
+ * record about her, what is coming, and what has happened. The top is the
+ * same anatomy as her row in the herd — tag, name, one line, at most one chip
+ * — so the page reads as that row opened. Then eight big buttons that open the
+ * Log flow with her already chosen; then "Coming up"; then one History list,
+ * newest first, merging what used to sit under three tabs. Everything a
+ * working week does not reach for — pedigree, papers, genetics, money — is one
+ * disclosure at the bottom, and every one of those views still works there.
  *
  * The URL is a slug, not an id — see `lib/animal-slug.ts`. The record is found
  * by walking the herd on the device rather than by a keyed lookup, which is
  * cheap at this size and is what lets an old link keep resolving after a cow
  * is renamed or finally tagged.
  */
+
+/** How much History shows before "Show all" — about a phone screen. */
+const HISTORY_PAGE = 12;
 
 export function AnimalScreen({
   slug,
@@ -106,6 +118,10 @@ export function AnimalScreen({
   const { records: health } = useRecords<HealthRecord>("healthRecords", { propertyId });
   const { records: breedings } = useRecords<BreedingRecord>("breedingRecords", { propertyId });
   const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", { propertyId });
+  const { records: weights } = useRecords<WeightRecord>("weightRecords", { propertyId });
+  const { records: heats } = useRecords<HeatRecord>("heatRecords", { propertyId });
+
+  const [showAll, setShowAll] = useState(false);
 
   // One clock for the whole render, so the age, the class and the due date
   // cannot disagree with each other on the morning of a birthday.
@@ -167,9 +183,9 @@ export function AnimalScreen({
 
   // #15: a withdrawal must be unmissable here. Selling or slaughtering an
   // animal inside one is a residue violation, and the person about to do it is
-  // usually looking at this page — so it gets its own line above the tabs
-  // rather than a chip among chips.
-  const withdrawal = animalsUnderWithdrawal(health, asOf).find(
+  // usually looking at this page — so it takes the header's one chip, and
+  // leads "Coming up" with the date she clears and what put her there.
+  const withdrawn = animalsUnderWithdrawal(health, asOf).some(
     (entry) => entry.animalId === animal.id,
   );
 
@@ -184,9 +200,7 @@ export function AnimalScreen({
     .sort((left, right) => left.getTime() - right.getTime())[0];
   const flag = flagFor({
     animal,
-    // The withdrawal has the line under the header to itself; spending the
-    // chip on it too would say it twice and hide whatever is next.
-    withdrawn: false,
+    withdrawn,
     unplaced: animalsWithoutOutside([animal], placements, indoorZoneIds).length > 0,
     due,
     now: asOf,
@@ -194,13 +208,13 @@ export function AnimalScreen({
 
   const where = [outside?.zone?.name, inside?.zone?.name].filter(Boolean).join(" and ");
   const facts = [
+    breeding.composition.length === 0
+      ? undefined
+      : `${describeComposition(breeding.composition)}${breeding.source === "parents" ? " (from parents)" : ""}`,
     kind === undefined ? animal.sex : CATTLE_CLASS_SINGULAR[kind],
     ageLabel(animal, asOf),
     where,
     animal.ownership === "client" ? "Client calf" : undefined,
-    breeding.composition.length === 0
-      ? undefined
-      : `${describeComposition(breeding.composition)}${breeding.source === "parents" ? " (from parents)" : ""}`,
   ]
     .filter((part) => part !== undefined && part !== "")
     .join(" · ");
@@ -213,85 +227,109 @@ export function AnimalScreen({
     router.replace(`/admin/cattle/${canonical}`);
   }
 
+  const timeline: TimelineInputs = {
+    animal,
+    animals,
+    outsiders,
+    zones,
+    placements,
+    health,
+    weights,
+    breedings,
+    calvings,
+    heats,
+    now: asOf,
+  };
+  const ahead = comingUp(timeline);
+  const past = history(timeline);
+  const pastShown = showAll ? past : past.slice(0, HISTORY_PAGE);
+
   const tag = animal.tagNumber;
 
   return (
     <PageBody>
       <header className="flex flex-col gap-2">
-        {/* The trail, on a laptop only — on a phone the tab bar already says
-            where this is, and the row is worth more to the name. */}
-        <p className="hidden text-xs font-medium text-muted md:block">
-          <Link href="/admin/cattle" className="hover:text-ink">
-            Cattle
-          </Link>{" "}
-          · Herd
+        {/* The trail. On a phone the tab bar already says where this is, but
+            the way back to the whole list is worth a line. */}
+        <p className="text-xs font-medium text-muted">
+          <Link
+            href="/admin/animals"
+            className="inline-flex min-h-target items-center hover:text-ink md:min-h-0"
+          >
+            <span aria-hidden="true">‹</span>&nbsp;Animals
+          </Link>
         </p>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            {/* The ear tag, as on her row: what somebody at the chute reads
-                off her ear, so it is the first thing on the page. */}
-            <span
-              aria-hidden={tag === undefined || tag === "" ? true : undefined}
-              className="gf-numeric flex h-14 min-w-[3.5rem] max-w-[7rem] shrink-0 items-center justify-center rounded-full bg-raised px-2 font-semibold text-action"
-            >
-              <span className="truncate">{tag === undefined || tag === "" ? "–" : tag}</span>
-            </span>
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-ink">{animalTitle(animal)}</h1>
-                {flag === undefined ? null : flag.kind === "safety" ? (
-                  <SafetyBadge level={flag.level} size="compact" />
-                ) : (
-                  <Pill tone={flag.tone}>{flag.label}</Pill>
-                )}
-              </div>
-              {facts === "" ? null : <p className="text-sm text-muted">{facts}</p>}
+        <div className="flex min-w-0 items-center gap-3">
+          {/* The ear tag, as on her row: what somebody at the chute reads
+              off her ear, so it is the first thing on the page. */}
+          <span
+            aria-hidden={tag === undefined || tag === "" ? true : undefined}
+            className="gf-numeric flex h-14 min-w-[3.5rem] max-w-[7rem] shrink-0 items-center justify-center rounded-full bg-raised px-2 font-semibold text-action"
+          >
+            <span className="truncate">{tag === undefined || tag === "" ? "–" : tag}</span>
+          </span>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-ink">{animalTitle(animal)}</h1>
+              {flag === undefined ? null : flag.kind === "safety" ? (
+                <SafetyBadge level={flag.level} size="compact" />
+              ) : (
+                <Pill tone={flag.tone}>{flag.label}</Pill>
+              )}
             </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {/*
-              Tap the camera, take the photo. That is the whole of issue #9's
-              "adding a photo is ≤2 taps from the animal's profile", and it is
-              why the control is here rather than behind the Photos view — a
-              tab would spend the first tap getting to it. The bytes queue on
-              the device and go up on the sync heartbeat, so it works in a pen.
-            */}
-            <PhotoQuickCapture
-              propertyId={propertyId}
-              actorId={actorId}
-              ownerEntity="Animal"
-              ownerId={animal.id}
-            />
-            {/* Two taps from her profile, which is what issue #13 asks for:
-                this link, then Record. The dam arrives prefilled, so nothing
-                about the cow has to be chosen again by somebody standing in a
-                pen with her. */}
-            {animal.sex === "female" && animal.status === "active" ? (
-              <Link
-                href={`/admin/cattle/calving?dam=${animal.id}`}
-                className="inline-flex min-h-target items-center rounded-density bg-action px-4 font-medium text-action-ink hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
-              >
-                Record a calving
-              </Link>
-            ) : null}
+            {facts === "" ? null : <p className="text-sm text-muted">{facts}</p>}
           </div>
         </div>
+        {/* Why she is a handful, said before anybody opens her gate — the one
+            part of the old Overview that cannot wait behind a disclosure. */}
+        {animal.safetyLevel >= 4 &&
+        animal.safetyNotes !== undefined &&
+        animal.safetyNotes !== "" ? (
+          <p className="text-sm text-danger">{animal.safetyNotes}</p>
+        ) : null}
       </header>
 
-      {withdrawal === undefined ? null : (
-        <Callout
-          tone="danger"
-          title={`Withdrawal — not clear for sale or slaughter until ${withdrawal.clearsOn.toLocaleDateString(
-            undefined,
-            { day: "numeric", month: "long", year: "numeric" },
-          )}`}
-        >
-          {withdrawal.product === undefined ? "" : `${withdrawal.product} · `}
-          {withdrawal.daysRemaining} more day{withdrawal.daysRemaining === 1 ? "" : "s"}
-        </Callout>
-      )}
+      <AnimalActions animalId={animal.id} propertyId={propertyId} actorId={actorId} />
 
-      <AnimalTabs
+      <Section title="Coming up">
+        {ahead.length === 0 ? (
+          <p className="text-sm text-muted">Nothing coming up.</p>
+        ) : (
+          <Rows label="Coming up">
+            {ahead.map((row) => (
+              <TimelineItem key={row.key} row={row} />
+            ))}
+          </Rows>
+        )}
+      </Section>
+
+      <Section
+        title="History"
+        description={past.length === 0 ? undefined : `${past.length} on file`}
+      >
+        {past.length === 0 ? (
+          <p className="text-sm text-muted">Nothing recorded yet.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <Rows label={`History for ${animalTitle(animal)}`}>
+              {pastShown.map((row) => (
+                <TimelineItem key={row.key} row={row} />
+              ))}
+            </Rows>
+            {past.length > HISTORY_PAGE ? (
+              <button
+                type="button"
+                onClick={() => setShowAll((was) => !was)}
+                className="inline-flex min-h-target items-center self-start text-sm font-semibold text-action underline-offset-2 hover:underline"
+              >
+                {showAll ? "Show fewer" : `Show all ${past.length}`}
+              </button>
+            ) : null}
+          </div>
+        )}
+      </Section>
+
+      <Deeper
         animal={animal}
         profile={profile}
         profiles={profiles}
@@ -305,34 +343,39 @@ export function AnimalScreen({
   );
 }
 
-/**
- * §7's profile views, four on the strip and the rest one tap further.
- *
- * Eleven tabs was a strip that scrolled sideways on a phone with the one you
- * wanted off the edge. The four on the strip are the ones reached for in a
- * working week; pedigree, papers, genetics, finance and photos are reached for
- * when somebody is selling or registering her, and they live behind More with
- * their own row of chips. Nothing went: every view is still two taps at most.
- */
-const TABS = [
-  { id: "overview", label: "Overview" },
-  { id: "health", label: "Health" },
-  { id: "weights", label: "Weights" },
-  { id: "breeding", label: "Breeding" },
-  { id: "more", label: "More" },
-] as const;
+function TimelineItem({ row }: { readonly row: TimelineRow }) {
+  return (
+    <Row
+      title={row.title}
+      line={row.line}
+      chip={row.chip === undefined ? undefined : <Pill tone={row.chip.tone}>{row.chip.label}</Pill>}
+    />
+  );
+}
 
-const MORE = [
+/**
+ * The views a working week does not reach for, behind one disclosure.
+ *
+ * Pedigree, papers, genetics and money are reached for when somebody is
+ * selling or registering her; the description and handling details, the
+ * weight figures (gain, 205-day) and the calving interval sit here too, since
+ * History carries the records themselves. Nothing went: every view the old
+ * tab strip had is still here, one tap after the disclosure.
+ */
+const DEEPER = [
   { id: "pedigree", label: "Pedigree" },
   { id: "papers", label: "Papers" },
   { id: "genetics", label: "Genetics" },
-  { id: "finance", label: "Finance" },
+  { id: "finance", label: "Money" },
+  { id: "details", label: "Details" },
+  { id: "weights", label: "Weights" },
+  { id: "breeding", label: "Breeding" },
   { id: "photos", label: "Photos" },
 ] as const;
 
-type MoreView = (typeof MORE)[number]["id"];
+type DeeperView = (typeof DEEPER)[number]["id"];
 
-function AnimalTabs({
+function Deeper({
   animal,
   profile,
   profiles,
@@ -352,15 +395,17 @@ function AnimalTabs({
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
 }) {
-  const [more, setMore] = useState<MoreView>("pedigree");
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<DeeperView>("pedigree");
+  const panelId = useId();
 
-  function moreView(view: MoreView): ReactNode {
-    if (view === "pedigree") {
+  function render(active: DeeperView): ReactNode {
+    if (active === "pedigree") {
       return (
         <Pedigree animal={animal} profile={profile} propertyId={propertyId} actorId={actorId} />
       );
     }
-    if (view === "papers") {
+    if (active === "papers") {
       return (
         <div className="flex flex-col gap-density">
           <Registrations
@@ -386,7 +431,7 @@ function AnimalTabs({
         </div>
       );
     }
-    if (view === "genetics") {
+    if (active === "genetics") {
       return (
         <GeneticsPanel
           profile={profile}
@@ -398,7 +443,21 @@ function AnimalTabs({
         />
       );
     }
-    if (view === "finance") return <FinanceTab animal={animal} propertyId={propertyId} />;
+    if (active === "finance") return <FinanceTab animal={animal} propertyId={propertyId} />;
+    if (active === "details") {
+      return (
+        <Overview
+          animal={animal}
+          profile={profile}
+          zone={zone}
+          breeding={breeding}
+          propertyId={propertyId}
+          actorId={actorId}
+        />
+      );
+    }
+    if (active === "weights") return <WeightsTab animal={animal} propertyId={propertyId} />;
+    if (active === "breeding") return <BreedingTab animal={animal} propertyId={propertyId} />;
     return (
       <PhotoPanel
         propertyId={propertyId}
@@ -411,38 +470,43 @@ function AnimalTabs({
   }
 
   return (
-    <Tabs label="Animal profile" tabs={[...TABS]}>
-      {(active) => {
-        if (active === "overview") {
-          return (
-            <Overview
-              animal={animal}
-              profile={profile}
-              zone={zone}
-              breeding={breeding}
-              propertyId={propertyId}
-              actorId={actorId}
-            />
-          );
-        }
-        if (active === "health") return <HealthTab animal={animal} propertyId={propertyId} />;
-        if (active === "weights") return <WeightsTab animal={animal} propertyId={propertyId} />;
-        if (active === "breeding") return <BreedingTab animal={animal} propertyId={propertyId} />;
-
-        return (
-          <div className="flex flex-col gap-density">
-            <ChipRow label="More about this animal">
-              {MORE.map((entry) => (
-                <Chip key={entry.id} on={more === entry.id} onClick={() => setMore(entry.id)}>
-                  {entry.label}
-                </Chip>
-              ))}
-            </ChipRow>
-            {moreView(more)}
-          </div>
-        );
-      }}
-    </Tabs>
+    <div className="flex flex-col gap-density">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((was) => !was)}
+        className="flex min-h-target w-full items-center justify-between gap-3 rounded-density border border-rule bg-panel px-4 py-3 text-left font-semibold text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+      >
+        Pedigree, papers, genetics, money
+        <svg
+          aria-hidden="true"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`shrink-0 text-muted transition-transform ${open ? "rotate-90" : ""}`}
+        >
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </button>
+      {open ? (
+        <div id={panelId} className="flex flex-col gap-density">
+          <ChipRow label="More about this animal">
+            {DEEPER.map((entry) => (
+              <Chip key={entry.id} on={view === entry.id} onClick={() => setView(entry.id)}>
+                {entry.label}
+              </Chip>
+            ))}
+          </ChipRow>
+          {render(view)}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

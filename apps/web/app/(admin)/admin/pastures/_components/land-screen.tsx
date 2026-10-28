@@ -93,7 +93,7 @@ export function LandScreen({
 
   return (
     <PageBody>
-      <PageHeader eyebrow="Land" title="Pastures and water" subtitle={facts} />
+      <PageHeader eyebrow="Farm" title="Pastures and water" subtitle={facts} />
 
       {/*
         Status by exception. The old row of four tiles said "All fitted" and

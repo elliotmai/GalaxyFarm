@@ -27,7 +27,8 @@ vi.mock("@/app/_components/sync-provider", () => ({
   }),
 }));
 
-const { AdminNav } = await import("../app/(admin)/_components/admin-nav.js");
+const { AdminNav, BottomTabs } = await import("../app/(admin)/_components/admin-nav.js");
+const { default: MorePage } = await import("../app/(admin)/admin/more/page.js");
 const { SectionStrip } = await import("../app/(admin)/_components/section-strip.js");
 
 /**
@@ -46,28 +47,26 @@ function at(route: string) {
 }
 
 describe("AdminNav", () => {
-  it("shows five destinations, not fifty-five links", () => {
+  it("shows four places and Log, not fifty-five links", () => {
     at("/admin");
     render(<AdminNav propertyId={PROPERTY} farmName="Flying Double M" />);
 
     const nav = screen.getByRole("navigation", { name: "Admin sections" });
-    for (const label of ["Today", "Animals", "Land", "Kit", "Business"]) {
+    for (const label of ["Today", "Animals", "Farm", "More", "Log"]) {
       expect(within(nav).getByRole("link", { name: new RegExp(label) })).toBeInTheDocument();
     }
 
     // The views that used to sit in the sidebar are not in it any more.
     expect(within(nav).queryByRole("link", { name: "Breeding" })).not.toBeInTheDocument();
     expect(within(nav).queryByRole("link", { name: "Calving" })).not.toBeInTheDocument();
-    expect(within(nav).queryByRole("link", { name: "Eggs" })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole("link", { name: "Contacts" })).not.toBeInTheDocument();
   });
 
-  it("keeps the utility rail reachable but quiet", () => {
-    at("/admin");
-    render(<AdminNav propertyId={PROPERTY} farmName="Flying Double M" />);
+  it("puts what used to be the utility rail on the More page", () => {
+    render(<MorePage />);
 
-    const nav = screen.getByRole("navigation", { name: "Admin sections" });
-    for (const label of ["Contacts", "Reports", "Housesitter", "Settings"]) {
-      expect(within(nav).getByRole("link", { name: label })).toBeInTheDocument();
+    for (const label of ["Contacts", "Reports", "Housesitter", "Settings", "Invoices"]) {
+      expect(screen.getByRole("link", { name: new RegExp(label) })).toBeInTheDocument();
     }
   });
 
@@ -82,6 +81,28 @@ describe("AdminNav", () => {
 
     expect(current).toHaveLength(1);
     expect(current[0]).toHaveAccessibleName(/Animals/);
+  });
+
+  it("lights More for a page reached from it", () => {
+    at("/admin/settings/trash");
+    render(<BottomTabs />);
+
+    const tabs = screen.getByRole("navigation", { name: "Main" });
+    const current = within(tabs)
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("aria-current") === "page");
+    expect(current).toHaveLength(1);
+    expect(current[0]).toHaveAccessibleName(/More/);
+  });
+
+  it("puts Log in the middle of the phone's tab bar", () => {
+    at("/admin");
+    render(<BottomTabs />);
+
+    const names = within(screen.getByRole("navigation", { name: "Main" }))
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("aria-label") ?? link.textContent);
+    expect(names).toEqual(["Today", "Animals", "Log something", "Farm", "More"]);
   });
 });
 
@@ -155,7 +176,7 @@ describe("SectionStrip", () => {
     at("/admin/supplies");
     render(<SectionStrip />);
 
-    const sections = screen.getByRole("navigation", { name: "Kit sections" });
+    const sections = screen.getByRole("navigation", { name: "Farm sections" });
     const lit = within(sections)
       .getAllByRole("link")
       .filter((link) => link.getAttribute("aria-current") === "page");
@@ -175,6 +196,12 @@ describe("SectionStrip", () => {
 
     expect(current).toHaveLength(1);
     expect(current[0]).toHaveAccessibleName("Breeding");
+  });
+
+  it("draws no strip on the Animals landing, which has its own chips", () => {
+    at("/admin/animals");
+    const { container } = render(<SectionStrip />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("shows nothing where there is no choice to make", () => {

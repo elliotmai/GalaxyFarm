@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   NAV,
   SUB_SECTIONS,
+  LOG_HREF,
   UTILITY,
   VIEW_GROUPS,
   allNavRoutes,
@@ -56,11 +57,11 @@ describe("admin nav reachability", () => {
   });
 
   it("keeps the sidebar short, which was the point", () => {
-    // Nine rows total. The wall it replaced was fifty-five across nine
-    // collapsing groups; if this creeps back up, the restructure has been
-    // undone one convenient addition at a time.
-    expect(NAV.length).toBe(5);
-    expect(NAV.length + UTILITY.length).toBeLessThanOrEqual(10);
+    // Four places and Log. The wall it replaced was fifty-five links across
+    // nine collapsing groups; everything else lives on the More page, which
+    // says what each thing is for. If the rail creeps back up, the
+    // restructure has been undone one convenient addition at a time.
+    expect(NAV.length).toBe(4);
   });
 
   it("puts every route under exactly one destination", () => {
@@ -80,7 +81,8 @@ describe("admin nav reachability", () => {
         (item) =>
           item.href === route || (SUB_SECTIONS[item.href] ?? []).some((sub) => sub.href === route),
       );
-      if (isUtility) continue;
+      // Log is the button between the places, not a place, so it lights none.
+      if (isUtility || route === LOG_HREF) continue;
 
       expect(owners.length, `${route} is claimed by ${owners.length} destinations`).toBe(1);
     }

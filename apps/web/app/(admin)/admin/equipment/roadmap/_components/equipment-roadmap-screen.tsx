@@ -331,7 +331,7 @@ export function EquipmentRoadmapScreen({
       {/* Bottom clearance on a phone for the floating add button. */}
       <div className="flex flex-col gap-density pb-20 sm:pb-0">
         <KitHeader
-          eyebrow="Kit"
+          eyebrow="Farm"
           title="Equipment roadmap"
           facts={loading ? undefined : facts}
           action={

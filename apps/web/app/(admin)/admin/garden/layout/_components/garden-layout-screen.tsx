@@ -379,7 +379,7 @@ export function GardenLayoutScreen({
   return (
     <PageBody>
       <PageHeader
-        eyebrow="Land"
+        eyebrow="Farm"
         title="Garden layout"
         subtitle={`${drawn} of ${inZone.length} bed${inZone.length === 1 ? "" : "s"} drawn`}
       />

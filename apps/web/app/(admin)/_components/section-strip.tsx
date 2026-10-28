@@ -109,6 +109,8 @@ export function SectionStrip() {
   const pathname = usePathname();
   const destination = destinationFor(pathname);
   if (destination === undefined) return null;
+  // A landing that carries its own chips (Animals) draws no strip above them.
+  if (destination.quietLanding === true && pathname === destination.href) return null;
 
   const section = sectionFor(pathname);
   const subs = section === undefined ? undefined : SUB_SECTIONS[section.href];

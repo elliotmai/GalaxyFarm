@@ -403,6 +403,14 @@ Route: `/admin/supplies`. Builds in Phase 2.
                                 session and no data
 
 /admin                          dashboard: today's chores, alerts, calving countdowns, run-outs
+/admin/animals                  every animal on the place, all species, in one list; select
+                                several to log one thing for all of them (§8 v1.7)
+/admin/breeding                 the season's breeding workspace, at a desk: cows to breed, a
+                                sire from the tank or the catalog, the pairing's risks (§8 v1.7)
+/admin/log                      log anything for one animal or several: what, who, details
+                                (§8 v1.7); ?kind= and ?animals= start it part-way
+/admin/more                     everything not daily: reports, calendar, contacts, housesitter,
+                                boarding business, chore templates, settings (§8 v1.7)
 /admin/map                      property map — draw pens/pastures over aerial photo,
                                 drag animal chips between zones, tap for instructions
 /admin/pastures                 care logs (seed/overseed, fertilize, spray, mow), rest status,
