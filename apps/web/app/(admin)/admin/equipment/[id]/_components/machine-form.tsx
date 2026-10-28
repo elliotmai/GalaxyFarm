@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Select, TextInput, useToast } from "@galaxy-farm/ui";
+import { Select, TextInput, useToast, optionLabel } from "@galaxy-farm/ui";
 import { fromDollars, type Ulid } from "@galaxy-farm/core";
 import {
   EQUIPMENT_CATEGORIES,
@@ -121,7 +121,7 @@ export function MachineForm({
         onChange={(event) => setStatus(event.target.value as EquipmentStatus)}
         options={EQUIPMENT_STATUSES.map((value) => ({
           value,
-          label: value.replace(/_/g, " "),
+          label: optionLabel(value),
         }))}
       />
       <TextInput label="Make" value={make} onChange={(event) => setMake(event.target.value)} />

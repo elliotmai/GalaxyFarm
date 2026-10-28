@@ -409,6 +409,7 @@ export function FeedScreen({
                 now={now}
                 loading={loading}
                 onRestock={restock}
+                onAddFeed={() => setPanel({ kind: "type" })}
                 onCount={(feed) =>
                   setPanel({
                     kind: "use",

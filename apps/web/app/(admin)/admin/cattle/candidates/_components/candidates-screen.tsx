@@ -15,6 +15,7 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
+  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   CANDIDATE_STATUSES,
@@ -363,7 +364,7 @@ export function CattleCandidatesScreen({
             onChange={(event) => void setStatus(opened, event.target.value as CandidateStatus)}
             options={CANDIDATE_STATUSES.map((value) => ({
               value,
-              label: value.replace(/_/g, " "),
+              label: optionLabel(value),
             }))}
           />
           <DetailList
@@ -555,7 +556,7 @@ function AddCandidate({
           onChange={(event) => setSaleType(event.target.value as CattleSaleType)}
           options={CATTLE_SALE_TYPES.map((value) => ({
             value,
-            label: value.replace(/_/g, " "),
+            label: optionLabel(value),
           }))}
         />
         <div className="grid grid-cols-2 gap-density">

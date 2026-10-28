@@ -17,6 +17,7 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
+  toOptions,
 } from "@galaxy-farm/ui";
 import { displayName, formatMoney, fromDollars, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -986,7 +987,7 @@ function AddMed({
           label="Category"
           value={category}
           onChange={(event) => setCategory(event.target.value as MedCategory)}
-          options={MED_CATEGORIES.map((value) => ({ value, label: value }))}
+          options={toOptions(MED_CATEGORIES)}
         />
         <div className="grid grid-cols-2 gap-density">
           <TextInput
@@ -1262,7 +1263,7 @@ function AddStep({
           label="Step"
           value={action}
           onChange={(event) => setAction(event.target.value)}
-          options={PROTOCOL_ACTIONS.map((value) => ({ value, label: value.replace(/_/g, " ") }))}
+          options={toOptions(PROTOCOL_ACTIONS)}
         />
       </div>
       <span>

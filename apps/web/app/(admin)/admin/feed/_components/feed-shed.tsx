@@ -69,6 +69,7 @@ export function ShedView({
   loading,
   onRestock,
   onCount,
+  onAddFeed,
   history,
 }: {
   readonly rows: readonly ShedRow[];
@@ -77,6 +78,8 @@ export function ShedView({
   readonly onRestock: (feed?: FeedType) => void;
   /** Count one feed, or the whole shed. */
   readonly onCount: (feed?: FeedType) => void;
+  /** A new feed type — the first thing an empty shed needs. */
+  readonly onAddFeed: () => void;
   readonly history: ReactNode;
 }) {
   return (
@@ -98,7 +101,12 @@ export function ShedView({
       ) : rows.length === 0 ? (
         <EmptyState
           title="No feed on file"
-          detail="Add a feed type under History, then record what you bought. The run-out date follows from the plans."
+          detail="Add the feeds you buy, then record a purchase. The run-out date follows from the plans."
+          action={
+            <Button variant="primary" aria-haspopup="dialog" onClick={onAddFeed}>
+              Add a feed
+            </Button>
+          }
         />
       ) : (
         <ul

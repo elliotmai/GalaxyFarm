@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { Button, Modal, Pill, Select } from "@galaxy-farm/ui";
+import { Button, Modal, Pill, Select, optionLabel } from "@galaxy-farm/ui";
 import {
   CANDIDATE_STATUSES,
   formatMoney,
@@ -83,7 +83,7 @@ export function CandidatePanel({
         onChange={(event) => onStatus(event.target.value as CandidateStatus)}
         options={CANDIDATE_STATUSES.map((value) => ({
           value,
-          label: value.replace(/_/g, " "),
+          label: optionLabel(value),
         }))}
       />
 

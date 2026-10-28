@@ -13,6 +13,7 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
+  optionLabel,
 } from "@galaxy-farm/ui";
 import { formatMoney, fromDollars, type Money, type Ulid } from "@galaxy-farm/core";
 import {
@@ -77,7 +78,7 @@ function describe(machine: Equipment): string {
 
 const STATUS_OPTIONS = EQUIPMENT_STATUSES.map((value) => ({
   value,
-  label: value.replace(/_/g, " "),
+  label: optionLabel(value),
 }));
 
 const STATUS_TONE: Record<EquipmentStatus, "calm" | "danger" | "neutral"> = {

@@ -11,6 +11,7 @@ import {
   TagInput,
   TextInput,
   useToast,
+  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   formatMoney,
@@ -405,7 +406,7 @@ export function CandidateForm({
             onChange={(event) => setDraft({ ...draft, titleStatus: event.target.value })}
             options={TITLE_STATUSES.map((value: TitleStatus) => ({
               value,
-              label: value.replace(/_/g, " "),
+              label: optionLabel(value),
             }))}
           />
           <div className="sm:col-span-2">

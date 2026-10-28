@@ -13,6 +13,7 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
+  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   byPriority,
@@ -458,7 +459,7 @@ export function EquipmentRoadmapScreen({
               }
               options={ROADMAP_STATUSES.map((value) => ({
                 value,
-                label: value.replace(/_/g, " "),
+                label: optionLabel(value),
               }))}
             />
             <Select
@@ -469,7 +470,7 @@ export function EquipmentRoadmapScreen({
               }
               options={ROADMAP_ITEM_TYPES.map((value) => ({
                 value,
-                label: value.replace(/_/g, " "),
+                label: optionLabel(value),
               }))}
             />
             <TextInput

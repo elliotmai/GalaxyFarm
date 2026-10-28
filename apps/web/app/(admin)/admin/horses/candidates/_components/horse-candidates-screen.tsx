@@ -18,6 +18,7 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
+  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   CANDIDATE_STATUSES,
@@ -652,7 +653,7 @@ export function HorseCandidatesScreen({
             onChange={(event) => void setStatus(looking, event.target.value as CandidateStatus)}
             options={CANDIDATE_STATUSES.map((value) => ({
               value,
-              label: value.replace(/_/g, " "),
+              label: optionLabel(value),
             }))}
           />
 
@@ -915,7 +916,7 @@ export function HorseCandidatesScreen({
                   { value: "", label: "Not stated" },
                   ...TRAINING_LEVELS.map((value) => ({
                     value,
-                    label: value.replace(/_/g, " "),
+                    label: optionLabel(value),
                   })),
                 ]}
               />
@@ -927,7 +928,7 @@ export function HorseCandidatesScreen({
                 }
                 options={SOUNDNESS_STATUSES.map((value) => ({
                   value,
-                  label: value.replace(/_/g, " "),
+                  label: optionLabel(value),
                 }))}
               />
             </div>
@@ -1036,7 +1037,7 @@ export function HorseCandidatesScreen({
               }
               options={CANDIDATE_STATUSES.map((value) => ({
                 value,
-                label: value.replace(/_/g, " "),
+                label: optionLabel(value),
               }))}
             />
 

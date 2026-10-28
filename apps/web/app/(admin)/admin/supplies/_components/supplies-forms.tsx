@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Select, TextInput, useConfirmDelete, useToast } from "@galaxy-farm/ui";
+import { Select, TextInput, useConfirmDelete, useToast, optionLabel } from "@galaxy-farm/ui";
 import {
   displayName,
   fromDollars,
@@ -166,7 +166,7 @@ export function ItemForm({
         onChange={(event) => setDraft({ ...draft, category: event.target.value as SupplyCategory })}
         options={SUPPLY_CATEGORIES.map((value) => ({
           value,
-          label: value.replace(/_/g, " "),
+          label: optionLabel(value),
         }))}
       />
       <Select

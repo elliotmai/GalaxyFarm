@@ -16,6 +16,7 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
+  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   formatMoney,
@@ -659,7 +660,7 @@ export function HorseRoadmapScreen({
               }
               options={ROADMAP_STATUSES.map((value) => ({
                 value,
-                label: value.replace(/_/g, " "),
+                label: optionLabel(value),
               }))}
             />
 

@@ -15,6 +15,7 @@ import {
   useConfirmDelete,
   useToast,
   toOptions,
+  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   displayName,
@@ -826,9 +827,9 @@ export function PlanForm({
             setTargetId("");
           }}
           options={[
-            { value: "group", label: "the whole group" },
-            { value: "zone", label: "a zone" },
-            { value: "animal", label: "one animal" },
+            { value: "group", label: "The whole group" },
+            { value: "zone", label: "A pen or pasture" },
+            { value: "animal", label: "One animal" },
           ]}
         />
         {target === "group" ? null : (
@@ -916,7 +917,7 @@ export function PlanForm({
               }
               options={FEEDING_FREQUENCIES.map((value) => ({
                 value,
-                label: value.replace(/_/g, " "),
+                label: optionLabel(value),
               }))}
             />
             <Select

@@ -19,6 +19,7 @@ import {
   Tile,
   useConfirmDelete,
   useToast,
+  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   displayName,
@@ -591,7 +592,7 @@ function SalesTab({
               onChange={(event) => setType(event.target.value as TransactionType)}
               options={TRANSACTION_TYPES.map((value) => ({
                 value,
-                label: value.replace(/_/g, " "),
+                label: optionLabel(value),
               }))}
             />
             <TextInput
@@ -776,7 +777,7 @@ function AcquisitionsTab({
               onChange={(event) => setType(event.target.value as TransactionType)}
               options={TRANSACTION_TYPES.map((value) => ({
                 value,
-                label: value.replace(/_/g, " "),
+                label: optionLabel(value),
               }))}
             />
             <TextInput
