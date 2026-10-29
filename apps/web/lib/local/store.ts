@@ -10,6 +10,7 @@ import {
   encodeUlid,
   systemClock,
   type BaseRecord,
+  type OutboxStore,
   type PhotoQueue,
   type Repository,
 } from "@galaxy-farm/core";
@@ -215,6 +216,11 @@ export interface LocalStore {
    * bytes queue here.
    */
   readonly photoQueue: PhotoQueue;
+  /**
+   * The same outbox the engine drains, for the sync panel to list what is
+   * waiting. Read it; the engine is the only thing that should write it.
+   */
+  readonly outbox: OutboxStore;
   repository<T extends BaseRecord>(name: LocalStoreName): DexieRepository<T>;
 }
 
@@ -284,6 +290,7 @@ export function localStore(): LocalStore {
     db,
     engine,
     photoQueue: new DexiePhotoQueue(db),
+    outbox,
     repository: <T extends BaseRecord>(name: LocalStoreName) =>
       repositories.get(name) as unknown as DexieRepository<T>,
   };

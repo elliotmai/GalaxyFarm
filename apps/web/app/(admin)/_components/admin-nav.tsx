@@ -4,13 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { Badge, Logomark } from "@galaxy-farm/ui";
+import { Logomark } from "@galaxy-farm/ui";
 import type { Ulid } from "@galaxy-farm/core";
 
-import { useSync } from "@/app/_components/sync-provider";
 import { LOG_HREF, NAV, destinationFor } from "@/app/(admin)/_components/nav-groups";
 import { logHref } from "@/app/(admin)/admin/log/_components/log-kinds";
 import { markMove } from "@/app/(admin)/_components/back-link";
+import { SyncStatus } from "@/app/(admin)/_components/sync-status";
 import { useSearchPalette } from "@/app/(admin)/_components/search-palette";
 import { useFarmName } from "@/lib/branding";
 
@@ -136,25 +136,26 @@ export function AdminNav({
           <Logomark size="small" decorative />
           <span className="truncate">{name}</span>
         </Link>
-        <button
-          type="button"
-          onClick={search.open}
-          aria-label="Search"
-          className="flex min-h-target min-w-target items-center justify-center rounded-full border border-rule bg-panel text-ink md:hidden"
-        >
-          <SearchIcon />
-        </button>
-      </div>
-
-      {/* On a phone the sync state only takes a row when it has something to
-          say; "Up to date" on every screen is a line nobody reads. */}
-      <div className="px-density pb-2 empty:hidden md:hidden">
-        <SyncBadge quiet />
+        {/* On a phone the sync state sits in the bar, beside search: a quiet
+            green dot when all is well — "Up to date" on every screen is a line
+            nobody reads — and the pill when it has something to say. Either
+            one opens the details. */}
+        <div className="flex shrink-0 items-center gap-1 md:hidden">
+          <SyncStatus quiet />
+          <button
+            type="button"
+            onClick={search.open}
+            aria-label="Search"
+            className="flex min-h-target min-w-target items-center justify-center rounded-full border border-rule bg-panel text-ink"
+          >
+            <SearchIcon />
+          </button>
+        </div>
       </div>
 
       <div className="hidden min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-density md:flex">
         <div className="flex flex-col gap-2 px-2">
-          <SyncBadge />
+          <SyncStatus />
           <button
             type="button"
             onClick={search.open}
@@ -261,49 +262,4 @@ export function BottomTabs() {
       {NAV.slice(2).map(tab)}
     </nav>
   );
-}
-
-/**
- * Whether the device is caught up.
- *
- * Offline is worth showing calmly: it is the expected state in a barn, not a
- * failure, and what someone needs to know is that their work is queued and
- * safe. A server that answered and refused is the opposite — it will still be
- * broken tomorrow — and showing that as "Offline" is what let a deploy sit
- * ahead of its migrations with nothing but a red line in a browser console to
- * say so.
- */
-function SyncBadge({ quiet = false }: { readonly quiet?: boolean }) {
-  const { offline, problem, syncing, pending, stuck, retryStuck } = useSync();
-
-  // Set-aside entries first: they are the only state here that will not fix
-  // itself, and the only one with something for a person to do about it.
-  if (stuck > 0) {
-    return (
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge tone="danger">{stuck} not sent</Badge>
-        <button
-          type="button"
-          onClick={() => void retryStuck()}
-          className="min-h-target text-sm text-action underline underline-offset-4"
-        >
-          Try again
-        </button>
-      </div>
-    );
-  }
-
-  if (syncing) return <Badge tone="neutral">Syncing…</Badge>;
-  if (problem !== undefined) {
-    return (
-      <Badge tone="danger" title={problem}>
-        Sync failing{pending > 0 ? ` · ${pending} queued` : ""}
-      </Badge>
-    );
-  }
-  if (offline) {
-    return <Badge tone="calm">Offline{pending > 0 ? ` · ${pending} queued` : ""}</Badge>;
-  }
-  if (pending > 0) return <Badge tone="action">{pending} to send</Badge>;
-  return quiet ? null : <Badge tone="calm">Up to date</Badge>;
 }
