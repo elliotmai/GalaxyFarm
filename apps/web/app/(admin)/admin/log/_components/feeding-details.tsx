@@ -73,7 +73,9 @@ export function FeedingDetails({ propertyId, actorId, onSaved }: DetailsProps) {
   // ticked ones became (matched back by `sourceKey`).
   const sheet = choreDaySheet(
     {
-      tasks: tasks.filter((task) => task.sourceKey !== undefined && task.templateId === undefined),
+      tasks: tasks.filter(
+        (task) => task.sourceKey?.startsWith("feeding:") && task.templateId === undefined,
+      ),
       templates: [],
       derived,
     },

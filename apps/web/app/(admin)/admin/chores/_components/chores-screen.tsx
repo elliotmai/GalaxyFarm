@@ -23,6 +23,7 @@ import type { FeedType } from "@galaxy-farm/module-feed";
 
 import { feedingChoreText, feedingChoresFor } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
+import { useWeatherChores } from "@/lib/use-weather-chores";
 
 /**
  * Chores — today, and the templates behind it (spec §6, §7).
@@ -76,8 +77,9 @@ export function ChoresScreen({
   const date = addCalendarDays(today, offset);
 
   const text = feedingChoreText({ zones, feeds, propertyId });
-  const derived = feedingChoresFor(plans, text, date, now);
-  const sheet = choreDaySheet({ tasks, templates, derived }, date, now);
+  const weather = useWeatherChores(propertyId, date, now);
+  const derived = [...feedingChoresFor(plans, text, date, now), ...weather.derived];
+  const sheet = choreDaySheet({ tasks, templates, derived, weather: weather.weather }, date, now);
   const progress = choreProgress(sheet);
   const day = dayLabel(date, today);
 

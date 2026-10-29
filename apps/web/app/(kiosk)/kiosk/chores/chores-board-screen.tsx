@@ -19,6 +19,7 @@ import { KioskHeader, KioskQuiet, kioskDate } from "@/app/(kiosk)/kiosk/_compone
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
+import { useWeatherChores } from "@/lib/use-weather-chores";
 import type { PeopleNames } from "@/lib/people-names";
 
 /**
@@ -54,6 +55,9 @@ export function ChoresBoardScreen({
   const { records: feeds } = useRecords<FeedType>("feedTypes", query);
 
   const today = useMemo(() => new Date(), []);
+  // The weather's chores, read the way Today reads them, so the board in the
+  // barn asks for the covers on the same evenings the phone does.
+  const weather = useWeatherChores(propertyId, today, today);
   const entries = useMemo(() => {
     const derived = feedingChoresFor(
       plans,
@@ -61,8 +65,12 @@ export function ChoresBoardScreen({
       today,
       today,
     );
-    return choreDaySheet({ tasks, templates, derived }, today, today);
-  }, [tasks, templates, plans, zones, feeds, propertyId, today]);
+    return choreDaySheet(
+      { tasks, templates, derived: [...derived, ...weather.derived], weather: weather.weather },
+      today,
+      today,
+    );
+  }, [tasks, templates, plans, zones, feeds, propertyId, today, weather.derived, weather.weather]);
 
   return (
     <PageBody>

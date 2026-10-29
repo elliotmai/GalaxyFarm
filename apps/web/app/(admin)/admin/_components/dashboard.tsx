@@ -16,18 +16,13 @@ import {
 } from "@galaxy-farm/ui";
 import {
   addCalendarDays,
-  coversToFit,
   effectiveSafetyLevel,
-  freezeCheckTargets,
   frostRisk,
-  isSameDay,
   type Forecast,
   type Animal,
-  type FreezeCheckTarget,
   type SafetyLevel,
   type WatchSettings,
   type Ulid,
-  type WaterSource,
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
@@ -53,6 +48,7 @@ import {
   type WeaningWatch,
 } from "@/app/(admin)/admin/_components/weaning-card";
 import { useRecords } from "@/lib/local/use-records";
+import { isForecastDay, type WeatherJobs } from "@/lib/weather-jobs";
 
 /**
  * The admin dashboard — "Today".
@@ -88,7 +84,6 @@ export function Dashboard({
   const { records: zones, loading: zonesLoading } = useRecords<Zone>("zones", query);
   const { records: animals } = useRecords<Animal>("animals", query);
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
-  const { records: water } = useRecords<WaterSource>("waterSources", query);
 
   if (zonesLoading) {
     // The layout is known long before the records are, so draw it. A line of
@@ -120,7 +115,6 @@ export function Dashboard({
       zones={zones}
       animals={animals}
       assignments={assignments}
-      water={water}
     />
   );
 }
@@ -150,9 +144,9 @@ function weatherFact(
     (left, right) =>
       Math.abs(left.at.getTime() - now.getTime()) - Math.abs(right.at.getTime() - now.getTime()),
   )[0];
-  const today = forecast.daily.find((day) => isSameDay(day.date, now));
+  const today = forecast.daily.find((day) => isForecastDay(day.date, now));
   // A day's low lands in its small hours, so tonight is tomorrow's low.
-  const tonight = forecast.daily.find((day) => isSameDay(day.date, addCalendarDays(now, 1)));
+  const tonight = forecast.daily.find((day) => isForecastDay(day.date, addCalendarDays(now, 1)));
   const frost =
     tonight === undefined
       ? undefined
@@ -236,18 +230,23 @@ function weaningNeed(watch: WeaningWatch, propertyId: Ulid, actorId: Ulid): Need
   };
 }
 
-function coversNeed(toFit: readonly FreezeCheckTarget[]): Need | undefined {
-  if (toFit.length === 0) return undefined;
+/**
+ * "Sat night" — the night a freeze lands, which is the evening before the
+ * morning its low is dated. Read in UTC because forecast dates are bare dates.
+ */
+function freezeNight(freezeOn: Date): string {
+  const night = new Date(freezeOn.getTime() - 86_400_000);
+  return `${night.toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" })} night`;
+}
 
-  return {
-    key: "covers",
-    // Before dark rather than this minute, so soon and not urgent.
-    urgency: "soon",
-    title: `${toFit.length} tank cover${toFit.length === 1 ? "" : "s"} to put on`,
-    line: `${names(toFit.map((target) => target.waterSource.name))} · before dark`,
-    action: "Show tanks",
-    detail: <TankList targets={toFit} />,
-  };
+/** What the quiet line says about the covers when there is nothing to do. */
+function coversFine(jobs: WeatherJobs): string | undefined {
+  if (jobs.covers !== undefined) return undefined;
+  if (jobs.coversOff === 0) return "tank covers";
+  if (!jobs.known) return undefined;
+  return jobs.nextFreezeOn === undefined
+    ? "tank covers (no freeze forecast)"
+    : `tank covers (next freeze ${freezeNight(jobs.nextFreezeOn)})`;
 }
 
 function choresNeed(chores: ChoreSheet): Need | undefined {
@@ -271,7 +270,6 @@ function Today({
   zones,
   animals,
   assignments,
-  water,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
@@ -279,7 +277,6 @@ function Today({
   readonly zones: readonly Zone[];
   readonly animals: readonly Animal[];
   readonly assignments: readonly ZoneAssignment[];
-  readonly water: readonly WaterSource[];
 }) {
   const calving = useCalvingWatch(propertyId);
   const weaning = useWeaningWatch(propertyId);
@@ -290,19 +287,9 @@ function Today({
   // hand it his handling level on the board below.
   const placements = penAssignments(assignments, animals);
 
-  // One check per tank, not per zone: four tanks serve eight zones here, and a
-  // per-zone list sends somebody to the same trough three times.
-  const toFit = coversToFit(
-    freezeCheckTargets(
-      water,
-      zones.map((zone) => ({
-        id: zone.id,
-        name: zone.name,
-        waterSourceIds: zone.waterSourceIds,
-        active: zone.active,
-      })),
-    ),
-  );
+  // Covers, ice and the garden are chores now, on this list and the kiosk's;
+  // the forecast's verdict on them is read here only for the quiet line.
+  const jobs = chores.weather.jobs;
 
   // Ordered by the clock rather than by domain: a calving is a night's work
   // decided by the weather, weaning a week's work decided by a date. Urgent
@@ -311,7 +298,6 @@ function Today({
     calvingNeed(calving),
     weaningNeed(weaning, propertyId, actorId),
     choresNeed(chores),
-    coversNeed(toFit),
   ].filter((need): need is Need => need !== undefined);
   const needs = [
     ...candidates.filter((need) => need.urgency === "urgent"),
@@ -323,7 +309,7 @@ function Today({
   const fine = [
     calving.cards.length === 0 ? "calving" : undefined,
     weaning.batches.length === 0 ? "weaning" : undefined,
-    toFit.length === 0 ? "tank covers" : undefined,
+    coversFine(jobs),
   ].filter((part): part is string => part !== undefined);
   const clear = fine.length === 0 ? undefined : `${listed(fine)}: nothing due.`;
   const allClear = clear === undefined ? undefined : clear.charAt(0).toUpperCase() + clear.slice(1);
@@ -556,32 +542,5 @@ function PenBoard({
         );
       })}
     </CardGrid>
-  );
-}
-
-/**
- * The tanks with a cover to put on, opened from their "Needs you" row.
- *
- * Only the covers, because they are the only part anybody can act on ahead of
- * time: no tank here is heated, so "no heater" is a constant, and a constant
- * on a to-do list is furniture.
- */
-function TankList({ targets }: { readonly targets: readonly FreezeCheckTarget[] }) {
-  return (
-    <div className="flex flex-col gap-density">
-      <ul className="flex flex-col gap-2">
-        {targets.map((target) => (
-          <li key={target.waterSource.id} className="flex flex-col gap-0.5">
-            <span className="text-density text-ink">{target.waterSource.name}</span>
-            <span className="text-sm text-muted">
-              Serves {target.zones.map((zone) => zone.name).join(", ")}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <Link href="/admin/pastures" className="text-sm text-action underline underline-offset-2">
-        Manage the tanks
-      </Link>
-    </div>
   );
 }

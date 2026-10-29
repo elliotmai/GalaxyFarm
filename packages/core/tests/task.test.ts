@@ -247,6 +247,21 @@ describe("the chore day sheet", () => {
     expect(choreDaySheet(input, thursday, new Date(2026, 0, 16, 0, 1))[0]?.overdue).toBe(true);
   });
 
+  it("puts a weather template on the board only when the forecast calls for it", () => {
+    // "Covers on" waits for a freeze. A mild week must not list it every day,
+    // and a day nobody could check the forecast keeps it rather than drop it.
+    const covers = template({ title: "Tank covers on", weather: "freeze_tonight" });
+    const input = { tasks: [], templates: [covers, template()] };
+    const titles = (weather: ReadonlySet<"freeze_tonight" | "rain_today"> | undefined) =>
+      choreDaySheet({ ...input, weather }, thursday, morning).map((entry) => entry.title);
+
+    expect(titles(new Set())).toEqual(["Feed the flock"]);
+    expect(titles(new Set(["rain_today"]))).toEqual(["Feed the flock"]);
+    expect(titles(new Set(["freeze_tonight"]))).toEqual(["Feed the flock", "Tank covers on"]);
+    expect(titles(undefined)).toEqual(["Feed the flock", "Tank covers on"]);
+    expect(choreTemplateSchema.safeParse({ ...covers, weather: "hail" }).success).toBe(false);
+  });
+
   it("turns a timed template's chore late when its part of the day passes", () => {
     // A template that names a part of the day keeps the same clock a feeding
     // round does: the morning check unfinished at noon is late at noon, not

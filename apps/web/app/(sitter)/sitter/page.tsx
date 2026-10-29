@@ -6,7 +6,7 @@ import { SitterScreen } from "@/app/(sitter)/sitter/_components/sitter-screen";
 import { currentActor } from "@/lib/auth";
 import { withDeadline } from "@/lib/deadline";
 import { peopleNames } from "@/lib/people-names";
-import { EMPTY_SITTER_VIEW, sitterView } from "@/lib/sitter-store";
+import { EMPTY_SITTER_VIEW, sitterView, sitterWeather } from "@/lib/sitter-store";
 
 export const metadata = { title: "Care Guide" };
 
@@ -55,6 +55,12 @@ export default async function SitterPage() {
   // run side by side: on a database that is not answering, each waits out
   // its own deadline, and one after the other is twice the wait.
   const names = peopleNames(actor.propertyId);
+  // The weather's chores and its say over weather templates — covers before a
+  // freeze, not every night. Never rejects; with no forecast it keeps them.
+  const weather = withDeadline(
+    sitterWeather(actor.propertyId, startOfDay(now), now),
+    "the forecast",
+  ).catch(() => ({ derived: [], weather: undefined }));
 
   let view = EMPTY_SITTER_VIEW;
   let unavailable: string | undefined;
@@ -70,8 +76,9 @@ export default async function SitterPage() {
       "The guide could not be loaded just now. Try again in a moment — and if it is urgent, ring the numbers you were given.";
   }
 
+  const { derived, weather: forecastWeather } = await weather;
   const chores = choreDaySheet(
-    { tasks: view.tasks, templates: view.templates },
+    { tasks: view.tasks, templates: view.templates, derived, weather: forecastWeather },
     startOfDay(now),
     now,
   );

@@ -130,6 +130,11 @@ export function SitterChores({
       const result = await setChoreDone({
         ...(entry.taskId === undefined ? {} : { taskId: entry.taskId }),
         ...(entry.templateId === undefined ? {} : { templateId: entry.templateId }),
+        // A derived chore — the weather's covers or ice — has neither; its own
+        // id is the key the server re-derives it by.
+        ...(entry.taskId === undefined && entry.templateId === undefined
+          ? { sourceKey: entry.id }
+          : {}),
         // The day on screen, not "today": a tick landing at ten past midnight
         // belongs to the evening round it finished. Sent as noon in this
         // device's own timezone, as an absolute instant, so the server reads

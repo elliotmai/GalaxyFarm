@@ -15,6 +15,8 @@ import {
   useToast,
 } from "@galaxy-farm/ui";
 import {
+  CHORE_WEATHER,
+  CHORE_WEATHER_LABELS,
   choreTemplateSchema,
   displayName,
   occurrencesInWindow,
@@ -24,6 +26,7 @@ import {
   TIMES_OF_DAY,
   type Animal,
   type ChoreTemplate,
+  type ChoreWeather,
   type Recurrence,
   type TimeOfDay,
   type Ulid,
@@ -70,6 +73,8 @@ interface Draft {
   readonly monthDays: string;
   /** `""` means the whole day, the same as the field being absent. */
   readonly timeOfDay: string;
+  /** `""` means any weather — the recurrence alone decides. */
+  readonly weather: string;
   readonly zoneId: string;
   readonly animalId: string;
   readonly active: boolean;
@@ -82,6 +87,7 @@ const BLANK: Draft = {
   weekdays: [],
   monthDays: "",
   timeOfDay: "",
+  weather: "",
   zoneId: "",
   animalId: "",
   active: true,
@@ -129,6 +135,7 @@ export function TemplatesPanel({
       weekdays: template.recurrence === "weekly" ? template.recurrenceDays : [],
       monthDays: template.recurrence === "monthly" ? template.recurrenceDays.join(", ") : "",
       timeOfDay: template.timeOfDay ?? "",
+      weather: template.weather ?? "",
       zoneId: template.zoneId ?? "",
       animalId: template.animalId ?? "",
       active: template.active,
@@ -162,6 +169,8 @@ export function TemplatesPanel({
       // Explicit rather than omitted when blank, so editing a template back
       // to "any time" actually clears the field in the patch that travels.
       timeOfDay: draft.timeOfDay === "" ? undefined : (draft.timeOfDay as TimeOfDay),
+      // The same: editing back to "any weather" has to clear it.
+      weather: draft.weather === "" ? undefined : (draft.weather as ChoreWeather),
       ...(draft.detail.trim() === "" ? {} : { detail: draft.detail.trim() }),
       ...(draft.zoneId === "" ? {} : { zoneId: draft.zoneId as Ulid }),
       ...(draft.animalId === "" ? {} : { animalId: draft.animalId as Ulid }),
@@ -229,8 +238,11 @@ export function TemplatesPanel({
       zones.find((zone) => zone.id === template.zoneId)?.name,
       animal === undefined ? undefined : displayName(animal),
       // What the rule means in practice, which is easier to check than the
-      // rule that produced it.
-      `${occurrencesInWindow(template, today, 14).length} in the next fortnight`,
+      // rule that produced it. A weather template's count depends on a
+      // forecast nobody has yet, so it says what it waits for instead.
+      template.weather === undefined
+        ? `${occurrencesInWindow(template, today, 14).length} in the next fortnight`
+        : `Only ${CHORE_WEATHER_LABELS[template.weather].toLowerCase()}`,
     ]
       .filter((part): part is string => part !== undefined)
       .join(" · ");
@@ -375,6 +387,21 @@ export function TemplatesPanel({
                 })),
               ]}
               onChange={(event) => setDraft({ ...draft, timeOfDay: event.target.value })}
+            />
+
+            <Select
+              label="Only when"
+              value={draft.weather}
+              error={errors["weather"]}
+              hint="Waits for the forecast — covers before a freeze, not every night."
+              options={[
+                { value: "", label: "Any weather" },
+                ...CHORE_WEATHER.map((weather) => ({
+                  value: weather,
+                  label: CHORE_WEATHER_LABELS[weather],
+                })),
+              ]}
+              onChange={(event) => setDraft({ ...draft, weather: event.target.value })}
             />
 
             <Select

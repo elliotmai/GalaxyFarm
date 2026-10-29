@@ -25,6 +25,7 @@ import type { FeedType } from "@galaxy-farm/module-feed";
 
 import { feedingChoreText, feedingChoresFor } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
+import { useWeatherChores, type WeatherChores } from "@/lib/use-weather-chores";
 
 /**
  * Today's feeding and chores, on the Today screen (spec §7).
@@ -56,6 +57,8 @@ export interface ChoreSheet {
   readonly progress: ReturnType<typeof choreProgress>;
   readonly busy: string | undefined;
   readonly tick: (entry: ChoreEntry) => Promise<void>;
+  /** What the forecast made of the day, for Today's quiet line. */
+  readonly weather: WeatherChores;
 }
 
 /**
@@ -81,20 +84,29 @@ export function useChoreSheet(propertyId: Ulid, actorId: Ulid): ChoreSheet {
 
   const now = new Date();
   const today = startOfDay(now);
-  const derived = feedingChoresFor(
+  const feeding = feedingChoresFor(
     plans,
     feedingChoreText({ zones, feeds, propertyId }),
     today,
     now,
   );
-  const sheet = choreDaySheet({ tasks, templates, derived }, today, now);
+  // The weather's jobs — covers before a freeze, ice on a freezing morning —
+  // sit in the chore list rather than beside it, so they are ticked the same
+  // way and the kiosk shows them too.
+  const weather = useWeatherChores(propertyId, today, now);
+  const sheet = choreDaySheet(
+    { tasks, templates, derived: [...feeding, ...weather.derived], weather: weather.weather },
+    today,
+    now,
+  );
 
   // A feeding trip is either still the derived occurrence, or the row it
   // became when somebody ticked it — which keeps the occurrence's id as its
-  // `sourceKey`. Nothing else writes a `sourceKey`.
-  const derivedIds = new Set(derived.map((entry) => entry.id));
+  // `sourceKey`. Weather chores keep theirs the same way, under their own
+  // prefix, so only `feeding:` keys count here.
+  const derivedIds = new Set(feeding.map((entry) => entry.id));
   const fedRows = new Set(
-    tasks.filter((task) => task.sourceKey !== undefined).map((task) => task.id),
+    tasks.filter((task) => task.sourceKey?.startsWith("feeding:")).map((task) => task.id),
   );
   const isFeeding = (entry: ChoreEntry) =>
     derivedIds.has(entry.id) || (entry.taskId !== undefined && fedRows.has(entry.taskId));
@@ -125,6 +137,7 @@ export function useChoreSheet(propertyId: Ulid, actorId: Ulid): ChoreSheet {
     progress: choreProgress(sheet),
     busy,
     tick,
+    weather,
   };
 }
 

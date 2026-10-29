@@ -1,16 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 import { Button, Meter, Pill, RecordCard } from "@galaxy-farm/ui";
 import {
-  DEFAULT_WATCH_SETTINGS,
   displayName,
   illumination,
   isNearFullMoon,
   moonPhase,
-  resolveWatchSettings,
   type Animal,
   type Forecast,
   type Ulid,
@@ -28,6 +25,7 @@ import {
 } from "@galaxy-farm/module-cattle";
 
 import { useRecords } from "@/lib/local/use-records";
+import { useForecast } from "@/lib/use-forecast";
 
 /**
  * The calving watch, on the dashboard (spec §6, issue #14).
@@ -48,31 +46,6 @@ import { useRecords } from "@/lib/local/use-records";
  * not. §6's last acceptance criterion is exactly this, and it is the one that
  * matters at 2am in a barn with one bar of signal.
  */
-
-interface Snapshot {
-  readonly forecast?: Forecast;
-  readonly settings: WatchSettings;
-  readonly unavailable?: string;
-}
-
-/**
- * Dates arrive from JSON as strings.
- *
- * Revived here rather than trusted, because every derivation downstream does
- * date arithmetic and a string that looks like a date silently produces `NaN`
- * days rather than an error anybody would notice.
- */
-function reviveForecast(raw: unknown): Forecast | undefined {
-  if (raw === null || typeof raw !== "object") return undefined;
-  const value = raw as Forecast;
-
-  return {
-    ...value,
-    retrievedAt: new Date(value.retrievedAt),
-    hourly: (value.hourly ?? []).map((hour) => ({ ...hour, at: new Date(hour.at) })),
-    daily: (value.daily ?? []).map((day) => ({ ...day, date: new Date(day.date) })),
-  };
-}
 
 export interface CalvingWatch {
   /** One entry per cow in her window, soonest first as the domain orders them. */
@@ -102,46 +75,10 @@ export function useCalvingWatch(propertyId: Ulid): CalvingWatch {
   const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", { propertyId });
   const { records: animals } = useRecords<Animal>("animals", { propertyId });
 
-  const [snapshot, setSnapshot] = useState<Snapshot>({
-    settings: DEFAULT_WATCH_SETTINGS,
-  });
-  const [asked, setAsked] = useState(false);
-
-  useEffect(() => {
-    let live = true;
-
-    void (async () => {
-      try {
-        const response = await fetch("/api/weather");
-        if (!response.ok) throw new Error(String(response.status));
-
-        const body = (await response.json()) as Record<string, unknown>;
-        if (!live) return;
-
-        setSnapshot({
-          ...(reviveForecast(body["forecast"]) === undefined
-            ? {}
-            : { forecast: reviveForecast(body["forecast"]) }),
-          settings: resolveWatchSettings(body["settings"]),
-          ...(typeof body["unavailable"] === "string" ? { unavailable: body["unavailable"] } : {}),
-        });
-      } catch {
-        if (!live) return;
-        // Offline is the ordinary case in a barn, not an error state. The watch
-        // still knows every day count.
-        setSnapshot({
-          settings: DEFAULT_WATCH_SETTINGS,
-          unavailable: "No forecast right now — day counts are still current.",
-        });
-      } finally {
-        if (live) setAsked(true);
-      }
-    })();
-
-    return () => {
-      live = false;
-    };
-  }, []);
+  // Shared with the chore sheet and the header, so Today asks for the
+  // forecast once and every part of it reads the same one.
+  const snapshot = useForecast();
+  const asked = snapshot.asked;
 
   const now = new Date();
   const settings = snapshot.settings;
