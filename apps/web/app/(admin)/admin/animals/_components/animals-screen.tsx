@@ -14,6 +14,7 @@ import {
   GROUPS,
   type AnimalGroup,
 } from "@/app/(admin)/admin/animals/_components/animal-entries";
+import { logHref } from "@/app/(admin)/admin/log/_components/log-kinds";
 import { AnimalListRow } from "@/app/(admin)/admin/animals/_components/animal-list-row";
 import { Chip, ChipRow } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
 import { useRecords } from "@/lib/local/use-records";
@@ -215,7 +216,10 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
               Log for them
             </span>
           ) : (
-            <Link href={`/admin/log?animals=${selected.join(",")}`} className={ACTION_LINK}>
+            <Link
+              href={logHref({ animals: selected, from: "/admin/animals" })}
+              className={ACTION_LINK}
+            >
               Log for them
             </Link>
           )}

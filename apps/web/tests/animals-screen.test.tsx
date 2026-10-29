@@ -123,7 +123,7 @@ describe("the Animals list", () => {
     );
     expect(screen.getByText("2 selected")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Log for them" }).getAttribute("href")).toBe(
-      `/admin/log?animals=${ROSIE.id},${BISCUIT.id}`,
+      `/admin/log?animals=${ROSIE.id},${BISCUIT.id}&from=%2Fadmin%2Fanimals`,
     );
   });
 });

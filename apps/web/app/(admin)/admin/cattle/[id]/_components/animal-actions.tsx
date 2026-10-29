@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useId } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 
 import type { Ulid } from "@galaxy-farm/core";
 import { useToast } from "@galaxy-farm/ui";
 
+import { logHref as logFlowHref } from "@/app/(admin)/admin/log/_components/log-kinds";
 import { useAttachPhotos } from "@/lib/photos/use-photos";
 
 /**
@@ -45,9 +47,12 @@ const LABELS: Readonly<Record<LogKind, string>> = {
   note: "Note",
 };
 
-/** The Log flow's address for one kind of record about one animal. */
-export function logHref(kind: LogKind, animalId: Ulid): string {
-  return `/admin/log?kind=${kind}&animals=${animalId}`;
+/**
+ * The Log flow's address for one kind of record about one animal, closing
+ * back to `from` — her page — rather than to Today.
+ */
+export function logHref(kind: LogKind, animalId: Ulid, from?: string | null): string {
+  return logFlowHref({ kind, animals: [animalId], from });
 }
 
 const TILE =
@@ -62,13 +67,14 @@ export function AnimalActions({
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
 }) {
+  const pathname = usePathname();
   return (
     <nav aria-label="Log for this animal" className="grid grid-cols-4 gap-2">
       {LOG_KINDS.map((kind) =>
         kind === "photo" ? (
           <PhotoTile key={kind} animalId={animalId} propertyId={propertyId} actorId={actorId} />
         ) : (
-          <Link key={kind} href={logHref(kind, animalId)} className={TILE}>
+          <Link key={kind} href={logHref(kind, animalId, pathname)} className={TILE}>
             <Icon kind={kind} />
             {LABELS[kind]}
           </Link>

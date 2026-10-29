@@ -165,3 +165,41 @@ export function startFrom(
 export function plural(count: number, noun: string, many = `${noun}s`): string {
   return `${count} ${count === 1 ? noun : many}`;
 }
+
+/** Where Close and Done go when the Log was not opened from anywhere in particular. */
+export const LOG_HOME = "/admin";
+
+/**
+ * Where Close and Done go: back to the page the Log was opened from.
+ *
+ * Every way in carries `?from=` — Weight on Andromeda's page closes back to
+ * her page, ＋ Log in the tab bar back to whatever was underneath. Only an
+ * admin page is honoured, so a crafted link cannot send someone off the site
+ * or round in a loop back into the Log.
+ */
+export function returnTo(from: string | null | undefined): string {
+  if (from === null || from === undefined) return LOG_HOME;
+  const inAdmin = from === "/admin" || from.startsWith("/admin/") || from.startsWith("/admin?");
+  const isLog =
+    from === "/admin/log" || from.startsWith("/admin/log/") || from.startsWith("/admin/log?");
+  if (!inAdmin || isLog || from.includes("\\") || from.includes("//")) return LOG_HOME;
+  return from;
+}
+
+/** The Log's address, opened part-way and knowing where to close back to. */
+export function logHref({
+  kind,
+  animals = [],
+  from,
+}: {
+  readonly kind?: LogKind;
+  readonly animals?: readonly Ulid[];
+  readonly from?: string | null;
+}): string {
+  const query = [
+    kind === undefined ? undefined : `kind=${kind}`,
+    animals.length === 0 ? undefined : `animals=${animals.join(",")}`,
+    returnTo(from) === LOG_HOME ? undefined : `from=${encodeURIComponent(returnTo(from))}`,
+  ].filter((part) => part !== undefined);
+  return query.length === 0 ? "/admin/log" : `/admin/log?${query.join("&")}`;
+}

@@ -16,6 +16,7 @@ import {
   eligible,
   needsAnimals,
   partnerOf,
+  returnTo,
   singleAnimal,
   startFrom,
   TILES,
@@ -38,7 +39,7 @@ import { WhoStep } from "./who-step";
  * Other screens link straight into the middle of it:
  * `/admin/log?kind=treatment&animals=<id>,<id>` opens on the details with
  * those animals chosen, so "Treatment" on a cow's page is one tap from the
- * form. See `startFrom` in `log-kinds.ts` for the exact rules.
+ * form, and `&from=<page>` is where Close and Done go back to. See `startFrom` in `log-kinds.ts` for the exact rules.
  *
  * Nothing here writes on its own. Each kind's form writes through the same
  * mutation path and schema as the screen that owns that record, so a weight
@@ -73,6 +74,7 @@ export function LogFlow({
   const { records: animals, loading } = useRecords<Animal>("animals", { propertyId });
 
   const asked = { kind: params.get("kind"), animals: params.get("animals") };
+  const home = returnTo(params.get("from"));
   // Linked animals can only be checked against the herd once it has loaded,
   // so the flow waits for it rather than opening on the wrong step.
   const waiting = loading && (asked.animals ?? "") !== "";
@@ -80,7 +82,7 @@ export function LogFlow({
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-canvas md:relative md:inset-auto md:z-auto md:mx-auto md:w-full md:max-w-[560px] md:bg-transparent">
       {waiting ? (
-        <Shell step={undefined} onBack={undefined}>
+        <Shell step={undefined} onBack={undefined} home={home}>
           <StepBody>
             <p className="text-muted">Looking…</p>
           </StepBody>
@@ -91,6 +93,7 @@ export function LogFlow({
           actorId={actorId}
           animals={animals}
           start={startFrom(asked, animals)}
+          home={home}
         />
       )}
     </div>
@@ -102,11 +105,14 @@ function Flow({
   actorId,
   animals,
   start,
+  home,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
   readonly animals: readonly Animal[];
   readonly start: LogStart;
+  /** The page the Log was opened from, which Close and Done return to. */
+  readonly home: string;
 }) {
   // The opening state is read once: the query says where to start, not where
   // to stay, and "Log something else" must not be pulled back to it.
@@ -150,7 +156,7 @@ function Flow({
   const Details = kind === undefined ? undefined : DETAILS[kind];
 
   return (
-    <Shell step={step} onBack={step === 2 || step === 3 ? back : undefined}>
+    <Shell step={step} onBack={step === 2 || step === 3 ? back : undefined} home={home}>
       {step === 1 ? (
         <StepBody>
           <h1 className="text-ink">Log what?</h1>
@@ -200,7 +206,9 @@ function Flow({
         />
       ) : null}
 
-      {step === 4 && saved !== undefined ? <Saved summary={saved} onAgain={again} /> : null}
+      {step === 4 && saved !== undefined ? (
+        <Saved summary={saved} onAgain={again} home={home} />
+      ) : null}
     </Shell>
   );
 }
@@ -209,10 +217,12 @@ function Flow({
 function Shell({
   step,
   onBack,
+  home,
   children,
 }: {
   readonly step: Step | undefined;
   readonly onBack: (() => void) | undefined;
+  readonly home: string;
   readonly children: React.ReactNode;
 }) {
   return (
@@ -233,7 +243,7 @@ function Shell({
           {step === undefined || step === 4 ? "" : `Step ${step} of 3`}
         </span>
         <Link
-          href="/admin"
+          href={home}
           className="inline-flex min-h-target items-center px-1.5 font-medium text-action focus-visible:outline-2 focus-visible:outline-action"
         >
           Close
@@ -247,9 +257,11 @@ function Shell({
 function Saved({
   summary,
   onAgain,
+  home,
 }: {
   readonly summary: SavedSummary;
   readonly onAgain: () => void;
+  readonly home: string;
 }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3.5 overflow-y-auto px-6 py-10 text-center">
@@ -285,7 +297,7 @@ function Saved({
           Log something else
         </button>
         <Link
-          href="/admin"
+          href={home}
           className="inline-flex min-h-[52px] w-full items-center justify-center rounded-density border border-edge bg-panel text-base font-semibold text-ink hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
         >
           Done

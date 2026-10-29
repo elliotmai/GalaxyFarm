@@ -9,6 +9,7 @@ import type { Ulid } from "@galaxy-farm/core";
 
 import { useSync } from "@/app/_components/sync-provider";
 import { LOG_HREF, NAV, destinationFor } from "@/app/(admin)/_components/nav-groups";
+import { logHref } from "@/app/(admin)/admin/log/_components/log-kinds";
 import { useSearchPalette } from "@/app/(admin)/_components/search-palette";
 import { useFarmName } from "@/lib/branding";
 
@@ -163,7 +164,7 @@ export function AdminNav({
             <kbd className="rounded border border-rule bg-panel px-1.5 text-xs">⌘K</kbd>
           </button>
           <Link
-            href={LOG_HREF}
+            href={logHref({ from: pathname })}
             prefetch
             aria-current={pathname === LOG_HREF ? "page" : undefined}
             className="flex min-h-target items-center justify-center gap-2 rounded-density bg-action px-3 text-density font-semibold text-action-ink"
@@ -241,7 +242,7 @@ export function BottomTabs() {
     >
       {NAV.slice(0, 2).map(tab)}
       <Link
-        href={LOG_HREF}
+        href={logHref({ from: pathname })}
         prefetch
         aria-label="Log something"
         aria-current={pathname === LOG_HREF ? "page" : undefined}

@@ -61,7 +61,8 @@ vi.mock("next/navigation", () => ({
 
 const { ToastProvider, ConfirmProvider } = await import("@galaxy-farm/ui");
 const { LogFlow } = await import("../app/(admin)/admin/log/_components/log-flow.js");
-const { startFrom } = await import("../app/(admin)/admin/log/_components/log-kinds.js");
+const { logHref, returnTo, startFrom } =
+  await import("../app/(admin)/admin/log/_components/log-kinds.js");
 
 function animal(id: Ulid, name: string, extra: Partial<Animal> = {}): Animal {
   return {
@@ -175,7 +176,53 @@ describe("where the log flow opens", () => {
   });
 });
 
+describe("where the log flow closes to", () => {
+  it("goes back to the admin page it came from", () => {
+    expect(returnTo("/admin/cattle/andromeda")).toBe("/admin/cattle/andromeda");
+    expect(returnTo("/admin/feed?tab=shed")).toBe("/admin/feed?tab=shed");
+    expect(returnTo(null)).toBe("/admin");
+  });
+
+  it("never leaves the admin, and never loops back into the Log", () => {
+    for (const from of [
+      "https://example.com",
+      "//example.com",
+      "/admin//example.com",
+      "/\\example.com",
+      "/administer",
+      "/kiosk",
+      "/admin/log",
+      "/admin/log?kind=weight",
+    ]) {
+      expect(returnTo(from)).toBe("/admin");
+    }
+  });
+
+  it("carries the page into the Log's address", () => {
+    expect(logHref({ kind: "weight", animals: [ROSIE], from: "/admin/cattle/andromeda" })).toBe(
+      `/admin/log?kind=weight&animals=${ROSIE}&from=%2Fadmin%2Fcattle%2Fandromeda`,
+    );
+    expect(logHref({ from: "/admin" })).toBe("/admin/log");
+    expect(logHref({ from: "/admin/log" })).toBe("/admin/log");
+  });
+});
+
 describe("the log flow", () => {
+  it("closes back to the page it was opened from, before and after saving", async () => {
+    const user = userEvent.setup();
+    stored.params = `kind=weight&animals=${ROSIE}&from=%2Fadmin%2Fcattle%2Fandromeda`;
+    view();
+
+    expect(screen.getByRole("link", { name: "Close" }).getAttribute("href")).toBe(
+      "/admin/cattle/andromeda",
+    );
+    await user.type(screen.getByLabelText(/Weight of Rosie/), "1180");
+    await user.click(screen.getByRole("button", { name: /^Save/ }));
+    expect(screen.getByRole("link", { name: "Done" }).getAttribute("href")).toBe(
+      "/admin/cattle/andromeda",
+    );
+  });
+
   it("goes what → who → details → saved, one treatment per animal", async () => {
     const user = userEvent.setup();
     view();

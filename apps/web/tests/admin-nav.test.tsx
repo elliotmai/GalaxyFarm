@@ -104,6 +104,15 @@ describe("AdminNav", () => {
       .map((link) => link.getAttribute("aria-label") ?? link.textContent);
     expect(names).toEqual(["Today", "Animals", "Log something", "Farm", "More"]);
   });
+
+  it("opens Log knowing the page to close back to", () => {
+    at("/admin/feed");
+    render(<BottomTabs />);
+
+    expect(screen.getByRole("link", { name: "Log something" }).getAttribute("href")).toBe(
+      "/admin/log?from=%2Fadmin%2Ffeed",
+    );
+  });
 });
 
 describe("SectionStrip", () => {

@@ -119,12 +119,12 @@ describe("the animal page", () => {
       within(actions)
         .getByRole("link", { name: /Treatment/ })
         .getAttribute("href"),
-    ).toBe(`/admin/log?kind=treatment&animals=${COW.id}`);
+    ).toBe(`/admin/log?kind=treatment&animals=${COW.id}&from=%2Fadmin%2Fcattle%2F42`);
     expect(
       within(actions)
         .getByRole("link", { name: /Calving/ })
         .getAttribute("href"),
-    ).toBe(`/admin/log?kind=calving&animals=${COW.id}`);
+    ).toBe(`/admin/log?kind=calving&animals=${COW.id}&from=%2Fadmin%2Fcattle%2F42`);
   });
 
   it("merges every kind of record into one History, newest first", () => {
