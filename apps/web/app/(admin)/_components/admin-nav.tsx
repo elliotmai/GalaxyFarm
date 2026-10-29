@@ -10,6 +10,7 @@ import type { Ulid } from "@galaxy-farm/core";
 import { useSync } from "@/app/_components/sync-provider";
 import { LOG_HREF, NAV, destinationFor } from "@/app/(admin)/_components/nav-groups";
 import { logHref } from "@/app/(admin)/admin/log/_components/log-kinds";
+import { markMove } from "@/app/(admin)/_components/back-link";
 import { useSearchPalette } from "@/app/(admin)/_components/search-palette";
 import { useFarmName } from "@/lib/branding";
 
@@ -182,6 +183,8 @@ export function AdminNav({
               <Link
                 key={destination.href}
                 href={destination.href}
+                // A tab change is a fresh start: no Back into the place left.
+                onClick={() => markMove("tab")}
                 // See `next.config.ts`. Next's default stops a dynamic route's
                 // prefetch at the loading boundary, so the skeleton arrives
                 // early and the page itself is still a round trip away when it
@@ -223,6 +226,8 @@ export function BottomTabs() {
       <Link
         key={destination.href}
         href={destination.href}
+        // A tab change is a fresh start: no Back into the place left.
+        onClick={() => markMove("tab")}
         prefetch
         aria-current={here ? "page" : undefined}
         className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] ${

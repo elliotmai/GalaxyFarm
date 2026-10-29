@@ -34,12 +34,25 @@ import { useRecords } from "@/lib/local/use-records";
 /** Seven days including today, which is what "last 7 days" means out loud. */
 const WEEK_DAYS = 6;
 
+const TABS = [
+  { id: "collect", label: "Collect" },
+  { id: "log", label: "Log" },
+  { id: "trends", label: "Trends" },
+  { id: "gone", label: "Where they went" },
+] as const;
+
 export function EggsScreen({
   propertyId,
   actorId,
+  initialTab,
+  initialFlockId,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /** The tab to open on (`?tab=`), when it names one. */
+  readonly initialTab?: string;
+  /** The flock the trends open on (`?flock=`), from that flock's page. */
+  readonly initialFlockId?: string;
 }) {
   const query = { propertyId };
   const { records: logs, loading } = useRecords<EggLog>("eggLogs", query);
@@ -105,12 +118,10 @@ export function EggsScreen({
 
       <Tabs
         label="Eggs"
-        tabs={[
-          { id: "collect", label: "Collect" },
-          { id: "log", label: "Log" },
-          { id: "trends", label: "Trends" },
-          { id: "gone", label: "Where they went" },
-        ]}
+        tabs={TABS}
+        {...(initialTab !== undefined && TABS.some((tab) => tab.id === initialTab)
+          ? { defaultTab: initialTab }
+          : {})}
       >
         {(active) =>
           active === "collect" ? (
@@ -124,7 +135,12 @@ export function EggsScreen({
               actorId={actorId}
             />
           ) : active === "trends" ? (
-            <TrendsPanel logs={logs} flocks={flocks} adjustments={adjustments} />
+            <TrendsPanel
+              logs={logs}
+              flocks={flocks}
+              adjustments={adjustments}
+              {...(initialFlockId === undefined ? {} : { initialFlockId })}
+            />
           ) : (
             <DispositionsPanel
               dispositions={dispositions}

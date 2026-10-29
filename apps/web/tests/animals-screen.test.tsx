@@ -79,11 +79,13 @@ describe("the Animals list", () => {
       "/admin/cattle/214",
     );
     expect(screen.getByRole("link", { name: /Biscuit/ }).getAttribute("href")).toBe(
-      "/admin/horses/herd",
+      "/admin/horses/biscuit",
     );
-    expect(screen.getByRole("link", { name: /Scout/ }).getAttribute("href")).toBe("/admin/pets");
+    expect(screen.getByRole("link", { name: /Scout/ }).getAttribute("href")).toBe(
+      "/admin/pets/scout",
+    );
     expect(screen.getByRole("link", { name: /Layers/ }).getAttribute("href")).toBe(
-      "/admin/chickens/flock",
+      "/admin/chickens/flock/layers",
     );
 
     await user.click(screen.getByRole("button", { name: /Pets\s*1/ }));

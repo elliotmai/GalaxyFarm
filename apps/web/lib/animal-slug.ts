@@ -42,12 +42,20 @@ export interface Sluggable {
  * is. Registration sits between them — it is authoritative but nobody says it
  * out loud.
  */
-export function animalSlug(animal: Sluggable, registrationNumber?: string): string {
+export function animalSlug(
+  animal: Sluggable,
+  registrationNumber?: string,
+  reserved: ReadonlySet<string> = NOTHING_RESERVED,
+): string {
   const candidates = [animal.tagNumber, registrationNumber, animal.name];
   for (const candidate of candidates) {
     if (candidate === undefined) continue;
     const slug = slugify(candidate);
-    if (slug !== "") return slug;
+    if (slug === "") continue;
+    // A horse called "Herd" would be `/admin/horses/herd`, which is the herd
+    // list: Next serves a fixed segment before a dynamic one, so the page for
+    // her would never be reached. Such a name keeps its word and gains one.
+    return reserved.has(slug) ? `${slug}-${RESERVED_SUFFIX}` : slug;
   }
 
   // Nothing readable to use. The id is a poor address but it is always an
@@ -55,6 +63,11 @@ export function animalSlug(animal: Sluggable, registrationNumber?: string): stri
   // nor a tag, so this is close to unreachable.
   return animal.id.toLowerCase();
 }
+
+const NOTHING_RESERVED: ReadonlySet<string> = new Set();
+
+/** What a slug that collides with a section route gets on the end. */
+const RESERVED_SUFFIX = "animal";
 
 export interface SlugResolution<T> {
   readonly animal: T;
@@ -78,6 +91,7 @@ export function resolveAnimalSlug<T extends Sluggable>(
   segment: string,
   animals: readonly T[],
   registrationFor: (animal: T) => string | undefined = () => undefined,
+  reserved: ReadonlySet<string> = NOTHING_RESERVED,
 ): SlugResolution<T> | undefined {
   const wanted = slugify(decodeURIComponent(segment));
   if (wanted === "") return undefined;
@@ -85,7 +99,7 @@ export function resolveAnimalSlug<T extends Sluggable>(
   const byCreation = [...animals].sort((left, right) => left.id.localeCompare(right.id));
 
   const current = byCreation.find(
-    (animal) => animalSlug(animal, registrationFor(animal)) === wanted,
+    (animal) => animalSlug(animal, registrationFor(animal), reserved) === wanted,
   );
   if (current !== undefined) return { animal: current, stale: false };
 
@@ -109,9 +123,69 @@ export function resolveAnimalSlug<T extends Sluggable>(
   return byRegistration === undefined ? undefined : { animal: byRegistration, stale: true };
 }
 
-/** Where an animal lives, for a link. */
+/** Where a cow lives, for a link. */
 export function animalHref(animal: Sluggable, registrationNumber?: string): string {
-  return `/admin/cattle/${animalSlug(animal, registrationNumber)}`;
+  return `/admin/cattle/${animalSlug(animal, registrationNumber, CATTLE_SECTION_SEGMENTS)}`;
+}
+
+/**
+ * The fixed routes beside each species' record pages (spec §7).
+ *
+ * A record page is `/admin/<species>/<slug>`, and its section's own views sit
+ * at the same depth. Next resolves a fixed segment first, so a horse whose slug
+ * were `pens` would open the pens board instead of her page. These are the
+ * words a slug must step around; `tests/animal-slug.test.ts` checks them
+ * against the folders on disk, so a new view cannot be added without them.
+ *
+ * Cattle steps around its own views the same way. Only a cow whose slug *was*
+ * one of these words moves — and her old address opened the view instead of
+ * her, so no bookmark that worked stops working.
+ */
+export const CATTLE_SECTION_SEGMENTS: ReadonlySet<string> = new Set([
+  "ancestors",
+  "breeding",
+  "calving",
+  "candidates",
+  "catalog",
+  "feed",
+  "health",
+  "risks",
+  "roadmap",
+  "sales",
+  "supplies",
+  "weights",
+]);
+
+export const HORSE_SECTION_SEGMENTS: ReadonlySet<string> = new Set([
+  "herd",
+  "pens",
+  "feeding",
+  "breeding",
+  "roadmap",
+  "candidates",
+]);
+
+/** Pets have no views of their own yet; kept so a future one has a home. */
+export const PET_SECTION_SEGMENTS: ReadonlySet<string> = new Set();
+
+/** A pet's address segment — the same preference order, minus its section's words. */
+export function petSlug(animal: Sluggable): string {
+  return animalSlug(animal, undefined, PET_SECTION_SEGMENTS);
+}
+
+/** A horse's address segment, stepping around the horse section's own views. */
+export function horseSlug(animal: Sluggable): string {
+  return animalSlug(animal, undefined, HORSE_SECTION_SEGMENTS);
+}
+
+/** Where a dog or a cat lives, for a link: `/admin/pets/<slug>`. */
+export function petHref(animal: Sluggable): string {
+  return `/admin/pets/${petSlug(animal)}`;
+}
+
+/** Where a horse lives, for a link: `/admin/horses/<slug>`. */
+export function horseHref(animal: Sluggable): string {
+  return `/admin/horses/${horseSlug(animal)}`;
 }
 
 /** Two animals resolving to one slug — worth telling somebody about. */

@@ -12,6 +12,8 @@ import {
   Select,
   TextArea,
   TextInput,
+  optionLabel,
+  toOptions,
   useConfirmDelete,
   useToast,
 } from "@galaxy-farm/ui";
@@ -21,9 +23,7 @@ import {
   ageInMonths,
   animalSchema,
   displayName,
-  primaryPhone,
   type Animal,
-  type Contact,
   type CrudError,
   type FeedingPlan,
   type SafetyLevel,
@@ -40,6 +40,7 @@ import {
   RowIconButton,
   RowList,
 } from "@/app/(admin)/admin/horses/_components/list-row";
+import { petHref } from "@/lib/animal-slug";
 import { currentMedicinesFor, feedingLinesFor, plansFeeding } from "@/lib/pet-care";
 import { useMutations } from "@/lib/local/mutations";
 
@@ -47,14 +48,23 @@ import { useMutations } from "@/lib/local/mutations";
  * Who lives here (spec §5.8).
  *
  * A row per pet — name, one line, one chip — in the guide's own order, and
- * behind each row the briefing: deliberately the housesitter's view of the pet
- * rather than the owner's — handling level, then instructions, then what it
- * eats, then what it is on. §5.8 asks for pets to appear in the guide automatically, and the
+ * each row opens the pet's own page (`/admin/pets/[id]`), which leads with the
+ * briefing: deliberately the housesitter's view of the pet rather than the
+ * owner's — handling level, then instructions, then what it eats, then what it
+ * is on. §5.8 asks for pets to appear in the guide automatically, and the
  * fastest way to notice that the guide would be useless is to be reading the
- * same thing yourself every time you open this screen.
+ * same thing yourself every time you open a pet.
+ *
+ * The editor is exported (`PetEditor`) so the pet's page edits through the
+ * same form, schema and delete confirmation as this list.
  */
 
-const SPECIES_LABELS: Readonly<Record<PetSpecies, string>> = { dog: "Dog", cat: "Cat" };
+export const PET_SPECIES_LABELS: Readonly<Record<PetSpecies, string>> = { dog: "Dog", cat: "Cat" };
+
+/** "Dog" or "Cat", for a pet whose species the type system only knows as a string. */
+export function petSpeciesLabel(pet: Pick<Animal, "species">): string {
+  return PET_SPECIES_LABELS[pet.species === "cat" ? "cat" : "dog"];
+}
 
 const SAFETY_OPTIONS = Object.values(SAFETY_LEVEL_DEFAULTS).map((level) => ({
   value: String(level.level),
@@ -85,7 +95,7 @@ const BLANK: Draft = {
   notes: "",
 };
 
-function ageLabel(pet: Animal, now: Date): string {
+export function petAgeLabel(pet: Animal, now: Date): string {
   const months = ageInMonths(pet, now);
   if (months === undefined) return "age unknown";
   const years = Math.floor(months / 12);
@@ -97,7 +107,6 @@ export function PetPanel({
   pets,
   health,
   plans,
-  contacts,
   feeds,
   loading,
   propertyId,
@@ -106,46 +115,148 @@ export function PetPanel({
   readonly pets: readonly Animal[];
   readonly health: readonly HealthRecord[];
   readonly plans: readonly FeedingPlan[];
-  readonly contacts: readonly Contact[];
   readonly feeds: readonly FeedType[];
   readonly loading: boolean;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
 }) {
-  const mutations = useMutations<Animal>("animals", "animals", animalSchema, propertyId, actorId);
-  const confirmDelete = useConfirmDelete();
-  const { show } = useToast();
-
-  const [draft, setDraft] = useState<Draft | undefined>();
-  const [editing, setEditing] = useState<Animal | undefined>();
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
-  /** The pet whose briefing is open. */
-  const [looked, setLooked] = useState<Ulid | undefined>();
+  /** The editor: absent while closed, `{ pet: undefined }` while adding. */
+  const [editor, setEditor] = useState<{ readonly pet: Animal | undefined } | undefined>();
 
   const now = new Date();
-  const vet = contacts.find((contact) => contact.tags.includes("vet"));
 
   /**
-   * The guide's own words, rendered here.
+   * The guide's own words, used here for its order and its chips.
    *
-   * Same function the housesitter guide calls, so what is in the panel is what
-   * a helper will read — including the order, which puts the animal that bites
-   * at the top.
+   * Same function the housesitter guide calls, so the list reads in the order
+   * a helper will — the animal that bites at the top.
    */
   const briefings = petBriefings(
     pets.map((pet) => ({
       pet,
       feeding: feedingLinesFor(pet.id, plans, feeds, pets).map((text) => ({ text })),
       medicines: currentMedicinesFor(pet.id, health, now),
-      ...(vet === undefined
-        ? {}
-        : {
-            vetName: vet.name,
-            ...(primaryPhone(vet) === undefined ? {} : { vetPhone: primaryPhone(vet) }),
-          }),
     })),
   );
+
+  if (loading) return <p className="text-muted">Loading pets…</p>;
+
+  return (
+    <div className="flex flex-col gap-density">
+      <div className="flex justify-end">
+        <Button
+          variant="primary"
+          aria-haspopup="dialog"
+          onClick={() => setEditor({ pet: undefined })}
+        >
+          <span aria-hidden="true">+</span> Add a pet
+        </Button>
+      </div>
+
+      {pets.length === 0 ? (
+        <EmptyState
+          title="No pets yet"
+          detail="Adding one here puts it on the housesitter guide."
+          action={<Button onClick={() => setEditor({ pet: undefined })}>Add the first one</Button>}
+        />
+      ) : (
+        // In the guide's own order, which puts the animal that bites first.
+        <RowList label="The household">
+          {briefings.map((briefing) => {
+            const pet = pets.find((held) => held.id === briefing.animalId) as Animal;
+
+            return (
+              <ListRow
+                key={pet.id}
+                title={briefing.name}
+                line={[petSpeciesLabel(pet), optionLabel(pet.sex), petAgeLabel(pet, now)]}
+                // One chip, in the order a helper needs it: how to handle
+                // them, then a gap in the guide, then a medicine to give.
+                chip={
+                  briefing.handleWithCare ? (
+                    <SafetyBadge level={pet.safetyLevel} size="compact" />
+                  ) : briefing.feeding.length === 0 ? (
+                    <Pill tone="action">No ration</Pill>
+                  ) : briefing.medicines.length > 0 ? (
+                    <Pill tone="neutral">On medication</Pill>
+                  ) : undefined
+                }
+                href={petHref(pet)}
+                trailing={
+                  <RowIconButton label={`Edit ${briefing.name}`} onClick={() => setEditor({ pet })}>
+                    <PencilIcon />
+                  </RowIconButton>
+                }
+              />
+            );
+          })}
+        </RowList>
+      )}
+
+      {editor === undefined ? null : (
+        <PetEditor
+          key={editor.pet?.id ?? "new"}
+          pet={editor.pet}
+          health={health}
+          plans={plans}
+          propertyId={propertyId}
+          actorId={actorId}
+          onClose={() => setEditor(undefined)}
+        />
+      )}
+    </div>
+  );
+}
+
+function draftOf(pet: Animal | undefined): Draft {
+  if (pet === undefined) return BLANK;
+  return {
+    name: pet.name ?? "",
+    species: (pet.species === "cat" ? "cat" : "dog") as PetSpecies,
+    sex: pet.sex,
+    dob: pet.dob === undefined ? "" : pet.dob.toISOString().slice(0, 10),
+    dobIsEstimate: pet.dobIsEstimate,
+    safetyLevel: pet.safetyLevel,
+    safetyNotes: pet.safetyNotes ?? "",
+    customInstructions: pet.customInstructions ?? "",
+    notes: pet.notes ?? "",
+  };
+}
+
+/**
+ * Adding a pet, or editing one — and deleting it, behind a typed confirmation.
+ *
+ * One component for the list and the pet's own page, so both write through
+ * `animalSchema` the same way. `onDeleted` is the page's chance to leave: a
+ * page left standing on a pet that has just gone would show "no pet by that
+ * name" under the undo toast.
+ */
+export function PetEditor({
+  pet: editing,
+  health,
+  plans,
+  propertyId,
+  actorId,
+  onClose,
+  onDeleted,
+}: {
+  /** Absent to add a new one. */
+  readonly pet: Animal | undefined;
+  /** Every health record and plan, so the delete can say what goes with it. */
+  readonly health: readonly HealthRecord[];
+  readonly plans: readonly FeedingPlan[];
+  readonly propertyId: Ulid;
+  readonly actorId: Ulid;
+  readonly onClose: () => void;
+  readonly onDeleted?: () => void;
+}) {
+  const mutations = useMutations<Animal>("animals", "animals", animalSchema, propertyId, actorId);
+  const confirmDelete = useConfirmDelete();
+  const { show } = useToast();
+
+  const [draft, setDraft] = useState<Draft>(() => draftOf(editing));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
 
   function reportErrors(error: CrudError) {
     // §4.5 clause 2: on the field, not in a banner.
@@ -154,34 +265,6 @@ export function PetPanel({
         ? Object.fromEntries(error.issues.map((issue) => [String(issue.path[0]), issue.message]))
         : { name: "Could not save. Check the fields and try again." },
     );
-  }
-
-  function startAdd() {
-    setEditing(undefined);
-    setDraft(BLANK);
-    setErrors({});
-  }
-
-  function startEdit(pet: Animal) {
-    setEditing(pet);
-    setDraft({
-      name: pet.name ?? "",
-      species: (pet.species === "cat" ? "cat" : "dog") as PetSpecies,
-      sex: pet.sex,
-      dob: pet.dob === undefined ? "" : pet.dob.toISOString().slice(0, 10),
-      dobIsEstimate: pet.dobIsEstimate,
-      safetyLevel: pet.safetyLevel,
-      safetyNotes: pet.safetyNotes ?? "",
-      customInstructions: pet.customInstructions ?? "",
-      notes: pet.notes ?? "",
-    });
-    setErrors({});
-  }
-
-  function close() {
-    setDraft(undefined);
-    setEditing(undefined);
-    setErrors({});
   }
 
   /**
@@ -213,7 +296,6 @@ export function PetPanel({
   }
 
   async function save() {
-    if (draft === undefined) return;
     setErrors({});
     setBusy(true);
 
@@ -233,7 +315,7 @@ export function PetPanel({
         message: editing === undefined ? `${patch.name ?? "Pet"} added` : "Saved",
         tone: "success",
       });
-      close();
+      onClose();
     } finally {
       setBusy(false);
     }
@@ -284,266 +366,111 @@ export function PetPanel({
       message: `${displayName(pet)} deleted`,
       action: { label: "Undo", onAct: () => void mutations.restoreRecord(pet.id) },
     });
+    onDeleted?.();
   }
 
-  if (loading) return <p className="text-muted">Loading pets…</p>;
-
-  // The briefing whose panel is open, read live so an edit shows in it.
-  const reading = looked === undefined ? undefined : briefings.find((b) => b.animalId === looked);
-  const readingPet =
-    reading === undefined ? undefined : pets.find((held) => held.id === reading.animalId);
-
   return (
-    <div className="flex flex-col gap-density">
-      <div className="flex justify-end">
-        <Button variant="primary" onClick={startAdd}>
-          <span aria-hidden="true">+</span> Add a pet
-        </Button>
-      </div>
+    <Modal
+      placement="side"
+      title={editing === undefined ? "Add a pet" : `Editing ${displayName(editing)}`}
+      description="The handling level and instructions are what a housesitter reads first."
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="primary" busy={busy} onClick={() => void save()}>
+            {editing === undefined ? "Add them" : "Save changes"}
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+          {editing === undefined ? null : (
+            // The editor closes first, so the typed confirmation is the
+            // only dialog on screen.
+            <Button
+              variant="danger"
+              className="ml-auto"
+              onClick={() => {
+                onClose();
+                void remove(editing);
+              }}
+            >
+              Delete
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="flex flex-col gap-density">
+        <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+          <TextInput
+            label="Name"
+            required
+            value={draft.name}
+            error={errors["name"] ?? errors["tagNumber"]}
+            onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+          />
+          <Select
+            label="Species"
+            value={draft.species}
+            options={PET_SPECIES.map((species) => ({
+              value: species,
+              label: PET_SPECIES_LABELS[species],
+            }))}
+            onChange={(event) => setDraft({ ...draft, species: event.target.value as PetSpecies })}
+          />
+          <Select
+            label="Sex"
+            value={draft.sex}
+            error={errors["sex"]}
+            options={toOptions(SEXES.filter((sex) => sex !== "steer"))}
+            onChange={(event) => setDraft({ ...draft, sex: event.target.value as Sex })}
+          />
+          <TextInput
+            label="Date of birth"
+            type="date"
+            hint="A rescue rarely has one — put your best guess."
+            value={draft.dob}
+            error={errors["dob"]}
+            onChange={(event) => setDraft({ ...draft, dob: event.target.value })}
+          />
+          <Checkbox
+            label="That date is a guess"
+            checked={draft.dobIsEstimate}
+            onChange={(event) => setDraft({ ...draft, dobIsEstimate: event.target.checked })}
+          />
+          <Select
+            label="Handling level"
+            value={String(draft.safetyLevel)}
+            error={errors["safetyLevel"]}
+            options={SAFETY_OPTIONS}
+            onChange={(event) =>
+              setDraft({ ...draft, safetyLevel: Number(event.target.value) as SafetyLevel })
+            }
+          />
+        </div>
 
-      {pets.length === 0 ? (
-        <EmptyState
-          title="No pets yet"
-          detail="Adding one here puts it on the housesitter guide."
-          action={<Button onClick={startAdd}>Add the first one</Button>}
+        <TextArea
+          label="Why that level"
+          rows={2}
+          hint='"Barks at the gate but is fine once you are in."'
+          value={draft.safetyNotes}
+          error={errors["safetyNotes"]}
+          onChange={(event) => setDraft({ ...draft, safetyNotes: event.target.value })}
         />
-      ) : (
-        // In the guide's own order, which puts the animal that bites first.
-        <RowList label="The household">
-          {briefings.map((briefing) => {
-            const pet = pets.find((held) => held.id === briefing.animalId) as Animal;
-
-            return (
-              <ListRow
-                key={pet.id}
-                title={briefing.name}
-                line={[
-                  SPECIES_LABELS[(pet.species === "cat" ? "cat" : "dog") as PetSpecies],
-                  pet.sex,
-                  ageLabel(pet, now),
-                ]}
-                // One chip, in the order a helper needs it: how to handle
-                // them, then a gap in the guide, then a medicine to give.
-                chip={
-                  briefing.handleWithCare ? (
-                    <SafetyBadge level={pet.safetyLevel} size="compact" />
-                  ) : briefing.feeding.length === 0 ? (
-                    <Pill tone="action">No ration</Pill>
-                  ) : briefing.medicines.length > 0 ? (
-                    <Pill tone="neutral">On medication</Pill>
-                  ) : undefined
-                }
-                onOpen={() => setLooked(pet.id)}
-                trailing={
-                  <RowIconButton label={`Edit ${briefing.name}`} onClick={() => startEdit(pet)}>
-                    <PencilIcon />
-                  </RowIconButton>
-                }
-              />
-            );
-          })}
-        </RowList>
-      )}
-
-      {/*
-        The briefing: what a helper reads, in the order they read it — how to
-        handle them, then what they eat, then what they are on. It is the
-        guide's own words, so reading it here is proof-reading the guide.
-      */}
-      {reading === undefined || readingPet === undefined ? null : (
-        <Modal
-          key={readingPet.id}
-          placement="side"
-          title={reading.name}
-          description={[
-            SPECIES_LABELS[(readingPet.species === "cat" ? "cat" : "dog") as PetSpecies],
-            readingPet.sex,
-            ageLabel(readingPet, now),
-          ].join(" · ")}
-          onClose={() => setLooked(undefined)}
-          footer={
-            <>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setLooked(undefined);
-                  startEdit(readingPet);
-                }}
-              >
-                Edit
-              </Button>
-              <Button onClick={() => setLooked(undefined)}>Close</Button>
-              {/* The panel closes first, so the typed confirmation is the only
-                  dialog on screen. */}
-              <Button
-                variant="danger"
-                className="ml-auto"
-                onClick={() => {
-                  setLooked(undefined);
-                  void remove(readingPet);
-                }}
-              >
-                Delete
-              </Button>
-            </>
-          }
-        >
-          <div>
-            <SafetyBadge level={readingPet.safetyLevel} />
-          </div>
-          <dl className="flex flex-col gap-3 text-sm">
-            {reading.safetyNotes === undefined ? null : (
-              <div>
-                <dt className="font-medium text-ink">Handling</dt>
-                <dd className="text-muted">{reading.safetyNotes}</dd>
-              </div>
-            )}
-            {reading.instructions === undefined ? null : (
-              <div>
-                <dt className="font-medium text-ink">Instructions</dt>
-                <dd className="whitespace-pre-line text-muted">{reading.instructions}</dd>
-              </div>
-            )}
-            <div>
-              <dt className="font-medium text-ink">Feeding</dt>
-              <dd className="text-muted">
-                {reading.feeding.length === 0 ? (
-                  <span>Nothing written down — the guide will say so too.</span>
-                ) : (
-                  <ul className="flex flex-col gap-1">
-                    {reading.feeding.map((line) => (
-                      <li key={line}>{line}</li>
-                    ))}
-                  </ul>
-                )}
-              </dd>
-            </div>
-            {reading.medicines.length === 0 ? null : (
-              <div>
-                <dt className="font-medium text-ink">On now</dt>
-                <dd className="text-muted">
-                  <ul className="flex flex-col gap-1">
-                    {reading.medicines.map((line) => (
-                      <li key={line}>{line}</li>
-                    ))}
-                  </ul>
-                </dd>
-              </div>
-            )}
-          </dl>
-        </Modal>
-      )}
-
-      {draft === undefined ? null : (
-        <Modal
-          placement="side"
-          title={editing === undefined ? "Add a pet" : `Editing ${displayName(editing)}`}
-          description="The handling level and instructions are what a housesitter reads first."
-          onClose={close}
-          footer={
-            <>
-              <Button variant="primary" busy={busy} onClick={() => void save()}>
-                {editing === undefined ? "Add them" : "Save changes"}
-              </Button>
-              <Button onClick={close}>Cancel</Button>
-              {editing === undefined ? null : (
-                // The editor closes first, so the typed confirmation is the
-                // only dialog on screen.
-                <Button
-                  variant="danger"
-                  className="ml-auto"
-                  onClick={() => {
-                    const pet = editing;
-                    close();
-                    void remove(pet);
-                  }}
-                >
-                  Delete
-                </Button>
-              )}
-            </>
-          }
-        >
-          <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
-              <TextInput
-                label="Name"
-                required
-                value={draft.name}
-                error={errors["name"] ?? errors["tagNumber"]}
-                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-              />
-              <Select
-                label="Species"
-                value={draft.species}
-                options={PET_SPECIES.map((species) => ({
-                  value: species,
-                  label: SPECIES_LABELS[species],
-                }))}
-                onChange={(event) =>
-                  setDraft({ ...draft, species: event.target.value as PetSpecies })
-                }
-              />
-              <Select
-                label="Sex"
-                value={draft.sex}
-                error={errors["sex"]}
-                options={SEXES.filter((sex) => sex !== "steer").map((sex) => ({
-                  value: sex,
-                  label: sex,
-                }))}
-                onChange={(event) => setDraft({ ...draft, sex: event.target.value as Sex })}
-              />
-              <TextInput
-                label="Date of birth"
-                type="date"
-                hint="A rescue rarely has one — put your best guess."
-                value={draft.dob}
-                error={errors["dob"]}
-                onChange={(event) => setDraft({ ...draft, dob: event.target.value })}
-              />
-              <Checkbox
-                label="That date is a guess"
-                checked={draft.dobIsEstimate}
-                onChange={(event) => setDraft({ ...draft, dobIsEstimate: event.target.checked })}
-              />
-              <Select
-                label="Handling level"
-                value={String(draft.safetyLevel)}
-                error={errors["safetyLevel"]}
-                options={SAFETY_OPTIONS}
-                onChange={(event) =>
-                  setDraft({ ...draft, safetyLevel: Number(event.target.value) as SafetyLevel })
-                }
-              />
-            </div>
-
-            <TextArea
-              label="Why that level"
-              rows={2}
-              hint='"Barks at the gate but is fine once you are in."'
-              value={draft.safetyNotes}
-              error={errors["safetyNotes"]}
-              onChange={(event) => setDraft({ ...draft, safetyNotes: event.target.value })}
-            />
-            <TextArea
-              label="Instructions"
-              rows={3}
-              hint="Goes on the guide word for word."
-              value={draft.customInstructions}
-              error={errors["customInstructions"]}
-              onChange={(event) => setDraft({ ...draft, customInstructions: event.target.value })}
-            />
-            <TextArea
-              label="Notes"
-              rows={2}
-              value={draft.notes}
-              error={errors["notes"]}
-              onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-            />
-          </div>
-        </Modal>
-      )}
-    </div>
+        <TextArea
+          label="Instructions"
+          rows={3}
+          hint="Goes on the guide word for word."
+          value={draft.customInstructions}
+          error={errors["customInstructions"]}
+          onChange={(event) => setDraft({ ...draft, customInstructions: event.target.value })}
+        />
+        <TextArea
+          label="Notes"
+          rows={2}
+          value={draft.notes}
+          error={errors["notes"]}
+          onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
+        />
+      </div>
+    </Modal>
   );
 }

@@ -12,9 +12,23 @@ export const metadata = { title: "Eggs" };
  * date that is already today. Everything else on the screen is derived from
  * what those buttons write.
  */
-export default async function AdminChickensEggsPage() {
+export default async function AdminChickensEggsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const actor = await currentActor();
   if (actor === undefined) redirect("/login?next=/admin/chickens/eggs");
 
-  return <EggsScreen propertyId={actor.propertyId} actorId={actor.id} />;
+  // `?tab=trends&flock=<id>` is how a flock's page links to its own trend.
+  // Both are only where the screen starts; anything unknown is ignored there.
+  const { tab, flock } = await searchParams;
+  return (
+    <EggsScreen
+      propertyId={actor.propertyId}
+      actorId={actor.id}
+      {...(typeof tab === "string" ? { initialTab: tab } : {})}
+      {...(typeof flock === "string" ? { initialFlockId: flock } : {})}
+    />
+  );
 }

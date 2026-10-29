@@ -186,19 +186,29 @@ export function returnTo(from: string | null | undefined): string {
   return from;
 }
 
-/** The Log's address, opened part-way and knowing where to close back to. */
+/**
+ * The Log's address, opened part-way and knowing where to close back to.
+ *
+ * `flock` preselects the flock on the eggs form — "Collect eggs" on a flock's
+ * page means *that* coop's basket. It is a separate parameter rather than one
+ * more id in `animals`, because a flock is not an `Animal` and the who step
+ * would quietly drop it.
+ */
 export function logHref({
   kind,
   animals = [],
+  flock,
   from,
 }: {
   readonly kind?: LogKind;
   readonly animals?: readonly Ulid[];
+  readonly flock?: Ulid | undefined;
   readonly from?: string | null;
 }): string {
   const query = [
     kind === undefined ? undefined : `kind=${kind}`,
     animals.length === 0 ? undefined : `animals=${animals.join(",")}`,
+    flock === undefined ? undefined : `flock=${flock}`,
     returnTo(from) === LOG_HOME ? undefined : `from=${encodeURIComponent(returnTo(from))}`,
   ].filter((part) => part !== undefined);
   return query.length === 0 ? "/admin/log" : `/admin/log?${query.join("&")}`;

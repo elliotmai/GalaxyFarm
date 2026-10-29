@@ -15,8 +15,11 @@ import type { ReactNode } from "react";
 
 import { Modal } from "@galaxy-farm/ui";
 import type { Animal, BaseRecord, Ulid } from "@galaxy-farm/core";
+import type { Flock } from "@galaxy-farm/module-poultry";
 
 import { NAV, SUB_SECTIONS, UTILITY } from "@/app/(admin)/_components/nav-groups";
+import { animalHref, horseHref, petHref } from "@/lib/animal-slug";
+import { flockHref } from "@/lib/flock-slug";
 import { useRecords } from "@/lib/local/use-records";
 import type { LocalStoreName } from "@/lib/local/store";
 
@@ -137,10 +140,17 @@ function useHits<T extends BaseRecord>(
   return text === "" ? [] : records.map(toHit);
 }
 
-const SPECIES_HOME: Readonly<Record<string, string>> = {
-  horse: "/admin/horses/herd",
-  chicken: "/admin/chickens/flock",
-};
+/**
+ * An animal's own page, the same address the Animals list opens. A bird kept
+ * by name goes to the flocks, since which flock is hers needs her placement,
+ * and the search reads five rows, not the yard.
+ */
+function animalPage(animal: Animal): string {
+  if (animal.species === "cattle") return animalHref(animal);
+  if (animal.species === "horse") return horseHref(animal);
+  if (animal.species === "dog" || animal.species === "cat") return petHref(animal);
+  return "/admin/chickens/flock";
+}
 
 function SearchPalette({
   propertyId,
@@ -162,10 +172,7 @@ function SearchPalette({
 
   const animals = useHits<Animal>("animals", propertyId, words, (animal) => ({
     key: animal.id,
-    href:
-      animal.species === "cattle"
-        ? `/admin/cattle/${animal.id}`
-        : (SPECIES_HOME[animal.species] ?? "/admin/pets"),
+    href: animalPage(animal),
     title: animal.name ?? `Tag ${animal.tagNumber ?? "—"}`,
     line: [
       animal.tagNumber === undefined ? undefined : `Tag ${animal.tagNumber}`,
@@ -174,6 +181,12 @@ function SearchPalette({
     ]
       .filter(Boolean)
       .join(" · "),
+  }));
+  const flocks = useHits<Flock>("flocks", propertyId, words, (flock) => ({
+    key: flock.id,
+    href: flockHref(flock),
+    title: flock.name,
+    line: flock.species === "quail" ? "Quail flock" : "Flock",
   }));
   const ancestors = useHits<
     BaseRecord & { name?: string; regNumber?: string; association?: string }
@@ -231,7 +244,7 @@ function SearchPalette({
           }));
 
   const groups = [
-    { label: "Your animals", hits: animals },
+    { label: "Your animals", hits: [...animals, ...flocks] },
     { label: "Ancestors", hits: ancestors },
     { label: "People", hits: people },
     { label: "Equipment", hits: kit },

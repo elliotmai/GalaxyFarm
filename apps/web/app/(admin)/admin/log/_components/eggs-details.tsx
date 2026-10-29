@@ -25,13 +25,13 @@ import { atNoon, DetailsForm, errorText, todayValue, type DetailsProps } from ".
  *
  * The collect panel's fields and write — `eggLogs` through `eggLogSchema`,
  * the coop taken off the flock — laid out for a phone held in one hand: the
- * date is already today, the only flock is already chosen, and the count is
- * tapped in rather than typed.
+ * date is already today, the only flock (or the one whose page sent us here)
+ * is already chosen, and the count is tapped in rather than typed.
  */
 
 const STEPS = [1, 6, 12] as const;
 
-export function EggsDetails({ propertyId, actorId, onSaved }: DetailsProps) {
+export function EggsDetails({ propertyId, actorId, flockId: linked, onSaved }: DetailsProps) {
   const query = { propertyId };
   const { records: flocks } = useRecords<Flock>("flocks", query);
   const { records: logs } = useRecords<EggLog>("eggLogs", query);
@@ -39,7 +39,9 @@ export function EggsDetails({ propertyId, actorId, onSaved }: DetailsProps) {
 
   const live = flocks.filter((flock) => flock.active);
 
-  const [flockId, setFlockId] = useState("");
+  // Opened from a flock's page, that flock is already chosen. An id that is
+  // not a live flock falls through to the rules below, as an empty one does.
+  const [flockId, setFlockId] = useState<string>(linked ?? "");
   const [collectedOn, setCollectedOn] = useState(todayValue);
   const [tally, setTally] = useState(0);
   const [rows, setRows] = useState<readonly EggBreakdown[]>([]);

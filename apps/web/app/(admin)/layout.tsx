@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ConfirmProvider, ToastProvider } from "@galaxy-farm/ui";
 
 import { AdminNav, BottomTabs } from "@/app/(admin)/_components/admin-nav";
+import { BackLink } from "@/app/(admin)/_components/back-link";
 import { SearchPaletteProvider } from "@/app/(admin)/_components/search-palette";
 import { ThemeSync } from "@/app/(admin)/_components/theme-sync";
 import { APPEARANCE_BOOT_SCRIPT } from "@/lib/appearance";
@@ -94,6 +95,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                     remounting — which is what keeps a thirteen-tab strip from
                     losing its scroll every time you change view.
                   */}
+                    {/*
+                    The way back, in the same place on every page that has one
+                    — above the strip, where a thumb looks for it.
+                  */}
+                    <BackLink />
                     <SectionStrip />
                     {children}
                   </Refreshable>

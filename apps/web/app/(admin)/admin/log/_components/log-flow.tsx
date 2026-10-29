@@ -39,7 +39,8 @@ import { WhoStep } from "./who-step";
  * Other screens link straight into the middle of it:
  * `/admin/log?kind=treatment&animals=<id>,<id>` opens on the details with
  * those animals chosen, so "Treatment" on a cow's page is one tap from the
- * form, and `&from=<page>` is where Close and Done go back to. See `startFrom` in `log-kinds.ts` for the exact rules.
+ * form, `&flock=<id>` puts the eggs form on that flock, and `&from=<page>` is
+ * where Close and Done go back to. See `startFrom` in `log-kinds.ts` for the exact rules.
  *
  * Nothing here writes on its own. Each kind's form writes through the same
  * mutation path and schema as the screen that owns that record, so a weight
@@ -75,6 +76,8 @@ export function LogFlow({
 
   const asked = { kind: params.get("kind"), animals: params.get("animals") };
   const home = returnTo(params.get("from"));
+  // Only ever a preselection: the eggs form checks it against the live flocks.
+  const flock = (params.get("flock") ?? "").trim();
   // Linked animals can only be checked against the herd once it has loaded,
   // so the flow waits for it rather than opening on the wrong step.
   const waiting = loading && (asked.animals ?? "") !== "";
@@ -94,6 +97,7 @@ export function LogFlow({
           animals={animals}
           start={startFrom(asked, animals)}
           home={home}
+          {...(flock === "" ? {} : { flockId: flock as Ulid })}
         />
       )}
     </div>
@@ -106,6 +110,7 @@ function Flow({
   animals,
   start,
   home,
+  flockId,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
@@ -113,6 +118,8 @@ function Flow({
   readonly start: LogStart;
   /** The page the Log was opened from, which Close and Done return to. */
   readonly home: string;
+  /** The flock a flock's page opened the Log for, if any. */
+  readonly flockId?: Ulid | undefined;
 }) {
   // The opening state is read once: the query says where to start, not where
   // to stay, and "Log something else" must not be pulled back to it.
@@ -199,6 +206,7 @@ function Flow({
             if (next === partnerOf(kind)) setKind(next);
           }}
           animals={chosen}
+          flockId={flockId}
           onSaved={(summary) => {
             setSaved(summary);
             setStep(4);

@@ -30,6 +30,8 @@ export interface DetailsProps {
   readonly onKind: (kind: LogKind) => void;
   /** The chosen animals, in the order they were picked. */
   readonly animals: readonly Animal[];
+  /** The flock the Log was opened for (`?flock=`), which the eggs form starts on. */
+  readonly flockId?: Ulid | undefined;
   readonly onSaved: (summary: SavedSummary) => void;
 }
 

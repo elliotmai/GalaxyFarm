@@ -22,7 +22,8 @@ import { outstandingPetCare } from "@galaxy-farm/module-pets";
 import { headCountOn, type Flock, type FlockAdjustment } from "@galaxy-farm/module-poultry";
 
 import { ageLabel, flagFor, type HerdFlag } from "@/app/(admin)/admin/cattle/_components/herd-row";
-import { animalHref, animalTitle } from "@/lib/animal-slug";
+import { animalHref, animalTitle, horseHref, petHref } from "@/lib/animal-slug";
+import { birdHref, flockHref } from "@/lib/flock-slug";
 import { careRecordsFor } from "@/lib/pet-care";
 
 /**
@@ -89,12 +90,12 @@ function groupOf(animal: Animal): AnimalGroup {
   return "flock";
 }
 
-/** Where a row goes. Only cattle have a page of their own today. */
-function hrefOf(animal: Animal, group: AnimalGroup): string {
+/** Where a row goes: the animal's own page, or a bird's flock's page. */
+function hrefOf(animal: Animal, group: AnimalGroup, input: EntryInputs): string {
   if (group === "cattle") return animalHref(animal);
-  if (group === "horses") return "/admin/horses/herd";
-  if (group === "pets") return "/admin/pets";
-  return "/admin/chickens/flock";
+  if (group === "horses") return horseHref(animal);
+  if (group === "pets") return petHref(animal);
+  return birdHref(animal, input.flocks, input.assignments);
 }
 
 const SPECIES_WORD: Readonly<Record<string, string>> = {
@@ -190,7 +191,7 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
       title,
       line,
       flag,
-      href: hrefOf(animal, group),
+      href: hrefOf(animal, group, input),
       selectable: true,
       onFarm: isOnFarm(animal),
       haystack: [animal.name, animal.tagNumber, line].filter(Boolean).join(" ").toLowerCase(),
@@ -216,7 +217,7 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
       title: flock.name,
       line,
       flag: undefined,
-      href: "/admin/chickens/flock",
+      href: flockHref(flock, input.flocks),
       selectable: false,
       onFarm: flock.active,
       haystack: [flock.name, line].join(" ").toLowerCase(),

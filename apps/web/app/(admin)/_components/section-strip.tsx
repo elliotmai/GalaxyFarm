@@ -9,6 +9,7 @@ import {
   destinationFor,
   sectionFor,
 } from "@/app/(admin)/_components/nav-groups";
+import { markMove } from "@/app/(admin)/_components/back-link";
 import type { NavItem } from "@/app/(admin)/_components/nav-groups";
 
 /**
@@ -73,6 +74,9 @@ function Strip({
           <Link
             key={item.href}
             href={item.href}
+            // Along the strip is sideways: it replaces this page in the trail
+            // rather than adding a Back through every tab flicked across.
+            onClick={() => markMove("sideways")}
             // Whole, not just as far as the loading boundary — see
             // `next.config.ts`. A tab strip is the fastest-clicked thing in the
             // app: thirteen views of one herd, moved between a dozen times in a

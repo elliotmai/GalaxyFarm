@@ -198,7 +198,7 @@ Every animal carries a level plus **safetyNotes** stating *why* ("kicks when cor
 
 **Attachment** — polymorphic file link (registration papers, manuals, receipts, signed forms) → R2 key.
 
-**Task / ChoreTemplate** — recurring templates (daily, weekly, cron-ish) generate dated instances; completable from kiosk; assignable; overdue state feeds notifications.
+**Task / ChoreTemplate** — recurring templates (daily, weekly, cron-ish) generate dated instances; completable from kiosk; assignable; overdue state feeds notifications. A template may also wait for the weather (`freeze_tonight`, `frost_tonight`, `freezing_today`, `rain_today`, `heat_today`; added v1.8): it then generates only on days the forecast shows that, and is kept when no forecast could be read. The weather's own jobs — covers the day before a freeze, an ice check per tank on a freezing morning, row cover on a frost night with something planted out — are derived chores on the same day sheet (§6), ticked like any other and keyed by tank and day.
 
 **CalendarEvent** — mostly *projected* from other modules (calving windows, withdrawal ends, maintenance due, rule deadlines, planting windows, drop-offs) plus manual events. The calendar is a read model, so nothing is entered twice.
 
@@ -408,7 +408,7 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/breeding                 the season's breeding workspace, at a desk: cows to breed, a
                                 sire from the tank or the catalog, the pairing's risks (§8 v1.7)
 /admin/log                      log anything for one animal or several: what, who, details
-                                (§8 v1.7); ?kind= and ?animals= start it part-way
+                                (§8 v1.7); ?kind=, ?animals= and ?flock= start it part-way
 /admin/more                     everything not daily: reports, calendar, contacts, housesitter,
                                 boarding business, chore templates, settings (§8 v1.7)
 /admin/map                      property map — draw pens/pastures over aerial photo,
@@ -439,6 +439,8 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/feed                     inventory, purchases, run-out projections, cost per head
 /admin/supplies                 ranch supply inventory: consumables, show/fitting gear, hardware
 /admin/chickens/flock           flocks & headcount log
+/admin/chickens/flock/[id]      one flock, by name: headcount, eggs this week, coop chores,
+                                one history (headcount · eggs · notes), photos, details
 /admin/chickens/eggs            logs + trends
 /admin/garden/layout            visual designer (beds/rows, rotation warnings)
 /admin/garden/plantings         + care logs
@@ -446,9 +448,14 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/garden/harvest           + preservation
 /admin/equipment                fleet · /admin/equipment/[id] · /admin/equipment/roadmap
 /admin/equipment/candidates     purchase candidates: compare units, true cost, links, decision log
-/admin/pets
+/admin/pets                     the household, each row opening its pet's page
+/admin/pets/[id]                one dog or cat: what a sitter needs (handling, food, medicine)
+                                first, then shot · medicine · worming · vet · ration · note ·
+                                photo, coming up, one history, photos; slug per lib/animal-slug
 /admin/horses                   what is live and what is coming · /admin/horses/roadmap (active)
-/admin/horses/herd              shell (§5.9) — who is here and what each is like to handle
+/admin/horses/herd              who is here and what each is like to handle; add a horse (§5.9)
+/admin/horses/[id]              one horse: move · note · photo · edit, coming up, one history,
+                                photos; its slug steps around the section's own views
 /admin/horses/pens              shell — which horse is in which trap
 /admin/horses/feeding           shell — rations, and what a horse costs to keep
 /admin/horses/breeding          shell — covers, foaling dates, what a cross was for
@@ -662,3 +669,6 @@ The point of expressing §4.1 and §4.5 as *executable* checks rather than prose
 **v1.7 additions:**
 
 39. **The admin is light unless a device chooses otherwise** (§8, amends 37). The owners prefer daylight on the admin, on the phone as well as the laptop, so `/admin` now renders `flying-day` and Settings offers Light, Dark or Match device. The choice is kept on the device and never syncs: two people share the farm, and the phone in the barn and the laptop in the house can sensibly differ. A boot script applies a stored choice before first paint, so a device set to dark does not flash white. `/kiosk` and `/sitter` still follow the device under 37.
+40. **Weather work is decided by the forecast, and done from the chore list** (§5.1, §6). A tank cover that is off is not by itself a job: Today used to list the covers every day, and people learned to scroll past them. Covers now appear only the day before a freeze the forecast shows, ice checks only on a freezing day, and garden cover only on a frost night with plantings in the ground — as chores, on Today, the kiosk, the Chores screen and the housesitter's list alike, so they are ticked where the rest of the round is. Forecast days are matched by calendar date, not instant, because a bare forecast date reads as the previous evening west of Greenwich.
+41. **Every page reached by a step has a step back** (§8). The admin layout draws "‹ <previous page>" above any page that was not reached by changing tab. A tab change starts the trail afresh, as in any phone app; moving along a section strip replaces the current step rather than adding one; a page opened cold falls back to the list it sits under, or to More. The Log's Close and Done return to the page it was opened from (`?from=`).
+42. **Pets, horses and flocks have their own pages, like cattle** (§5.8, §5.9, §5.4, §7). The Animals list opens every animal onto its own record page, laid out the same way: who it is, the things people do to it as big buttons, what is coming up, one history, then the details behind one link.

@@ -58,10 +58,15 @@ import {
 
 import { AnimalActions } from "@/app/(admin)/admin/cattle/[id]/_components/animal-actions";
 import {
+  AnimalHeader,
+  ComingUpSection,
+  HistorySection,
+  MoreDisclosure,
+} from "@/app/(admin)/_components/animal-page";
+import {
   comingUp,
   history,
   type TimelineInputs,
-  type TimelineRow,
 } from "@/app/(admin)/admin/cattle/[id]/_components/animal-history";
 import {
   BreedComposition,
@@ -71,11 +76,16 @@ import {
   Pedigree,
   WeightsTab,
 } from "@/app/(admin)/admin/cattle/[id]/_components/animal-tabs";
-import { Chip, ChipRow, Row, Rows } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
+import { Chip, ChipRow } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
 import { GeneticsPanel } from "@/app/(admin)/admin/cattle/[id]/_components/genetics-panel";
 import { ageLabel, flagFor } from "@/app/(admin)/admin/cattle/_components/herd-row";
 import { PhotoPanel } from "@/app/_components/photo-panel";
-import { animalSlug, animalTitle, resolveAnimalSlug } from "@/lib/animal-slug";
+import {
+  animalSlug,
+  animalTitle,
+  CATTLE_SECTION_SEGMENTS,
+  resolveAnimalSlug,
+} from "@/lib/animal-slug";
 import { compositionLookup, compositionOfAnimal } from "@/lib/composition";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
@@ -98,9 +108,6 @@ import { useRecords } from "@/lib/local/use-records";
  * is renamed or finally tagged.
  */
 
-/** How much History shows before "Show all" — about a phone screen. */
-const HISTORY_PAGE = 12;
-
 export function AnimalScreen({
   slug,
   propertyId,
@@ -122,8 +129,6 @@ export function AnimalScreen({
   const { records: weights } = useRecords<WeightRecord>("weightRecords", { propertyId });
   const { records: heats } = useRecords<HeatRecord>("heatRecords", { propertyId });
 
-  const [showAll, setShowAll] = useState(false);
-
   // One clock for the whole render, so the age, the class and the due date
   // cannot disagree with each other on the morning of a birthday.
   const asOf = useMemo(() => new Date(), []);
@@ -134,7 +139,7 @@ export function AnimalScreen({
   }, [profiles]);
 
   const found = useMemo(
-    () => resolveAnimalSlug(slug, animals, registrationOf),
+    () => resolveAnimalSlug(slug, animals, registrationOf, CATTLE_SECTION_SEGMENTS),
     [slug, animals, registrationOf],
   );
 
@@ -144,7 +149,9 @@ export function AnimalScreen({
   // during render: navigating while rendering updates the router mid-render,
   // which React refuses and reports as an error.
   const canonical =
-    found === undefined ? undefined : animalSlug(found.animal, registrationOf(found.animal));
+    found === undefined
+      ? undefined
+      : animalSlug(found.animal, registrationOf(found.animal), CATTLE_SECTION_SEGMENTS);
   const moveTo = found?.stale === true && canonical !== slug ? canonical : undefined;
   useEffect(() => {
     if (moveTo !== undefined) router.replace(`/admin/cattle/${moveTo}`);
@@ -247,44 +254,26 @@ export function AnimalScreen({
   };
   const ahead = comingUp(timeline);
   const past = history(timeline);
-  const pastShown = showAll ? past : past.slice(0, HISTORY_PAGE);
 
   const tag = animal.tagNumber;
 
   return (
     <PageBody>
-      <header className="flex flex-col gap-2">
-        {/* The trail. On a phone the tab bar already says where this is, but
-            the way back to the whole list is worth a line. */}
-        <p className="text-xs font-medium text-muted">
-          <Link
-            href="/admin/animals"
-            className="inline-flex min-h-target items-center hover:text-ink md:min-h-0"
-          >
-            <span aria-hidden="true">‹</span>&nbsp;Animals
-          </Link>
-        </p>
-        <div className="flex min-w-0 items-center gap-3">
-          {/* The ear tag, as on her row: what somebody at the chute reads
-              off her ear, so it is the first thing on the page. */}
-          <span
-            aria-hidden={tag === undefined || tag === "" ? true : undefined}
-            className="gf-numeric flex h-14 min-w-[3.5rem] max-w-[7rem] shrink-0 items-center justify-center rounded-full bg-raised px-2 font-semibold text-action"
-          >
-            <span className="truncate">{tag === undefined || tag === "" ? "–" : tag}</span>
-          </span>
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-ink">{animalTitle(animal)}</h1>
-              {flag === undefined ? null : flag.kind === "safety" ? (
-                <SafetyBadge level={flag.level} size="compact" />
-              ) : (
-                <Pill tone={flag.tone}>{flag.label}</Pill>
-              )}
-            </div>
-            {facts === "" ? null : <p className="text-sm text-muted">{facts}</p>}
-          </div>
-        </div>
+      {/* The trail, as on every record page: on a phone the tab bar already
+          says where this is, but the way back to the whole list is worth a
+          line. The badge is the ear tag — what somebody at the chute reads. */}
+      <AnimalHeader
+        badge={tag}
+        title={animalTitle(animal)}
+        chip={
+          flag === undefined ? undefined : flag.kind === "safety" ? (
+            <SafetyBadge level={flag.level} size="compact" />
+          ) : (
+            <Pill tone={flag.tone}>{flag.label}</Pill>
+          )
+        }
+        facts={facts}
+      >
         {/* Why she is a handful, said before anybody opens her gate — the one
             part of the old Overview that cannot wait behind a disclosure. */}
         {animal.safetyLevel >= 4 &&
@@ -292,47 +281,13 @@ export function AnimalScreen({
         animal.safetyNotes !== "" ? (
           <p className="text-sm text-danger">{animal.safetyNotes}</p>
         ) : null}
-      </header>
+      </AnimalHeader>
 
       <AnimalActions animalId={animal.id} propertyId={propertyId} actorId={actorId} />
 
-      <Section title="Coming up">
-        {ahead.length === 0 ? (
-          <p className="text-sm text-muted">Nothing coming up.</p>
-        ) : (
-          <Rows label="Coming up">
-            {ahead.map((row) => (
-              <TimelineItem key={row.key} row={row} />
-            ))}
-          </Rows>
-        )}
-      </Section>
+      <ComingUpSection rows={ahead} />
 
-      <Section
-        title="History"
-        description={past.length === 0 ? undefined : `${past.length} on file`}
-      >
-        {past.length === 0 ? (
-          <p className="text-sm text-muted">Nothing recorded yet.</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <Rows label={`History for ${animalTitle(animal)}`}>
-              {pastShown.map((row) => (
-                <TimelineItem key={row.key} row={row} />
-              ))}
-            </Rows>
-            {past.length > HISTORY_PAGE ? (
-              <button
-                type="button"
-                onClick={() => setShowAll((was) => !was)}
-                className="inline-flex min-h-target items-center self-start text-sm font-semibold text-action underline-offset-2 hover:underline"
-              >
-                {showAll ? "Show fewer" : `Show all ${past.length}`}
-              </button>
-            ) : null}
-          </div>
-        )}
-      </Section>
+      <HistorySection rows={past} name={animalTitle(animal)} />
 
       <Deeper
         animal={animal}
@@ -345,16 +300,6 @@ export function AnimalScreen({
         actorId={actorId}
       />
     </PageBody>
-  );
-}
-
-function TimelineItem({ row }: { readonly row: TimelineRow }) {
-  return (
-    <Row
-      title={row.title}
-      line={row.line}
-      chip={row.chip === undefined ? undefined : <Pill tone={row.chip.tone}>{row.chip.label}</Pill>}
-    />
   );
 }
 
@@ -400,9 +345,7 @@ function Deeper({
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
 }) {
-  const [open, setOpen] = useState(false);
   const [view, setView] = useState<DeeperView>("pedigree");
-  const panelId = useId();
 
   function render(active: DeeperView): ReactNode {
     if (active === "pedigree") {
@@ -475,43 +418,16 @@ function Deeper({
   }
 
   return (
-    <div className="flex flex-col gap-density">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => setOpen((was) => !was)}
-        className="flex min-h-target w-full items-center justify-between gap-3 rounded-density border border-rule bg-panel px-4 py-3 text-left font-semibold text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
-      >
-        Pedigree, papers, genetics, money
-        <svg
-          aria-hidden="true"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={`shrink-0 text-muted transition-transform ${open ? "rotate-90" : ""}`}
-        >
-          <path d="M9 6l6 6-6 6" />
-        </svg>
-      </button>
-      {open ? (
-        <div id={panelId} className="flex flex-col gap-density">
-          <ChipRow label="More about this animal">
-            {DEEPER.map((entry) => (
-              <Chip key={entry.id} on={view === entry.id} onClick={() => setView(entry.id)}>
-                {entry.label}
-              </Chip>
-            ))}
-          </ChipRow>
-          {render(view)}
-        </div>
-      ) : null}
-    </div>
+    <MoreDisclosure label="Pedigree, papers, genetics, money">
+      <ChipRow label="More about this animal">
+        {DEEPER.map((entry) => (
+          <Chip key={entry.id} on={view === entry.id} onClick={() => setView(entry.id)}>
+            {entry.label}
+          </Chip>
+        ))}
+      </ChipRow>
+      {render(view)}
+    </MoreDisclosure>
   );
 }
 

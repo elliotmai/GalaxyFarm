@@ -63,13 +63,16 @@ export function TrendsPanel({
   logs,
   flocks,
   adjustments,
+  initialFlockId,
 }: {
   readonly logs: readonly EggLog[];
   readonly flocks: readonly Flock[];
   readonly adjustments: readonly FlockAdjustment[];
+  /** The flock to open on — a flock's page links here with its own id. */
+  readonly initialFlockId?: string;
 }) {
   const [period, setPeriod] = useState<Period>("day");
-  const [flockId, setFlockId] = useState("all");
+  const [flockId, setFlockId] = useState(initialFlockId ?? "all");
 
   const chosen = flocks.find((flock) => flock.id === flockId);
   const shown = flockId === "all" ? logs : logs.filter((log) => log.flockId === flockId);

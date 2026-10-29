@@ -1,12 +1,19 @@
+import { readdirSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import type { Ulid } from "@galaxy-farm/core";
 
 import {
+  CATTLE_SECTION_SEGMENTS,
+  HORSE_SECTION_SEGMENTS,
+  PET_SECTION_SEGMENTS,
   animalHref,
   animalSlug,
   animalTitle,
   duplicateSlugs,
+  horseHref,
+  petHref,
   resolveAnimalSlug,
   slugify,
 } from "../lib/animal-slug.js";
@@ -145,5 +152,46 @@ describe("animalHref and animalTitle", () => {
     expect(animalTitle(andromeda)).toBe("Andromeda");
     expect(animalTitle({ tagNumber: "A12" })).toBe("Tag A12");
     expect(animalTitle({})).toBe("Unnamed");
+  });
+});
+
+describe("pet and horse addresses", () => {
+  it("links a pet and a horse under their own sections", () => {
+    expect(petHref({ id: id(20), name: "Biscuit" })).toBe("/admin/pets/biscuit");
+    expect(horseHref({ id: id(21), name: "Juniper" })).toBe("/admin/horses/juniper");
+  });
+
+  it("steps a horse named for a section view around it", () => {
+    // Next serves the fixed folder first, so `/admin/horses/pens` is the pens
+    // board and a horse called Pens would never reach her own page.
+    expect(horseHref({ id: id(22), name: "Pens" })).toBe("/admin/horses/pens-animal");
+    expect(
+      resolveAnimalSlug(
+        "pens-animal",
+        [{ id: id(22), name: "Pens" }],
+        () => undefined,
+        HORSE_SECTION_SEGMENTS,
+      )?.stale,
+    ).toBe(false);
+    // A cow steps around her own section's views the same way.
+    expect(animalHref({ id: id(23), name: "Pens" })).toBe("/admin/cattle/pens");
+    expect(animalHref({ id: id(24), name: "Health" })).toBe("/admin/cattle/health-animal");
+  });
+
+  it("reserves exactly the views that exist beside each record page", () => {
+    // A folder added under horses/ or pets/ without its word here would
+    // shadow any animal whose name happens to match it.
+    const views = (section: string) =>
+      readdirSync(new URL(`../app/(admin)/admin/${section}`, import.meta.url), {
+        withFileTypes: true,
+      })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .filter((name) => !name.startsWith("_") && !name.startsWith("["))
+        .sort();
+
+    expect([...CATTLE_SECTION_SEGMENTS].sort()).toEqual(views("cattle"));
+    expect([...HORSE_SECTION_SEGMENTS].sort()).toEqual(views("horses"));
+    expect([...PET_SECTION_SEGMENTS].sort()).toEqual(views("pets"));
   });
 });

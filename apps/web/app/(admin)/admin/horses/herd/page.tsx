@@ -1,18 +1,17 @@
 import { redirect } from "next/navigation";
 
-import { HorseShell } from "@/app/(admin)/admin/horses/_components/horse-shell";
+import { HerdScreen } from "@/app/(admin)/admin/horses/_components/herd-screen";
 import { currentActor } from "@/lib/auth";
 
 export const metadata = { title: "Horse herd" };
 
+/**
+ * `/admin/horses/herd` (spec §5.9, §7): who is here, and the way into each
+ * horse's own page.
+ */
 export default async function AdminHorsesHerdPage() {
   const actor = await currentActor();
   if (actor === undefined) redirect("/login?next=/admin/horses/herd");
 
-  return (
-    <HorseShell
-      title={"Herd"}
-      holds={"Who is here, whose they are, and what each one is like to handle."}
-    />
-  );
+  return <HerdScreen propertyId={actor.propertyId} actorId={actor.id} />;
 }

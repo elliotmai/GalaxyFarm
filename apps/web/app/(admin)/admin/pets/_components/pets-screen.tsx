@@ -138,7 +138,6 @@ export function PetsScreen({
               pets={pets}
               health={petHealth}
               plans={petPlans}
-              contacts={contacts}
               feeds={feeds}
               loading={loading}
               propertyId={propertyId}

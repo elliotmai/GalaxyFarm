@@ -74,8 +74,12 @@ export const NAV: readonly NavDestination[] = [
       { href: "/admin/animals", label: "All" },
       { href: "/admin/cattle", label: "Cattle", owns: ["/admin/cattle/"] },
       { href: "/admin/horses", label: "Horses", owns: ["/admin/horses/"] },
-      { href: "/admin/chickens/flock", label: "Flock" },
-      { href: "/admin/pets", label: "Pets" },
+      // `owns`: a flock's own page (`/admin/chickens/flock/<name>`) sits in
+      // Flock, and as a record page draws no strips (see `SectionStrip`).
+      { href: "/admin/chickens/flock", label: "Flock", owns: ["/admin/chickens/flock/"] },
+      // Owns its pets' own pages, so a dog's page lights Animals › Pets and,
+      // being neither the list nor a view of it, draws no strip (a record page).
+      { href: "/admin/pets", label: "Pets", owns: ["/admin/pets/"] },
     ],
   },
   {
