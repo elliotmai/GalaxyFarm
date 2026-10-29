@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { KioskWeather } from "@/app/(kiosk)/kiosk/_components/kiosk-weather";
+
 /**
  * The top of every barn board.
  *
@@ -35,6 +37,8 @@ export function KioskHeader({
       {actions === undefined ? null : (
         <div className="flex flex-wrap items-center gap-2">{actions}</div>
       )}
+      {/* On every board, always: the time, and what it is doing outside. */}
+      <KioskWeather />
     </header>
   );
 }

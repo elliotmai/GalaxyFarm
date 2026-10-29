@@ -31,6 +31,13 @@ export interface OpenMeteoOptions {
 }
 
 interface OpenMeteoResponse {
+  current?: {
+    time?: string;
+    temperature_2m?: number | null;
+    weather_code?: number | null;
+    wind_speed_10m?: number | null;
+    wind_gusts_10m?: number | null;
+  };
   hourly?: {
     time?: string[];
     temperature_2m?: (number | null)[];
@@ -38,6 +45,7 @@ interface OpenMeteoResponse {
     wind_speed_10m?: (number | null)[];
     wind_gusts_10m?: (number | null)[];
     precipitation_probability?: (number | null)[];
+    weather_code?: (number | null)[];
   };
   daily?: {
     time?: string[];
@@ -53,8 +61,9 @@ export function openMeteoUrl(request: ForecastRequest, endpoint = ENDPOINT): str
   url.searchParams.set("longitude", String(request.longitude));
   url.searchParams.set(
     "hourly",
-    "temperature_2m,surface_pressure,wind_speed_10m,wind_gusts_10m,precipitation_probability",
+    "temperature_2m,surface_pressure,wind_speed_10m,wind_gusts_10m,precipitation_probability,weather_code",
   );
+  url.searchParams.set("current", "temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m");
   url.searchParams.set(
     "daily",
     "temperature_2m_min,temperature_2m_max,precipitation_probability_max",
@@ -96,6 +105,7 @@ export function parseOpenMeteo(
     const wind = response.hourly?.wind_speed_10m?.[index];
     const gust = response.hourly?.wind_gusts_10m?.[index];
     const precipitation = response.hourly?.precipitation_probability?.[index];
+    const code = response.hourly?.weather_code?.[index];
 
     return [
       {
@@ -107,9 +117,28 @@ export function parseOpenMeteo(
         ...(precipitation === null || precipitation === undefined
           ? {}
           : { precipitationChance: precipitation }),
+        ...(code === null || code === undefined ? {} : { weatherCode: code }),
       },
     ];
   });
+
+  const now = response.current;
+  const current =
+    now?.time === undefined || now.temperature_2m === null || now.temperature_2m === undefined
+      ? undefined
+      : {
+          at: new Date(now.time),
+          temperatureF: now.temperature_2m,
+          ...(now.weather_code === null || now.weather_code === undefined
+            ? {}
+            : { weatherCode: now.weather_code }),
+          ...(now.wind_speed_10m === null || now.wind_speed_10m === undefined
+            ? {}
+            : { windMph: now.wind_speed_10m }),
+          ...(now.wind_gusts_10m === null || now.wind_gusts_10m === undefined
+            ? {}
+            : { gustMph: now.wind_gusts_10m }),
+        };
 
   const daily: DailyWeather[] = (response.daily?.time ?? []).flatMap((time, index) => {
     const low = response.daily?.temperature_2m_min?.[index];
@@ -133,6 +162,7 @@ export function parseOpenMeteo(
     latitude: request.latitude,
     longitude: request.longitude,
     retrievedAt,
+    ...(current === undefined ? {} : { current }),
     hourly,
     daily,
   };

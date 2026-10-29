@@ -46,6 +46,9 @@ export function reviveForecast(raw: unknown): Forecast | undefined {
   return {
     ...value,
     retrievedAt: new Date(value.retrievedAt),
+    ...(value.current === undefined || value.current === null
+      ? {}
+      : { current: { ...value.current, at: new Date(value.current.at) } }),
     hourly: (value.hourly ?? []).map((hour) => ({ ...hour, at: new Date(hour.at) })),
     daily: (value.daily ?? []).map((day) => ({ ...day, date: new Date(day.date) })),
   };
@@ -105,7 +108,16 @@ export function forgetSharedForecast(): void {
   shared = undefined;
 }
 
-export function useForecast(): ForecastSnapshot {
+/**
+ * The forecast, asked once — or, with `refreshMs`, asked again on that beat.
+ *
+ * A phone page lives a few minutes and the first answer does it. A barn board
+ * stays up all day, and "the weather now" read at seven is wrong by noon, so
+ * the kiosk asks again every quarter of an hour. A failed refresh keeps the
+ * last good answer rather than blanking the board.
+ */
+export function useForecast(options: { readonly refreshMs?: number } = {}): ForecastSnapshot {
+  const { refreshMs } = options;
   const [snapshot, setSnapshot] = useState<ForecastSnapshot>({
     settings: DEFAULT_WATCH_SETTINGS,
     alerts: [],
@@ -117,10 +129,26 @@ export function useForecast(): ForecastSnapshot {
     void sharedAnswer().then((answer) => {
       if (live) setSnapshot(answer);
     });
+    if (refreshMs === undefined) {
+      return () => {
+        live = false;
+      };
+    }
+
+    const timer = setInterval(() => {
+      shared = undefined;
+      void sharedAnswer().then((answer) => {
+        if (!live) return;
+        setSnapshot((previous) =>
+          answer.forecast === undefined && previous.forecast !== undefined ? previous : answer,
+        );
+      });
+    }, refreshMs);
     return () => {
       live = false;
+      clearInterval(timer);
     };
-  }, []);
+  }, [refreshMs]);
 
   return snapshot;
 }
