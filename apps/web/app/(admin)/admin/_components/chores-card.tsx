@@ -95,7 +95,13 @@ export function useChoreSheet(propertyId: Ulid, actorId: Ulid): ChoreSheet {
   // way and the kiosk shows them too.
   const weather = useWeatherChores(propertyId, today, now);
   const sheet = choreDaySheet(
-    { tasks, templates, derived: [...feeding, ...weather.derived], weather: weather.weather },
+    {
+      tasks,
+      templates,
+      derived: [...feeding, ...weather.derived],
+      weather: weather.weather,
+      weatherArrives: weather.arrives,
+    },
     today,
     now,
   );

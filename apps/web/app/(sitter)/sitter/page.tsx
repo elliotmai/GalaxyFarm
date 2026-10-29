@@ -60,7 +60,7 @@ export default async function SitterPage() {
   const weather = withDeadline(
     sitterWeather(actor.propertyId, startOfDay(now), now),
     "the forecast",
-  ).catch(() => ({ derived: [], weather: undefined }));
+  ).catch(() => ({ derived: [], weather: undefined, arrives: {} }));
 
   let view = EMPTY_SITTER_VIEW;
   let unavailable: string | undefined;
@@ -76,9 +76,15 @@ export default async function SitterPage() {
       "The guide could not be loaded just now. Try again in a moment — and if it is urgent, ring the numbers you were given.";
   }
 
-  const { derived, weather: forecastWeather } = await weather;
+  const { derived, weather: forecastWeather, arrives } = await weather;
   const chores = choreDaySheet(
-    { tasks: view.tasks, templates: view.templates, derived, weather: forecastWeather },
+    {
+      tasks: view.tasks,
+      templates: view.templates,
+      derived,
+      weather: forecastWeather,
+      weatherArrives: arrives,
+    },
     startOfDay(now),
     now,
   );

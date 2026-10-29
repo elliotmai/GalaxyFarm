@@ -7,6 +7,7 @@ import {
   resolveWatchSettings,
   type Forecast,
   type WatchSettings,
+  type WeatherAlert,
 } from "@galaxy-farm/core";
 
 /**
@@ -25,6 +26,8 @@ import {
 export interface ForecastSnapshot {
   readonly forecast?: Forecast | undefined;
   readonly settings: WatchSettings;
+  /** The weather service's watches and warnings — wind and storms the hours smooth over. */
+  readonly alerts: readonly WeatherAlert[];
   /** Why there is no forecast, when there is none. */
   readonly unavailable?: string | undefined;
   /** The forecast has been asked for, whichever way it answered. */
@@ -48,6 +51,24 @@ export function reviveForecast(raw: unknown): Forecast | undefined {
   };
 }
 
+/** Alerts arrive with their dates as strings too; anything malformed is dropped. */
+function reviveAlerts(raw: unknown): WeatherAlert[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    if (entry === null || typeof entry !== "object") return [];
+    const alert = entry as WeatherAlert;
+    const from = new Date(alert.from);
+    if (typeof alert.event !== "string" || Number.isNaN(from.getTime())) return [];
+    return [
+      {
+        ...alert,
+        from,
+        ...(alert.to === undefined || alert.to === null ? {} : { to: new Date(alert.to) }),
+      },
+    ];
+  });
+}
+
 async function ask(): Promise<ForecastSnapshot> {
   try {
     const response = await fetch("/api/weather");
@@ -58,12 +79,14 @@ async function ask(): Promise<ForecastSnapshot> {
     return {
       ...(forecast === undefined ? {} : { forecast }),
       settings: resolveWatchSettings(body["settings"]),
+      alerts: reviveAlerts(body["alerts"]),
       ...(typeof body["unavailable"] === "string" ? { unavailable: body["unavailable"] } : {}),
       asked: true,
     };
   } catch {
     return {
       settings: DEFAULT_WATCH_SETTINGS,
+      alerts: [],
       unavailable: "No forecast right now — day counts are still current.",
       asked: true,
     };
@@ -85,6 +108,7 @@ export function forgetSharedForecast(): void {
 export function useForecast(): ForecastSnapshot {
   const [snapshot, setSnapshot] = useState<ForecastSnapshot>({
     settings: DEFAULT_WATCH_SETTINGS,
+    alerts: [],
     asked: false,
   });
 

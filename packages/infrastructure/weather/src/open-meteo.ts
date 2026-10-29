@@ -36,6 +36,7 @@ interface OpenMeteoResponse {
     temperature_2m?: (number | null)[];
     surface_pressure?: (number | null)[];
     wind_speed_10m?: (number | null)[];
+    wind_gusts_10m?: (number | null)[];
     precipitation_probability?: (number | null)[];
   };
   daily?: {
@@ -52,7 +53,7 @@ export function openMeteoUrl(request: ForecastRequest, endpoint = ENDPOINT): str
   url.searchParams.set("longitude", String(request.longitude));
   url.searchParams.set(
     "hourly",
-    "temperature_2m,surface_pressure,wind_speed_10m,precipitation_probability",
+    "temperature_2m,surface_pressure,wind_speed_10m,wind_gusts_10m,precipitation_probability",
   );
   url.searchParams.set(
     "daily",
@@ -93,6 +94,7 @@ export function parseOpenMeteo(
     if (temperature === null || temperature === undefined) return [];
     const pressure = response.hourly?.surface_pressure?.[index];
     const wind = response.hourly?.wind_speed_10m?.[index];
+    const gust = response.hourly?.wind_gusts_10m?.[index];
     const precipitation = response.hourly?.precipitation_probability?.[index];
 
     return [
@@ -101,6 +103,7 @@ export function parseOpenMeteo(
         temperatureF: temperature,
         ...(pressure === null || pressure === undefined ? {} : { pressureHpa: pressure }),
         ...(wind === null || wind === undefined ? {} : { windMph: wind }),
+        ...(gust === null || gust === undefined ? {} : { gustMph: gust }),
         ...(precipitation === null || precipitation === undefined
           ? {}
           : { precipitationChance: precipitation }),

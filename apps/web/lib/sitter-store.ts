@@ -29,7 +29,7 @@ import { guideForSitter, guideIncludes, visibleToSitter } from "@/lib/care-guide
 import { database } from "@/lib/credential-store";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { weatherSnapshot } from "@/lib/weather-service";
-import { choreWeatherOn, isWeatherChoreKey, weatherChores, weatherJobs } from "@/lib/weather-jobs";
+import { choreWeatherDay, isWeatherChoreKey, weatherChores, weatherJobs } from "@/lib/weather-jobs";
 import { applyPushAndMark } from "@/lib/change-stamp";
 
 export { guideForSitter, guideIncludes, visibleToSitter };
@@ -317,16 +317,17 @@ export async function sitterWeather(
 ): Promise<{
   readonly derived: readonly ChoreEntry[];
   readonly weather: ReadonlySet<ChoreWeather> | undefined;
+  readonly arrives: Partial<Record<ChoreWeather, Date>>;
 }> {
   try {
     const snapshot = await weatherSnapshot(propertyId);
     return {
       derived: await weatherOccurrences(propertyId, date, at, database(), snapshot),
-      weather: choreWeatherOn(snapshot.forecast, snapshot.settings, date),
+      ...choreWeatherDay(snapshot.forecast, snapshot.settings, date, snapshot.alerts),
     };
   } catch (error) {
     console.error("[sitter:weather]", error);
-    return { derived: [], weather: undefined };
+    return { derived: [], weather: undefined, arrives: {} };
   }
 }
 

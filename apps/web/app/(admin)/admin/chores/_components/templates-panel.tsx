@@ -393,7 +393,7 @@ export function TemplatesPanel({
               label="Only when"
               value={draft.weather}
               error={errors["weather"]}
-              hint="Waits for the forecast — covers before a freeze, not every night."
+              hint="Waits for the forecast — covers before a freeze, hay in before rain, tarps down before a wind. A “before” chore is due before the weather arrives."
               options={[
                 { value: "", label: "Any weather" },
                 ...CHORE_WEATHER.map((weather) => ({

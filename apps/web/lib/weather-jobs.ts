@@ -13,6 +13,7 @@ import {
   type FreezeCheckTarget,
   type Forecast,
   type WatchSettings,
+  type WeatherAlert,
   type WaterSource,
   type ZoneWaterRef,
 } from "@galaxy-farm/core";
@@ -179,35 +180,140 @@ export const HEAT_F = 95;
 /** "Likely" rain, as the Today header already reads it. */
 const RAIN_LIKELY = 50;
 
+/** Gusts this strong take a tarp, a gate or a round-bale net. */
+export const HIGH_WIND_GUST_MPH = 40;
+/** A steady wind this strong does the same, more slowly. */
+export const HIGH_WIND_MPH = 25;
+
+/**
+ * The issuer's own words for weather a "before" job is getting ahead of.
+ *
+ * The National Weather Service's warnings are read alongside the forecast
+ * because they catch what an hourly model smooths over: a squall line is a
+ * thirty-minute event, and averaged into an hour it can look like a breeze.
+ */
+const WIND_ALERT = /wind|thunderstorm|tornado|hurricane|tropical|derecho|dust storm/i;
+const RAIN_ALERT = /thunderstorm|flood|hurricane|tropical|winter storm|ice storm/i;
+
+/** The weather a day has, and when the "before" kinds of it arrive. */
+export interface ChoreWeatherDay {
+  /**
+   * Undefined when the forecast is missing or does not reach that day — a day
+   * nobody could check, which `choreDaySheet` treats as "keep the chore"
+   * rather than "drop it". An empty set is a day checked and found clear.
+   */
+  readonly weather: ReadonlySet<ChoreWeather> | undefined;
+  /** For `choreDaySheet`'s `weatherArrives`: only weather landing on the day. */
+  readonly arrives: Partial<Record<ChoreWeather, Date>>;
+}
+
+/** An alert that fits the issuer's wording and overlaps the window. */
+function alertIn(
+  alerts: readonly WeatherAlert[],
+  pattern: RegExp,
+  from: Date,
+  to: Date,
+): WeatherAlert | undefined {
+  return alerts
+    .filter((alert) => pattern.test(alert.event))
+    .filter((alert) => alert.from < to && (alert.to === undefined || alert.to > from))
+    .sort((left, right) => left.from.getTime() - right.from.getTime())[0];
+}
+
 /**
  * The weather a day has, for chore templates that wait on it.
  *
- * Undefined when the forecast is missing or does not reach that day — a day
- * nobody could check, which `choreDaySheet` treats as "keep the chore" rather
- * than "drop it". An empty set is a day that was checked and had none of it.
+ * The night and the day come off the daily lows and highs. Rain and wind are
+ * "before" weather, so they look ahead: from five in the morning to noon the
+ * next day, hour by hour where the forecast has hours, and through the
+ * official warnings. Weather first due tomorrow morning puts the job on this
+ * evening; weather due this afternoon also says *when*, so the chore can be
+ * due before it rather than at its usual time.
+ *
+ * Hourly times arrive the same way the days do — the farm's own clock, read
+ * as UTC — so an hour is placed on the farm's calendar by its UTC fields.
  */
-export function choreWeatherOn(
+export function choreWeatherDay(
   forecast: Pick<Forecast, "daily" | "hourly"> | undefined,
   settings: Pick<WatchSettings, "frostF" | "hardFreezeF">,
   date: Date,
-): ReadonlySet<ChoreWeather> | undefined {
-  if (forecast === undefined) return undefined;
+  alerts: readonly WeatherAlert[] = [],
+): ChoreWeatherDay {
+  const arrives: Partial<Record<ChoreWeather, Date>> = {};
+  if (forecast === undefined) return { weather: undefined, arrives };
   const today = forecast.daily.find((day) => isForecastDay(day.date, date));
-  if (today === undefined) return undefined;
+  if (today === undefined) return { weather: undefined, arrives };
 
-  const tonight = forecast.daily.find((day) => isForecastDay(day.date, addCalendarDays(date, 1)));
+  const next = addCalendarDays(date, 1);
+  const tonight = forecast.daily.find((day) => isForecastDay(day.date, next));
   const freezes = freezeDays(forecast, { hardFreezeF: settings.hardFreezeF });
   const weather = new Set<ChoreWeather>();
 
-  if (tonight !== undefined && freezes.includes(tonight)) {
-    weather.add("freeze_tonight");
-  }
+  if (tonight !== undefined && freezes.includes(tonight)) weather.add("freeze_tonight");
   if (tonight !== undefined && tonight.lowF <= settings.frostF) weather.add("frost_tonight");
   if (freezes.includes(today)) weather.add("freezing_today");
-  if ((today.precipitationChance ?? 0) >= RAIN_LIKELY) weather.add("rain_today");
   if (today.highF >= HEAT_F) weather.add("heat_today");
 
-  return weather;
+  // The look-ahead, as farm-clock hours: this morning to noon tomorrow.
+  const ahead = forecast.hourly
+    .map((hour) => {
+      const onToday = isForecastDay(hour.at, date);
+      const onNext = isForecastDay(hour.at, next);
+      const clock = hour.at.getUTCHours();
+      if (!(onToday && clock >= 5) && !(onNext && clock < 12)) return undefined;
+      const local = new Date(
+        (onToday ? date : next).getFullYear(),
+        (onToday ? date : next).getMonth(),
+        (onToday ? date : next).getDate(),
+        clock,
+      );
+      return { hour, local, onToday };
+    })
+    .filter((entry) => entry !== undefined)
+    .sort((left, right) => left.local.getTime() - right.local.getTime());
+
+  const windowFrom = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 5);
+  const windowTo = new Date(next.getFullYear(), next.getMonth(), next.getDate(), 12);
+  const endOfToday = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+
+  const mark = (kind: ChoreWeather, at: Date | undefined) => {
+    weather.add(kind);
+    if (at !== undefined && at < endOfToday) arrives[kind] = at;
+  };
+
+  const rainHour = ahead.find((entry) => (entry.hour.precipitationChance ?? 0) >= RAIN_LIKELY);
+  const rainAlert = alertIn(alerts, RAIN_ALERT, windowFrom, windowTo);
+  if (rainHour !== undefined || rainAlert !== undefined) {
+    mark("rain_coming", earliest(rainHour?.local, rainAlert?.from, windowFrom));
+  } else if (ahead.length === 0) {
+    // A forecast with no hours (the weather service's own) still has days.
+    const tomorrow = tonight?.precipitationChance ?? 0;
+    if ((today.precipitationChance ?? 0) >= RAIN_LIKELY || tomorrow >= RAIN_LIKELY) {
+      weather.add("rain_coming");
+    }
+  }
+
+  const windHour = ahead.find(
+    (entry) =>
+      (entry.hour.gustMph ?? 0) >= HIGH_WIND_GUST_MPH || (entry.hour.windMph ?? 0) >= HIGH_WIND_MPH,
+  );
+  const windAlert = alertIn(alerts, WIND_ALERT, windowFrom, windowTo);
+  if (windHour !== undefined || windAlert !== undefined) {
+    mark("wind_coming", earliest(windHour?.local, windAlert?.from, windowFrom));
+  }
+
+  return { weather, arrives };
+}
+
+/**
+ * The earlier of an hour and an alert's start — but never before the window
+ * opens, since a warning that began yesterday arrives, for today's list, now.
+ */
+function earliest(hour: Date | undefined, alert: Date | undefined, floor: Date): Date | undefined {
+  const times = [hour, alert].filter((at): at is Date => at !== undefined);
+  if (times.length === 0) return undefined;
+  const first = new Date(Math.min(...times.map((at) => at.getTime())));
+  return first < floor ? floor : first;
 }
 
 /** Every weather chore's id starts so, which is how its ticked row is told apart. */

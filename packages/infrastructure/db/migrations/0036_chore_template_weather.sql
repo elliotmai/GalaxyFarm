@@ -5,7 +5,7 @@
 -- template that said "every day" put "covers on" on the board every morning
 -- of a mild week, and people learned to tick it without looking. This column
 -- names the weather it waits for — `freeze_tonight`, `frost_tonight`,
--- `freezing_today`, `rain_today` or `heat_today` — and the day sheet only
+-- `freezing_today`, `rain_coming`, `wind_coming` or `heat_today` — and the day sheet only
 -- generates it on days the forecast shows that.
 --
 -- Nullable, and no default: NULL means the recurrence alone decides, which is

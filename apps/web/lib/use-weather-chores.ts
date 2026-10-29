@@ -11,7 +11,7 @@ import type { Planting } from "@galaxy-farm/module-garden";
 
 import { useRecords } from "@/lib/local/use-records";
 import { useForecast } from "@/lib/use-forecast";
-import { choreWeatherOn, weatherChores, weatherJobs, type WeatherJobs } from "@/lib/weather-jobs";
+import { choreWeatherDay, weatherChores, weatherJobs, type WeatherJobs } from "@/lib/weather-jobs";
 
 /**
  * The weather's part of a day sheet, for every screen that draws one.
@@ -32,6 +32,8 @@ export interface WeatherChores {
   readonly derived: readonly ChoreEntry[];
   /** For `choreDaySheet`'s `weather`. */
   readonly weather: ReadonlySet<ChoreWeather> | undefined;
+  /** For `choreDaySheet`'s `weatherArrives`. */
+  readonly arrives: Partial<Record<ChoreWeather, Date>>;
   readonly jobs: WeatherJobs;
 }
 
@@ -58,9 +60,11 @@ export function useWeatherChores(propertyId: Ulid, date: Date, now: Date): Weath
     now: date,
   });
 
+  const day = choreWeatherDay(snapshot.forecast, snapshot.settings, date, snapshot.alerts);
   return {
     derived: weatherChores(jobs, date, now),
-    weather: snapshot.asked ? choreWeatherOn(snapshot.forecast, snapshot.settings, date) : NOT_YET,
+    weather: snapshot.asked ? day.weather : NOT_YET,
+    arrives: day.arrives,
     jobs,
   };
 }

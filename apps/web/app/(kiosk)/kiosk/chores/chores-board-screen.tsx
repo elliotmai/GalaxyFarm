@@ -66,11 +66,28 @@ export function ChoresBoardScreen({
       today,
     );
     return choreDaySheet(
-      { tasks, templates, derived: [...derived, ...weather.derived], weather: weather.weather },
+      {
+        tasks,
+        templates,
+        derived: [...derived, ...weather.derived],
+        weather: weather.weather,
+        weatherArrives: weather.arrives,
+      },
       today,
       today,
     );
-  }, [tasks, templates, plans, zones, feeds, propertyId, today, weather.derived, weather.weather]);
+  }, [
+    tasks,
+    templates,
+    plans,
+    zones,
+    feeds,
+    propertyId,
+    today,
+    weather.derived,
+    weather.weather,
+    weather.arrives,
+  ]);
 
   return (
     <PageBody>

@@ -79,7 +79,11 @@ export function ChoresScreen({
   const text = feedingChoreText({ zones, feeds, propertyId });
   const weather = useWeatherChores(propertyId, date, now);
   const derived = [...feedingChoresFor(plans, text, date, now), ...weather.derived];
-  const sheet = choreDaySheet({ tasks, templates, derived, weather: weather.weather }, date, now);
+  const sheet = choreDaySheet(
+    { tasks, templates, derived, weather: weather.weather, weatherArrives: weather.arrives },
+    date,
+    now,
+  );
   const progress = choreProgress(sheet);
   const day = dayLabel(date, today);
 

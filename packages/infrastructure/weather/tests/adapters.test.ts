@@ -46,6 +46,7 @@ describe("parseOpenMeteo", () => {
       temperature_2m: [42, null, 39],
       surface_pressure: [1018.2, 1017.5, null],
       wind_speed_10m: [8, 9, 10],
+      wind_gusts_10m: [21, null, 44],
       precipitation_probability: [10, null, 30],
     },
     daily: {
@@ -67,6 +68,11 @@ describe("parseOpenMeteo", () => {
     const forecast = parseOpenMeteo(body, REQUEST, new Date());
     expect(forecast.hourly[1]?.pressureHpa).toBeUndefined();
     expect(forecast.hourly[0]?.pressureHpa).toBe(1018.2);
+  });
+
+  it("reads the gusts, which are what take a tarp, not the mean wind", () => {
+    const forecast = parseOpenMeteo(body, REQUEST, new Date());
+    expect(forecast.hourly.map((hour) => hour.gustMph)).toEqual([21, 44]);
   });
 
   it("drops a day missing either end of its range", () => {

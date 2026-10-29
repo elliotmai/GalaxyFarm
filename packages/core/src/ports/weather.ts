@@ -18,6 +18,8 @@ export interface HourlyWeather {
   /** Surface pressure. The calving watch is looking for a fall in this. */
   readonly pressureHpa?: number | undefined;
   readonly windMph?: number | undefined;
+  /** The strongest gust in the hour — what takes a tarp or a gate, not the mean. */
+  readonly gustMph?: number | undefined;
   readonly precipitationChance?: number | undefined;
 }
 

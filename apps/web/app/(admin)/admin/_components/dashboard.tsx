@@ -48,6 +48,7 @@ import {
   type WeaningWatch,
 } from "@/app/(admin)/admin/_components/weaning-card";
 import { useRecords } from "@/lib/local/use-records";
+import type { WeatherChores } from "@/lib/use-weather-chores";
 import { isForecastDay, type WeatherJobs } from "@/lib/weather-jobs";
 
 /**
@@ -126,25 +127,30 @@ function names(list: readonly string[], max = 2): string {
 }
 
 /**
- * One fact about the weather, for the header: "41°, dry, frost tonight".
+ * One fact about the weather, for the header: "41°, rain from 3 PM, frost
+ * tonight".
  *
- * The temperature nearest now, whether today is wet, and the night only when
- * it matters — the same frost threshold the watch settings use, read off the
- * coming night's low. Nothing at all without a forecast: offline is the
- * ordinary case in a barn, and the date stands on its own.
+ * The temperature nearest now, whether wet or windy weather is on its way and
+ * when, and the night only when it matters — the same frost threshold the
+ * watch settings use, read off the coming night's low. Nothing at all without
+ * a forecast: offline is the ordinary case in a barn, and the date stands on
+ * its own.
  */
 function weatherFact(
   forecast: Forecast | undefined,
   settings: WatchSettings,
+  coming: Pick<WeatherChores, "weather" | "arrives">,
   now: Date,
 ): string | undefined {
   if (forecast === undefined) return undefined;
 
+  // Hours are on the farm's clock, read as UTC; placed on this device's clock
+  // the same way, so "nearest now" means the hour it is at the farm.
   const nearest = [...forecast.hourly].sort(
     (left, right) =>
-      Math.abs(left.at.getTime() - now.getTime()) - Math.abs(right.at.getTime() - now.getTime()),
+      Math.abs(farmClock(left.at).getTime() - now.getTime()) -
+      Math.abs(farmClock(right.at).getTime() - now.getTime()),
   )[0];
-  const today = forecast.daily.find((day) => isForecastDay(day.date, now));
   // A day's low lands in its small hours, so tonight is tomorrow's low.
   const tonight = forecast.daily.find((day) => isForecastDay(day.date, addCalendarDays(now, 1)));
   const frost =
@@ -154,15 +160,30 @@ function weatherFact(
 
   const parts = [
     nearest === undefined ? undefined : `${Math.round(nearest.temperatureF)}°`,
-    today?.precipitationChance === undefined
+    coming.weather === undefined
       ? undefined
-      : today.precipitationChance >= 50
-        ? "rain likely"
+      : coming.weather.has("rain_coming")
+        ? arriving("rain", coming.arrives.rain_coming, now)
         : "dry",
+    coming.weather?.has("wind_coming") === true
+      ? arriving("high winds", coming.arrives.wind_coming, now)
+      : undefined,
     frost === undefined ? undefined : frost.hardFreeze ? "hard freeze tonight" : "frost tonight",
   ].filter((part): part is string => part !== undefined);
 
   return parts.length === 0 ? undefined : parts.join(", ");
+}
+
+/** A forecast hour — the farm's clock read as UTC — as a time on this device. */
+function farmClock(at: Date): Date {
+  return new Date(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate(), at.getUTCHours());
+}
+
+/** "rain from 3 PM", "high winds now", or "rain on the way" when it lands after today. */
+function arriving(what: string, at: Date | undefined, now: Date): string {
+  if (at === undefined) return `${what} on the way`;
+  if (at <= now) return `${what} now`;
+  return `${what} from ${at.toLocaleTimeString(undefined, { hour: "numeric" })}`;
 }
 
 function shortDate(date: Date): string {
@@ -320,7 +341,7 @@ function Today({
     day: "numeric",
     month: "short",
   });
-  const weather = weatherFact(calving.forecast, calving.settings, now);
+  const weather = weatherFact(calving.forecast, calving.settings, chores.weather, now);
 
   return (
     <PageBody>
