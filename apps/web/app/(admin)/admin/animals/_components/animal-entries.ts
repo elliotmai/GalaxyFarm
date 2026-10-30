@@ -2,6 +2,7 @@ import {
   animalsWithoutOutside,
   endOfDay,
   isOnFarm,
+  startOfDay,
   type Animal,
   type Ulid,
   type Zone,
@@ -19,7 +20,12 @@ import {
   type HealthRecord,
 } from "@galaxy-farm/module-cattle";
 import { outstandingPetCare } from "@galaxy-farm/module-pets";
-import { headCountOn, type Flock, type FlockAdjustment } from "@galaxy-farm/module-poultry";
+import {
+  headCountOn,
+  type EggLog,
+  type Flock,
+  type FlockAdjustment,
+} from "@galaxy-farm/module-poultry";
 
 import { ageLabel, flagFor, type HerdFlag } from "@/app/(admin)/admin/cattle/_components/herd-row";
 import { animalHref, animalTitle, horseHref, petHref } from "@/lib/animal-slug";
@@ -105,6 +111,8 @@ export interface EntryInputs {
   readonly health: readonly HealthRecord[];
   readonly breedings: readonly BreedingRecord[];
   readonly calvings: readonly CalvingRecord[];
+  /** For a flock row's eggs today. Optional: only the lists that show it read it. */
+  readonly eggLogs?: readonly EggLog[];
   readonly now: Date;
 }
 
@@ -173,14 +181,26 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
       .filter((animal) => groupOf(animal) === "dogs" || groupOf(animal) === "cats")
       .map((animal) => animal.id),
   );
-  const careOverdue = new Set(
-    outstandingPetCare(
-      careRecordsFor(input.health.filter((record) => petIds.has(record.animalId))),
-      now,
-    )
-      .filter((need) => need.status === "overdue")
-      .map((need) => need.animalId),
+  const petNeeds = outstandingPetCare(
+    careRecordsFor(input.health.filter((record) => petIds.has(record.animalId))),
+    now,
   );
+  const careOverdue = new Set(
+    petNeeds.filter((need) => need.status === "overdue").map((need) => need.animalId),
+  );
+  // The next thing each pet is due — "Rabies due 3 Nov" — for its row.
+  const nextNeed = new Map<Ulid, (typeof petNeeds)[number]>();
+  for (const need of [...petNeeds].sort((a, b) => a.dueOn.getTime() - b.dueOn.getTime())) {
+    if (!nextNeed.has(need.animalId)) nextNeed.set(need.animalId, need);
+  }
+
+  // Each flock's basket today, for its row.
+  const eggsToday = new Map<Ulid, number>();
+  for (const log of input.eggLogs ?? []) {
+    if (log.flockId === undefined || startOfDay(log.collectedOn) < startOfDay(now)) continue;
+    if (log.collectedOn > endOfDay(now)) continue;
+    eggsToday.set(log.flockId, (eggsToday.get(log.flockId) ?? 0) + log.total);
+  }
 
   const rows: AnimalEntry[] = animals.map((animal) => {
     const group = groupOf(animal);
@@ -196,12 +216,28 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
         ? kind === undefined
           ? capitalise(animal.sex)
           : CATTLE_CLASS_SINGULAR[kind]
-        : (SPECIES_WORD[animal.species] ?? capitalise(animal.species));
+        : group === "horses"
+          ? animal.sex === "female"
+            ? "Mare"
+            : "Horse"
+          : (SPECIES_WORD[animal.species] ?? capitalise(animal.species));
+    // What each species' row adds after where it stands (decision 45): a pet's
+    // next shot or medicine, a horse that needs care to handle.
+    const need = nextNeed.get(animal.id);
+    const extra =
+      group === "dogs" || group === "cats"
+        ? need === undefined
+          ? undefined
+          : `${need.label} ${need.status === "overdue" ? "overdue" : `due ${shortDay(need.dueOn)}`}`
+        : group === "horses" && animal.safetyLevel >= 4
+          ? "handle with care"
+          : undefined;
     const line = [
       what,
       ageLabel(animal, now),
       outside?.name,
       inside === undefined ? undefined : `inside ${inside.name}`,
+      extra,
     ]
       .filter((part) => part !== undefined && part !== "")
       .join(" · ");
@@ -250,6 +286,7 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
     const line = [
       `${count} ${flock.species === "quail" ? "quail" : count === 1 ? "bird" : "birds"}`,
       zone,
+      eggsToday.has(flock.id) ? `${eggsToday.get(flock.id)} eggs today` : undefined,
     ]
       .filter((part) => part !== undefined && part !== "")
       .join(" · ");
@@ -280,6 +317,10 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
       GROUPS.indexOf(left.group) - GROUPS.indexOf(right.group) ||
       left.title.localeCompare(right.title, undefined, { numeric: true }),
   );
+}
+
+function shortDay(date: Date): string {
+  return date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
 function capitalise(value: string): string {

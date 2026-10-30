@@ -133,7 +133,10 @@ export function SectionStrip() {
   // A single-section destination needs no strip — one tab is not a choice.
   // Nor does a grouped section's parent: Cattle's own four groups say where you
   // are, and switching species is what the Animals tab is for.
-  const showPrimary = destination.sections.length > 1 && groups === undefined;
+  // Nor does a destination whose pages switch between their sections from the
+  // title — every animal page carries the species switcher (decision 45).
+  const showPrimary =
+    destination.sections.length > 1 && groups === undefined && destination.titleSwitches !== true;
   if (!showPrimary && subs === undefined) return null;
 
   // The sub-view being looked at, if any. These carry no `owns`, so an exact

@@ -71,9 +71,14 @@ function write(trail: readonly TrailStep[]): void {
   }
 }
 
-/** The page's own name: its first heading inside the content column. */
+/**
+ * The page's own name: its first heading inside the content column — or the
+ * name it gives itself in `data-title`, when the heading carries more than a
+ * name (the species switcher's "▾, switch species").
+ */
 function headingNow(): string | undefined {
-  return document.querySelector("main h1")?.textContent?.trim() || undefined;
+  const heading = document.querySelector<HTMLElement>("main h1");
+  return heading?.dataset["title"]?.trim() || heading?.textContent?.trim() || undefined;
 }
 
 export function BackLink() {

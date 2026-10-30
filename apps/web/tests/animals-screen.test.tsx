@@ -151,7 +151,7 @@ describe("the Animals list", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { level: 1, name: "Dogs" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: /^Dogs/ })).toBeTruthy();
     const list = screen.getByRole("list", { name: "Dogs on this property" });
     expect(
       within(list)

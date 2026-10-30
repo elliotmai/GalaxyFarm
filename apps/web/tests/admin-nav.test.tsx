@@ -133,13 +133,16 @@ describe("SectionStrip", () => {
     expect(within(views).queryByRole("link", { name: "Weights" })).not.toBeInTheDocument();
   });
 
-  it("offers the other species alongside a species without view groups", () => {
+  it("leaves the species to the page title, and shows the species' own tools", () => {
+    // Every animal page switches species from its title (decision 45), so the
+    // strip above it is that species' tools alone.
     at("/admin/horses");
     render(<SectionStrip />);
 
-    const sections = screen.getByRole("navigation", { name: "Animals sections" });
-    for (const label of ["All", "Cattle", "Horses", "Chickens", "Dogs", "Cats"]) {
-      expect(within(sections).getByRole("link", { name: label })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Animals sections" })).not.toBeInTheDocument();
+    const tools = screen.getByRole("navigation", { name: "Horses views" });
+    for (const label of ["Horses", "Pens", "Feeding", "Breeding"]) {
+      expect(within(tools).getByRole("link", { name: label })).toBeInTheDocument();
     }
   });
 
@@ -150,17 +153,17 @@ describe("SectionStrip", () => {
     expect(screen.queryByRole("navigation", { name: "Animals sections" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Cattle views" })).toBeInTheDocument();
   });
-  it("keeps the section lit while a view of it is open", () => {
+  it("lights the tool that is open, and only that one", () => {
     at("/admin/horses/pens");
     render(<SectionStrip />);
 
-    const sections = screen.getByRole("navigation", { name: "Animals sections" });
-    const lit = within(sections)
+    const tools = screen.getByRole("navigation", { name: "Horses views" });
+    const lit = within(tools)
       .getAllByRole("link")
       .filter((link) => link.getAttribute("aria-current") === "page");
 
     expect(lit).toHaveLength(1);
-    expect(lit[0]).toHaveAccessibleName("Horses");
+    expect(lit[0]).toHaveAccessibleName("Pens");
   });
   it("draws no strips on an animal's own page, which has its own way back", () => {
     at("/admin/cattle/01ARZ3NDEKTSV4RRFFQ69G5FAV");

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -52,6 +53,11 @@ import {
   type HealthRecord,
 } from "@galaxy-farm/module-cattle";
 
+import { SpeciesSwitcher } from "@/app/(admin)/_components/species-switcher";
+import {
+  CATTLE_ACTIONS,
+  CattleGlance,
+} from "@/app/(admin)/admin/animals/_components/species-glance";
 import { useMutations } from "@/lib/local/mutations";
 import { animalHref, animalTitle } from "@/lib/animal-slug";
 import { useRecords } from "@/lib/local/use-records";
@@ -104,6 +110,9 @@ interface Filters {
   /** Only the animals with no pen recorded — what the alert line opens. */
   readonly unplacedOnly: boolean;
 }
+
+const ACTION_TILE =
+  "flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-density border border-rule bg-panel px-1 text-center text-[13px] font-medium text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
 
 const NO_FILTERS: Filters = {
   zoneId: "",
@@ -571,10 +580,7 @@ export function HerdScreen({
     <div className="flex flex-col gap-density pb-20 sm:pb-0">
       <header className="flex items-center justify-between gap-density">
         {/* The count is a fact, said beside the title rather than under it. */}
-        <div className="flex min-w-0 items-baseline gap-2.5">
-          <h1 className="text-ink">Cattle</h1>
-          <span className="text-sm text-muted">{head} head</span>
-        </div>
+        <SpeciesSwitcher propertyId={propertyId} current="/admin/cattle" detail={`${head} head`} />
         {/* Hidden on a phone by a wrapper, not a class on the button: the
             button's own `inline-flex` wins over a `hidden` passed in. */}
         <span className="hidden sm:block">
@@ -583,6 +589,19 @@ export function HerdScreen({
           </Button>
         </span>
       </header>
+
+      {/* The cattle page's own jobs and facts (decision 45). */}
+      <nav aria-label="Quick actions for cattle" className="grid grid-cols-4 gap-2">
+        {CATTLE_ACTIONS.map((action) => (
+          <Link key={action.label} href={action.href} className={ACTION_TILE}>
+            <span aria-hidden="true" className="text-xl leading-none">
+              {action.glyph}
+            </span>
+            {action.label}
+          </Link>
+        ))}
+      </nav>
+      <CattleGlance propertyId={propertyId} />
 
       <div className="flex items-end gap-2">
         <div className="min-w-0 flex-1">

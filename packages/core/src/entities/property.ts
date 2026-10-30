@@ -90,5 +90,8 @@ export const propertySchema = baseRecordSchema.extend({
 export function hasCoordinates(
   property: Pick<Property, "latitude" | "longitude">,
 ): property is Pick<Property, "latitude" | "longitude"> & { latitude: number; longitude: number } {
-  return property.latitude !== undefined && property.longitude !== undefined;
+  // A number, not merely present: a database row reads an unset column as
+  // `null`, and a forecast asked for at "null, null" is a 400 from the
+  // provider that reads as an outage rather than "set the coordinates".
+  return typeof property.latitude === "number" && typeof property.longitude === "number";
 }

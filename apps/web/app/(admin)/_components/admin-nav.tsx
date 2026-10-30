@@ -13,6 +13,7 @@ import { markMove } from "@/app/(admin)/_components/back-link";
 import { SyncStatus } from "@/app/(admin)/_components/sync-status";
 import { useSearchPalette } from "@/app/(admin)/_components/search-palette";
 import { useFarmName } from "@/lib/branding";
+import { useAnimalHome } from "@/lib/use-animal-home";
 
 export { NAV, isCurrent } from "@/app/(admin)/_components/nav-groups";
 
@@ -128,6 +129,8 @@ export function AdminNav({
   // there unread until a deploy.
   const name = useFarmName(propertyId, farmName);
   const search = useSearchPalette();
+  // Animals reopens the species last looked at (decision 45).
+  const animalHome = useAnimalHome();
 
   return (
     <nav aria-label="Admin sections" className="flex h-full flex-col">
@@ -183,7 +186,7 @@ export function AdminNav({
             return (
               <Link
                 key={destination.href}
-                href={destination.href}
+                href={destination.href === "/admin/animals" ? animalHome : destination.href}
                 // A tab change is a fresh start: no Back into the place left.
                 onClick={() => markMove("tab")}
                 // See `next.config.ts`. Next's default stops a dynamic route's
@@ -220,13 +223,14 @@ export function AdminNav({
  */
 export function BottomTabs() {
   const pathname = usePathname();
+  const animalHome = useAnimalHome();
   const current = destinationFor(pathname);
   const tab = (destination: (typeof NAV)[number]) => {
     const here = current?.href === destination.href;
     return (
       <Link
         key={destination.href}
-        href={destination.href}
+        href={destination.href === "/admin/animals" ? animalHome : destination.href}
         // A tab change is a fresh start: no Back into the place left.
         onClick={() => markMove("tab")}
         prefetch

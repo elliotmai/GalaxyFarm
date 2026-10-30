@@ -40,6 +40,12 @@ export interface NavDestination extends NavItem {
   readonly sections: readonly NavItem[];
   /** The landing page draws no strip; see `NAV`. */
   readonly quietLanding?: boolean;
+  /**
+   * The sections are switched from the page title rather than a strip — the
+   * species switcher on every animal page (decision 45). Their own tools
+   * still draw their strip below.
+   */
+  readonly titleSwitches?: boolean;
 }
 
 /**
@@ -70,6 +76,7 @@ export const NAV: readonly NavDestination[] = [
     label: "Animals",
     glyph: "✦",
     quietLanding: true,
+    titleSwitches: true,
     sections: [
       { href: "/admin/animals", label: "All" },
       { href: "/admin/cattle", label: "Cattle", owns: ["/admin/cattle/"] },

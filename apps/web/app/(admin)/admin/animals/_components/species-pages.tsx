@@ -4,6 +4,14 @@ import type { Ulid, Zone } from "@galaxy-farm/core";
 import type { EggLog, FlockAdjustment } from "@galaxy-farm/module-poultry";
 
 import { AnimalsScreen } from "@/app/(admin)/admin/animals/_components/animals-screen";
+import {
+  CHICKEN_ACTIONS,
+  ChickensGlance,
+  HORSE_ACTIONS,
+  HorsesGlance,
+  petActions,
+  PetsGlance,
+} from "@/app/(admin)/admin/animals/_components/species-glance";
 import { FlockEditor } from "@/app/(admin)/admin/chickens/flock/_components/flock-editor";
 import { HorseEditor } from "@/app/(admin)/admin/horses/_components/horse-editor";
 import { PetEditor } from "@/app/(admin)/admin/pets/_components/pet-panel";
@@ -32,6 +40,8 @@ export function HorsesPage({ propertyId, actorId }: PageProps) {
       propertyId={propertyId}
       species="horses"
       basePath="/admin/horses"
+      glance={<HorsesGlance propertyId={propertyId} />}
+      actions={HORSE_ACTIONS}
       add={{
         label: "Add a horse",
         render: (close) => (
@@ -65,6 +75,8 @@ function PetsPage({
       propertyId={propertyId}
       species={species === "dog" ? "dogs" : "cats"}
       basePath={species === "dog" ? "/admin/pets/dogs" : "/admin/pets/cats"}
+      glance={<PetsGlance propertyId={propertyId} species={species} />}
+      actions={petActions(species)}
       add={{
         label: species === "dog" ? "Add a dog" : "Add a cat",
         render: (close) => (
@@ -95,6 +107,8 @@ export function ChickensPage({ propertyId, actorId }: PageProps) {
       propertyId={propertyId}
       species="chickens"
       basePath="/admin/chickens/flock"
+      glance={<ChickensGlance propertyId={propertyId} />}
+      actions={CHICKEN_ACTIONS}
       add={{
         label: "Add a flock",
         render: (close) => (

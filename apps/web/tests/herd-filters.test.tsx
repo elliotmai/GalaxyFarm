@@ -166,7 +166,7 @@ describe("the herd list", () => {
   it("counts the head and opens the editor in a dialog", async () => {
     view();
 
-    expect(screen.getByRole("heading", { level: 1, name: "Cattle" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: /^Cattle/ })).toBeInTheDocument();
     expect(screen.getByText("2 head")).toBeInTheDocument();
 
     // Two add buttons are drawn — the header one for a laptop, the floating

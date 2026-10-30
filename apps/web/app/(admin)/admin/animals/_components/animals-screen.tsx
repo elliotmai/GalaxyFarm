@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, EmptyState, Modal, Select, TextInput, optionLabel } from "@galaxy-farm/ui";
 import type { Animal, Ulid, Zone, ZoneAssignment } from "@galaxy-farm/core";
 import type { BreedingRecord, CalvingRecord, HealthRecord } from "@galaxy-farm/module-cattle";
-import type { Flock, FlockAdjustment } from "@galaxy-farm/module-poultry";
+import type { EggLog, Flock, FlockAdjustment } from "@galaxy-farm/module-poultry";
 
 import {
   animalEntries,
@@ -23,6 +23,8 @@ import {
   type AnimalGroup,
 } from "@/app/(admin)/admin/animals/_components/animal-entries";
 import { noteAddress } from "@/app/(admin)/_components/back-link";
+import { SpeciesSwitcher } from "@/app/(admin)/_components/species-switcher";
+import { DEFAULT_ANIMAL_HOME, isAnimalHome } from "@/lib/last-species";
 import { logHref } from "@/app/(admin)/admin/log/_components/log-kinds";
 import { AnimalListRow } from "@/app/(admin)/admin/animals/_components/animal-list-row";
 import { Chip, ChipRow } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
@@ -47,6 +49,14 @@ import { useRecords } from "@/lib/local/use-records";
  * component, so the pages cannot drift apart.
  */
 
+/** One of a species page's big buttons: the job, as a link into the Log or a tool. */
+export interface QuickAction {
+  readonly label: string;
+  readonly href: string;
+  /** A character, not an icon set — read before the word is. */
+  readonly glyph: string;
+}
+
 /** How a species page adds one: a link elsewhere, or its own form in place. */
 export interface AddAction {
   readonly label: string;
@@ -59,6 +69,9 @@ export interface AddAction {
 const SPECIES_LINK =
   "inline-flex min-h-target shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm font-medium text-muted hover:bg-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
 
+const ACTION_TILE =
+  "flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-density border border-rule bg-panel px-1 text-center text-[13px] font-medium text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
+
 const ACTION_LINK =
   "inline-flex min-h-target items-center justify-center rounded-density bg-action px-4 font-semibold text-action-ink hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
 
@@ -67,6 +80,8 @@ export function AnimalsScreen({
   species,
   basePath = "/admin/animals",
   add = { label: "Add animal", href: "/admin/cattle?add=1" },
+  glance,
+  actions,
 }: {
   readonly propertyId: Ulid;
   /** One species' page rather than every animal on the place. */
@@ -74,6 +89,10 @@ export function AnimalsScreen({
   /** Where this list lives, for the address its filters are kept in. */
   readonly basePath?: string;
   readonly add?: AddAction;
+  /** The species' own at-a-glance panel, under the title. */
+  readonly glance?: ReactNode;
+  /** The species' common jobs, as big buttons. */
+  readonly actions?: readonly QuickAction[];
 }) {
   const query = { propertyId };
   const { records: animals, loading } = useRecords<Animal>("animals", query);
@@ -84,6 +103,7 @@ export function AnimalsScreen({
   const { records: health } = useRecords<HealthRecord>("healthRecords", query);
   const { records: breedings } = useRecords<BreedingRecord>("breedingRecords", query);
   const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", query);
+  const { records: eggLogs } = useRecords<EggLog>("eggLogs", query);
 
   const router = useRouter();
   const params = useSearchParams();
@@ -135,9 +155,10 @@ export function AnimalsScreen({
         health,
         breedings,
         calvings,
+        eggLogs,
         now,
       }),
-    [animals, flocks, adjustments, zones, assignments, health, breedings, calvings, now],
+    [animals, flocks, adjustments, zones, assignments, health, breedings, calvings, eggLogs, now],
   );
 
   const mine = group === "" ? entries : entries.filter((entry) => entry.group === group);
@@ -204,10 +225,11 @@ export function AnimalsScreen({
     // last row.
     <div className="flex flex-col gap-density pb-20 sm:pb-0">
       <header className="flex items-center justify-between gap-density">
-        <div className="flex min-w-0 items-baseline gap-2.5">
-          <h1 className="text-ink">{title}</h1>
-          <span className="text-sm text-muted">{here.length} here</span>
-        </div>
+        <SpeciesSwitcher
+          propertyId={propertyId}
+          current={isAnimalHome(basePath) ? basePath : DEFAULT_ANIMAL_HOME}
+          detail={`${here.length} here`}
+        />
         <div className="flex shrink-0 items-center gap-2">
           <Button
             variant={selecting ? "primary" : "secondary"}
@@ -227,6 +249,24 @@ export function AnimalsScreen({
           </span>
         </div>
       </header>
+
+      {actions === undefined || actions.length === 0 ? null : (
+        <nav
+          aria-label={`Quick actions for ${title.toLowerCase()}`}
+          className="grid grid-cols-4 gap-2"
+        >
+          {actions.map((action) => (
+            <Link key={action.label} href={action.href} className={ACTION_TILE}>
+              <span aria-hidden="true" className="text-xl leading-none">
+                {action.glyph}
+              </span>
+              {action.label}
+            </Link>
+          ))}
+        </nav>
+      )}
+
+      {glance}
 
       <TextInput
         label="Find an animal"

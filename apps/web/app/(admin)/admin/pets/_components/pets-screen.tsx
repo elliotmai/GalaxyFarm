@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import {
   animalsFedBy,
@@ -45,6 +47,15 @@ export function PetsScreen({
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
 }) {
+  // `?tab=health` or `?tab=feeding` opens on that tab — the Medicine and
+  // Rations buttons on the Dogs and Cats pages land here. Read off `window`
+  // once, so the page needs no Suspense boundary.
+  const [tab, setTab] = useState("pets");
+  useEffect(() => {
+    const asked = new URLSearchParams(window.location.search).get("tab");
+    if (asked === "health" || asked === "feeding") setTab(asked);
+  }, []);
+
   const query = { propertyId };
   const { records: animals, loading } = useRecords<Animal>("animals", query);
   const { records: health, loading: healthLoading } = useRecords<HealthRecord>(
@@ -126,6 +137,8 @@ export function PetsScreen({
 
       <Tabs
         label="Pets"
+        activeTab={tab}
+        onTabChange={setTab}
         tabs={[
           { id: "pets", label: "Who lives here" },
           { id: "health", label: "Vet and medicine" },
