@@ -1,4 +1,13 @@
-import { advance, backoffDelayMs, cursorFor, drainableNow, isServerError } from "@galaxy-farm/core";
+import {
+  advance,
+  applyPatch,
+  backoffDelayMs,
+  cursorFor,
+  drainableNow,
+  isServerError,
+  isStuck,
+  type FieldValue,
+} from "@galaxy-farm/core";
 import type {
   AuditEntry,
   BaseRecord,
@@ -231,6 +240,10 @@ export class SyncEngine<T extends BaseRecord> {
           : { pulled, offline: true };
       }
 
+      // Read after the pull returns, not before it: the edit this protects is
+      // the one made while the request was in flight.
+      const queued = (await this.options.outbox.pending()).filter((entry) => !isStuck(entry));
+
       let written = 0;
       for (const page of pages) {
         const repository = this.options.repositories.get(page.entity);
@@ -239,7 +252,7 @@ export class SyncEngine<T extends BaseRecord> {
         // Tombstones are saved like any other record. Writing them rather than
         // deleting locally is what stops a record resurrecting on the next pull
         // from a device that missed the deletion.
-        await repository.saveMany(page.records);
+        await repository.saveMany(rebased(page.entity, page.records, queued));
         this.cursors = advance(this.cursors, page.entity, page.records);
         written += page.records.length;
       }
@@ -280,4 +293,35 @@ export class SyncEngine<T extends BaseRecord> {
   cursorForEntity(entity: string) {
     return cursorFor(this.cursors, entity);
   }
+}
+
+/**
+ * What arrived, with this device's unsent work laid back over it.
+ *
+ * A pull answers with the server's copy as of the request. Anything edited
+ * here after the push that preceded it is still in the outbox — and saving
+ * the server's copy straight over the local one put the old value back on
+ * screen: a capacity cleared a second after an earlier save came back the
+ * moment that save's pull landed, and the next save from a form opened on it
+ * sent the old value up again. The outbox still holds the change, so
+ * re-applying it is exact, and the server's word on every other field stands.
+ * Stuck entries are left out: the server has refused them, and keeping their
+ * values on screen would show something that is never going to be true.
+ */
+export function rebased<T extends BaseRecord>(
+  entity: string,
+  records: readonly T[],
+  queued: readonly OutboxEntry[],
+): T[] {
+  const mine = queued.filter((entry) => entry.patch.entity === entity);
+  if (mine.length === 0) return [...records];
+  return records.map((record) =>
+    mine
+      .filter((entry) => entry.patch.recordId === record.id)
+      .reduce(
+        (current, entry) =>
+          applyPatch(current as unknown as Record<string, FieldValue>, entry.patch) as unknown as T,
+        record,
+      ),
+  );
 }

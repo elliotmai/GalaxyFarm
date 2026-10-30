@@ -166,6 +166,37 @@ describe("pullSince", () => {
     expect(seen).toEqual([id(1), id(2), id(3), id(4), id(5)]);
   });
 
+  it("stops handing back rows stamped with microseconds a cursor cannot hold", async () => {
+    // A repair migration's `updated_at = now()` keeps microseconds; a device's
+    // cursor is a JavaScript Date and keeps milliseconds. Compared raw, the
+    // device was sent these rows again on every pull, for ever, and with more
+    // than a page of them every sync ran all its rounds.
+    await repository().saveMany([1, 2, 3, 4, 5].map((n) => animal(id(n))));
+    await client.exec(
+      `update animals set updated_at = '2026-06-01T08:00:00.825183Z' where id in ('${id(2)}', '${id(4)}')`,
+    );
+    await client.exec(
+      `update animals set updated_at = '2026-06-01T08:00:00.825911Z' where id in ('${id(1)}', '${id(3)}', '${id(5)}')`,
+    );
+
+    const seen: string[] = [];
+    let cursors: CursorSet = {};
+    let rounds = 0;
+    for (; rounds < 10; rounds += 1) {
+      const pages = await pull(cursors, 2);
+      const records = pages[0]?.records ?? [];
+      seen.push(...records.map((r) => r.id));
+      cursors = advance(cursors, "animals", records);
+      if (!pages[0]?.hasMore) break;
+    }
+
+    // Each once, in the order the cursor walks them: one millisecond, by id.
+    expect(seen).toEqual([id(1), id(2), id(3), id(4), id(5)]);
+    expect(rounds).toBe(2);
+    // And caught up: the next pull has nothing.
+    expect(await pull(cursors, 2)).toEqual([]);
+  });
+
   it("omits an entity with nothing new rather than sending an empty page", async () => {
     expect(await pull()).toEqual([]);
   });
