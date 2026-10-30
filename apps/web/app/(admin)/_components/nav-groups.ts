@@ -226,15 +226,15 @@ export const SUB_SECTIONS: Readonly<Record<string, readonly NavItem[]>> = {
     { href: "/admin/chickens/eggs", label: "Eggs" },
     { href: "/admin/chickens/headcount", label: "Headcount" },
   ],
-  // Vet, medicine and feeding are kept for every pet together, so both
-  // species' strips lead to the one Pet care page.
+  // Each species' own care — vet visits, medicine, rations — so the Cats
+  // strip never shows the dogs beside it (decision 46).
   "/admin/pets/dogs": [
     { href: "/admin/pets/dogs", label: "Dogs" },
-    { href: "/admin/pets", label: "Pet care" },
+    { href: "/admin/pets/dogs/care", label: "Dog care" },
   ],
   "/admin/pets/cats": [
     { href: "/admin/pets/cats", label: "Cats" },
-    { href: "/admin/pets", label: "Pet care" },
+    { href: "/admin/pets/cats/care", label: "Cat care" },
   ],
   "/admin/settings": [
     { href: "/admin/settings", label: "Settings" },

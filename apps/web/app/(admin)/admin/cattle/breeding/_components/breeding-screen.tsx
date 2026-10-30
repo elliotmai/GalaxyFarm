@@ -34,6 +34,7 @@ import {
   inferAncestorSexes,
   calvingWindow,
   daysBred,
+  daysCarried,
   drawStraw,
   awaitingCalving,
   groupOf,
@@ -344,8 +345,9 @@ export function BreedingScreen({
       numeric: true,
       // The number the calving-watch alert says out loud.
       render: (record) => {
-        const day = daysBred(record, now);
-        return day < 0 ? "—" : day;
+        // Frozen at the calving: what she carried, not days since the service.
+        const day = daysCarried(record, calvings, now);
+        return day === undefined ? "—" : day;
       },
     },
     {

@@ -33,7 +33,8 @@ import {
   calvingsFor,
   calvingInterval,
   cattleProfileSchema,
-  daysBred,
+  daysCarried,
+  hasCalved,
   healthHistoryFor,
   inferAncestorSexes,
   isUnderWithdrawal,
@@ -772,7 +773,9 @@ export function BreedingTab({
         ) : (
           <Rows label="Services">
             {hers.map((record) => {
-              const day = daysBred(record, now);
+              // Stops at the calving, so a service she has answered is not
+              // still counting up months later.
+              const day = daysCarried(record, calvings, now);
               const result = record.pregCheck?.result;
               return (
                 <Row
@@ -781,7 +784,8 @@ export function BreedingTab({
                   line={facts(
                     record.method,
                     `due ${formatDate(projectedDueDate(record))}`,
-                    day >= 0 && `day ${day}`,
+                    day !== undefined &&
+                      (hasCalved(calvings, record) ? `calved at day ${day}` : `day ${day}`),
                   )}
                   notes={record.notes}
                   chip={

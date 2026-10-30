@@ -61,7 +61,7 @@ vi.mock("next/navigation", () => ({
 
 const { ToastProvider, ConfirmProvider } = await import("@galaxy-farm/ui");
 const { LogFlow } = await import("../app/(admin)/admin/log/_components/log-flow.js");
-const { logHref, returnTo, startFrom } =
+const { eligible, logHref, returnTo, startFrom } =
   await import("../app/(admin)/admin/log/_components/log-kinds.js");
 
 function animal(id: Ulid, name: string, extra: Partial<Animal> = {}): Animal {
@@ -130,6 +130,16 @@ beforeEach(() => {
   };
   stored.params = "";
   stored.writes = [];
+});
+
+describe("who can be moved", () => {
+  it("moves dogs and cats too — a guardian dog with the flock, barn cats in the barn", () => {
+    const dog = animal(REX, "Rex", { species: "dog", sex: "male" });
+    expect(eligible("move", dog)).toBe(true);
+    expect(eligible("move", animal(REX, "Tom", { species: "cat" }))).toBe(true);
+    // Still nobody who has left the place.
+    expect(eligible("move", { ...dog, status: "sold" } as Animal)).toBe(false);
+  });
 });
 
 describe("where the log flow opens", () => {

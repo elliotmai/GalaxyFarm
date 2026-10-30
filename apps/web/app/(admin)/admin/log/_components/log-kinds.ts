@@ -89,9 +89,10 @@ export function singleAnimal(kind: LogKind): boolean {
  * The same narrowing the screens behind these writes already make: health and
  * weights are cattle-only (the pets screen writes to the same tables, and the
  * health screen draws doses out of the cattle fridge), calving, heats and
- * breeding are active cattle females, and a move is anything that stands in a
- * pen — not the dogs and cats, which have no pen (§5.8). Notes and photos go
- * on anything on the place.
+ * breeding are active cattle females, and a move is anything on the place —
+ * dogs and cats included, since a livestock guardian dog lives with the flock
+ * and barn cats live in the barn. Notes and photos go on anything on the
+ * place too.
  */
 export function eligible(kind: LogKind, animal: Animal): boolean {
   const onPlace = animal.status === "active" || animal.status === "boarding";
@@ -104,7 +105,7 @@ export function eligible(kind: LogKind, animal: Animal): boolean {
     case "breeding":
       return animal.species === "cattle" && animal.sex === "female" && animal.status === "active";
     case "move":
-      return onPlace && animal.species !== "dog" && animal.species !== "cat";
+      return onPlace;
     case "photo":
     case "note":
       return onPlace;

@@ -18,11 +18,14 @@ import {
   displayName,
   formatMoney,
   isOnFarm,
+  openAssignments,
   primaryPhone,
   type Animal,
   type Contact,
   type FeedingPlan,
   type Ulid,
+  type Zone,
+  type ZoneAssignment,
 } from "@galaxy-farm/core";
 import type { HealthRecord, HealthRecordType } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
@@ -113,6 +116,8 @@ export function PetScreen({
   const { records: plans } = useRecords<FeedingPlan>("feedingPlans", query);
   const { records: feeds } = useRecords<FeedType>("feedTypes", query);
   const { records: contacts } = useRecords<Contact>("contacts", query);
+  const { records: zones } = useRecords<Zone>("zones", query);
+  const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
 
   const [panel, setPanel] = useState<Panel | undefined>();
   const sitterId = useId();
@@ -145,8 +150,8 @@ export function PetScreen({
           title="No pet by that name"
           detail="Nothing on this device answers to that name or tag."
           action={
-            <Link href="/admin/pets" className="text-action underline">
-              Back to the pets
+            <Link href="/admin/animals" className="text-action underline">
+              Back to the animals
             </Link>
           }
         />
@@ -188,8 +193,18 @@ export function PetScreen({
     <Pill tone="neutral">On medication</Pill>
   ) : undefined;
 
-  // Where he is: a pet has no pen (§5.8), so the answer is whether he is home.
-  const where = isOnFarm(pet) ? "At home" : optionLabel(pet.status);
+  // Where he is: a guardian dog's pasture or a barn cat's barn when one is
+  // recorded, and otherwise simply whether he is home.
+  const placed = openAssignments(assignments, pet.id)
+    .map((assignment) => zones.find((zone) => zone.id === assignment.zoneId))
+    .filter((zone): zone is Zone => zone !== undefined)
+    .sort((left, right) => Number(left.indoor) - Number(right.indoor))
+    .map((zone) => (zone.indoor ? `inside ${zone.name}` : zone.name));
+  const where = !isOnFarm(pet)
+    ? optionLabel(pet.status)
+    : placed.length > 0
+      ? placed.join(" · ")
+      : "At home";
   const line = facts(petSpeciesLabel(pet), optionLabel(pet.sex), petAgeLabel(pet, asOf), where);
 
   const contactName = (id: Ulid | undefined) =>
@@ -347,6 +362,9 @@ export function PetScreen({
         <ActionButton icon="food" onClick={() => setPanel({ kind: "ration", plan: onlyRation })}>
           Ration
         </ActionButton>
+        <ActionLink icon="move" href={logHref({ kind: "move", animals: [pet.id], from: pathname })}>
+          Move
+        </ActionLink>
         <ActionLink icon="note" href={logHref({ kind: "note", animals: [pet.id], from: pathname })}>
           Note
         </ActionLink>
@@ -484,7 +502,9 @@ export function PetScreen({
           actorId={actorId}
           onClose={() => setPanel(undefined)}
           // Gone from the household, so back to the list it was opened from.
-          onDeleted={() => router.push("/admin/pets")}
+          onDeleted={() =>
+            router.push(pet.species === "cat" ? "/admin/pets/cats" : "/admin/pets/dogs")
+          }
         />
       ) : null}
     </PageBody>

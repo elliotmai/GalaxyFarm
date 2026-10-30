@@ -43,9 +43,15 @@ import { useRecords } from "@/lib/local/use-records";
 export function PetsScreen({
   propertyId,
   actorId,
+  species,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /**
+   * One species' care — Dog care, Cat care — each in its own species' strip,
+   * so the way to the cats' vet visits never shows the dogs beside it.
+   */
+  readonly species?: "dog" | "cat";
 }) {
   // `?tab=health` or `?tab=feeding` opens on that tab — the Medicine and
   // Rations buttons on the Dogs and Cats pages land here. Read off `window`
@@ -66,7 +72,9 @@ export function PetsScreen({
   const { records: feeds } = useRecords<FeedType>("feedTypes", query);
   const { records: contacts } = useRecords<Contact>("contacts", query);
 
-  const pets = petsOnFarm(animals);
+  const pets = petsOnFarm(animals).filter(
+    (pet) => species === undefined || pet.species === species,
+  );
   const petIds = new Set(pets.map((pet) => pet.id));
   const petHealth = health.filter((record) => petIds.has(record.animalId));
   // `animalsFedBy`, not `targetId`: a bowl two cats share is filed under one
@@ -92,9 +100,9 @@ export function PetsScreen({
     <PageBody>
       <PageHeader
         eyebrow="Animals"
-        title="Pet care"
+        title={species === "dog" ? "Dog care" : species === "cat" ? "Cat care" : "Pet care"}
         subtitle={[
-          `${pets.length} pet${pets.length === 1 ? "" : "s"}`,
+          `${pets.length} ${species ?? "pet"}${pets.length === 1 ? "" : "s"}`,
           due.length === 0 ? undefined : `${due.length} care due`,
           careful === 0 ? undefined : `${careful} handle with care`,
         ]

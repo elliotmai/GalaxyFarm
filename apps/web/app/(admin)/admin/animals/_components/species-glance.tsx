@@ -249,10 +249,10 @@ export function ChickensGlance({ propertyId }: { readonly propertyId: Ulid }) {
 export function petActions(species: "dog" | "cat"): readonly QuickAction[] {
   const from = species === "dog" ? "/admin/pets/dogs" : "/admin/pets/cats";
   return [
-    { label: "Medicine", glyph: "✚", href: "/admin/pets?tab=health" },
+    { label: "Medicine", glyph: "✚", href: `${from}/care?tab=health` },
     { label: "Feeding", glyph: "●", href: logHref({ kind: "feeding", from }) },
     { label: "Note", glyph: "✎", href: logHref({ kind: "note", from }) },
-    { label: "Rations", glyph: "▤", href: "/admin/pets?tab=feeding" },
+    { label: "Rations", glyph: "▤", href: `${from}/care?tab=feeding` },
   ];
 }
 
@@ -283,6 +283,7 @@ export function PetsGlance({
       .filter((id): id is Ulid => id !== undefined && ids.has(id as Ulid)),
   ).size;
   const word = species === "dog" ? "dog" : "cat";
+  const care = `/admin/pets/${word}s/care`;
 
   return (
     <Glance label={`${species === "dog" ? "Dogs" : "Cats"} at a glance`}>
@@ -290,14 +291,14 @@ export function PetsGlance({
       <Fact
         value={overdue}
         label="shots or medicine overdue"
-        href="/admin/pets?tab=health"
+        href={`${care}?tab=health`}
         tone={overdue > 0 ? "attention" : "neutral"}
       />
-      <Fact value={soon} label="due in two weeks" href="/admin/pets?tab=health" />
+      <Fact value={soon} label="due in two weeks" href={`${care}?tab=health`} />
       <Fact
         value={pets.length - fed}
         label="with no ration written"
-        href="/admin/pets?tab=feeding"
+        href={`${care}?tab=feeding`}
         tone={pets.length - fed > 0 ? "attention" : "neutral"}
       />
     </Glance>
