@@ -68,6 +68,22 @@ export interface AnimalEntry {
   readonly onFarm: boolean;
   /** Lower-cased text the search box matches against. */
   readonly haystack: string;
+  /** Where it stands outdoors — a pen or pasture — if anywhere is recorded. */
+  readonly outside: Place | undefined;
+  /** The barn or stall it is in tonight, if any. Optional, always. */
+  readonly inside: Place | undefined;
+  /** For the Sex filter. A flock has none. */
+  readonly sex: string | undefined;
+  /** The record's status — active, sold, dead… — or a flock's active/retired. */
+  readonly status: string;
+  /** "Cow", "Heifer", "Dog" — what the Class filter and grouping read. */
+  readonly kind: string;
+}
+
+/** A zone as a row names it. */
+export interface Place {
+  readonly id: Ulid;
+  readonly name: string;
 }
 
 export interface EntryInputs {
@@ -127,14 +143,17 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
     if (was === undefined || due < was) dueByAnimal.set(record.damId, due);
   }
 
-  // The pen a row names: the outside one when there is one, as on the herd.
-  const zoneOf = new Map<Ulid, Zone>();
-  for (const assignment of input.assignments) {
+  // Where each animal stands, in both places at once: the pasture it is on and
+  // the barn it may be shut in tonight. The latest open assignment wins each.
+  const outsideOf = new Map<Ulid, Zone>();
+  const insideOf = new Map<Ulid, Zone>();
+  for (const assignment of [...input.assignments].sort(
+    (left, right) => left.periodFrom.getTime() - right.periodFrom.getTime(),
+  )) {
     if (assignment.periodTo !== undefined) continue;
     const zone = zoneById.get(assignment.zoneId);
     if (zone === undefined) continue;
-    const held = zoneOf.get(assignment.animalId);
-    if (held === undefined || (held.indoor && !zone.indoor)) zoneOf.set(assignment.animalId, zone);
+    (zone.indoor ? insideOf : outsideOf).set(assignment.animalId, zone);
   }
 
   // A pet whose shots have lapsed — the pets screen's red line, as a chip.
@@ -153,7 +172,8 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
   const rows: AnimalEntry[] = animals.map((animal) => {
     const group = groupOf(animal);
     const title = animalTitle(animal);
-    const zone = zoneOf.get(animal.id)?.name;
+    const outside = outsideOf.get(animal.id);
+    const inside = insideOf.get(animal.id);
     const kind =
       group === "cattle"
         ? cattleClass(animal, now, { hasCalved: calved.has(animal.id) })
@@ -164,7 +184,12 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
           ? capitalise(animal.sex)
           : CATTLE_CLASS_SINGULAR[kind]
         : (SPECIES_WORD[animal.species] ?? capitalise(animal.species));
-    const line = [what, ageLabel(animal, now), zone]
+    const line = [
+      what,
+      ageLabel(animal, now),
+      outside?.name,
+      inside === undefined ? undefined : `inside ${inside.name}`,
+    ]
       .filter((part) => part !== undefined && part !== "")
       .join(" · ");
 
@@ -195,6 +220,11 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
       selectable: true,
       onFarm: isOnFarm(animal),
       haystack: [animal.name, animal.tagNumber, line].filter(Boolean).join(" ").toLowerCase(),
+      outside: outside === undefined ? undefined : { id: outside.id, name: outside.name },
+      inside: inside === undefined ? undefined : { id: inside.id, name: inside.name },
+      sex: animal.sex,
+      status: animal.status,
+      kind: what,
     };
   });
 
@@ -221,6 +251,14 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
       selectable: false,
       onFarm: flock.active,
       haystack: [flock.name, line].join(" ").toLowerCase(),
+      outside:
+        zone === undefined || flock.zoneId === undefined
+          ? undefined
+          : { id: flock.zoneId, name: zone },
+      inside: undefined,
+      sex: undefined,
+      status: flock.active ? "active" : "retired",
+      kind: flock.species === "quail" ? "Quail flock" : "Flock",
     });
   }
 
@@ -233,4 +271,120 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
 
 function capitalise(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/**
+ * How the list is narrowed and laid out: where, sex, status, class, and what
+ * it is grouped by. Each is "" for "any", because they come straight out of a
+ * `<select>` and out of the address bar, neither of which has an undefined.
+ *
+ * Kept in the address rather than in component state, so a list narrowed to
+ * "heifers in Pasture 3" is still narrowed after opening one of them and
+ * coming Back.
+ */
+export interface EntryView {
+  /** A zone id (outside or inside), `none` for nowhere recorded, or "". */
+  readonly where: string;
+  readonly sex: string;
+  /** A status, or "" for whatever is on the farm. */
+  readonly status: string;
+  readonly kind: string;
+  readonly groupBy: GroupBy;
+}
+
+export const GROUP_BYS = ["", "where", "kind", "sex", "status"] as const;
+export type GroupBy = (typeof GROUP_BYS)[number];
+
+export const GROUP_BY_LABELS: Readonly<Record<GroupBy, string>> = {
+  "": "No grouping",
+  where: "Where",
+  kind: "Class",
+  sex: "Sex",
+  status: "Status",
+};
+
+export const NO_VIEW: EntryView = { where: "", sex: "", status: "", kind: "", groupBy: "" };
+
+/** Read a view out of the address bar, ignoring anything it does not know. */
+export function viewFrom(params: { get(name: string): string | null }): EntryView {
+  const groupBy = params.get("by") ?? "";
+  return {
+    where: params.get("where") ?? "",
+    sex: params.get("sex") ?? "",
+    status: params.get("status") ?? "",
+    kind: params.get("class") ?? "",
+    groupBy: (GROUP_BYS as readonly string[]).includes(groupBy) ? (groupBy as GroupBy) : "",
+  };
+}
+
+/** The filters in force, as the line under the chips says them. */
+export function viewFacts(view: EntryView, zones: readonly Pick<Zone, "id" | "name">[]): string[] {
+  return [
+    view.where === ""
+      ? undefined
+      : view.where === "none"
+        ? "Not placed"
+        : (zones.find((zone) => zone.id === view.where)?.name ?? "A pen"),
+    view.sex === "" ? undefined : capitalise(view.sex),
+    view.status === "" ? undefined : capitalise(view.status),
+    view.kind === "" ? undefined : view.kind,
+  ].filter((part): part is string => part !== undefined);
+}
+
+export function filterEntries(entries: readonly AnimalEntry[], view: EntryView): AnimalEntry[] {
+  return entries.filter((entry) => {
+    if (view.where === "none" && entry.outside !== undefined) return false;
+    if (
+      view.where !== "" &&
+      view.where !== "none" &&
+      entry.outside?.id !== view.where &&
+      entry.inside?.id !== view.where
+    ) {
+      return false;
+    }
+    if (view.sex !== "" && entry.sex !== view.sex) return false;
+    if (view.status !== "" && entry.status !== view.status) return false;
+    if (view.kind !== "" && entry.kind !== view.kind) return false;
+    return true;
+  });
+}
+
+export interface EntrySection {
+  readonly label: string;
+  readonly entries: readonly AnimalEntry[];
+}
+
+/**
+ * The list cut into headed sections — by pasture, by class, by sex, by status.
+ *
+ * By "where" reads the outside place, the one every animal has; a barn it is
+ * shut in tonight still shows on its row. Sections come in name order, with
+ * the catch-all ("Not placed", "Unknown") last, where a list of loose ends
+ * belongs.
+ */
+export function groupEntries(entries: readonly AnimalEntry[], by: GroupBy): EntrySection[] {
+  if (by === "") return [{ label: "", entries }];
+
+  const LAST = "￿";
+  const labelOf = (entry: AnimalEntry): string => {
+    switch (by) {
+      case "where":
+        return entry.outside?.name ?? `${LAST}Not placed`;
+      case "kind":
+        return entry.kind;
+      case "sex":
+        return entry.sex === undefined ? `${LAST}Not recorded` : capitalise(entry.sex);
+      case "status":
+        return capitalise(entry.status);
+    }
+  };
+
+  const sections = new Map<string, AnimalEntry[]>();
+  for (const entry of entries) {
+    const label = labelOf(entry);
+    sections.set(label, [...(sections.get(label) ?? []), entry]);
+  }
+  return [...sections.entries()]
+    .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true }))
+    .map(([label, held]) => ({ label: label.replace(LAST, ""), entries: held }));
 }

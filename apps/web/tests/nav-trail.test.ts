@@ -5,6 +5,7 @@ import {
   backLabel,
   named,
   parentOf,
+  readdressed,
   type TrailStep,
 } from "../app/(admin)/_components/nav-trail.js";
 
@@ -14,7 +15,7 @@ import {
  * the trail's previous step was is going back.
  */
 
-const walk = (...steps: [string, "forward" | "tab" | "sideways"][]): TrailStep[] =>
+const walk = (...steps: [string, "forward" | "tab" | "sideways" | "back"][]): TrailStep[] =>
   steps.reduce<TrailStep[]>((trail, [href, move]) => arrive(trail, href, move), []);
 
 const hrefs = (trail: readonly TrailStep[]) => trail.map((step) => step.href);
@@ -25,7 +26,33 @@ describe("the trail", () => {
     expect(hrefs(into)).toEqual(["/admin/animals", "/admin/cattle/andromeda"]);
 
     // Back — the link or the browser's — lands on the previous step and pops.
-    expect(hrefs(arrive(into, "/admin/animals", "forward"))).toEqual(["/admin/animals"]);
+    expect(hrefs(arrive(into, "/admin/animals", "back"))).toEqual(["/admin/animals"]);
+  });
+
+  it("treats opening the page you came from as a step forward, not back", () => {
+    // From her page into the list, then into her again: the list stays behind.
+    const trail = walk(
+      ["/admin/cattle/andromeda", "tab"],
+      ["/admin/animals", "forward"],
+      ["/admin/cattle/andromeda", "forward"],
+    );
+    expect(hrefs(trail).at(-2)).toBe("/admin/animals");
+  });
+
+  it("walks back past the Log to the page it was opened from", () => {
+    const trail = walk(
+      ["/admin/animals", "tab"],
+      ["/admin/cattle/andromeda", "forward"],
+      ["/admin/log?kind=weight", "forward"],
+      ["/admin/cattle/andromeda", "back"],
+    );
+    expect(hrefs(trail)).toEqual(["/admin/animals", "/admin/cattle/andromeda"]);
+  });
+
+  it("returns to a list as it was filtered, not as it first opened", () => {
+    const listed = readdressed(walk(["/admin/animals", "tab"]), "/admin/animals?by=where");
+    const into = arrive(listed, "/admin/cattle/andromeda", "forward");
+    expect(hrefs(into)[0]).toBe("/admin/animals?by=where");
   });
 
   it("starts fresh on a tab change, so there is no Back into the tab left", () => {

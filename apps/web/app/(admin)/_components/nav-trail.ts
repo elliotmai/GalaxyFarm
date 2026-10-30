@@ -32,7 +32,7 @@ export interface TrailStep {
   readonly title: string | undefined;
 }
 
-export type Move = "forward" | "tab" | "sideways";
+export type Move = "forward" | "tab" | "sideways" | "back";
 
 /** Long enough for any real wander; short enough that sessionStorage never minds. */
 const LONGEST = 30;
@@ -44,19 +44,36 @@ function pathOf(href: string): string {
 /**
  * The trail after arriving at `href`.
  *
- * Arriving where the step before the current one was is going back — by the
- * Back link or by the browser's — and pops. Arriving at the same page with a
- * new query (a filter, a tab inside the page) keeps your place.
+ * A step back — the Back link, the browser's own back, the Log's Close — walks
+ * back to where that page sits in the trail, however far. Only an arrival
+ * marked as going back does: opening the very cow you came from is a step
+ * forward to her, and has to leave a way back to the list. Arriving at the
+ * same page with a new query (a filter, a tab inside the page) keeps your
+ * place.
  */
 export function arrive(trail: readonly TrailStep[], href: string, move: Move): TrailStep[] {
   const here = trail.at(-1);
   if (move === "tab" || here === undefined) return [{ href, title: undefined }];
-  if (trail.at(-2)?.href === href) return trail.slice(0, -1);
-  if (here.href === href) return [...trail];
-  if (move === "sideways" || pathOf(here.href) === pathOf(href)) {
-    return [...trail.slice(0, -1), { href, title: undefined }];
+  if (move === "back") {
+    const at = trail.map((step) => step.href).lastIndexOf(href, trail.length - 2);
+    return at === -1 ? [{ href, title: undefined }] : trail.slice(0, at + 1);
   }
+  if (here.href === href) return [...trail];
+  if (pathOf(here.href) === pathOf(href)) return readdressed(trail, href);
+  if (move === "sideways") return [...trail.slice(0, -1), { href, title: undefined }];
   return [...trail, { href, title: undefined }].slice(-LONGEST);
+}
+
+/**
+ * The page changed its own address — a filter applied — without leaving.
+ *
+ * Kept on the current step, so the Back that returns here returns to the list
+ * as it was left, filtered, rather than as it first opened.
+ */
+export function readdressed(trail: readonly TrailStep[], href: string): TrailStep[] {
+  const here = trail.at(-1);
+  if (here === undefined || pathOf(here.href) !== pathOf(href)) return [...trail];
+  return [...trail.slice(0, -1), { ...here, href }];
 }
 
 /**

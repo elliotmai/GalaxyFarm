@@ -9,6 +9,7 @@ import {
   backLabel,
   named,
   parentOf,
+  readdressed,
   type Move,
   type TrailStep,
 } from "@/app/(admin)/_components/nav-trail";
@@ -34,9 +35,21 @@ const KEY = "gf-trail";
  */
 let pending: Move | undefined;
 
-/** The tab bar and the rail call this; a section strip says "sideways". */
+/**
+ * The tab bar and the rail call this with "tab", a section strip with
+ * "sideways", and anything that returns somewhere — the Back link, the Log's
+ * Close — with "back". Unmarked arrivals are steps forward.
+ */
 export function markMove(move: Move): void {
   pending = move;
+}
+
+/**
+ * A page changed its own address without leaving — a filter applied — and the
+ * trail should remember it, so coming Back lands on the list as it was left.
+ */
+export function noteAddress(href: string): void {
+  write(readdressed(read(), href));
 }
 
 function read(): TrailStep[] {
@@ -66,6 +79,16 @@ function headingNow(): string | undefined {
 export function BackLink() {
   const pathname = usePathname();
   const [trail, setTrail] = useState<readonly TrailStep[]>([]);
+
+  // The browser's own back (and forward — indistinguishable here, and rare on
+  // a phone) walks the trail rather than adding to it.
+  useEffect(() => {
+    const onPop = () => {
+      pending = "back";
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   useEffect(() => {
     const move = pending ?? "forward";
@@ -100,7 +123,13 @@ export function BackLink() {
 
   const previous = trail.length >= 2 ? trail.at(-2) : undefined;
   if (previous !== undefined) {
-    return <Back href={previous.href} label={backLabel(previous.title, "Back")} />;
+    return (
+      <Back
+        href={previous.href}
+        label={backLabel(previous.title, "Back")}
+        onClick={() => markMove("back")}
+      />
+    );
   }
 
   // Opened cold — a link from a message, a bookmark, a reload with no trail.

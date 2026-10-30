@@ -23,6 +23,36 @@ vi.mock("@/lib/local/use-records", () => ({
   useRecords: (store: string) => ({ records: stored.current[store] ?? [], loading: false }),
 }));
 
+// The view lives in the address bar, so the router is a little store the
+// screen re-reads when `replace` changes it.
+const address = vi.hoisted(() => ({
+  query: "",
+  listeners: new Set<() => void>(),
+}));
+
+vi.mock("next/navigation", async () => {
+  const { useSyncExternalStore } = await import("react");
+  return {
+    useSearchParams: () =>
+      new URLSearchParams(
+        useSyncExternalStore(
+          (listener: () => void) => {
+            address.listeners.add(listener);
+            return () => address.listeners.delete(listener);
+          },
+          () => address.query,
+        ),
+      ),
+    useRouter: () => ({
+      replace: (href: string) => {
+        address.query = href.split("?")[1] ?? "";
+        for (const listener of address.listeners) listener();
+      },
+      push: () => {},
+    }),
+  };
+});
+
 const { AnimalsScreen } =
   await import("../app/(admin)/admin/animals/_components/animals-screen.js");
 
@@ -57,6 +87,7 @@ const FLOCK = {
 };
 
 beforeEach(() => {
+  address.query = "";
   stored.current = {
     animals: [ROSIE, BISCUIT, SCOUT, SOLD],
     flocks: [FLOCK],
@@ -127,5 +158,75 @@ describe("the Animals list", () => {
     expect(screen.getByRole("link", { name: "Log for them" }).getAttribute("href")).toBe(
       `/admin/log?animals=${ROSIE.id},${BISCUIT.id}&from=%2Fadmin%2Fanimals`,
     );
+  });
+});
+
+describe("filtering and grouping", () => {
+  const PASTURE = {
+    id: "01ARZ3NDEKTSV4RRFFQ69G5Z01" as Ulid,
+    name: "Pasture 3",
+    indoor: false,
+    active: true,
+  };
+  const BARN = {
+    id: "01ARZ3NDEKTSV4RRFFQ69G5Z02" as Ulid,
+    name: "Barn",
+    indoor: true,
+    active: true,
+  };
+  const BULL = animal("01ARZ3NDEKTSV4RRFFQ69G5A05", { name: "Duke", sex: "male" });
+  const placed = (id: string, animalId: Ulid, zoneId: Ulid) => ({
+    id,
+    propertyId: PROPERTY,
+    animalId,
+    zoneId,
+    slot: "outside",
+    periodFrom: new Date("2026-01-02"),
+  });
+
+  beforeEach(() => {
+    stored.current = {
+      animals: [ROSIE, BULL, SCOUT],
+      zones: [PASTURE, BARN],
+      // Rosie is on the pasture and shut in the barn tonight; Duke is nowhere.
+      zoneAssignments: [
+        placed("01ARZ3NDEKTSV4RRFFQ69G5P01", ROSIE.id, PASTURE.id),
+        { ...placed("01ARZ3NDEKTSV4RRFFQ69G5P02", ROSIE.id, BARN.id), slot: "inside" },
+      ],
+      flocks: [],
+      flockAdjustments: [],
+    };
+  });
+
+  it("names both places on a row, and finds her by either", async () => {
+    const user = userEvent.setup();
+    render(<AnimalsScreen propertyId={PROPERTY} />);
+
+    expect(screen.getByText(/Pasture 3 · inside Barn/)).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: /Filter & group/ }));
+    await user.selectOptions(screen.getByLabelText("Where"), BARN.id);
+    expect(address.query).toBe(`where=${BARN.id}`);
+    const list = screen.getByRole("list", { name: "Animals on this property" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(list).getByText("Rosie")).toBeTruthy();
+  });
+
+  it("narrows by sex, and groups by where with the unplaced last", async () => {
+    const user = userEvent.setup();
+    render(<AnimalsScreen propertyId={PROPERTY} />);
+
+    await user.click(screen.getByRole("button", { name: /Filter & group/ }));
+    await user.selectOptions(screen.getByLabelText("Sex"), "male");
+    await user.selectOptions(screen.getByLabelText("Group by"), "where");
+
+    expect(screen.queryByRole("list", { name: "Pasture 3" })).toBeNull();
+    const unplaced = screen.getByRole("list", { name: "Not placed" });
+    expect(
+      within(unplaced)
+        .getAllByRole("listitem")
+        .map((row) => row.textContent),
+    ).toEqual([expect.stringContaining("Duke"), expect.stringContaining("Scout")]);
+    expect(screen.getByText(/Grouped by where/)).toBeTruthy();
   });
 });

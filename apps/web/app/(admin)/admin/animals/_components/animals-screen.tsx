@@ -1,19 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Button, EmptyState, TextInput } from "@galaxy-farm/ui";
+import { Button, EmptyState, Modal, Select, TextInput, optionLabel } from "@galaxy-farm/ui";
 import type { Animal, Ulid, Zone, ZoneAssignment } from "@galaxy-farm/core";
 import type { BreedingRecord, CalvingRecord, HealthRecord } from "@galaxy-farm/module-cattle";
 import type { Flock, FlockAdjustment } from "@galaxy-farm/module-poultry";
 
 import {
   animalEntries,
+  filterEntries,
+  GROUP_BY_LABELS,
+  GROUP_BYS,
   GROUP_LABELS,
   GROUPS,
+  groupEntries,
+  viewFacts,
+  viewFrom,
   type AnimalGroup,
 } from "@/app/(admin)/admin/animals/_components/animal-entries";
+import { noteAddress } from "@/app/(admin)/_components/back-link";
 import { logHref } from "@/app/(admin)/admin/log/_components/log-kinds";
 import { AnimalListRow } from "@/app/(admin)/admin/animals/_components/animal-list-row";
 import { Chip, ChipRow } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
@@ -27,6 +35,10 @@ import { useRecords } from "@/lib/local/use-records";
  * species chips that are also the counts, and a Select mode for "these four
  * all got the same shot" — which hands the picked animals to the Log flow
  * rather than growing a second way to write a record here.
+ *
+ * Filter and group sit behind one button — where it stands (outside or in),
+ * sex, status, class, and grouping by any of those — and live in the address,
+ * so "the heifers in Pasture 3" survives opening one of them and coming Back.
  */
 
 const ACTION_LINK =
@@ -43,9 +55,42 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
   const { records: breedings } = useRecords<BreedingRecord>("breedingRecords", query);
   const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", query);
 
+  const router = useRouter();
+  const params = useSearchParams();
+  const view = viewFrom(params);
+  const asked = params.get("species") ?? "";
+  const group: AnimalGroup | "" = (GROUPS as readonly string[]).includes(asked)
+    ? (asked as AnimalGroup)
+    : "";
+
+  // The address as last asked for. The router applies a replace in a
+  // transition, so two changes in a row — Sex, then Group by — would each start
+  // from the address before either landed, and the second would undo the first.
+  const asking = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    asking.current = undefined;
+  }, [params]);
+
+  /** Change the view in the address, replacing rather than stacking history. */
+  function setView(changes: Readonly<Record<string, string>>) {
+    const next = new URLSearchParams(asking.current ?? params.toString());
+    for (const [key, value] of Object.entries(changes)) {
+      // crud-guard: allow-unconfirmed — drops a key from the address bar, nothing persisted
+      if (value === "") next.delete(key);
+      else next.set(key, value);
+    }
+    const query = next.toString();
+    asking.current = query;
+    const href = query === "" ? "/admin/animals" : `/admin/animals?${query}`;
+    router.replace(href, { scroll: false });
+    // So Back from an animal returns to the list filtered as it was left.
+    noteAddress(href);
+  }
+  const setGroup = (next: AnimalGroup | "") => setView({ species: next });
+
   const [search, setSearch] = useState("");
-  const [group, setGroup] = useState<AnimalGroup | "">("");
   const [showGone, setShowGone] = useState(false);
+  const [filtering, setFiltering] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<readonly Ulid[]>([]);
 
@@ -70,19 +115,34 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
 
   const here = entries.filter((entry) => entry.onFarm);
   const gone = entries.length - here.length;
-  const pool = showGone ? entries : here;
+  // Asking for a status — sold, dead — is asking to see the ones no longer here.
+  const pool = showGone || view.status !== "" ? entries : here;
+  const viewed = filterEntries(pool, view);
 
   // Counted before the search, so a chip's number is how many there are, not
   // how many happen to match what is half-typed.
   const counts = new Map<AnimalGroup, number>(
-    GROUPS.map((key) => [key, pool.filter((entry) => entry.group === key).length]),
+    GROUPS.map((key) => [key, viewed.filter((entry) => entry.group === key).length]),
   );
 
   const needle = search.trim().toLowerCase();
-  const shown = pool.filter(
+  const shown = viewed.filter(
     (entry) =>
       (group === "" || entry.group === group) && (needle === "" || entry.haystack.includes(needle)),
   );
+  const sections = groupEntries(shown, view.groupBy);
+  const facts = viewFacts(view, zones);
+
+  // What the filters offer: only what exists, so no choice leads to nothing.
+  const ofSpecies = entries.filter((entry) => group === "" || entry.group === group);
+  const kinds = [...new Set(ofSpecies.map((entry) => entry.kind))].sort();
+  const statuses = [...new Set(entries.map((entry) => entry.status))].sort();
+  const places = zones
+    .filter((zone) => zone.active)
+    .sort(
+      (left, right) =>
+        Number(left.indoor) - Number(right.indoor) || left.name.localeCompare(right.name),
+    );
 
   function toggle(id: Ulid) {
     setSelected((was) => (was.includes(id) ? was.filter((held) => held !== id) : [...was, id]));
@@ -95,7 +155,7 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
 
   if (loading || flocksLoading) return <p className="text-muted">Loading the animals…</p>;
 
-  const narrowed = group !== "" || needle !== "";
+  const narrowed = group !== "" || needle !== "" || facts.length > 0;
 
   return (
     // Bottom clearance on a phone, so the floating button never sits on the
@@ -131,6 +191,17 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
         onChange={(event) => setSearch(event.target.value)}
       />
 
+      <div className="flex flex-wrap items-center gap-2">
+        <Button aria-haspopup="dialog" onClick={() => setFiltering(true)}>
+          Filter &amp; group{facts.length === 0 ? "" : ` (${facts.length})`}
+        </Button>
+        {view.groupBy === "" ? null : (
+          <span className="text-sm text-muted">
+            Grouped by {GROUP_BY_LABELS[view.groupBy].toLowerCase()}
+          </span>
+        )}
+      </div>
+
       <ChipRow label="Filter by species">
         <Chip on={group === ""} onClick={() => setGroup("")}>
           All <span className="gf-numeric text-xs opacity-80">{pool.length}</span>
@@ -148,11 +219,12 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
         <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted" aria-live="polite">
           <span>
             Showing {shown.length} of {pool.length}
+            {facts.length === 0 ? "" : ` · ${facts.join(" · ")}`}
           </span>
           <button
             type="button"
             onClick={() => {
-              setGroup("");
+              setView({ species: "", where: "", sex: "", status: "", class: "" });
               setSearch("");
             }}
             className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
@@ -178,21 +250,110 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
           }
         />
       ) : (
-        <ul
-          aria-label="Animals on this property"
-          className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
-        >
-          {shown.map((entry) => (
-            <AnimalListRow
-              key={`${entry.group}:${entry.id}`}
-              entry={entry}
-              selecting={selecting}
-              selected={selected.includes(entry.id)}
-              onToggle={() => toggle(entry.id)}
-            />
-          ))}
-        </ul>
+        sections.map((section) => (
+          <section
+            key={section.label}
+            aria-label={section.label === "" ? undefined : section.label}
+            className="flex flex-col gap-2"
+          >
+            {section.label === "" ? null : (
+              <h2 className="flex items-baseline gap-2 text-sm font-semibold text-ink">
+                {section.label}
+                <span className="gf-numeric text-xs font-normal text-muted">
+                  {section.entries.length}
+                </span>
+              </h2>
+            )}
+            <ul
+              aria-label={section.label === "" ? "Animals on this property" : section.label}
+              className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
+            >
+              {section.entries.map((entry) => (
+                <AnimalListRow
+                  key={`${entry.group}:${entry.id}`}
+                  entry={entry}
+                  selecting={selecting}
+                  selected={selected.includes(entry.id)}
+                  onToggle={() => toggle(entry.id)}
+                />
+              ))}
+            </ul>
+          </section>
+        ))
       )}
+
+      {filtering ? (
+        <Modal
+          title="Filter and group"
+          placement="side"
+          onClose={() => setFiltering(false)}
+          footer={
+            <div className="flex flex-wrap justify-end gap-2">
+              {facts.length === 0 && view.groupBy === "" ? null : (
+                <Button
+                  variant="ghost"
+                  onClick={() => setView({ where: "", sex: "", status: "", class: "", by: "" })}
+                >
+                  Clear all
+                </Button>
+              )}
+              <Button variant="primary" onClick={() => setFiltering(false)}>
+                Show {shown.length}
+              </Button>
+            </div>
+          }
+        >
+          <div className="flex flex-col gap-density">
+            <Select
+              label="Where"
+              value={view.where}
+              onChange={(event) => setView({ where: event.target.value })}
+              options={[
+                { value: "", label: "Anywhere" },
+                ...places.map((zone) => ({
+                  value: zone.id,
+                  label: zone.indoor ? `${zone.name} · inside` : zone.name,
+                })),
+                { value: "none", label: "Not placed outside" },
+              ]}
+            />
+            <Select
+              label="Sex"
+              value={view.sex}
+              onChange={(event) => setView({ sex: event.target.value })}
+              options={[
+                { value: "", label: "Either" },
+                { value: "female", label: "Female" },
+                { value: "male", label: "Male" },
+              ]}
+            />
+            <Select
+              label="Status"
+              value={view.status}
+              onChange={(event) => setView({ status: event.target.value })}
+              options={[
+                { value: "", label: "On the farm" },
+                ...statuses.map((status) => ({ value: status, label: optionLabel(status) })),
+              ]}
+            />
+            <Select
+              label="Class"
+              value={view.kind}
+              onChange={(event) => setView({ class: event.target.value })}
+              options={[
+                { value: "", label: "Any" },
+                ...kinds.map((kind) => ({ value: kind, label: kind })),
+              ]}
+            />
+            <Select
+              label="Group by"
+              value={view.groupBy}
+              onChange={(event) => setView({ by: event.target.value })}
+              options={GROUP_BYS.map((by) => ({ value: by, label: GROUP_BY_LABELS[by] }))}
+            />
+          </div>
+        </Modal>
+      ) : null}
 
       {gone === 0 ? null : (
         <button

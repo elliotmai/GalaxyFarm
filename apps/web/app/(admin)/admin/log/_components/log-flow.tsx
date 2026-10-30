@@ -6,6 +6,7 @@ import { useMemo, useState, type ComponentType } from "react";
 
 import type { Animal, Ulid } from "@galaxy-farm/core";
 
+import { markMove } from "@/app/(admin)/_components/back-link";
 import { useRecords } from "@/lib/local/use-records";
 
 import { BreedingDetails } from "./breeding-details";
@@ -252,6 +253,8 @@ function Shell({
         </span>
         <Link
           href={home}
+          // Back where it was opened, not a step further on from there.
+          onClick={() => markMove("back")}
           className="inline-flex min-h-target items-center px-1.5 font-medium text-action focus-visible:outline-2 focus-visible:outline-action"
         >
           Close
@@ -306,6 +309,8 @@ function Saved({
         </button>
         <Link
           href={home}
+          // Back where it was opened, not a step further on from there.
+          onClick={() => markMove("back")}
           className="inline-flex min-h-[52px] w-full items-center justify-center rounded-density border border-edge bg-panel text-base font-semibold text-ink hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
         >
           Done

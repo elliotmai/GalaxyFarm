@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { AnimalsScreen } from "@/app/(admin)/admin/animals/_components/animals-screen";
@@ -10,5 +11,11 @@ export default async function AnimalsPage() {
   const actor = await currentActor();
   if (actor === undefined) redirect("/login?next=/admin/animals");
 
-  return <AnimalsScreen propertyId={actor.propertyId} />;
+  // The filters live in the address (`useSearchParams`), and Next asks for a
+  // boundary around anything that reads it.
+  return (
+    <Suspense>
+      <AnimalsScreen propertyId={actor.propertyId} />
+    </Suspense>
+  );
 }
