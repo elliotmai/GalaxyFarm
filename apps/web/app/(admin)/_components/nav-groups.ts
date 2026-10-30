@@ -75,11 +75,13 @@ export const NAV: readonly NavDestination[] = [
       { href: "/admin/cattle", label: "Cattle", owns: ["/admin/cattle/"] },
       { href: "/admin/horses", label: "Horses", owns: ["/admin/horses/"] },
       // `owns`: a flock's own page (`/admin/chickens/flock/<name>`) sits in
-      // Flock, and as a record page draws no strips (see `SectionStrip`).
-      { href: "/admin/chickens/flock", label: "Flock", owns: ["/admin/chickens/flock/"] },
-      // Owns its pets' own pages, so a dog's page lights Animals › Pets and,
-      // being neither the list nor a view of it, draws no strip (a record page).
-      { href: "/admin/pets", label: "Pets", owns: ["/admin/pets/"] },
+      // Chickens, and as a record page draws no strips (see `SectionStrip`).
+      { href: "/admin/chickens/flock", label: "Chickens", owns: ["/admin/chickens/flock/"] },
+      // Dogs owns the pets' own pages (`/admin/pets/<name>`), cats included:
+      // they share one address space, and a record page draws no strip, so
+      // which of the two lights is the only difference it makes.
+      { href: "/admin/pets/dogs", label: "Dogs", owns: ["/admin/pets/"] },
+      { href: "/admin/pets/cats", label: "Cats" },
     ],
   },
   {
@@ -192,9 +194,9 @@ export const SUB_SECTIONS: Readonly<Record<string, readonly NavItem[]>> = {
     { href: "/admin/cattle/candidates", label: "Candidates" },
     { href: "/admin/cattle/risks", label: "Worth a look" },
   ],
+  // Each species' page leads its own strip, and its tools follow (decision 44).
   "/admin/horses": [
     { href: "/admin/horses", label: "Horses" },
-    { href: "/admin/horses/herd", label: "Herd" },
     { href: "/admin/horses/pens", label: "Pens" },
     { href: "/admin/horses/feeding", label: "Feeding" },
     { href: "/admin/horses/breeding", label: "Breeding" },
@@ -213,8 +215,19 @@ export const SUB_SECTIONS: Readonly<Record<string, readonly NavItem[]>> = {
     { href: "/admin/garden/harvest", label: "Harvest" },
   ],
   "/admin/chickens/flock": [
-    { href: "/admin/chickens/flock", label: "Flocks" },
+    { href: "/admin/chickens/flock", label: "Chickens" },
     { href: "/admin/chickens/eggs", label: "Eggs" },
+    { href: "/admin/chickens/headcount", label: "Headcount" },
+  ],
+  // Vet, medicine and feeding are kept for every pet together, so both
+  // species' strips lead to the one Pet care page.
+  "/admin/pets/dogs": [
+    { href: "/admin/pets/dogs", label: "Dogs" },
+    { href: "/admin/pets", label: "Pet care" },
+  ],
+  "/admin/pets/cats": [
+    { href: "/admin/pets/cats", label: "Cats" },
+    { href: "/admin/pets", label: "Pet care" },
   ],
   "/admin/settings": [
     { href: "/admin/settings", label: "Settings" },

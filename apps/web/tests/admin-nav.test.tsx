@@ -138,7 +138,7 @@ describe("SectionStrip", () => {
     render(<SectionStrip />);
 
     const sections = screen.getByRole("navigation", { name: "Animals sections" });
-    for (const label of ["All", "Cattle", "Flock", "Horses", "Pets"]) {
+    for (const label of ["All", "Cattle", "Horses", "Chickens", "Dogs", "Cats"]) {
       expect(within(sections).getByRole("link", { name: label })).toBeInTheDocument();
     }
   });
@@ -151,7 +151,7 @@ describe("SectionStrip", () => {
     expect(screen.getByRole("navigation", { name: "Cattle views" })).toBeInTheDocument();
   });
   it("keeps the section lit while a view of it is open", () => {
-    at("/admin/horses/herd");
+    at("/admin/horses/pens");
     render(<SectionStrip />);
 
     const sections = screen.getByRole("navigation", { name: "Animals sections" });

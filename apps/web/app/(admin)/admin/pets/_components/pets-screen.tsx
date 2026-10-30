@@ -81,7 +81,7 @@ export function PetsScreen({
     <PageBody>
       <PageHeader
         eyebrow="Animals"
-        title="Pets"
+        title="Pet care"
         subtitle={[
           `${pets.length} pet${pets.length === 1 ? "" : "s"}`,
           due.length === 0 ? undefined : `${due.length} care due`,

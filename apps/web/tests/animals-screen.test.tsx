@@ -119,14 +119,51 @@ describe("the Animals list", () => {
       "/admin/chickens/flock/layers",
     );
 
-    await user.click(screen.getByRole("button", { name: /Pets\s*1/ }));
-    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
-    expect(screen.getByText(/Showing 1 of 4/)).toBeTruthy();
+    // Each species chip opens that species' own page.
+    expect(screen.getByRole("link", { name: /Dogs\s*1/ }).getAttribute("href")).toBe(
+      "/admin/pets/dogs",
+    );
+    expect(screen.getByRole("link", { name: /Chickens\s*1/ }).getAttribute("href")).toBe(
+      "/admin/chickens/flock",
+    );
 
     // The sold cow is folded away, not lost.
     await user.click(screen.getByRole("button", { name: "Show 1 no longer here" }));
-    await user.click(screen.getByRole("button", { name: /All\s*5/ }));
+    expect(screen.getByRole("button", { name: /All\s*5/ })).toBeTruthy();
     expect(screen.getByText("Gone")).toBeTruthy();
+  });
+
+  it("is each species' own page, with that species and its own Add", async () => {
+    const user = userEvent.setup();
+    let added = 0;
+    render(
+      <AnimalsScreen
+        propertyId={PROPERTY}
+        species="dogs"
+        basePath="/admin/pets/dogs"
+        add={{
+          label: "Add a dog",
+          render: () => {
+            added += 1;
+            return <p>The dog form</p>;
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { level: 1, name: "Dogs" })).toBeTruthy();
+    const list = screen.getByRole("list", { name: "Dogs on this property" });
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((row) => row.textContent),
+    ).toEqual([expect.stringContaining("Scout")]);
+    // No species chips on a species page.
+    expect(screen.queryByRole("link", { name: /Cattle/ })).toBeNull();
+
+    await user.click(screen.getAllByRole("button", { name: /Add a dog/ })[0] as HTMLElement);
+    expect(screen.getByText("The dog form")).toBeTruthy();
+    expect(added).toBeGreaterThan(0);
   });
 
   it("searches by name or tag", async () => {

@@ -208,8 +208,8 @@ export function PetPanel({
   );
 }
 
-function draftOf(pet: Animal | undefined): Draft {
-  if (pet === undefined) return BLANK;
+function draftOf(pet: Animal | undefined, species?: PetSpecies): Draft {
+  if (pet === undefined) return species === undefined ? BLANK : { ...BLANK, species };
   return {
     name: pet.name ?? "",
     species: (pet.species === "cat" ? "cat" : "dog") as PetSpecies,
@@ -239,9 +239,12 @@ export function PetEditor({
   actorId,
   onClose,
   onDeleted,
+  species,
 }: {
   /** Absent to add a new one. */
   readonly pet: Animal | undefined;
+  /** What a new one starts as — the Cats page adds a cat. */
+  readonly species?: PetSpecies;
   /** Every health record and plan, so the delete can say what goes with it. */
   readonly health: readonly HealthRecord[];
   readonly plans: readonly FeedingPlan[];
@@ -254,7 +257,7 @@ export function PetEditor({
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
 
-  const [draft, setDraft] = useState<Draft>(() => draftOf(editing));
+  const [draft, setDraft] = useState<Draft>(() => draftOf(editing, species));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 

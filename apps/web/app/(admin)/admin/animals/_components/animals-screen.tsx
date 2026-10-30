@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Button, EmptyState, Modal, Select, TextInput, optionLabel } from "@galaxy-farm/ui";
 import type { Animal, Ulid, Zone, ZoneAssignment } from "@galaxy-farm/core";
@@ -14,6 +14,7 @@ import {
   filterEntries,
   GROUP_BY_LABELS,
   GROUP_BYS,
+  GROUP_HOMES,
   GROUP_LABELS,
   GROUPS,
   groupEntries,
@@ -39,12 +40,41 @@ import { useRecords } from "@/lib/local/use-records";
  * Filter and group sit behind one button — where it stands (outside or in),
  * sex, status, class, and grouping by any of those — and live in the address,
  * so "the heifers in Pasture 3" survives opening one of them and coming Back.
+ *
+ * The same screen is each species' own page (`species`): Horses, Chickens,
+ * Dogs, Cats — the herd page's shape for every animal on the place, with the
+ * species chips swapped for that species' classes and its own Add. One
+ * component, so the pages cannot drift apart.
  */
+
+/** How a species page adds one: a link elsewhere, or its own form in place. */
+export interface AddAction {
+  readonly label: string;
+  readonly href?: string;
+  /** Draws the species' existing add form; `close` hides it again. */
+  readonly render?: (close: () => void) => ReactNode;
+}
+
+/** A species chip on the Animals list: the off chip's look, as a link onward. */
+const SPECIES_LINK =
+  "inline-flex min-h-target shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm font-medium text-muted hover:bg-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
 
 const ACTION_LINK =
   "inline-flex min-h-target items-center justify-center rounded-density bg-action px-4 font-semibold text-action-ink hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
 
-export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
+export function AnimalsScreen({
+  propertyId,
+  species,
+  basePath = "/admin/animals",
+  add = { label: "Add animal", href: "/admin/cattle?add=1" },
+}: {
+  readonly propertyId: Ulid;
+  /** One species' page rather than every animal on the place. */
+  readonly species?: AnimalGroup;
+  /** Where this list lives, for the address its filters are kept in. */
+  readonly basePath?: string;
+  readonly add?: AddAction;
+}) {
   const query = { propertyId };
   const { records: animals, loading } = useRecords<Animal>("animals", query);
   const { records: flocks, loading: flocksLoading } = useRecords<Flock>("flocks", query);
@@ -58,10 +88,7 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
   const router = useRouter();
   const params = useSearchParams();
   const view = viewFrom(params);
-  const asked = params.get("species") ?? "";
-  const group: AnimalGroup | "" = (GROUPS as readonly string[]).includes(asked)
-    ? (asked as AnimalGroup)
-    : "";
+  const group: AnimalGroup | "" = species ?? "";
 
   // The address as last asked for. The router applies a replace in a
   // transition, so two changes in a row — Sex, then Group by — would each start
@@ -81,16 +108,16 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
     }
     const query = next.toString();
     asking.current = query;
-    const href = query === "" ? "/admin/animals" : `/admin/animals?${query}`;
+    const href = query === "" ? basePath : `${basePath}?${query}`;
     router.replace(href, { scroll: false });
     // So Back from an animal returns to the list filtered as it was left.
     noteAddress(href);
   }
-  const setGroup = (next: AnimalGroup | "") => setView({ species: next });
 
   const [search, setSearch] = useState("");
   const [showGone, setShowGone] = useState(false);
   const [filtering, setFiltering] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<readonly Ulid[]>([]);
 
@@ -113,10 +140,11 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
     [animals, flocks, adjustments, zones, assignments, health, breedings, calvings, now],
   );
 
-  const here = entries.filter((entry) => entry.onFarm);
-  const gone = entries.length - here.length;
+  const mine = group === "" ? entries : entries.filter((entry) => entry.group === group);
+  const here = mine.filter((entry) => entry.onFarm);
+  const gone = mine.length - here.length;
   // Asking for a status — sold, dead — is asking to see the ones no longer here.
-  const pool = showGone || view.status !== "" ? entries : here;
+  const pool = showGone || view.status !== "" ? mine : here;
   const viewed = filterEntries(pool, view);
 
   // Counted before the search, so a chip's number is how many there are, not
@@ -126,17 +154,21 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
   );
 
   const needle = search.trim().toLowerCase();
-  const shown = viewed.filter(
-    (entry) =>
-      (group === "" || entry.group === group) && (needle === "" || entry.haystack.includes(needle)),
-  );
+  const shown = viewed.filter((entry) => needle === "" || entry.haystack.includes(needle));
   const sections = groupEntries(shown, view.groupBy);
   const facts = viewFacts(view, zones);
 
   // What the filters offer: only what exists, so no choice leads to nothing.
-  const ofSpecies = entries.filter((entry) => group === "" || entry.group === group);
-  const kinds = [...new Set(ofSpecies.map((entry) => entry.kind))].sort();
-  const statuses = [...new Set(entries.map((entry) => entry.status))].sort();
+  const kinds = [...new Set(mine.map((entry) => entry.kind))].sort();
+  const statuses = [...new Set(mine.map((entry) => entry.status))].sort();
+  // On a species page the chips are its classes, counted before the search.
+  const kindCounts = new Map(
+    kinds.map((kind) => [
+      kind,
+      filterEntries(pool, { ...view, kind: "" }).filter((entry) => entry.kind === kind).length,
+    ]),
+  );
+  const title = group === "" ? "Animals" : GROUP_LABELS[group];
   const places = zones
     .filter((zone) => zone.active)
     .sort(
@@ -155,7 +187,17 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
 
   if (loading || flocksLoading) return <p className="text-muted">Loading the animals…</p>;
 
-  const narrowed = group !== "" || needle !== "" || facts.length > 0;
+  const narrowed = needle !== "" || facts.length > 0;
+  const addButton = (className: string, children: ReactNode) =>
+    add.href !== undefined ? (
+      <Link href={add.href} className={className}>
+        {children}
+      </Link>
+    ) : (
+      <button type="button" onClick={() => setAdding(true)} className={className}>
+        {children}
+      </button>
+    );
 
   return (
     // Bottom clearance on a phone, so the floating button never sits on the
@@ -163,7 +205,7 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
     <div className="flex flex-col gap-density pb-20 sm:pb-0">
       <header className="flex items-center justify-between gap-density">
         <div className="flex min-w-0 items-baseline gap-2.5">
-          <h1 className="text-ink">Animals</h1>
+          <h1 className="text-ink">{title}</h1>
           <span className="text-sm text-muted">{here.length} here</span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -176,9 +218,12 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
           </Button>
           {/* Hidden on a phone by a wrapper: there the add button floats. */}
           <span className="hidden sm:block">
-            <Link href="/admin/cattle?add=1" className={ACTION_LINK}>
-              <span aria-hidden="true">+</span>&nbsp;Add animal
-            </Link>
+            {addButton(
+              ACTION_LINK,
+              <>
+                <span aria-hidden="true">+</span>&nbsp;{add.label}
+              </>,
+            )}
           </span>
         </div>
       </header>
@@ -202,18 +247,41 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
         )}
       </div>
 
-      <ChipRow label="Filter by species">
-        <Chip on={group === ""} onClick={() => setGroup("")}>
-          All <span className="gf-numeric text-xs opacity-80">{pool.length}</span>
-        </Chip>
-        {GROUPS.filter((key) => (counts.get(key) ?? 0) > 0).map((key) => (
-          // Pressing the one already on goes back to everyone.
-          <Chip key={key} on={group === key} onClick={() => setGroup(group === key ? "" : key)}>
-            {GROUP_LABELS[key]}{" "}
-            <span className="gf-numeric text-xs opacity-80">{counts.get(key)}</span>
+      {group === "" ? (
+        // Each species chip opens that species' own page, with its own tools;
+        // this list stays every animal on the place.
+        <ChipRow label="Species">
+          <Chip on onClick={() => {}}>
+            All <span className="gf-numeric text-xs opacity-80">{pool.length}</span>
           </Chip>
-        ))}
-      </ChipRow>
+          {GROUPS.filter((key) => (counts.get(key) ?? 0) > 0).map((key) => (
+            <Link key={key} href={GROUP_HOMES[key]} className={SPECIES_LINK}>
+              {GROUP_LABELS[key]}{" "}
+              <span className="gf-numeric text-xs opacity-80">{counts.get(key)}</span>
+              <span aria-hidden="true">›</span>
+            </Link>
+          ))}
+        </ChipRow>
+      ) : kinds.length < 2 ? null : (
+        <ChipRow label={`Filter ${title.toLowerCase()} by class`}>
+          <Chip on={view.kind === ""} onClick={() => setView({ class: "" })}>
+            All{" "}
+            <span className="gf-numeric text-xs opacity-80">
+              {filterEntries(pool, { ...view, kind: "" }).length}
+            </span>
+          </Chip>
+          {kinds.map((kind) => (
+            // Pressing the one already on goes back to all of them.
+            <Chip
+              key={kind}
+              on={view.kind === kind}
+              onClick={() => setView({ class: view.kind === kind ? "" : kind })}
+            >
+              {kind} <span className="gf-numeric text-xs opacity-80">{kindCounts.get(kind)}</span>
+            </Chip>
+          ))}
+        </ChipRow>
+      )}
 
       {narrowed ? (
         <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted" aria-live="polite">
@@ -224,7 +292,7 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
           <button
             type="button"
             onClick={() => {
-              setView({ species: "", where: "", sex: "", status: "", class: "" });
+              setView({ where: "", sex: "", status: "", class: "" });
               setSearch("");
             }}
             className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
@@ -237,16 +305,20 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
       {shown.length === 0 ? (
         <EmptyState
           title={
-            entries.length === 0
-              ? "No animals yet"
-              : needle === ""
-                ? "None here"
-                : `Nothing matches "${search}"`
+            mine.length === 0
+              ? group === ""
+                ? "No animals yet"
+                : `No ${title.toLowerCase()} yet`
+              : needle !== ""
+                ? `Nothing matches "${search}"`
+                : "None match these filters"
           }
           detail={
-            entries.length === 0
-              ? "Add the first one and it shows up here."
-              : "Search looks at name and tag."
+            mine.length === 0
+              ? `${add.label} and it shows up here.`
+              : needle !== ""
+                ? "Search looks at name and tag."
+                : "Clear a filter to see more."
           }
         />
       ) : (
@@ -265,7 +337,13 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
               </h2>
             )}
             <ul
-              aria-label={section.label === "" ? "Animals on this property" : section.label}
+              aria-label={
+                section.label === ""
+                  ? group === ""
+                    ? "Animals on this property"
+                    : `${title} on this property`
+                  : section.label
+              }
               className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
             >
               {section.entries.map((entry) => (
@@ -377,25 +455,24 @@ export function AnimalsScreen({ propertyId }: { readonly propertyId: Ulid }) {
               Log for them
             </span>
           ) : (
-            <Link
-              href={logHref({ animals: selected, from: "/admin/animals" })}
-              className={ACTION_LINK}
-            >
+            <Link href={logHref({ animals: selected, from: basePath })} className={ACTION_LINK}>
               Log for them
             </Link>
           )}
         </div>
       ) : (
-        <Link
-          href="/admin/cattle?add=1"
-          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-        >
-          <span aria-hidden="true" className="text-xl leading-none">
-            +
-          </span>
-          Add animal
-        </Link>
+        addButton(
+          "fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden",
+          <>
+            <span aria-hidden="true" className="text-xl leading-none">
+              +
+            </span>
+            {add.label}
+          </>,
+        )
       )}
+
+      {adding && add.render !== undefined ? add.render(() => setAdding(false)) : null}
     </div>
   );
 }

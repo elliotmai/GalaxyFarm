@@ -95,7 +95,7 @@ export function EggsScreen({
         Each is derived, so correcting a row corrects all of them at once.
       */}
       <PageHeader
-        eyebrow="Flock"
+        eyebrow="Chickens"
         title="Eggs"
         subtitle={[
           `${collectedToday} today`,

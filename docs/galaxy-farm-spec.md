@@ -438,7 +438,9 @@ Route: `/admin/supplies`. Builds in Phase 2.
 
 /admin/feed                     inventory, purchases, run-out projections, cost per head
 /admin/supplies                 ranch supply inventory: consumables, show/fitting gear, hardware
-/admin/chickens/flock           flocks & headcount log
+/admin/chickens/flock           Chickens: every flock and bird kept by name, on the species-page
+                                shape (decision 44); add a flock
+/admin/chickens/headcount       the flocks' headcount log and the losses line
 /admin/chickens/flock/[id]      one flock, by name: headcount, eggs this week, coop chores,
                                 one history (headcount · eggs · notes), photos, details
 /admin/chickens/eggs            logs + trends
@@ -448,12 +450,14 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/garden/harvest           + preservation
 /admin/equipment                fleet · /admin/equipment/[id] · /admin/equipment/roadmap
 /admin/equipment/candidates     purchase candidates: compare units, true cost, links, decision log
-/admin/pets                     the household, each row opening its pet's page
+/admin/pets                     Pet care: vet, medicine and feeding for every pet
+/admin/pets/dogs                Dogs, on the species-page shape (decision 44); add a dog
+/admin/pets/cats                Cats, on the species-page shape (decision 44); add a cat
 /admin/pets/[id]                one dog or cat: what a sitter needs (handling, food, medicine)
                                 first, then shot · medicine · worming · vet · ration · note ·
                                 photo, coming up, one history, photos; slug per lib/animal-slug
-/admin/horses                   what is live and what is coming · /admin/horses/roadmap (active)
-/admin/horses/herd              who is here and what each is like to handle; add a horse (§5.9)
+/admin/horses                   Horses, on the species-page shape (decision 44); add a horse
+/admin/horses/roadmap           horse goals and purchases planned (active)
 /admin/horses/[id]              one horse: move · note · photo · edit, coming up, one history,
                                 photos; its slug steps around the section's own views
 /admin/horses/pens              shell — which horse is in which trap
@@ -673,3 +677,4 @@ The point of expressing §4.1 and §4.5 as *executable* checks rather than prose
 41. **Every page reached by a step has a step back** (§8). The admin layout draws "‹ <previous page>" above any page that was not reached by changing tab. A tab change starts the trail afresh, as in any phone app; moving along a section strip replaces the current step rather than adding one; a page opened cold falls back to the list it sits under, or to More. The Log's Close and Done return to the page it was opened from (`?from=`).
 42. **Pets, horses and flocks have their own pages, like cattle** (§5.8, §5.9, §5.4, §7). The Animals list opens every animal onto its own record page, laid out the same way: who it is, the things people do to it as big buttons, what is coming up, one history, then the details behind one link.
 43. **Photos upload through the app, not straight to the bucket** (§4.2, amends its presigned PUT). A browser PUT to R2 is cross-origin and needs a bucket CORS rule for every origin the app is served from — the farm's domain, each deploy preview, a laptop — and with none in place every photo sat queued on the phone and never arrived. `/api/storage/presign` still names the key, but now hands back `/api/storage/upload`, which checks the same rules (a writer, the caller's own property's prefix, a photograph, the size limit) and forwards the bytes server to server. A photo is compressed to about 300 KB on the device first, so the second hop costs little. Reads stay signed bucket URLs, which an `<img>` loads without CORS. The photo buttons no longer force the camera, so a picture already on the phone can be chosen too.
+44. **Every species has a page of its own, laid out the same way** (§7, §8). Cattle, Horses, Chickens, Dogs and Cats each open on the herd page's shape: the head count, search, Filter & group, the species' classes as chips, a list opening each animal's own page, and Add — the species' existing add form, so there is one way to write each. The species' tools (breeding, feeding, pens, eggs, headcount, vet and medicine) follow in the strip above, as cattle's do. Horses, Chickens, Dogs and Cats are one component (the Animals list with one species in it), so they cannot drift apart. On the Animals list each species chip opens that page rather than filtering in place. Dogs and cats are separate pages; their vet, medicine and feeding stay together on Pet care.

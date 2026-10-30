@@ -6,7 +6,7 @@ import type { Animal, Ulid } from "@galaxy-farm/core";
 
 /**
  * One horse's page and the herd list (spec §7 `/admin/horses/[id]`,
- * `/admin/horses/herd`, §5.9).
+ * `/admin/horses`, §5.9).
  *
  * Pinned here: the herd row opens her own page; the page leads with who she
  * is and where she stands; Move and Note go to the ＋ Log and close back
@@ -65,7 +65,8 @@ vi.mock("@/lib/photos/use-photos", () => ({
 const { ToastProvider, ConfirmProvider } = await import("@galaxy-farm/ui");
 const { HorseScreen } =
   await import("../app/(admin)/admin/horses/[id]/_components/horse-screen.js");
-const { HerdScreen } = await import("../app/(admin)/admin/horses/_components/herd-screen.js");
+const { animalEntries } =
+  await import("../app/(admin)/admin/animals/_components/animal-entries.js");
 
 const MARE: Animal = {
   id: "01ARZ3NDEKTSV4RRFFQ69G5R01" as Ulid,
@@ -88,7 +89,7 @@ const MARE: Animal = {
 const HERD: Animal = {
   ...MARE,
   id: "01ARZ3NDEKTSV4RRFFQ69G5R02" as Ulid,
-  name: "Herd",
+  name: "Pens",
   notes: undefined,
 } as Animal;
 
@@ -119,16 +120,25 @@ beforeEach(() => {
   stored.writes = [];
 });
 
-describe("the horse herd", () => {
+describe("the horses list", () => {
   it("links each horse to her own page, stepping around the section's views", () => {
-    wrap(<HerdScreen propertyId={PROPERTY} actorId={ACTOR} />);
-
-    const list = screen.getByRole("list", { name: "The horses" });
-    const hrefs = within(list)
-      .getAllByRole("link")
-      .map((link) => link.getAttribute("href"));
-    // "Herd" would be the herd list itself, so she gets a word on the end.
-    expect(hrefs).toEqual(["/admin/horses/herd-animal", "/admin/horses/juniper"]);
+    // The Horses page is the Animals list with one species in it; its rows
+    // come from the same entries, so the links are checked there.
+    const hrefs = animalEntries({
+      animals: [MARE, HERD],
+      flocks: [],
+      adjustments: [],
+      zones: [],
+      assignments: [],
+      health: [],
+      breedings: [],
+      calvings: [],
+      now: new Date("2026-10-30"),
+    })
+      .map((entry) => entry.href)
+      .sort();
+    // "Pens" would be a view of the section, so she gets a word on the end.
+    expect(hrefs).toEqual(["/admin/horses/juniper", "/admin/horses/pens-animal"]);
   });
 });
 
@@ -165,8 +175,8 @@ describe("the horse page", () => {
   });
 
   it("resolves a horse named for a section view by her stepped-around slug", () => {
-    wrap(<HorseScreen slug="herd-animal" propertyId={PROPERTY} actorId={ACTOR} />);
-    expect(screen.getByRole("heading", { level: 1, name: "Herd" })).toBeTruthy();
+    wrap(<HorseScreen slug="pens-animal" propertyId={PROPERTY} actorId={ACTOR} />);
+    expect(screen.getByRole("heading", { level: 1, name: "Pens" })).toBeTruthy();
   });
 
   it("keeps the details behind one disclosure, and edits her there", async () => {

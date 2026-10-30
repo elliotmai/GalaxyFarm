@@ -44,6 +44,9 @@ const ROUTES = [
   "/admin/settings",
   "/admin/equipment",
   "/admin/horses",
+  "/admin/pets/dogs",
+  "/admin/pets/cats",
+  "/admin/chickens/headcount",
   "/admin/garden",
 ];
 

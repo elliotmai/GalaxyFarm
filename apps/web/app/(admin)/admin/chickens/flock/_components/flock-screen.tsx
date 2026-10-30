@@ -129,8 +129,8 @@ export function FlockScreen({
       {/* Bottom clearance on a phone for the floating record button. */}
       <div className="flex flex-col gap-density pb-20 sm:pb-0">
         <PageHeader
-          eyebrow="Flock"
-          title="Flocks"
+          eyebrow="Chickens"
+          title="Headcount"
           subtitle={[
             `${birds} bird${birds === 1 ? "" : "s"}`,
             `${live.length} flock${live.length === 1 ? "" : "s"}`,

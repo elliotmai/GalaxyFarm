@@ -36,14 +36,24 @@ import { careRecordsFor } from "@/lib/pet-care";
  * rendering a list.
  */
 
-export const GROUPS = ["cattle", "horses", "flock", "pets"] as const;
+export const GROUPS = ["cattle", "horses", "chickens", "dogs", "cats"] as const;
 export type AnimalGroup = (typeof GROUPS)[number];
 
 export const GROUP_LABELS: Readonly<Record<AnimalGroup, string>> = {
   cattle: "Cattle",
   horses: "Horses",
-  flock: "Flock",
-  pets: "Pets",
+  chickens: "Chickens",
+  dogs: "Dogs",
+  cats: "Cats",
+};
+
+/** Each species' own page — what its chip on the Animals list opens. */
+export const GROUP_HOMES: Readonly<Record<AnimalGroup, string>> = {
+  cattle: "/admin/cattle",
+  horses: "/admin/horses",
+  chickens: "/admin/chickens/flock",
+  dogs: "/admin/pets/dogs",
+  cats: "/admin/pets/cats",
 };
 
 export interface AnimalEntry {
@@ -101,16 +111,17 @@ export interface EntryInputs {
 function groupOf(animal: Animal): AnimalGroup {
   if (animal.species === "cattle") return "cattle";
   if (animal.species === "horse") return "horses";
-  if (animal.species === "dog" || animal.species === "cat") return "pets";
+  if (animal.species === "dog") return "dogs";
+  if (animal.species === "cat") return "cats";
   // A bird kept as its own record is still part of the flock people look for.
-  return "flock";
+  return "chickens";
 }
 
 /** Where a row goes: the animal's own page, or a bird's flock's page. */
 function hrefOf(animal: Animal, group: AnimalGroup, input: EntryInputs): string {
   if (group === "cattle") return animalHref(animal);
   if (group === "horses") return horseHref(animal);
-  if (group === "pets") return petHref(animal);
+  if (group === "dogs" || group === "cats") return petHref(animal);
   return birdHref(animal, input.flocks, input.assignments);
 }
 
@@ -158,7 +169,9 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
 
   // A pet whose shots have lapsed — the pets screen's red line, as a chip.
   const petIds = new Set(
-    animals.filter((animal) => groupOf(animal) === "pets").map((animal) => animal.id),
+    animals
+      .filter((animal) => groupOf(animal) === "dogs" || groupOf(animal) === "cats")
+      .map((animal) => animal.id),
   );
   const careOverdue = new Set(
     outstandingPetCare(
@@ -242,7 +255,7 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
       .join(" · ");
     rows.push({
       id: flock.id,
-      group: "flock",
+      group: "chickens",
       badge: String(count),
       title: flock.name,
       line,

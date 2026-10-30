@@ -108,7 +108,7 @@ export function HorseScreen({
           title="No horse by that name"
           detail="Nothing on this device answers to that name or tag."
           action={
-            <Link href="/admin/horses/herd" className="text-action underline">
+            <Link href="/admin/horses" className="text-action underline">
               Back to the herd
             </Link>
           }
@@ -254,7 +254,7 @@ export function HorseScreen({
           propertyId={propertyId}
           actorId={actorId}
           onClose={() => setEditing(false)}
-          onDeleted={() => router.push("/admin/horses/herd")}
+          onDeleted={() => router.push("/admin/horses")}
         />
       ) : null}
     </PageBody>

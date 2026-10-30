@@ -44,7 +44,9 @@ const ADMIN_ROUTES = [
   "/admin/horses",
   "/admin/horses/roadmap",
   "/admin/horses/candidates",
-  "/admin/horses/herd",
+  "/admin/pets/dogs",
+  "/admin/pets/cats",
+  "/admin/chickens/headcount",
 ];
 
 const KIOSK_BOARDS = [
