@@ -70,7 +70,7 @@ export function LotCard({
   const breed = detail.breedText ?? detail.dobText;
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-xl border border-edge bg-surface">
+    <article className="flex flex-col overflow-hidden rounded-xl border border-edge bg-panel">
       <div className="relative aspect-[4/3] bg-edge/10">
         {detail.pictureUrl === undefined ? (
           <div className="grid h-full place-items-center text-sm text-muted">No photo</div>

@@ -241,7 +241,7 @@ export function CattleCandidatesScreen({
                 "rounded-full border px-3 py-1 text-sm capitalize transition-colors",
                 filter === option.value
                   ? "border-action bg-action text-white"
-                  : "border-edge bg-surface text-ink hover:border-action",
+                  : "border-edge bg-panel text-ink hover:border-action",
               ].join(" ")}
             >
               {option.label}
