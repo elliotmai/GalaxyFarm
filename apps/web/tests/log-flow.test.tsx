@@ -308,7 +308,7 @@ describe("the log flow", () => {
     stored.params = `kind=move&animals=${ROSIE},${PEARL}`;
     view();
 
-    await user.selectOptions(screen.getByLabelText(/^To/), NORTH);
+    await user.selectOptions(screen.getByLabelText(/^Outside/), NORTH);
     await user.click(screen.getByRole("button", { name: "Move 2 animals" }));
 
     const writes = stored.writes.filter((write) => write.store === "zoneAssignments");
@@ -317,6 +317,53 @@ describe("the log flow", () => {
     expect(
       writes.filter((write) => write.op === "create").map((write) => write.value["zoneId"]),
     ).toEqual([NORTH, NORTH]);
+  });
+
+  it("puts her in the barn without touching her pasture, and None takes her out", async () => {
+    const user = userEvent.setup();
+    const BARN = "01ARZ3NDEKTSV4RRFFQ69G5Z03" as Ulid;
+    const barn = { ...CALVING_PEN, id: BARN, name: "Barn", indoor: true } as unknown as Zone;
+    stored.current = { ...stored.current, zones: [CALVING_PEN, barn] };
+    stored.params = `kind=move&animals=${ROSIE}`;
+    const first = view();
+
+    // Leaving Outside alone says where she stays.
+    expect(screen.getByRole("option", { name: "Leave as is — Calving pen" })).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText(/^Inside/), BARN);
+    await user.click(screen.getByRole("button", { name: "Move 1 animal" }));
+
+    let writes = stored.writes.filter((write) => write.store === "zoneAssignments");
+    expect(writes.filter((write) => write.op === "update")).toHaveLength(0);
+    expect(writes.filter((write) => write.op === "create")).toEqual([
+      expect.objectContaining({ value: expect.objectContaining({ zoneId: BARN, slot: "inside" }) }),
+    ]);
+
+    // Now in the barn: None closes that row and leaves the pasture open.
+    first.unmount();
+    stored.writes = [];
+    stored.current = {
+      ...stored.current,
+      zoneAssignments: [
+        placed(ROSIE, 1),
+        { ...placed(ROSIE, 3), zoneId: BARN, slot: "inside" } as ZoneAssignment,
+      ],
+    };
+    view();
+    expect(screen.getByRole("option", { name: "Leave as is — Barn" })).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText(/^Inside/), "none");
+    await user.click(screen.getByRole("button", { name: "Move 1 animal" }));
+
+    writes = stored.writes.filter((write) => write.store === "zoneAssignments");
+    expect(writes.map((write) => write.op)).toEqual(["update"]);
+  });
+
+  it("asks for a change rather than saving nothing", async () => {
+    const user = userEvent.setup();
+    stored.params = `kind=move&animals=${ROSIE}`;
+    view();
+
+    await user.click(screen.getByRole("button", { name: "Move 1 animal" }));
+    expect(screen.getByText("Choose a new place, outside or inside")).toBeTruthy();
   });
 
   it("logs eggs with no animals step", async () => {
