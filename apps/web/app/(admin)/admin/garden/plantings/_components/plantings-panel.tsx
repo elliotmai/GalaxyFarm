@@ -38,6 +38,8 @@ import {
   dateFromInput,
   dateInputValue,
   formatDate,
+  optionalNumber,
+  optionalText,
   quantityLabel,
 } from "@/app/(admin)/admin/garden/_components/labels";
 import { RotationCallout } from "@/app/(admin)/admin/garden/_components/rotation-callout";
@@ -49,7 +51,7 @@ import {
   RowList,
   type RowChip,
 } from "@/app/(admin)/admin/pastures/_components/land-kit";
-import { familyHistory, familyOf, varietyLabel } from "@/lib/garden";
+import { byId, familyHistory, familyOf, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -146,11 +148,47 @@ export function PlantingsPanel({
   /** A chip from the row above the list; "" is everything not finished or failed. */
   const [filter, setFilter] = useState("");
 
-  const bedName = (id: Ulid) => beds.find((bed) => bed.id === id)?.name ?? "Unknown bed";
-  const varietyOf = (id: Ulid) => varieties.find((variety) => variety.id === id);
+  const bedName = (id: Ulid) => byId(beds).get(id)?.name ?? "Unknown bed";
+  const varietyOf = (id: Ulid) => byId(varieties).get(id);
   const nameOf = (id: Ulid) => varietyLabel(varietyOf(id), crops);
 
   const openBeds = beds.filter((bed) => bed.active);
+
+  /**
+   * The beds a planting can name: the ones in use, plus the one an existing
+   * planting already names. A bed since switched off keeps its old plantings,
+   * and opening one of them must show where it grew rather than quietly
+   * offering the first bed on the list.
+   */
+  const bedOptions = (current: string) => [
+    { value: "", label: "Pick one" },
+    ...openBeds.map((bed) => ({ value: bed.id, label: bed.name })),
+    ...(current === "" || openBeds.some((bed) => bed.id === current)
+      ? []
+      : [{ value: current, label: `${bedName(current as Ulid)} (switched off)` }]),
+  ];
+
+  /** What was picked from, and what was done to, each planting — gathered once. */
+  const { harvestsOf, careOf } = useMemo(() => {
+    const picked = new Map<Ulid, HarvestLog[]>();
+    for (const log of harvests) {
+      const list = picked.get(log.plantingId) ?? [];
+      list.push(log);
+      picked.set(log.plantingId, list);
+    }
+    const done = new Map<Ulid, GardenCareLog[]>();
+    for (const entry of care) {
+      if (entry.plantingId === undefined) continue;
+      const list = done.get(entry.plantingId) ?? [];
+      list.push(entry);
+      done.set(entry.plantingId, list);
+    }
+    return {
+      harvestsOf: (id: Ulid) => picked.get(id) ?? [],
+      careOf: (id: Ulid) => done.get(id) ?? [],
+    };
+  }, [harvests, care]);
+
   const varietyOptions = [...varieties]
     .map((variety) => ({ value: variety.id, label: varietyLabel(variety, crops) }))
     .sort((left, right) => left.label.localeCompare(right.label));
@@ -229,8 +267,8 @@ export function PlantingsPanel({
       indoorStartedOn: dateFromInput(draft.indoorStartedOn),
       plantedOn: dateFromInput(draft.plantedOn),
       status: draft.status,
-      quantity: draft.quantity.trim() === "" ? undefined : Number(draft.quantity.trim()),
-      notes: draft.notes.trim() === "" ? undefined : draft.notes.trim(),
+      quantity: optionalNumber(draft.quantity),
+      notes: optionalText(draft.notes),
     };
 
     const result =
@@ -268,8 +306,8 @@ export function PlantingsPanel({
    * finished is the move that keeps all three, and the dialog says so.
    */
   async function remove(planting: Planting) {
-    const picked = harvests.filter((log) => log.plantingId === planting.id);
-    const logs = care.filter((entry) => entry.plantingId === planting.id);
+    const picked = harvestsOf(planting.id);
+    const logs = careOf(planting.id);
     const label = `${nameOf(planting.varietyId)} in ${bedName(planting.bedId)}`;
 
     const confirmed = await confirmDelete({
@@ -279,7 +317,7 @@ export function PlantingsPanel({
       dependents: [
         ...picked.map((log) => ({
           entity: "Harvest",
-          label: `${quantityLabel(log.quantity, log.unit)} on ${formatDate(log.harvestedOn)}`,
+          label: `${quantityLabel(log.quantity, log.unit, "A picking")} on ${formatDate(log.harvestedOn)}`,
           effect: "deleted" as const,
         })),
         ...logs.map((entry) => ({
@@ -302,8 +340,12 @@ export function PlantingsPanel({
       return;
     }
 
-    for (const log of picked) await harvestApi.remove(log.id, "Planting deleted");
-    for (const entry of logs) await careApi.remove(entry.id, "Planting deleted");
+    // Together rather than one at a time: each is a local write, and the
+    // toast should not wait on the slowest of a season's harvests in turn.
+    await Promise.all([
+      ...picked.map((log) => harvestApi.remove(log.id, "Planting deleted")),
+      ...logs.map((entry) => careApi.remove(entry.id, "Planting deleted")),
+    ]);
 
     show({
       message: `${label} deleted`,
@@ -312,8 +354,10 @@ export function PlantingsPanel({
         onAct: () => {
           void (async () => {
             await api.restoreRecord(planting.id);
-            for (const log of picked) await harvestApi.restoreRecord(log.id);
-            for (const entry of logs) await careApi.restoreRecord(entry.id);
+            await Promise.all([
+              ...picked.map((log) => harvestApi.restoreRecord(log.id)),
+              ...logs.map((entry) => careApi.restoreRecord(entry.id)),
+            ]);
           })();
         },
       },
@@ -370,7 +414,7 @@ export function PlantingsPanel({
   function lineFor(planting: Planting): string {
     const variety = varietyOf(planting.varietyId);
     const expected = variety === undefined ? undefined : expectedHarvestDate(planting, variety);
-    const harvest = totalHarvest(harvests, planting.id);
+    const harvest = totalHarvest(harvestsOf(planting.id), planting.id);
     return [
       bedName(planting.bedId),
       METHOD_LABEL[planting.method],
@@ -528,10 +572,7 @@ export function PlantingsPanel({
               <Select
                 label="Bed"
                 required
-                options={[
-                  { value: "", label: "Pick one" },
-                  ...openBeds.map((bed) => ({ value: bed.id, label: bed.name })),
-                ]}
+                options={bedOptions(draft.bedId)}
                 value={draft.bedId}
                 error={errors["bedId"]}
                 onChange={(event) => setDraft({ ...draft, bedId: event.target.value })}

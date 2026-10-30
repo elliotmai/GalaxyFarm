@@ -6,6 +6,7 @@ import {
   daysOnMarket,
   isActive,
   isExpiring,
+  isPriced,
   purchaseCandidateSchema,
   rankByTotalCost,
   totalAcquisitionCost,
@@ -228,5 +229,26 @@ describe("ranking", () => {
     expect(byTotalCost(cheap, dear)).toBeLessThan(0);
     expect(byTotalCost(dear, cheap)).toBeGreaterThan(0);
     expect(byTotalCost(cheap, cheap)).toBe(0);
+  });
+});
+
+describe("a candidate with no price yet", () => {
+  // "Price on request", a sale-barn lot, a neighbour who has not decided.
+  const unpriced = candidate({
+    askingPrice: undefined,
+    additionalCosts: [{ label: "hauling", amount: fromDollars(900) }],
+  });
+
+  it("is a valid candidate", () => {
+    expect(purchaseCandidateSchema.safeParse(unpriced).success).toBe(true);
+  });
+
+  it("says it is unpriced, so no screen shows it as $0 or as the cheapest", () => {
+    expect(isPriced(unpriced)).toBe(false);
+    expect(isPriced(candidate())).toBe(true);
+  });
+
+  it("still sums the costs on top without throwing", () => {
+    expect(totalAcquisitionCost(unpriced)).toEqual(fromDollars(900));
   });
 });

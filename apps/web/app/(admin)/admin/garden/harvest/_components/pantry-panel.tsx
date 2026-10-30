@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   Button,
@@ -32,6 +32,8 @@ import {
   dateFromInput,
   dateInputValue,
   formatDate,
+  optionalNumber,
+  optionalText,
   quantityLabel,
 } from "@/app/(admin)/admin/garden/_components/labels";
 import {
@@ -41,7 +43,7 @@ import {
   LandRow,
   RowList,
 } from "@/app/(admin)/admin/pastures/_components/land-kit";
-import { pantryByMethod, pantryShelf, varietyLabel } from "@/lib/garden";
+import { byId, pantryByMethod, pantryShelf, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -83,6 +85,8 @@ export function PantryPanel({
   loading,
   propertyId,
   actorId,
+  startFrom,
+  onStarted,
 }: {
   readonly pantry: readonly PreservationLog[];
   readonly harvests: readonly HarvestLog[];
@@ -92,6 +96,9 @@ export function PantryPanel({
   readonly loading: boolean;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /** A picking sent over from the harvest log: open a batch that names it. */
+  readonly startFrom?: HarvestLog;
+  readonly onStarted?: () => void;
 }) {
   const api = useMutations<PreservationLog>(
     "preservationLogs",
@@ -109,11 +116,32 @@ export function PantryPanel({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [method, setMethod] = useState<PreservationMethod | "all">("all");
 
-  const harvestLabel = (log: HarvestLog) => {
-    const planting = plantings.find((row) => row.id === log.plantingId);
-    const variety = varieties.find((row) => row.id === planting?.varietyId);
-    return `${varietyLabel(variety, crops)} — ${quantityLabel(log.quantity, log.unit)}, ${formatDate(log.harvestedOn)}`;
+  const varietyOfHarvest = (log: HarvestLog) => {
+    const planting = byId(plantings).get(log.plantingId);
+    return planting === undefined ? undefined : byId(varieties).get(planting.varietyId);
   };
+  const harvestLabel = (log: HarvestLog) =>
+    `${varietyLabel(varietyOfHarvest(log), crops)} — ${quantityLabel(log.quantity, log.unit, "not weighed")}, ${formatDate(log.harvestedOn)}`;
+
+  // Arriving from a picking: the form opens on it, labelled with what it was.
+  useEffect(() => {
+    if (startFrom === undefined) return;
+    setEditing(undefined);
+    setDraft({
+      label: varietyOfHarvest(startFrom)?.name ?? "",
+      method: "canned",
+      quantity: "",
+      unit: "jar",
+      preservedOn: dateInputValue(new Date()),
+      storageLocation: "",
+      harvestLogId: startFrom.id,
+      notes: "",
+    });
+    setErrors({});
+    onStarted?.();
+    // Only on arrival: the lists changing under an open form must not reset
+    // it, which is why the effect follows `startFrom` and nothing else.
+  }, [startFrom]);
 
   const shown = method === "all" ? pantry : pantry.filter((entry) => entry.method === method);
   const shelf = pantryShelf(shown);
@@ -139,7 +167,7 @@ export function PantryPanel({
     setDraft({
       label: entry.label,
       method: entry.method,
-      quantity: String(entry.quantity),
+      quantity: entry.quantity === undefined ? "" : String(entry.quantity),
       unit: entry.unit,
       preservedOn: dateInputValue(entry.preservedOn),
       storageLocation: entry.storageLocation ?? "",
@@ -161,11 +189,12 @@ export function PantryPanel({
     if (draft === undefined) return;
     setErrors({});
 
-    const text = (value: string) => (value.trim() === "" ? undefined : value.trim());
+    const text = optionalText;
     const fields = {
       label: draft.label.trim(),
       method: draft.method,
-      quantity: draft.quantity.trim() === "" ? Number.NaN : Number(draft.quantity),
+      // Optional, and zero is allowed: a batch eaten down to nothing.
+      quantity: optionalNumber(draft.quantity),
       unit: draft.unit,
       preservedOn: dateFromInput(draft.preservedOn) ?? new Date(),
       storageLocation: text(draft.storageLocation),
@@ -199,7 +228,7 @@ export function PantryPanel({
   async function remove(entry: PreservationLog) {
     const confirmed = await confirmDelete({
       tier: "standard",
-      recordName: `${entry.label} — ${quantityLabel(entry.quantity, entry.unit)}`,
+      recordName: `${entry.label} — ${quantityLabel(entry.quantity, entry.unit, "not counted")}`,
       entity: "pantry batch",
       dependents: [],
       consequence:
@@ -277,6 +306,7 @@ export function PantryPanel({
                     <>
                       {line.label}{" "}
                       <span className="gf-numeric font-normal text-muted">
+                        {line.uncounted ? "at least " : ""}
                         {quantityLabel(line.quantity, line.unit)}
                       </span>
                     </>
@@ -303,7 +333,7 @@ export function PantryPanel({
                     title={entry.label}
                     openLabel={`Edit ${entry.label}, ${formatDate(entry.preservedOn)}`}
                     line={[
-                      quantityLabel(entry.quantity, entry.unit),
+                      quantityLabel(entry.quantity, entry.unit, "not counted"),
                       PRESERVATION_LABEL[entry.method],
                       formatDate(entry.preservedOn),
                       entry.storageLocation,
@@ -374,7 +404,7 @@ export function PantryPanel({
                 min={0}
                 step="any"
                 numeric
-                required
+                hint="Optional. Edit it down as jars are eaten — zero keeps the batch."
                 value={draft.quantity}
                 error={errors["quantity"]}
                 onChange={(event) => setDraft({ ...draft, quantity: event.target.value })}

@@ -30,10 +30,12 @@ import {
   dateFromInput,
   dateInputValue,
   formatDate,
+  optionalNumber,
+  optionalText,
   quantityLabel,
 } from "@/app/(admin)/admin/garden/_components/labels";
 import { AddAction, LandRow, RowList } from "@/app/(admin)/admin/pastures/_components/land-kit";
-import { varietyLabel } from "@/lib/garden";
+import { byId, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -79,7 +81,8 @@ export function HarvestLogPanel({
   readonly loading: boolean;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
-  readonly onPreserve: () => void;
+  /** Off to the pantry — with this picking chosen as the source, when there is one. */
+  readonly onPreserve: (from?: HarvestLog) => void;
 }) {
   const api = useMutations<HarvestLog>(
     "harvestLogs",
@@ -106,12 +109,21 @@ export function HarvestLogPanel({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const plantingLabel = (id: Ulid) => {
-    const planting = plantings.find((row) => row.id === id);
+    const planting = byId(plantings).get(id);
     if (planting === undefined) return "A planting that has been deleted";
-    const variety = varieties.find((row) => row.id === planting.varietyId);
-    const bed = beds.find((row) => row.id === planting.bedId)?.name;
+    const variety = byId(varieties).get(planting.varietyId);
+    const bed = byId(beds).get(planting.bedId)?.name;
     return `${varietyLabel(variety, crops)}${bed === undefined ? "" : ` · ${bed}`}`;
   };
+
+  /** What was put by from each picking, gathered once rather than per row. */
+  const jarsByHarvest = new Map<Ulid, PreservationLog[]>();
+  for (const entry of pantry) {
+    if (entry.harvestLogId === undefined) continue;
+    const list = jarsByHarvest.get(entry.harvestLogId) ?? [];
+    list.push(entry);
+    jarsByHarvest.set(entry.harvestLogId, list);
+  }
 
   /**
    * What can still be picked from.
@@ -123,6 +135,20 @@ export function HarvestLogPanel({
   const pickable = plantings.filter(
     (planting) => planting.status !== "planned" && planting.status !== "failed",
   );
+
+  /**
+   * The picker's options: what can be picked from, plus whatever the entry
+   * being edited already names. A picking recorded against a planting since
+   * marked failed must still show its own planting, or opening it to fix a
+   * typo would quietly offer to move it.
+   */
+  const fromOptions = (current: string) => [
+    { value: "", label: "Pick one" },
+    ...pickable.map((planting) => ({ value: planting.id, label: plantingLabel(planting.id) })),
+    ...(current === "" || pickable.some((planting) => planting.id === current)
+      ? []
+      : [{ value: current, label: plantingLabel(current as Ulid) }]),
+  ];
 
   function startCreate() {
     setEditing(undefined);
@@ -141,7 +167,7 @@ export function HarvestLogPanel({
     setDraft({
       plantingId: log.plantingId,
       harvestedOn: dateInputValue(log.harvestedOn),
-      quantity: String(log.quantity),
+      quantity: log.quantity === undefined ? "" : String(log.quantity),
       unit: log.unit,
       notes: log.notes ?? "",
     });
@@ -163,9 +189,10 @@ export function HarvestLogPanel({
     const fields = {
       plantingId: draft.plantingId as Ulid,
       harvestedOn: dateFromInput(draft.harvestedOn) ?? new Date(),
-      quantity: draft.quantity.trim() === "" ? Number.NaN : Number(draft.quantity),
+      // Optional: a basket nobody weighed is still a picking worth dating.
+      quantity: optionalNumber(draft.quantity),
       unit: draft.unit,
-      notes: draft.notes.trim() === "" ? undefined : draft.notes.trim(),
+      notes: optionalText(draft.notes),
     };
 
     const result =
@@ -194,8 +221,8 @@ export function HarvestLogPanel({
    * saying where the tomatoes came from. They lose the link and keep the jars.
    */
   async function remove(log: HarvestLog) {
-    const jars = pantry.filter((entry) => entry.harvestLogId === log.id);
-    const label = `${quantityLabel(log.quantity, log.unit)} of ${plantingLabel(log.plantingId)}`;
+    const jars = jarsByHarvest.get(log.id) ?? [];
+    const label = `${quantityLabel(log.quantity, log.unit, "A picking")} of ${plantingLabel(log.plantingId)}`;
 
     const confirmed = await confirmDelete({
       tier: jars.length > 0 ? "elevated" : "standard",
@@ -220,7 +247,9 @@ export function HarvestLogPanel({
       return;
     }
 
-    for (const entry of jars) await pantryApi.update(entry.id, { harvestLogId: undefined });
+    // Together rather than one after another: each is a local write, and
+    // nothing about one depends on the last.
+    await Promise.all(jars.map((entry) => pantryApi.update(entry.id, { harvestLogId: undefined })));
 
     show({
       message: "Harvest entry deleted",
@@ -229,7 +258,9 @@ export function HarvestLogPanel({
         onAct: () => {
           void (async () => {
             await api.restoreRecord(log.id);
-            for (const entry of jars) await pantryApi.update(entry.id, { harvestLogId: log.id });
+            await Promise.all(
+              jars.map((entry) => pantryApi.update(entry.id, { harvestLogId: log.id })),
+            );
           })();
         },
       },
@@ -239,8 +270,18 @@ export function HarvestLogPanel({
   if (loading) return <p className="text-muted">Loading the harvest log…</p>;
 
   /** What each planting has given in total, for the summary under the list. */
+  // One pass over the log, grouped, rather than a scan of it per planting.
+  const pickedFrom = new Map<Ulid, HarvestLog[]>();
+  for (const log of harvests) {
+    const list = pickedFrom.get(log.plantingId) ?? [];
+    list.push(log);
+    pickedFrom.set(log.plantingId, list);
+  }
   const yields = pickable
-    .map((planting) => ({ planting, totals: totalHarvest(harvests, planting.id) }))
+    .map((planting) => ({
+      planting,
+      totals: totalHarvest(pickedFrom.get(planting.id) ?? [], planting.id),
+    }))
     .filter((row) => row.totals.size > 0)
     .sort((left, right) =>
       plantingLabel(left.planting.id).localeCompare(plantingLabel(right.planting.id)),
@@ -248,10 +289,10 @@ export function HarvestLogPanel({
 
   /** The one line: when, how much, what it became, anything noted. */
   function lineFor(log: HarvestLog): string {
-    const jars = pantry.filter((entry) => entry.harvestLogId === log.id);
+    const jars = jarsByHarvest.get(log.id) ?? [];
     return [
       formatDate(log.harvestedOn),
-      quantityLabel(log.quantity, log.unit),
+      quantityLabel(log.quantity, log.unit, "not weighed"),
       jars.length === 0 ? undefined : `put by: ${jars.map((entry) => entry.label).join(", ")}`,
       log.notes,
     ]
@@ -283,7 +324,7 @@ export function HarvestLogPanel({
           <div className="flex flex-wrap items-center justify-between gap-density">
             <button
               type="button"
-              onClick={onPreserve}
+              onClick={() => onPreserve()}
               className="inline-flex min-h-target items-center text-sm font-semibold text-action underline-offset-2 hover:underline"
             >
               Put some of it by →
@@ -298,7 +339,7 @@ export function HarvestLogPanel({
                 <LandRow
                   key={log.id}
                   title={plantingLabel(log.plantingId)}
-                  openLabel={`Edit ${quantityLabel(log.quantity, log.unit)} of ${plantingLabel(log.plantingId)}, ${formatDate(log.harvestedOn)}`}
+                  openLabel={`Edit ${quantityLabel(log.quantity, log.unit, "a picking")} of ${plantingLabel(log.plantingId)}, ${formatDate(log.harvestedOn)}`}
                   line={lineFor(log)}
                   onOpen={() => startEdit(log)}
                 />
@@ -343,6 +384,21 @@ export function HarvestLogPanel({
               </Button>
               <Button onClick={() => setDraft(undefined)}>Cancel</Button>
               {editing === undefined ? null : (
+                // From the picking straight to a pantry batch that names it,
+                // rather than to an empty form and a dropdown of every harvest.
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    const log = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    onPreserve(log);
+                  }}
+                >
+                  Put some by
+                </Button>
+              )}
+              {editing === undefined ? null : (
                 <Button
                   variant="danger"
                   className="ml-auto"
@@ -364,13 +420,7 @@ export function HarvestLogPanel({
               <Select
                 label="From"
                 required
-                options={[
-                  { value: "", label: "Pick one" },
-                  ...pickable.map((planting) => ({
-                    value: planting.id,
-                    label: plantingLabel(planting.id),
-                  })),
-                ]}
+                options={fromOptions(draft.plantingId)}
                 value={draft.plantingId}
                 error={errors["plantingId"]}
                 onChange={(event) => setDraft({ ...draft, plantingId: event.target.value })}
@@ -390,7 +440,7 @@ export function HarvestLogPanel({
                 min={0}
                 step="any"
                 numeric
-                required
+                hint="Optional — leave it blank if nobody weighed it."
                 value={draft.quantity}
                 error={errors["quantity"]}
                 onChange={(event) => setDraft({ ...draft, quantity: event.target.value })}

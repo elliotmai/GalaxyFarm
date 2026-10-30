@@ -25,7 +25,16 @@ import type { FeedType } from "./feed-type.js";
 export interface FeedPurchase extends BaseRecord {
   readonly feedTypeId: Ulid;
   readonly quantity: number;
-  readonly unitCost: Money;
+  /**
+   * What one unit cost, when somebody knows.
+   *
+   * Optional on purpose. The bales came off a neighbour's wagon and the bill
+   * comes at the end of the month; refusing the purchase until then means the
+   * shed count is wrong for a month, which is worse than a missing price. A
+   * purchase without one still counts toward on-hand, and the cost a head says
+   * it is incomplete (`costComplete`) rather than valuing the feed at $0.
+   */
+  readonly unitCost?: Money | undefined;
   /** Contact — the feed store or the neighbour with hay. */
   readonly vendorContactId?: Ulid | undefined;
   readonly purchasedOn: Date;
@@ -57,21 +66,54 @@ export interface FeedConsumption extends BaseRecord {
 export const feedPurchaseSchema = baseRecordSchema.extend({
   feedTypeId: ulidSchema,
   quantity: z.number().positive("A purchase has to be more than nothing"),
-  unitCost: moneySchema,
+  unitCost: moneySchema.optional(),
   vendorContactId: ulidSchema.optional(),
   purchasedOn: z.coerce.date(),
   notes: z.string().max(2000).optional(),
 }) as unknown as z.ZodType<FeedPurchase>;
 
-export const feedConsumptionSchema = baseRecordSchema.extend({
-  feedTypeId: ulidSchema,
-  quantity: z.number().positive("Record what was used, not zero"),
-  kind: z.enum(CONSUMPTION_KINDS),
-  usedOn: z.coerce.date(),
-  animalId: ulidSchema.optional(),
-  zoneId: ulidSchema.optional(),
-  notes: z.string().max(2000).optional(),
-}) as unknown as z.ZodType<FeedConsumption>;
+export const feedConsumptionSchema = baseRecordSchema
+  .extend({
+    feedTypeId: ulidSchema,
+    // Zero is a real count — the shed is empty — so the floor is checked per
+    // kind below rather than here.
+    quantity: z.number().min(0, "A quantity cannot be negative"),
+    kind: z.enum(CONSUMPTION_KINDS),
+    usedOn: z.coerce.date(),
+    animalId: ulidSchema.optional(),
+    zoneId: ulidSchema.optional(),
+    notes: z.string().max(2000).optional(),
+  })
+  .refine((entry) => entry.kind === "correction" || entry.quantity > 0, {
+    message: "Record what was used, not zero",
+    path: ["quantity"],
+  }) as unknown as z.ZodType<FeedConsumption>;
+
+/**
+ * The count somebody last made of this feed, if anybody has.
+ *
+ * A `correction` is a person standing in the shed counting, and its quantity
+ * is **what they counted** — the form calls it "On hand". Latest by the day it
+ * was counted, then by when it was written, so two counts on one day resolve
+ * to the second.
+ */
+export function lastCount(
+  feedTypeId: Ulid,
+  consumption: readonly FeedConsumption[],
+): FeedConsumption | undefined {
+  let latest: FeedConsumption | undefined;
+  for (const entry of consumption) {
+    if (entry.feedTypeId !== feedTypeId || entry.kind !== "correction") continue;
+    if (latest === undefined || isLater(entry.usedOn, entry.createdAt, latest)) latest = entry;
+  }
+  return latest;
+}
+
+/** After the count: a later day, or the same day and written after it. */
+function isLater(on: Date, createdAt: Date, count: FeedConsumption): boolean {
+  const day = on.getTime() - count.usedOn.getTime();
+  return day > 0 || (day === 0 && createdAt.getTime() > count.createdAt.getTime());
+}
 
 /**
  * What is in the barn.
@@ -86,10 +128,16 @@ export const feedConsumptionSchema = baseRecordSchema.extend({
  * So `plannedConsumed` is what the plans imply since the last reconciliation,
  * computed by the caller (`projectFeed` does it) and passed in.
  *
+ * A count replaces everything before it. Once somebody has counted the shed,
+ * on-hand is that count, plus what was bought after it, less what was logged
+ * after it — the purchases and entries before the count are already in the
+ * number they counted. Treating the count as a deduction instead (the old
+ * reading) turned "3 on hand" into "3 fewer", which is not what anybody
+ * standing in a shed means.
+ *
  * The result can legitimately go negative and is deliberately not clamped: a
  * negative on-hand means the records disagree with the barn, which is worth
- * seeing rather than hiding behind a zero. The fix is a `correction` entry — a
- * record of the discrepancy rather than a silent overwrite of it.
+ * seeing rather than hiding behind a zero. The fix is a count.
  */
 export function onHand(
   feedTypeId: Ulid,
@@ -97,15 +145,20 @@ export function onHand(
   consumption: readonly FeedConsumption[],
   plannedConsumed = 0,
 ): number {
-  const bought = purchases
-    .filter((purchase) => purchase.feedTypeId === feedTypeId)
-    .reduce((total, purchase) => total + purchase.quantity, 0);
+  const count = lastCount(feedTypeId, consumption);
+  const since = (on: Date, createdAt: Date) => count === undefined || isLater(on, createdAt, count);
 
-  const used = consumption
-    .filter((entry) => entry.feedTypeId === feedTypeId)
-    .reduce((total, entry) => total + entry.quantity, 0);
+  let total = count?.quantity ?? 0;
+  for (const purchase of purchases) {
+    if (purchase.feedTypeId !== feedTypeId) continue;
+    if (since(purchase.purchasedOn, purchase.createdAt)) total += purchase.quantity;
+  }
+  for (const entry of consumption) {
+    if (entry.feedTypeId !== feedTypeId || entry.kind === "correction") continue;
+    if (since(entry.usedOn, entry.createdAt)) total -= entry.quantity;
+  }
 
-  return bought - used - plannedConsumed;
+  return total - plannedConsumed;
 }
 
 /**
@@ -120,25 +173,42 @@ export function lastReconciledOn(
   purchases: readonly FeedPurchase[],
   consumption: readonly FeedConsumption[],
 ): Date | undefined {
-  const corrections = consumption
-    .filter((entry) => entry.feedTypeId === feedTypeId && entry.kind === "correction")
-    .map((entry) => entry.usedOn);
-  if (corrections.length > 0) {
-    return corrections.reduce((latest, at) => (at > latest ? at : latest));
-  }
+  const count = lastCount(feedTypeId, consumption);
+  if (count !== undefined) return count.usedOn;
 
-  const first = purchases
-    .filter((purchase) => purchase.feedTypeId === feedTypeId)
-    .map((purchase) => purchase.purchasedOn);
-  return first.length === 0
-    ? undefined
-    : first.reduce((earliest, at) => (at < earliest ? at : earliest));
+  let earliest: Date | undefined;
+  for (const purchase of purchases) {
+    if (purchase.feedTypeId !== feedTypeId) continue;
+    if (earliest === undefined || purchase.purchasedOn < earliest) earliest = purchase.purchasedOn;
+  }
+  return earliest;
 }
 
 /** What the plans imply was eaten between two dates. Never negative. */
 export function plannedConsumption(demandPerDay: number, from: Date, to: Date): number {
   const days = (to.getTime() - from.getTime()) / 86_400_000;
   return days <= 0 ? 0 : demandPerDay * days;
+}
+
+/** True when the purchase says what it cost. */
+export function isPriced(
+  purchase: Pick<FeedPurchase, "unitCost">,
+): purchase is Pick<FeedPurchase, "unitCost"> & { readonly unitCost: Money } {
+  return purchase.unitCost !== undefined;
+}
+
+/**
+ * What one purchase cost in all, or undefined when nobody entered a price.
+ *
+ * Undefined rather than zero, everywhere it is read: a sum that quietly adds a
+ * $0 load of hay understates the bill in exactly the way nobody notices.
+ */
+export function purchaseTotal(
+  purchase: Pick<FeedPurchase, "unitCost" | "quantity">,
+): Money | undefined {
+  return purchase.unitCost === undefined
+    ? undefined
+    : { cents: Math.round(purchase.unitCost.cents * purchase.quantity) };
 }
 
 /**
@@ -148,20 +218,47 @@ export function plannedConsumption(demandPerDay: number, from: Date, to: Date): 
  * nobody knows which bale came from which load — and a per-head cost that
  * jumped every time a cheaper load arrived would be a number nobody could
  * explain to themselves a month later.
+ *
+ * Averaged over the priced purchases only. An unpriced load is not a free
+ * load, so it is left out of the average rather than dragging it towards
+ * zero; `feedCost` says when that happened.
  */
 export function weightedAverageCost(
   feedTypeId: Ulid,
   purchases: readonly FeedPurchase[],
 ): Money | undefined {
-  const relevant = purchases.filter((purchase) => purchase.feedTypeId === feedTypeId);
-  const quantity = relevant.reduce((total, purchase) => total + purchase.quantity, 0);
-  if (quantity <= 0) return undefined;
+  return feedCost(feedTypeId, purchases).average;
+}
 
-  const cents = relevant.reduce(
-    (total, purchase) => total + purchase.unitCost.cents * purchase.quantity,
-    0,
-  );
-  return { cents: Math.round(cents / quantity) };
+export interface FeedCost {
+  /** Weighted average of what was paid, over the purchases that say. */
+  readonly average?: Money | undefined;
+  /** False when any purchase of this feed has no price, or there are none. */
+  readonly complete: boolean;
+}
+
+/** The average, and whether every purchase behind it had a price. */
+export function feedCost(feedTypeId: Ulid, purchases: readonly FeedPurchase[]): FeedCost {
+  let quantity = 0;
+  let cents = 0;
+  let bought = 0;
+  let unpriced = 0;
+
+  for (const purchase of purchases) {
+    if (purchase.feedTypeId !== feedTypeId) continue;
+    bought += 1;
+    if (purchase.unitCost === undefined) {
+      unpriced += 1;
+      continue;
+    }
+    quantity += purchase.quantity;
+    cents += purchase.unitCost.cents * purchase.quantity;
+  }
+
+  return {
+    average: quantity <= 0 ? undefined : { cents: Math.round(cents / quantity) },
+    complete: bought > 0 && unpriced === 0,
+  };
 }
 
 /**

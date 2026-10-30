@@ -1,12 +1,18 @@
 import type { Money, PurchaseCandidate } from "@galaxy-farm/core";
 import type { EquipmentCandidateDetail } from "@galaxy-farm/module-equipment";
 
+/**
+ * One formatter, built once. `toLocaleDateString` with options builds a new
+ * `Intl.DateTimeFormat` on every call — about a tenth of a millisecond each,
+ * which on a list of a few hundred rows, dated twice a row, was most of the
+ * time a save spent re-rendering the list behind its panel.
+ */
+const DAY = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
+
 /** The formatting the comparison, the panel and the editor share. */
 
 export function formatDate(value: Date | undefined): string {
-  return value === undefined
-    ? "—"
-    : value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return value === undefined ? "—" : DAY.format(value);
 }
 
 export function num(value: number | undefined, decimals = 0): string {

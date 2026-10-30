@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import type { Ulid, Zone } from "@galaxy-farm/core";
@@ -69,6 +69,24 @@ export function PlantingsScreen({
 
   const [tab, setTab] = useState("plantings");
   const [focusedBed, setFocusedBed] = useState<Ulid | undefined>();
+  /** A bed the address asked to open — the layout's bed rows link here. */
+  const [openBed, setOpenBed] = useState<Ulid | undefined>();
+
+  // `?tab=beds&bed=<id>` opens that bed's editor; `?tab=care` or `?tab=plan`
+  // opens on that tab. Read off `window` once, so the page needs no Suspense
+  // boundary — the same convention as the pets screen.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const asked = params.get("tab");
+    if (asked === "plantings" || asked === "beds" || asked === "care" || asked === "plan") {
+      setTab(asked);
+    }
+    const bed = params.get("bed");
+    if (bed !== null && bed !== "") {
+      setTab("beds");
+      setOpenBed(bed as Ulid);
+    }
+  }, []);
 
   const now = new Date();
 
@@ -151,6 +169,7 @@ export function PlantingsScreen({
               loading={bedsLoading}
               propertyId={propertyId}
               actorId={actorId}
+              openBedId={openBed}
               onPlantHere={(bed) => {
                 setFocusedBed(bed.id);
                 setTab("plantings");

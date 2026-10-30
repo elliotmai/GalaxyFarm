@@ -297,7 +297,9 @@ export function FuelTab({
   readonly onEdit: (log: FuelLog) => void;
 }) {
   const mpg = fuelEfficiency(fuel, machine.id);
-  const spent: Money = { cents: fuel.reduce((total, log) => total + log.cost.cents, 0) };
+  // Priced fills only; a fill from the farm tank has gallons and no receipt.
+  const spent: Money = { cents: fuel.reduce((total, log) => total + (log.cost?.cents ?? 0), 0) };
+  const unpriced = fuel.filter((log) => log.cost === undefined).length;
   const burned = fuel.reduce((total, log) => total + log.gallons, 0);
 
   return (
@@ -310,6 +312,7 @@ export function FuelTab({
             ? undefined
             : line(
                 formatMoney(spent),
+                unpriced === 0 ? undefined : `${unpriced} without a price`,
                 `${num(burned, 1)} gal`,
                 `${fuel.length} fill${fuel.length === 1 ? "" : "s"}`,
                 mpg === undefined ? "mpg after two fills with miles" : `${num(mpg, 1)} mpg`,
@@ -334,12 +337,18 @@ export function FuelTab({
             .map((log) => (
               <KitRow
                 key={log.id}
-                title={`${num(log.gallons, 1)} gal · ${formatMoney(log.cost)}`}
+                title={
+                  log.cost === undefined
+                    ? `${num(log.gallons, 1)} gal`
+                    : `${num(log.gallons, 1)} gal · ${formatMoney(log.cost)}`
+                }
                 line={line(
                   formatDate(log.filledOn),
-                  log.gallons <= 0
-                    ? undefined
-                    : `${formatMoney({ cents: Math.round(log.cost.cents / log.gallons) })}/gal`,
+                  log.cost === undefined
+                    ? "no price"
+                    : log.gallons <= 0
+                      ? undefined
+                      : `${formatMoney({ cents: Math.round(log.cost.cents / log.gallons) })}/gal`,
                   meterAt(log.hours, log.miles),
                 )}
                 onOpen={() => onEdit(log)}

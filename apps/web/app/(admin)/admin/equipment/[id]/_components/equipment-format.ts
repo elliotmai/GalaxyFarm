@@ -1,6 +1,14 @@
 import type { MaintenanceDue } from "@galaxy-farm/module-equipment";
 
 /**
+ * One formatter, built once. `toLocaleDateString` with options builds a new
+ * `Intl.DateTimeFormat` on every call — about a tenth of a millisecond each,
+ * which on a list of a few hundred rows, dated twice a row, was most of the
+ * time a save spent re-rendering the list behind its panel.
+ */
+const DAY = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+/**
  * The small formatting rules one machine's page is written in.
  *
  * Shared by the screen, its ledgers and its forms, so a reading says "1,234.5"
@@ -8,9 +16,7 @@ import type { MaintenanceDue } from "@galaxy-farm/module-equipment";
  */
 
 export function formatDate(value: Date | undefined): string {
-  return value === undefined
-    ? "—"
-    : value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return value === undefined ? "—" : DAY.format(value);
 }
 
 /** Hours read to a tenth; miles do not. */

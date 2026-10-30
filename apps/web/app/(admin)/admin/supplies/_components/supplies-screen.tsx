@@ -3,18 +3,12 @@
 import { useMemo, useState } from "react";
 
 import { Button, PageBody, Tabs } from "@galaxy-farm/ui";
-import {
-  formatMoney,
-  type Animal,
-  type Contact,
-  type Money,
-  type Ulid,
-  type Zone,
-} from "@galaxy-farm/core";
+import { formatMoney, type Animal, type Contact, type Ulid, type Zone } from "@galaxy-farm/core";
 import {
   currentlyAssigned,
   isLowStock,
-  stockOnHand,
+  stockByItem,
+  supplySpend,
   type DurableAssignment,
   type SupplyItem,
   type SupplyPurchase,
@@ -85,10 +79,8 @@ export function SuppliesScreen({
 
   const now = new Date();
 
-  const onHand = useMemo(
-    () => new Map(items.map((item) => [item.id, stockOnHand(item, purchases, usage)] as const)),
-    [items, purchases, usage],
-  );
+  // One pass over each ledger for the whole shelf, not one per item.
+  const onHand = useMemo(() => stockByItem(items, purchases, usage), [items, purchases, usage]);
 
   const holds = useMemo(
     () => itemHolds(purchases, usage, assignments),
@@ -100,11 +92,8 @@ export function SuppliesScreen({
 
   const low = items.filter((item) => isLowStock(item, onHand.get(item.id) ?? 0));
 
-  const spend: Money = {
-    cents: Math.round(
-      purchases.reduce((total, purchase) => total + purchase.unitCost.cents * purchase.quantity, 0),
-    ),
-  };
+  // Priced purchases only: one with no price is not a free one.
+  const spend = useMemo(() => supplySpend(purchases), [purchases]);
 
   const durablesOut = currentlyAssigned(assignments, now).filter(
     (assignment) => !isEnding(assignment),

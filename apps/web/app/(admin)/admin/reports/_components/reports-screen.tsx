@@ -186,7 +186,15 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
       header: "Average unit",
       render: (row) => (row.averageUnitCost === undefined ? "—" : formatMoney(row.averageUnitCost)),
     },
-    { key: "spend", header: "Spend", render: (row) => formatMoney(row.spend) },
+    {
+      key: "spend",
+      header: "Spend",
+      // Short by the loads bought without a price, and it says so.
+      render: (row) =>
+        row.unpriced === 0
+          ? formatMoney(row.spend)
+          : `${formatMoney(row.spend)} + ${row.unpriced} unpriced`,
+    },
   ];
 
   const yieldColumns: readonly Column<YieldRow>[] = [

@@ -142,12 +142,12 @@ export function DraftFigure({
       {draft.boundary.length >= 2 ? (
         <path
           d={
-            draft.boundary.length >= 3
+            draft.boundary.length >= 3 && draft.open !== true
               ? pathData(draft.boundary, view)
               : lineData(draft.boundary, view)
           }
-          fill="#FFFFFF"
-          fillOpacity={draft.boundary.length >= 3 ? 0.2 : 0}
+          fill={draft.open === true ? "none" : "#FFFFFF"}
+          fillOpacity={draft.boundary.length >= 3 && draft.open !== true ? 0.2 : 0}
           stroke="#FFFFFF"
           strokeWidth={3}
           strokeLinejoin="round"

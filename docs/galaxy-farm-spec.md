@@ -274,7 +274,11 @@ Hatching/incubation: not built; the module boundary leaves a clean seam if that 
 
 **Bed** — a child of a garden Zone: shape/position from the layout designer, type (`raised_bed | row`), dimensions, soil notes.
 
-**Crop / Variety** — name, **family (for rotation logic)**, daysToMaturity, spacing, source. **SeedInventory** — variety, qty, packedForYear, source, germination notes.
+**Crop / Variety** — name, **family (for rotation logic)**, scientific name, daysToMaturity, spacing, source. **SeedInventory** — variety, qty (optional — a packet nobody counted is still in the box), packedForYear, source, germination notes.
+
+**The family is inferred, not asked for.** A built-in table of common garden crops (`GARDEN_CROPS` in the garden module — Solanaceae: tomato, pepper, potato, eggplant; Brassicaceae: cabbage, kale, broccoli; Cucurbitaceae; Fabaceae; Amaryllidaceae, which folds the older Alliaceae; Apiaceae; Asteraceae; Amaranthaceae; Poaceae; and the rest of an ordinary kitchen garden) maps a crop's name, or failing that its scientific name's genus, to its family. It works offline, and it is what the rotation guard reads whenever a crop stores no family of its own. A family that is stored — typed as an override behind the crop form's "Family · Change" disclosure, or supplied by a plant-search pick for something the table does not know — always wins. A family that merely repeats the table's answer is not stored, so it stays derived (§2). Old family names are normalised (Alliaceae → Amaryllidaceae, Leguminosae → Fabaceae …) so one rotation is never read as two. Family is never required; a crop the table cannot place reads "family unknown — rotation not checked".
+
+**Plant search.** The crop form's name box is also a search, and the variety form has a "Find the plant" box that files the variety under the matching crop (adding the crop if the list has none). Picking a match fills the name, scientific name and family. The built-in table answers instantly and offline; `/api/plants/search` (session-checked, server-side, answers cached for a day) adds GBIF's species API — accepted plant species of the GBIF backbone, re-ranked so a common name that *is* the query beats one that merely contains it. The browser never calls GBIF directly, and when the route or GBIF is unreachable the form says so in one quiet line and still works by hand.
 
 **Planting** — bed, variety, method (`direct_sow | transplant`), optional indoor start date, plantedDate, expectedHarvestDate (derived), status. **CareLog** — bed/planting, action (`fertilize | water | weed | pest_treatment | amend`), product, notes.
 
@@ -282,7 +286,7 @@ Hatching/incubation: not built; the module boundary leaves a clean seam if that 
 
 **Rotation guard** — each bed keeps its crop-family history; planting the same family in a bed within a configurable window (default 3 years) raises a visible warning in the designer.
 
-**HarvestLog** — planting, date, qty, unit. **PreservationLog** — method (`canned | frozen | dried | fermented`), qty, date, storage location — your pantry inventory.
+**HarvestLog** — planting, date, qty (optional — the date is what says how long a variety kept giving), unit. **PreservationLog** — method (`canned | frozen | dried | fermented`), qty (optional, and may be edited down to zero as jars are eaten — the batch stays on record), date, storage location — your pantry inventory. A picking's editor offers "Put some by", which opens a pantry batch already naming it.
 
 **Planting calendar** — derived from the property's growing zone (dynamic; Fort Worth ≈ 8b today, but it's a property setting): per-crop sow/transplant windows and frost dates projected onto the unified calendar.
 
@@ -412,9 +416,11 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/more                     everything not daily: reports, calendar, contacts, housesitter,
                                 boarding business, chore templates, settings (§8 v1.7)
 /admin/map                      property map — draw pens/pastures over aerial photo,
-                                drag animal chips between zones, tap for instructions
+                                drag animal chips between zones, tap for instructions; each
+                                zone opens a panel for its boundary and temporary fencing
 /admin/pastures                 care logs (seed/overseed, fertilize, spray, mow), rest status,
-                                seasonal reminders, per-pasture cost history
+                                seasonal reminders, per-pasture cost history; ?zone= opens
+                                that zone's editor (the map's "Edit zone details")
 /admin/calendar                 unified calendar
 /admin/chores                   templates + today
 /admin/reports
@@ -444,10 +450,14 @@ Route: `/admin/supplies`. Builds in Phase 2.
 /admin/chickens/flock/[id]      one flock, by name: headcount, eggs this week, coop chores,
                                 one history (headcount · eggs · notes), photos, details
 /admin/chickens/eggs            logs + trends
-/admin/garden/layout            visual designer (beds/rows, rotation warnings)
-/admin/garden/plantings         + care logs
-/admin/garden/seeds
-/admin/garden/harvest           + preservation
+/admin/garden/layout            visual designer (beds/rows, rotation warnings); a bed's row opens
+                                its record under plantings ?tab=beds&bed=
+/admin/garden/plantings         + beds, care logs, season plan; ?tab=beds|care|plan opens a tab,
+                                ?bed=<id> opens that bed's editor
+/admin/garden/seeds             seed box · crops & varieties, with plant search (§5.5) — names
+                                come from the built-in table and GET api/plants/search?q=
+                                (built-in + GBIF, cached, session-checked)
+/admin/garden/harvest           + preservation; ?tab=harvest opens the log
 /admin/equipment                fleet · /admin/equipment/[id] · /admin/equipment/roadmap
 /admin/equipment/candidates     purchase candidates: compare units, true cost, links, decision log
 /admin/pets/dogs                Dogs, on the species-page shape (decision 44); add a dog

@@ -5,7 +5,6 @@ import { useState } from "react";
 import { Select, TextInput, useConfirmDelete, useToast, optionLabel } from "@galaxy-farm/ui";
 import {
   displayName,
-  fromDollars,
   UNITS,
   type Animal,
   type Contact,
@@ -38,6 +37,8 @@ import {
   errorMessage,
   formatDate,
   isEnding,
+  moneyFrom,
+  moneyText,
   qty,
   today,
   unitLabel,
@@ -177,12 +178,13 @@ export function ItemForm({
       />
       <TextInput
         label="Opening count"
+        hint="Blank is none."
         type="number"
         inputMode="decimal"
+        min="0"
         numeric
         value={draft.openingQty}
         onChange={(event) => setDraft({ ...draft, openingQty: event.target.value })}
-        required
       />
       {draft.kind === "consumable" ? (
         <TextInput
@@ -238,9 +240,7 @@ export function PurchaseForm({
 
   const [supplyItemId, setSupplyItemId] = useState<string>(editing?.supplyItemId ?? start ?? "");
   const [quantity, setQuantity] = useState(editing === undefined ? "" : String(editing.quantity));
-  const [unitCost, setUnitCost] = useState(
-    editing === undefined ? "" : (editing.unitCost.cents / 100).toFixed(2),
-  );
+  const [unitCost, setUnitCost] = useState(moneyText(editing?.unitCost));
   const [vendorContactId, setVendorContactId] = useState<string>(editing?.vendorContactId ?? "");
   const [purchasedOn, setPurchasedOn] = useState(
     editing === undefined ? today() : editing.purchasedOn.toISOString().slice(0, 10),
@@ -263,7 +263,8 @@ export function PurchaseForm({
       const payload = {
         supplyItemId: supplyItemId as Ulid,
         quantity: Number(quantity),
-        unitCost: fromDollars(Number(unitCost)),
+        // Blank is "not priced", not $0 — see `SupplyPurchase.unitCost`.
+        unitCost: moneyFrom(unitCost),
         vendorContactId: vendorContactId === "" ? undefined : (vendorContactId as Ulid),
         purchasedOn: atNoon(purchasedOn),
         notes: notes.trim() === "" ? undefined : notes.trim(),
@@ -321,13 +322,14 @@ export function PurchaseForm({
       />
       <TextInput
         label="Cost each ($)"
+        hint="Blank if there was no bill."
         type="number"
         inputMode="decimal"
         step="0.01"
+        min="0"
         numeric
         value={unitCost}
         onChange={(event) => setUnitCost(event.target.value)}
-        required
       />
       <Select
         label="Vendor"
@@ -765,7 +767,11 @@ export function useSupplyActions({
     if (!confirmed) return;
 
     await purchasesApi.remove(purchase.id, "Removed from the supply purchases");
-    show({ message: "Purchase deleted", tone: "danger" });
+    show({
+      message: "Purchase deleted",
+      tone: "danger",
+      action: { label: "Undo", onAct: () => void purchasesApi.restoreRecord(purchase.id) },
+    });
   }
 
   async function removeUsage(entry: SupplyUsage) {
@@ -790,7 +796,11 @@ export function useSupplyActions({
     if (!confirmed) return;
 
     await usageApi.remove(entry.id, "Removed from the supply usage log");
-    show({ message: "Entry deleted", tone: "danger" });
+    show({
+      message: "Entry deleted",
+      tone: "danger",
+      action: { label: "Undo", onAct: () => void usageApi.restoreRecord(entry.id) },
+    });
   }
 
   async function removeAssignment(assignment: DurableAssignment) {
@@ -809,7 +819,11 @@ export function useSupplyActions({
     if (!confirmed) return;
 
     await assignmentsApi.remove(assignment.id, "Removed from the durable log");
-    show({ message: "Assignment deleted", tone: "danger" });
+    show({
+      message: "Assignment deleted",
+      tone: "danger",
+      action: { label: "Undo", onAct: () => void assignmentsApi.restoreRecord(assignment.id) },
+    });
   }
 
   /** End an assignment without deleting it — the halter came back. */

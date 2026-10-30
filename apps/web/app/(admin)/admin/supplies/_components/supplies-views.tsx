@@ -13,8 +13,9 @@ import {
 } from "@galaxy-farm/core";
 import {
   currentlyAssigned,
-  inService,
+  goneByItem,
   isLowStock,
+  purchaseTotal,
   type DurableAssignment,
   type SupplyItem,
   type SupplyPurchase,
@@ -42,15 +43,35 @@ function TabHead({ facts, action }: { readonly facts: ReactNode; readonly action
   );
 }
 
-/** Who or where something is with, in the words a row uses. */
-function withWhom(
-  animals: readonly Animal[],
-  zones: readonly Zone[],
-  entry: { readonly animalId?: Ulid | undefined; readonly zoneId?: Ulid | undefined },
-): string | undefined {
-  const animal = animals.find((candidate) => candidate.id === entry.animalId);
-  if (animal !== undefined) return displayName(animal);
-  return zones.find((candidate) => candidate.id === entry.zoneId)?.name;
+/**
+ * Who or where something is with, in the words a row uses.
+ *
+ * Built once per list as a lookup, rather than searching the herd and the pens
+ * for every row: a year of usage against a full herd was a million comparisons
+ * on every render of the Used tab.
+ */
+function useWithWhom(animals: readonly Animal[], zones: readonly Zone[]) {
+  return useMemo(() => {
+    const names = new Map<Ulid, string>();
+    for (const zone of zones) names.set(zone.id, zone.name);
+    const animalNames = new Map<Ulid, string>();
+    for (const animal of animals) animalNames.set(animal.id, displayName(animal));
+    return (entry: {
+      readonly animalId?: Ulid | undefined;
+      readonly zoneId?: Ulid | undefined;
+    }): string | undefined =>
+      (entry.animalId === undefined ? undefined : animalNames.get(entry.animalId)) ??
+      (entry.zoneId === undefined ? undefined : names.get(entry.zoneId));
+  }, [animals, zones]);
+}
+
+/** How many open assignments each item has out, keyed by item. */
+function countByItem(assignments: readonly DurableAssignment[]): Map<Ulid, number> {
+  const counts = new Map<Ulid, number>();
+  for (const assignment of assignments) {
+    counts.set(assignment.supplyItemId, (counts.get(assignment.supplyItemId) ?? 0) + 1);
+  }
+  return counts;
 }
 
 /* ------------------------------------------------------------------ shelf */
@@ -72,6 +93,11 @@ export function ShelfTab({
   /** A durable's row: assign it, or retire it. */
   readonly onAssign: (item: SupplyItem) => void;
 }) {
+  // `now` is a new Date every render, so these are linear passes rather than
+  // memos that would recompute anyway.
+  const out = countByItem(currentlyAssigned(assignments, now));
+  const gone = useMemo(() => goneByItem(assignments), [assignments]);
+
   if (items.length === 0) {
     return (
       <EmptyState
@@ -80,8 +106,6 @@ export function ShelfTab({
       />
     );
   }
-
-  const out = currentlyAssigned(assignments, now);
 
   return (
     <KitList label="What is here">
@@ -95,8 +119,8 @@ export function ShelfTab({
           const short = isLowStock(item, stock);
           // Durables count what is still in service, which is not the same as
           // what was bought.
-          const usable = item.kind === "durable" ? inService(item.id, stock, assignments) : stock;
-          const assigned = out.filter((assignment) => assignment.supplyItemId === item.id).length;
+          const usable = item.kind === "durable" ? stock - (gone.get(item.id) ?? 0) : stock;
+          const assigned = out.get(item.id) ?? 0;
           const durable = item.kind === "durable";
 
           return (
@@ -205,6 +229,10 @@ export function PurchasesTab({
   readonly onEdit: (purchase: SupplyPurchase) => void;
 }) {
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const vendors = useMemo(
+    () => new Map(contacts.map((contact) => [contact.id, contact.name])),
+    [contacts],
+  );
 
   return (
     <div className="flex flex-col gap-density">
@@ -223,15 +251,21 @@ export function PurchasesTab({
             .sort((a, b) => b.purchasedOn.getTime() - a.purchasedOn.getTime())
             .map((purchase) => {
               const name = byId.get(purchase.supplyItemId)?.name ?? "Unknown item";
+              const total = purchaseTotal(purchase);
               return (
                 <KitRow
                   key={purchase.id}
                   title={name}
                   line={line(
                     formatDate(purchase.purchasedOn),
-                    `${qty(purchase.quantity)} × ${formatMoney(purchase.unitCost)}`,
-                    formatMoney({ cents: Math.round(purchase.unitCost.cents * purchase.quantity) }),
-                    contacts.find((contact) => contact.id === purchase.vendorContactId)?.name,
+                    // No price is said as such — never as $0, which reads as free.
+                    purchase.unitCost === undefined
+                      ? `${qty(purchase.quantity)} · no price`
+                      : `${qty(purchase.quantity)} × ${formatMoney(purchase.unitCost)}`,
+                    total === undefined ? undefined : formatMoney(total),
+                    purchase.vendorContactId === undefined
+                      ? undefined
+                      : vendors.get(purchase.vendorContactId),
                   )}
                   onOpen={() => onEdit(purchase)}
                   openLabel={`Edit the ${name} purchase of ${formatDate(purchase.purchasedOn)}`}
@@ -262,6 +296,7 @@ export function UsedTab({
   readonly onEdit: (entry: SupplyUsage) => void;
 }) {
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const withWhom = useWithWhom(animals, zones);
 
   return (
     <div className="flex flex-col gap-density">
@@ -287,7 +322,7 @@ export function UsedTab({
                   line={line(
                     formatDate(entry.usedOn),
                     qty(entry.quantity),
-                    withWhom(animals, zones, entry) ?? "the place generally",
+                    withWhom(entry) ?? "the place generally",
                     entry.notes,
                   )}
                   onOpen={() => onEdit(entry)}
@@ -333,6 +368,10 @@ export function DurablesTab({
 }) {
   const durables = items.filter((item) => item.kind === "durable");
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const withWhom = useWithWhom(animals, zones);
+  const gone = useMemo(() => goneByItem(assignments), [assignments]);
+  const outNow = currentlyAssigned(assignments, now).filter((assignment) => !isEnding(assignment));
+  const lentByItem = countByItem(outNow);
 
   if (durables.length === 0) {
     return (
@@ -342,8 +381,6 @@ export function DurablesTab({
       />
     );
   }
-
-  const out = currentlyAssigned(assignments, now).filter((assignment) => !isEnding(assignment));
 
   /** One chip on an assignment: how it ended, or that it is still out. */
   function chipFor(assignment: DurableAssignment) {
@@ -357,14 +394,14 @@ export function DurablesTab({
       <TabHead
         // Twenty-four panels with two bent into scrap is twenty-two panels,
         // and a pen laid out against twenty-four will not close.
-        facts={`${out.length} out right now`}
+        facts={`${outNow.length} out right now`}
         action={<Button onClick={() => onAdd()}>Assign, or retire</Button>}
       />
       <KitList label="What is still in service">
         {durables.map((item) => {
           const total = onHand.get(item.id) ?? 0;
-          const usable = inService(item.id, total, assignments);
-          const lent = out.filter((assignment) => assignment.supplyItemId === item.id).length;
+          const usable = total - (gone.get(item.id) ?? 0);
+          const lent = lentByItem.get(item.id) ?? 0;
           return (
             <KitRow
               key={item.id}
@@ -401,7 +438,7 @@ export function DurablesTab({
                   title={name}
                   line={line(
                     qty(assignment.quantity),
-                    withWhom(animals, zones, assignment),
+                    withWhom(assignment),
                     isEnding(assignment) ? undefined : assignment.condition,
                     assignment.periodTo === undefined
                       ? `since ${formatDate(assignment.periodFrom)}`

@@ -29,6 +29,7 @@ import {
   dateFromInput,
   dateInputValue,
   formatDate,
+  optionalText,
 } from "@/app/(admin)/admin/garden/_components/labels";
 import {
   AddAction,
@@ -37,7 +38,7 @@ import {
   LandRow,
   RowList,
 } from "@/app/(admin)/admin/pastures/_components/land-kit";
-import { varietyLabel } from "@/lib/garden";
+import { byId, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -102,18 +103,37 @@ export function CareLogPanel({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const bedName = (id: Ulid | undefined) =>
-    id === undefined ? undefined : beds.find((bed) => bed.id === id)?.name;
+    id === undefined ? undefined : byId(beds).get(id)?.name;
 
   const plantingName = (id: Ulid | undefined) => {
     if (id === undefined) return undefined;
-    const planting = plantings.find((row) => row.id === id);
+    const planting = byId(plantings).get(id);
     if (planting === undefined) return undefined;
-    const variety = varieties.find((row) => row.id === planting.varietyId);
+    const variety = byId(varieties).get(planting.varietyId);
     return `${varietyLabel(variety, crops)} in ${bedName(planting.bedId) ?? "a bed"}`;
   };
 
   const targetLabel = (entry: GardenCareLog) =>
     plantingName(entry.plantingId) ?? bedName(entry.bedId) ?? "Something that has been deleted";
+
+  /**
+   * The bed or planting an entry can name: what is in use, plus whatever the
+   * entry being edited already names. Spraying a planting that has since been
+   * pulled is still a fact about that planting, and opening the entry must
+   * show it rather than whatever happens to be first in the list.
+   */
+  const optionsFor = (current: string) =>
+    current === "" || options.some((option) => option.value === current)
+      ? options
+      : [
+          ...options,
+          {
+            value: current,
+            label: current.startsWith(PLANTING)
+              ? `${plantingName(current.slice(PLANTING.length) as Ulid) ?? "A planting"} (finished)`
+              : `${bedName(current.slice(BED.length) as Ulid) ?? "A bed"} (switched off)`,
+          },
+        ];
 
   const options = [
     { value: "", label: "Pick one" },
@@ -171,7 +191,7 @@ export function CareLogPanel({
 
     const isPlanting = draft.target.startsWith(PLANTING);
     const id = draft.target.slice(draft.target.indexOf(":") + 1) as Ulid;
-    const planting = isPlanting ? plantings.find((row) => row.id === id) : undefined;
+    const planting = isPlanting ? byId(plantings).get(id) : undefined;
 
     const fields = {
       // A planting entry carries its bed too, so "what has this bed had done
@@ -180,8 +200,8 @@ export function CareLogPanel({
       plantingId: isPlanting ? id : undefined,
       action: draft.action,
       performedOn: dateFromInput(draft.performedOn) ?? new Date(),
-      product: draft.product.trim() === "" ? undefined : draft.product.trim(),
-      notes: draft.notes.trim() === "" ? undefined : draft.notes.trim(),
+      product: optionalText(draft.product),
+      notes: optionalText(draft.notes),
     };
 
     const result =
@@ -330,7 +350,7 @@ export function CareLogPanel({
                 label="Bed or planting"
                 required
                 hint="The bed for the ground; the planting for the crop."
-                options={options}
+                options={optionsFor(draft.target)}
                 value={draft.target}
                 error={errors["bedId"]}
                 onChange={(event) => setDraft({ ...draft, target: event.target.value })}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import {
@@ -34,9 +35,10 @@ import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
 import { formatDate, line, meterAt, num } from "./equipment-format";
+import { MachineForm } from "../../_components/machine-form";
+import { useMachineRemoval } from "../../_components/machine-removal";
 import { FuelForm, MeterForm, RuleForm, ServiceForm } from "./equipment-forms";
 import { DetailsTab, FuelTab, MaintenanceTab, MetersTab, ServiceTab } from "./equipment-ledgers";
-import { MachineForm } from "./machine-form";
 
 /**
  * One machine (spec §5.6, §7's `/admin/equipment/[id]`).
@@ -54,8 +56,9 @@ import { MachineForm } from "./machine-form";
  *
  * This file is the frame: the header, what is overdue, the tabs, and which
  * side panel is open. The tabs are lists (`equipment-ledgers.tsx`) and every
- * add and edit is a panel (`equipment-forms.tsx`, `machine-form.tsx`), so no
- * form ever pushes the ledger it writes to down the page.
+ * add and edit is a panel (`equipment-forms.tsx`, and the fleet's own
+ * `machine-form.tsx` for the machine itself, Delete included), so no form ever
+ * pushes the ledger it writes to down the page.
  */
 
 const TABS = [
@@ -119,6 +122,7 @@ export function EquipmentScreen({
   const fuelApi = useMutations<FuelLog>("fuelLogs", "fuelLogs", fuelLogSchema, propertyId, actorId);
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
+  const router = useRouter();
 
   const [tab, setTab] = useState<string>("meters");
   const [panel, setPanel] = useState<Panel | undefined>();
@@ -141,6 +145,15 @@ export function EquipmentScreen({
     () => allFuel.filter((entry) => entry.equipmentId === equipmentId),
     [allFuel, equipmentId],
   );
+
+  // Deleting the machine takes its ledgers with it — the same cascade as the
+  // fleet's — and then there is no page left to be on, so it goes back there.
+  const confirmRemoveMachine = useMachineRemoval({
+    propertyId,
+    actorId,
+    ledgers: { readings, rules, logs, fuel },
+    onRemoved: () => router.push("/admin/equipment"),
+  });
 
   if (loading) return <p className="text-muted">Looking…</p>;
 
@@ -195,7 +208,11 @@ export function EquipmentScreen({
     if (!confirmed) return;
 
     await readingsApi.remove(reading.id, "Removed from the meter log");
-    show({ message: "Reading deleted", tone: "danger" });
+    show({
+      message: "Reading deleted",
+      tone: "danger",
+      action: { label: "Undo", onAct: () => void readingsApi.restoreRecord(reading.id) },
+    });
   }
 
   async function removeRule(rule: MaintenanceRule) {
@@ -211,7 +228,11 @@ export function EquipmentScreen({
     if (!confirmed) return;
 
     await rulesApi.remove(rule.id, "Removed from the maintenance rules");
-    show({ message: "Rule deleted", tone: "danger" });
+    show({
+      message: "Rule deleted",
+      tone: "danger",
+      action: { label: "Undo", onAct: () => void rulesApi.restoreRecord(rule.id) },
+    });
   }
 
   async function removeLog(log: MaintenanceLog) {
@@ -234,7 +255,11 @@ export function EquipmentScreen({
     if (!confirmed) return;
 
     await logsApi.remove(log.id, "Removed from the service log");
-    show({ message: "Entry deleted", tone: "danger" });
+    show({
+      message: "Entry deleted",
+      tone: "danger",
+      action: { label: "Undo", onAct: () => void logsApi.restoreRecord(log.id) },
+    });
   }
 
   async function removeFill(log: FuelLog) {
@@ -251,7 +276,11 @@ export function EquipmentScreen({
     if (!confirmed) return;
 
     await fuelApi.remove(log.id, "Removed from the fuel log");
-    show({ message: "Fill deleted", tone: "danger" });
+    show({
+      message: "Fill deleted",
+      tone: "danger",
+      action: { label: "Undo", onAct: () => void fuelApi.restoreRecord(log.id) },
+    });
   }
 
   /**
@@ -277,14 +306,9 @@ export function EquipmentScreen({
   return (
     <PageBody>
       <PageHeader
-        eyebrow={
-          <span>
-            <Link href="/admin/equipment" className="hover:text-ink">
-              Kit
-            </Link>{" "}
-            · Equipment
-          </span>
-        }
+        // Plain words, not a link: the way back is the layout's Back, above
+        // every page, and a second one here only disagreed with it.
+        eyebrow="Farm"
         title={machine.name}
         subtitle={line(
           [machine.year, machine.make, machine.model].filter(Boolean).join(" "),
@@ -409,7 +433,16 @@ export function EquipmentScreen({
           onDelete={deleteFrom(panel.editing, removeFill)}
         />
       ) : panel?.kind === "machine" ? (
-        <MachineForm machine={machine} propertyId={propertyId} actorId={actorId} onClose={close} />
+        <MachineForm
+          machine={machine}
+          propertyId={propertyId}
+          actorId={actorId}
+          onClose={close}
+          onDelete={() => {
+            close();
+            void confirmRemoveMachine(machine);
+          }}
+        />
       ) : null}
     </PageBody>
   );

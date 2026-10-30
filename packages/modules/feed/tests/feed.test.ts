@@ -5,11 +5,13 @@ import { fromDollars, quantity, type FeedingPlan, type Ulid } from "@galaxy-farm
 import { feedTypeSchema, poundsOf, type FeedType } from "../src/domain/feed-type.js";
 import {
   feedConsumptionSchema,
+  feedCost,
   feedPurchaseSchema,
   lastReconciledOn,
   onHand,
   plannedConsumption,
   projectFeed,
+  purchaseTotal,
   reorderOn,
   runOutDate,
   weightedAverageCost,
@@ -202,11 +204,11 @@ describe("projectFeed", () => {
   });
 
   it("restarts the accrual from a correction, which is somebody counting the barn", () => {
-    const counted = used({ kind: "correction", quantity: 0.5, usedOn: new Date("2026-10-30") });
+    const counted = used({ kind: "correction", quantity: 9.5, usedOn: new Date("2026-10-30") });
     const projection = projectFeed(hay, [purchase()], [counted], demand, AT);
 
     expect(projection.reconciledOn).toEqual(new Date("2026-10-30"));
-    // Ten bought, half corrected away, two and a half days at half a bale.
+    // Nine and a half counted, then two and a half days at half a bale.
     expect(projection.onHand).toBeCloseTo(8.25, 5);
     expect(projection.runsOutOn).toEqual(new Date("2026-11-17T12:00:00Z"));
     expect(projection.orderBy).toEqual(new Date("2026-11-10T12:00:00Z"));
@@ -214,7 +216,7 @@ describe("projectFeed", () => {
   });
 
   it("says order now once the lead time has been reached", () => {
-    const counted = used({ kind: "correction", quantity: 0.5, usedOn: new Date("2026-10-30") });
+    const counted = used({ kind: "correction", quantity: 9.5, usedOn: new Date("2026-10-30") });
     const late = projectFeed(
       hay,
       [purchase()],
@@ -258,6 +260,113 @@ describe("purchase and consumption schemas", () => {
   it("accept real entries", () => {
     expect(feedPurchaseSchema.safeParse(purchase()).success).toBe(true);
     expect(feedConsumptionSchema.safeParse(used()).success).toBe(true);
+  });
+
+  it("accept a purchase with no price — the bill can come later", () => {
+    expect(feedPurchaseSchema.safeParse({ ...purchase(), unitCost: undefined }).success).toBe(true);
+  });
+
+  it("accept a count of zero, which is an empty shed, but no negative count", () => {
+    const empty = used({ kind: "correction", quantity: 0 });
+    expect(feedConsumptionSchema.safeParse(empty).success).toBe(true);
+    expect(feedConsumptionSchema.safeParse({ ...empty, quantity: -1 }).success).toBe(false);
+  });
+});
+
+describe("a count of the shed", () => {
+  const count = (over: Partial<FeedConsumption> = {}) =>
+    used({ id: id(25), kind: "correction", quantity: 4, usedOn: new Date("2026-10-20"), ...over });
+
+  it("is what is there — the purchases and entries before it are already in it", () => {
+    const extra = used({ usedOn: new Date("2026-10-10") });
+    expect(onHand(HAY, [purchase()], [extra, count()])).toBe(4);
+  });
+
+  it("adds what was bought after it and takes off what was logged after it", () => {
+    const later = purchase({ id: id(11), quantity: 6, purchasedOn: new Date("2026-10-25") });
+    const torn = used({ id: id(26), quantity: 1, usedOn: new Date("2026-10-26") });
+    expect(onHand(HAY, [purchase(), later], [count(), torn])).toBe(9);
+  });
+
+  it("resolves a purchase on the count's own day by which was written first", () => {
+    const sameDay = new Date("2026-10-20");
+    const before = purchase({ id: id(11), quantity: 6, purchasedOn: sameDay });
+    const after = purchase({
+      id: id(12),
+      quantity: 6,
+      purchasedOn: sameDay,
+      createdAt: new Date(AT.getTime() + 1_000),
+    });
+    expect(onHand(HAY, [before], [count()])).toBe(4);
+    expect(onHand(HAY, [after], [count()])).toBe(10);
+  });
+
+  it("takes the latest count, and a count of zero empties the shed", () => {
+    const earlier = count({ id: id(27), quantity: 9, usedOn: new Date("2026-10-05") });
+    expect(onHand(HAY, [purchase()], [count({ quantity: 0 }), earlier])).toBe(0);
+  });
+});
+
+describe("a purchase with no price", () => {
+  const unpriced = purchase({ id: id(13), quantity: 5, unitCost: undefined });
+
+  it("still counts toward what is in the shed", () => {
+    expect(onHand(HAY, [purchase(), unpriced], [])).toBe(15);
+  });
+
+  it("has no total, rather than a total of nothing", () => {
+    expect(purchaseTotal(unpriced)).toBeUndefined();
+    expect(purchaseTotal(purchase())).toEqual(fromDollars(850));
+  });
+
+  it("is left out of the average and marks the cost incomplete", () => {
+    expect(feedCost(HAY, [purchase(), unpriced])).toEqual({
+      average: fromDollars(85),
+      complete: false,
+    });
+    expect(feedCost(HAY, [unpriced])).toEqual({ average: undefined, complete: false });
+    expect(feedCost(HAY, [purchase()])).toEqual({ average: fromDollars(85), complete: true });
+  });
+
+  it("leaves the cost a head incomplete, and never prices the feed at $0", () => {
+    const zonePlan: FeedingPlan = {
+      id: id(39),
+      ...base,
+      name: "Pen hay",
+      target: "zone",
+      targetId: id(40),
+      alsoFeeds: [],
+      portion: "per_head",
+      active: true,
+      lines: [
+        {
+          feedTypeId: HAY,
+          amount: quantity(0.25, "round_bale"),
+          frequency: "once_daily",
+          timeOfDay: "morning",
+        },
+      ],
+    };
+    const cow = { id: id(50), zoneIds: [id(40)] };
+
+    const none = allocateFeedCost({
+      plans: [zonePlan],
+      purchases: [unpriced],
+      animals: [cow],
+      days: 30,
+    });
+    expect(none[0]?.costComplete).toBe(false);
+    expect(none[0]?.cost).toEqual({ cents: 0 });
+
+    const some = allocateFeedCost({
+      plans: [zonePlan],
+      purchases: [purchase(), unpriced],
+      animals: [cow],
+      days: 30,
+    });
+    // Priced at what the priced load cost, and still flagged.
+    expect(some[0]?.cost).toEqual(fromDollars(637.5));
+    expect(some[0]?.costComplete).toBe(false);
   });
 });
 

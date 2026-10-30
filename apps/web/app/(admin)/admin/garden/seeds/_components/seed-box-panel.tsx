@@ -21,7 +21,12 @@ import {
   type Variety,
 } from "@galaxy-farm/module-garden";
 
-import { SEED_UNIT_OPTIONS, quantityLabel } from "@/app/(admin)/admin/garden/_components/labels";
+import {
+  SEED_UNIT_OPTIONS,
+  optionalNumber,
+  optionalText,
+  quantityLabel,
+} from "@/app/(admin)/admin/garden/_components/labels";
 import {
   AddAction,
   ChipGroup,
@@ -30,7 +35,7 @@ import {
   RowList,
   StatusLine,
 } from "@/app/(admin)/admin/pastures/_components/land-kit";
-import { varietyLabel } from "@/lib/garden";
+import { byId, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -96,11 +101,7 @@ export function SeedBoxPanel({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const now = new Date();
-  const nameOf = (varietyId: Ulid) =>
-    varietyLabel(
-      varieties.find((variety) => variety.id === varietyId),
-      crops,
-    );
+  const nameOf = (varietyId: Ulid) => varietyLabel(byId(varieties).get(varietyId), crops);
 
   const varietyOptions = [...varieties]
     .map((variety) => ({ value: variety.id, label: varietyLabel(variety, crops) }))
@@ -116,7 +117,7 @@ export function SeedBoxPanel({
     setEditing(entry);
     setDraft({
       varietyId: entry.varietyId,
-      quantity: String(entry.quantity),
+      quantity: entry.quantity === undefined ? "" : String(entry.quantity),
       unit: entry.unit,
       packedForYear: entry.packedForYear === undefined ? "" : String(entry.packedForYear),
       source: entry.source ?? "",
@@ -138,10 +139,11 @@ export function SeedBoxPanel({
     if (draft === undefined) return;
     setErrors({});
 
-    const text = (value: string) => (value.trim() === "" ? undefined : value.trim());
+    const text = optionalText;
     const fields = {
       varietyId: draft.varietyId as Ulid,
-      quantity: draft.quantity.trim() === "" ? Number.NaN : Number(draft.quantity),
+      // Optional: a packet whose count nobody knows is still in the box.
+      quantity: optionalNumber(draft.quantity),
       unit: draft.unit,
       // Explicitly undefined rather than left out: on an edit, a field the
       // patch never mentions keeps its old value, so a year somebody cleared
@@ -180,7 +182,7 @@ export function SeedBoxPanel({
 
     const confirmed = await confirmDelete({
       tier: "standard",
-      recordName: `${quantityLabel(entry.quantity, entry.unit)} of ${label}`,
+      recordName: `${quantityLabel(entry.quantity, entry.unit, "Some")} of ${label}`,
       entity: "seed entry",
       dependents: [],
       consequence: "Nothing else points at it — a planting names the variety, not the packet.",
@@ -207,9 +209,11 @@ export function SeedBoxPanel({
 
   if (loading) return <p className="text-muted">Loading the seed box…</p>;
 
-  const sorted = [...seed].sort((left, right) =>
-    nameOf(left.varietyId).localeCompare(nameOf(right.varietyId)),
-  );
+  // Named once each, not twice per comparison.
+  const sorted = seed
+    .map((entry) => ({ entry, name: nameOf(entry.varietyId) }))
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map(({ entry }) => entry);
   const staleCount = seed.filter((entry) => isStaleSeed(entry, now)).length;
   const emptyCount = seed.filter((entry) => entry.quantity === 0).length;
   const chips = [
@@ -224,7 +228,7 @@ export function SeedBoxPanel({
   /** The one line: how much, how old, where from. */
   function lineFor(entry: SeedInventory): string {
     return [
-      quantityLabel(entry.quantity, entry.unit),
+      quantityLabel(entry.quantity, entry.unit, "amount not counted"),
       entry.packedForYear === undefined ? "no year on it" : `packed for ${entry.packedForYear}`,
       entry.source,
       entry.germinationNotes,
@@ -374,7 +378,7 @@ export function SeedBoxPanel({
                 min={0}
                 step="any"
                 numeric
-                required
+                hint="Optional — leave it blank if you have not counted."
                 value={draft.quantity}
                 error={errors["quantity"]}
                 onChange={(event) => setDraft({ ...draft, quantity: event.target.value })}

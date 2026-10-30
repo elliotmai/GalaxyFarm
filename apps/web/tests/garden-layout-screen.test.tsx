@@ -60,6 +60,11 @@ vi.mock("@/lib/local/mutations", () => ({
   }),
 }));
 
+const navigation = vi.hoisted(() => ({ pushed: [] as string[] }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: (href: string) => navigation.pushed.push(href) }),
+}));
+
 vi.mock("@/app/_components/sync-provider", () => ({
   useSync: () => ({
     offline: false,
@@ -194,6 +199,7 @@ beforeEach(() => {
   writes.beds = [];
   writes.plantings = [];
   writes.created = [];
+  navigation.pushed = [];
 
   stored.current = {
     beds: [LONG_BED, SIDE_BED],
@@ -373,5 +379,34 @@ describe("a garden with nowhere to hang", () => {
 
     expect(screen.getByText(/The garden has nowhere to hang/)).toBeInTheDocument();
     expect(screen.queryByRole("application")).not.toBeInTheDocument();
+    // The beds are still listed, and each still opens its record.
+    const table = within(screen.getByRole("list", { name: "Beds and where they sit" }));
+    fireEvent.click(table.getByRole("button", { name: "Edit The long bed" }));
+    expect(navigation.pushed).toEqual([`/admin/garden/plantings?tab=beds&bed=${LONG_BED.id}`]);
+    expect(table.queryByRole("button", { name: /^Draw|^Adjust/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("from the drawing to the record", () => {
+  it("opens a bed's editor under Plantings → Beds, which the Back link returns from", () => {
+    view();
+
+    const table = within(screen.getByRole("list", { name: "Beds and where they sit" }));
+    fireEvent.click(table.getByRole("button", { name: "Edit Side bed" }));
+
+    expect(navigation.pushed).toEqual([`/admin/garden/plantings?tab=beds&bed=${SIDE_BED.id}`]);
+  });
+
+  it("checks rotation on a family inferred from the crop's name", () => {
+    // Neither crop carries a family: "Tomato" is a nightshade to the guard
+    // anyway, so the long bed that grew one still warns.
+    stored.current["crops"] = [
+      { ...TOMATO, family: undefined },
+      { ...KALE, family: undefined },
+    ] as Crop[];
+    view();
+
+    fireEvent.change(screen.getByLabelText("Variety"), { target: { value: CHEROKEE.id } });
+    expect(screen.getByText(/for Solanaceae/)).toBeInTheDocument();
   });
 });

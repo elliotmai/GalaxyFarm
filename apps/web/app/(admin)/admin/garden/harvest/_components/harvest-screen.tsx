@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import { addCalendarDays, startOfDay, type Ulid } from "@galaxy-farm/core";
@@ -54,13 +54,22 @@ export function HarvestScreen({
   const { records: beds } = useRecords<Bed>("beds", query);
 
   const [tab, setTab] = useState("pantry");
+  /** A picking the harvest log sent over to be put by, until the form opens. */
+  const [preserveFrom, setPreserveFrom] = useState<HarvestLog | undefined>();
+
+  // `?tab=harvest` opens on the log, so a link or a Back lands where it left.
+  // Read off `window` once, so the page needs no Suspense boundary.
+  useEffect(() => {
+    const asked = new URLSearchParams(window.location.search).get("tab");
+    if (asked === "harvest" || asked === "pantry") setTab(asked);
+  }, []);
 
   const since = startOfDay(addCalendarDays(new Date(), -RECENT_DAYS));
   const recent = harvests.filter((log) => log.harvestedOn >= since);
   const shelf = pantryShelf(pantry);
   const jars = pantry
     .filter((log) => log.unit === "jar" || log.unit === "quart" || log.unit === "pint")
-    .reduce((total, log) => total + log.quantity, 0);
+    .reduce((total, log) => total + (log.quantity ?? 0), 0);
 
   // What the tiles used to count, as facts beside the title: what is on the
   // shelf first, because that is what gets read.
@@ -99,6 +108,8 @@ export function HarvestScreen({
               loading={pantryLoading}
               propertyId={propertyId}
               actorId={actorId}
+              {...(preserveFrom === undefined ? {} : { startFrom: preserveFrom })}
+              onStarted={() => setPreserveFrom(undefined)}
             />
           ) : (
             <HarvestLogPanel
@@ -111,7 +122,10 @@ export function HarvestScreen({
               loading={harvestLoading}
               propertyId={propertyId}
               actorId={actorId}
-              onPreserve={() => setTab("pantry")}
+              onPreserve={(from) => {
+                setPreserveFrom(from);
+                setTab("pantry");
+              }}
             />
           )
         }

@@ -7,7 +7,11 @@ import {
   currentMeter,
   equipmentSchema,
   fuelEfficiency,
+  fuelLogSchema,
+  latestReading,
+  latestReadings,
   maintenanceDue,
+  meterKey,
   maintenanceRuleSchema,
   type FuelLog,
   type MaintenanceLog,
@@ -183,6 +187,38 @@ describe("costOfOwnership and fuelEfficiency", () => {
 
   it("says nothing from a single fill", () => {
     expect(fuelEfficiency([fuel()], TRUCK)).toBeUndefined();
+  });
+
+  it("accepts a fill from the farm tank with no price, and leaves it out of the cost", () => {
+    // Gallons and the odometer still give miles per gallon; no receipt is not
+    // a free tank (migration 0038).
+    const tank = fuel({ id: id(42), cost: undefined, gallons: 20, miles: 95_400 });
+    expect(fuelLogSchema.safeParse(tank).success).toBe(true);
+    expect(costOfOwnership(TRUCK, [], [fuel(), tank])).toEqual(fromDollars(70));
+    expect(fuelEfficiency([fuel(), tank], TRUCK)).toBeCloseTo(20, 6);
+  });
+});
+
+describe("latestReadings", () => {
+  const history = [
+    reading({ id: id(60), value: 95_000, readOn: new Date("2026-06-01") }),
+    reading({ id: id(61), value: 96_000, readOn: new Date("2026-08-01") }),
+    reading({ id: id(62), kind: "hours", value: 410, readOn: new Date("2026-07-01") }),
+    reading({ id: id(63), equipmentId: id(2), value: 12, readOn: new Date("2026-08-02") }),
+    // A tie on the date: the earlier entry wins, as latestReading's stable sort.
+    reading({ id: id(64), value: 1, readOn: new Date("2026-08-01") }),
+  ];
+
+  it("indexes the same answer latestReading gives, for every meter", () => {
+    const latest = latestReadings(history);
+    for (const [machine, kind] of [
+      [TRUCK, "miles"],
+      [TRUCK, "hours"],
+      [id(2), "miles"],
+    ] as const) {
+      expect(latest.get(meterKey(machine, kind))).toBe(latestReading(history, machine, kind));
+    }
+    expect(latest.get(meterKey(id(2), "hours"))).toBeUndefined();
   });
 });
 

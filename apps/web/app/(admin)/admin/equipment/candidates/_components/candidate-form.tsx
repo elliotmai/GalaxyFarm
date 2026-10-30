@@ -122,7 +122,8 @@ function draftFrom(candidate: PurchaseCandidate): Draft {
     title: candidate.title,
     roadmapItemId: candidate.roadmapItemId ?? "",
     status: candidate.status,
-    asking: (candidate.askingPrice.cents / 100).toFixed(2),
+    asking:
+      candidate.askingPrice === undefined ? "" : (candidate.askingPrice.cents / 100).toFixed(2),
     listingUrl: candidate.listingUrl ?? "",
     sellerId: candidate.sellerId ?? "",
     location: candidate.location ?? "",
@@ -210,7 +211,9 @@ export function CandidateForm({
         title: draft.title.trim(),
         status: draft.status,
         roadmapItemId: draft.roadmapItemId === "" ? undefined : (draft.roadmapItemId as Ulid),
-        askingPrice: fromDollars(Number(draft.asking || "0")),
+        // Blank is "no price yet", which every screen says as such — not $0,
+        // which would sort it to the top as the cheapest thing on the list.
+        askingPrice: draft.asking.trim() === "" ? undefined : fromDollars(Number(draft.asking)),
         additionalCosts: costs,
         listingUrl: draft.listingUrl.trim() === "" ? undefined : draft.listingUrl.trim(),
         sellerId: draft.sellerId === "" ? undefined : (draft.sellerId as Ulid),
@@ -327,13 +330,14 @@ export function CandidateForm({
           />
           <TextInput
             label="Asking ($)"
+            hint="Blank until they name a price."
             type="number"
             inputMode="decimal"
             step="0.01"
+            min="0"
             numeric
             value={draft.asking}
             onChange={(event) => setDraft({ ...draft, asking: event.target.value })}
-            required
           />
           <TextInput
             label="Where"
@@ -485,7 +489,7 @@ export function CandidateForm({
                     }
                   />
                 </div>
-                <div className="w-32">
+                <div className="w-28 shrink-0">
                   <TextInput
                     label={`Amount ${index + 1}`}
                     hideLabel
@@ -505,6 +509,20 @@ export function CandidateForm({
                     }
                   />
                 </div>
+                {/* Not a delete of anything saved — a line of the draft, gone
+                    when the form is saved — so no confirmation. */}
+                <Button
+                  variant="ghost"
+                  aria-label={`Remove cost ${index + 1}${cost.label === "" ? "" : `, ${cost.label}`}`}
+                  onClick={() =>
+                    setDraft({
+                      ...draft,
+                      additionalCosts: draft.additionalCosts.filter((_, at) => at !== index),
+                    })
+                  }
+                >
+                  <span aria-hidden="true">×</span>
+                </Button>
               </div>
             ))}
           </div>

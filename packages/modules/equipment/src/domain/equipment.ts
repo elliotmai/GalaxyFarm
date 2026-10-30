@@ -130,7 +130,14 @@ export const maintenanceLogSchema = baseRecordSchema.extend({
 export interface FuelLog extends BaseRecord {
   readonly equipmentId: Ulid;
   readonly gallons: number;
-  readonly cost: Money;
+  /**
+   * What the fill cost, if anybody kept the receipt.
+   *
+   * Optional because farm diesel comes out of a bulk tank as often as from a
+   * pump: the gallons and the odometer are what miles per gallon needs, and a
+   * fill with no price is left out of the cost rather than counted as free.
+   */
+  readonly cost?: Money | undefined;
   readonly filledOn: Date;
   readonly hours?: number | undefined;
   readonly miles?: number | undefined;
@@ -139,8 +146,8 @@ export interface FuelLog extends BaseRecord {
 
 export const fuelLogSchema = baseRecordSchema.extend({
   equipmentId: ulidSchema,
-  gallons: z.number().positive(),
-  cost: moneySchema,
+  gallons: z.number().positive("Say how many gallons went in"),
+  cost: moneySchema.optional(),
   filledOn: z.coerce.date(),
   hours: z.number().min(0).optional(),
   miles: z.number().min(0).optional(),
@@ -162,6 +169,33 @@ export function latestReading(
   return readings
     .filter((reading) => reading.equipmentId === equipmentId && reading.kind === kind)
     .sort((left, right) => right.readOn.getTime() - left.readOn.getTime())[0];
+}
+
+/**
+ * The latest reading of every meter on the place, in one pass.
+ *
+ * `latestReading` filters and sorts the whole history for the one meter it is
+ * asked about. A screen asking it once per machine — or `maintenanceDue`
+ * asking it twice per rule — walks the same few hundred readings dozens of
+ * times on every render, so those ask this once and look up.
+ *
+ * Ties keep the earlier entry, matching `latestReading`'s stable sort.
+ */
+export function latestReadings(readings: readonly MeterReading[]): Map<string, MeterReading> {
+  const latest = new Map<string, MeterReading>();
+  for (const reading of readings) {
+    const key = meterKey(reading.equipmentId, reading.kind);
+    const held = latest.get(key);
+    if (held === undefined || reading.readOn.getTime() > held.readOn.getTime()) {
+      latest.set(key, reading);
+    }
+  }
+  return latest;
+}
+
+/** The key `latestReadings` files a meter under. */
+export function meterKey(equipmentId: Ulid, kind: MeterKind): string {
+  return `${equipmentId}:${kind}`;
 }
 
 /** The latest reading of one meter. */
@@ -225,13 +259,26 @@ export function maintenanceDue(
 ): MaintenanceDue[] {
   const due: MaintenanceDue[] = [];
 
+  // Indexed once rather than searched per rule: the latest service per rule,
+  // and the latest reading per meter. Same answers as `lastService` and
+  // `currentMeter` — ties keep the earlier entry, as their stable sorts do.
+  const meters = latestReadings(readings);
+  const lastByRule = new Map<Ulid, MaintenanceLog>();
+  for (const log of logs) {
+    if (log.ruleId === undefined) continue;
+    const held = lastByRule.get(log.ruleId);
+    if (held === undefined || log.performedOn.getTime() > held.performedOn.getTime()) {
+      lastByRule.set(log.ruleId, log);
+    }
+  }
+
   for (const rule of rules) {
     if (!rule.active) continue;
 
-    const last = lastService(logs, rule.id);
+    const last = lastByRule.get(rule.id);
 
-    const hours = currentMeter(readings, rule.equipmentId, "hours");
-    const miles = currentMeter(readings, rule.equipmentId, "miles");
+    const hours = meters.get(meterKey(rule.equipmentId, "hours"))?.value;
+    const miles = meters.get(meterKey(rule.equipmentId, "miles"))?.value;
 
     const candidates: MaintenanceDue[] = [];
 
@@ -269,7 +316,7 @@ export function costOfOwnership(
       .reduce((total, log) => total + (log.cost?.cents ?? 0), 0) +
     fuel
       .filter((log) => log.equipmentId === equipmentId)
-      .reduce((total, log) => total + log.cost.cents, 0);
+      .reduce((total, log) => total + (log.cost?.cents ?? 0), 0);
 
   return { cents };
 }

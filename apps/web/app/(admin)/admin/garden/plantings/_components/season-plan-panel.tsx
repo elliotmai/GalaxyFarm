@@ -37,6 +37,8 @@ import {
   dateFromInput,
   dateInputValue,
   formatDate,
+  optionalNumber,
+  optionalText,
 } from "@/app/(admin)/admin/garden/_components/labels";
 import {
   AddAction,
@@ -44,7 +46,7 @@ import {
   RowAction,
   RowList,
 } from "@/app/(admin)/admin/pastures/_components/land-kit";
-import { varietyLabel } from "@/lib/garden";
+import { byId, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -138,13 +140,29 @@ export function SeasonPlanPanel({
 
   const now = new Date();
   const openBeds = beds.filter((bed) => bed.active);
-  const nameOf = (varietyId: Ulid) =>
-    varietyLabel(
-      varieties.find((variety) => variety.id === varietyId),
-      crops,
-    );
+  const nameOf = (varietyId: Ulid) => varietyLabel(byId(varieties).get(varietyId), crops);
   const bedName = (id: Ulid | undefined) =>
-    id === undefined ? undefined : beds.find((bed) => bed.id === id)?.name;
+    id === undefined ? undefined : byId(beds).get(id)?.name;
+
+  /** Each plan's lines, gathered once and in window order. */
+  const linesOf = new Map<Ulid, PlannedPlanting[]>();
+  for (const entry of planned) {
+    const list = linesOf.get(entry.seasonPlanId) ?? [];
+    list.push(entry);
+    linesOf.set(entry.seasonPlanId, list);
+  }
+  for (const list of linesOf.values()) {
+    list.sort((left, right) => left.windowFrom.getTime() - right.windowFrom.getTime());
+  }
+
+  /** The beds a line can name: those in use, plus the one it already names. */
+  const bedOptions = (current: string, blank: string) => [
+    ...(blank === "" ? [] : [{ value: "", label: blank }]),
+    ...openBeds.map((bed) => ({ value: bed.id, label: bed.name })),
+    ...(current === "" || openBeds.some((bed) => bed.id === current)
+      ? []
+      : [{ value: current, label: `${bedName(current as Ulid) ?? "A bed"} (switched off)` }]),
+  ];
 
   const windows = plantingWindows(planned, now, leadDays);
 
@@ -163,7 +181,7 @@ export function SeasonPlanPanel({
     const fields = {
       name: planDraft.name.trim(),
       year: planDraft.year.trim() === "" ? Number.NaN : Number(planDraft.year.trim()),
-      notes: planDraft.notes.trim() === "" ? undefined : planDraft.notes.trim(),
+      notes: optionalText(planDraft.notes),
       active: planDraft.active,
     };
 
@@ -196,9 +214,9 @@ export function SeasonPlanPanel({
       bedId: entryDraft.bedId === "" ? undefined : (entryDraft.bedId as Ulid),
       windowFrom: from ?? new Date(Number.NaN),
       windowTo: to ?? new Date(Number.NaN),
-      quantity: entryDraft.quantity.trim() === "" ? undefined : Number(entryDraft.quantity.trim()),
+      quantity: optionalNumber(entryDraft.quantity),
       planStatus: editingEntry?.planStatus ?? ("open" as const),
-      notes: entryDraft.notes.trim() === "" ? undefined : entryDraft.notes.trim(),
+      notes: optionalText(entryDraft.notes),
     };
 
     const result =
@@ -300,7 +318,7 @@ export function SeasonPlanPanel({
    * longer exists without losing anything about what is growing.
    */
   async function removePlan(plan: SeasonPlan) {
-    const entries = planned.filter((entry) => entry.seasonPlanId === plan.id);
+    const entries = linesOf.get(plan.id) ?? [];
     const realised = entries.filter((entry) => entry.planStatus === "realised").length;
 
     const confirmed = await confirmDelete({
@@ -326,7 +344,10 @@ export function SeasonPlanPanel({
       return;
     }
 
-    for (const entry of entries) await entryApi.remove(entry.id, `Plan ${plan.name} deleted`);
+    // Together: each line is a local write, and none waits on another.
+    await Promise.all(
+      entries.map((entry) => entryApi.remove(entry.id, `Plan ${plan.name} deleted`)),
+    );
 
     show({
       message: `${plan.name} deleted`,
@@ -335,7 +356,7 @@ export function SeasonPlanPanel({
         onAct: () => {
           void (async () => {
             await planApi.restoreRecord(plan.id);
-            for (const entry of entries) await entryApi.restoreRecord(entry.id);
+            await Promise.all(entries.map((entry) => entryApi.restoreRecord(entry.id)));
           })();
         },
       },
@@ -505,9 +526,7 @@ export function SeasonPlanPanel({
             {[...plans]
               .sort((left, right) => right.year - left.year || left.name.localeCompare(right.name))
               .map((plan) => {
-                const entries = [...planned]
-                  .filter((entry) => entry.seasonPlanId === plan.id)
-                  .sort((left, right) => left.windowFrom.getTime() - right.windowFrom.getTime());
+                const entries = linesOf.get(plan.id) ?? [];
                 const open = entries.filter((entry) => entry.planStatus === "open").length;
 
                 return (
@@ -786,10 +805,7 @@ export function SeasonPlanPanel({
               <Select
                 label="Bed"
                 hint="Optional — it can be chosen when you plant."
-                options={[
-                  { value: "", label: "Not decided" },
-                  ...openBeds.map((bed) => ({ value: bed.id, label: bed.name })),
-                ]}
+                options={bedOptions(entryDraft.bedId, "Not decided")}
                 value={entryDraft.bedId}
                 error={errors["bedId"]}
                 onChange={(event) => setEntryDraft({ ...entryDraft, bedId: event.target.value })}

@@ -21,6 +21,7 @@ import {
   formatMoney,
   isActive,
   isExpiring,
+  isPriced,
   purchaseCandidateSchema,
   totalAcquisitionCost,
   type CandidateStatus,
@@ -120,7 +121,7 @@ export function EquipmentCandidatesScreen({
   const now = new Date();
 
   const candidates = useMemo(() => all.filter((entry) => entry.domain === "equipment"), [all]);
-  const items = allItems.filter((item) => item.domain === "equipment");
+  const items = useMemo(() => allItems.filter((item) => item.domain === "equipment"), [allItems]);
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
   const budgetOf = (entry: PurchaseCandidate) =>
@@ -128,9 +129,11 @@ export function EquipmentCandidatesScreen({
       ? undefined
       : itemById.get(entry.roadmapItemId)?.budgetEstimate;
 
+  // An unpriced candidate is never over budget — nor under it. Its costs on
+  // top alone are not an all-in figure to compare.
   const isOver = (entry: PurchaseCandidate) => {
     const budget = budgetOf(entry);
-    return budget !== undefined && compareToBudget(entry, budget).overBudget;
+    return budget !== undefined && isPriced(entry) && compareToBudget(entry, budget).overBudget;
   };
 
   const open = candidates.filter(isActive);
@@ -150,10 +153,16 @@ export function EquipmentCandidatesScreen({
           : againstWant.filter(isActive)
   )
     .slice()
-    .sort((left, right) => totalAcquisitionCost(left).cents - totalAcquisitionCost(right).cents);
+    // Cheapest all-in first; the ones with no price yet after every priced
+    // one, rather than first as $0 would put them.
+    .sort(
+      (left, right) =>
+        Number(!isPriced(left)) - Number(!isPriced(right)) ||
+        totalAcquisitionCost(left).cents - totalAcquisitionCost(right).cents,
+    );
 
   const cheapest = shown
-    .filter(isActive)
+    .filter((entry) => isActive(entry) && isPriced(entry))
     .map((entry) => totalAcquisitionCost(entry))
     .sort((left, right) => left.cents - right.cents)[0];
 
@@ -191,8 +200,10 @@ export function EquipmentCandidatesScreen({
       vin: detail.vin,
       purchasedOn: new Date(),
       // What it actually cost to get here, not the sticker — the same figure
-      // the comparison was decided on.
-      purchasePrice: totalAcquisitionCost(candidate),
+      // the comparison was decided on. Bought before a price was written
+      // down, it is left for the machine's own panel rather than set to the
+      // costs on top alone.
+      purchasePrice: isPriced(candidate) ? totalAcquisitionCost(candidate) : undefined,
       photoKeys: [...candidate.photoKeys],
       notes: candidate.notes,
     } as never);
@@ -316,9 +327,12 @@ export function EquipmentCandidatesScreen({
       header: "All in",
       numeric: true,
       // The number the decision is made on.
-      render: (row) => (
-        <span className="font-semibold">{formatMoney(totalAcquisitionCost(row))}</span>
-      ),
+      render: (row) =>
+        isPriced(row) ? (
+          <span className="font-semibold">{formatMoney(totalAcquisitionCost(row))}</span>
+        ) : (
+          <span className="text-muted">No price</span>
+        ),
     },
     {
       key: "budget",
@@ -326,7 +340,7 @@ export function EquipmentCandidatesScreen({
       numeric: true,
       render: (row) => {
         const budget = budgetOf(row);
-        if (budget === undefined) return <span className="text-muted">—</span>;
+        if (budget === undefined || !isPriced(row)) return <span className="text-muted">—</span>;
         const against = compareToBudget(row, budget);
         return (
           <span className={against.overBudget ? "text-danger" : "text-calm"}>

@@ -5,6 +5,7 @@ import { useId, useMemo, useState } from "react";
 
 import {
   Button,
+  Checkbox,
   EmptyState,
   PageBody,
   Modal,
@@ -662,6 +663,15 @@ export function PlanForm({
   const [targetId, setTargetId] = useState<string>(
     plan === undefined || plan.target === "group" ? "" : plan.targetId,
   );
+  /**
+   * Everybody else an animal plan feeds — the bowl two cats share, or one
+   * ration written once for three show calves.
+   *
+   * Carried from the plan rather than reset. This editor used to write `[]`
+   * here on every save, which quietly took the second cat off a shared bowl
+   * the first time anybody adjusted its amount.
+   */
+  const [alsoFeeds, setAlsoFeeds] = useState<readonly string[]>(plan?.alsoFeeds ?? []);
   const [lines, setLines] = useState<LineDraft[]>(
     plan === undefined ? [blankLine()] : draftFrom(plan),
   );
@@ -686,12 +696,19 @@ export function PlanForm({
   const targets =
     target === "animal"
       ? animals.filter(
-          (entry) => anySpecies || entry.species === "cattle" || entry.id === plan?.targetId,
+          (entry) =>
+            anySpecies ||
+            entry.species === "cattle" ||
+            entry.id === plan?.targetId ||
+            (plan?.alsoFeeds ?? []).includes(entry.id),
         )
       : target === "zone"
         ? zones
         : [];
   const feedById = new Map<string, FeedType>(feeds.map((feed) => [feed.id, feed]));
+  /** Offered as company for the chosen animal: anywhere every species is, or already on it. */
+  const offerCompany = target === "animal" && (anySpecies || alsoFeeds.length > 0);
+  const company = target === "animal" ? alsoFeeds.filter((id) => id !== targetId) : [];
 
   const editLine = (key: string, patch: Partial<LineDraft>): void =>
     setLines(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
@@ -743,13 +760,12 @@ export function PlanForm({
         // A group plan targets the property: it is the group every animal on
         // the place belongs to, and `herdDemand` resolves it that way.
         targetId: (target === "group" ? propertyId : targetId) as Ulid,
-        // `alsoFeeds` is for a bowl shared by named animals, which is a pets
-        // shape. Here a shared amount is a *zone* or *group* plan that says
-        // `shared` — one mineral tub in a pen, not one tub per cow.
-        alsoFeeds: [],
-        // An animal plan feeds one animal, so there is nothing to share it
-        // with whatever the control last said.
-        portion: target === "animal" ? ("per_head" as const) : portion,
+        // The other animals on an animal plan. Only an animal plan names
+        // animals; a pen or group plan finds its animals through the pen.
+        alsoFeeds: company as Ulid[],
+        // A plan for one animal has nobody to share with, whatever the control
+        // last said.
+        portion: target === "animal" && company.length === 0 ? ("per_head" as const) : portion,
         lines: written,
         ...(notes.trim() === "" ? {} : { specialNotes: notes.trim() }),
       };
@@ -849,13 +865,48 @@ export function PlanForm({
           />
         )}
 
-        {target === "animal" ? null : (
+        {offerCompany ? (
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm font-medium text-ink">Also feeds</legend>
+            <p className="text-sm text-muted">
+              One ration for several animals, so a change to it changes it for all of them.
+            </p>
+            <div className="grid max-h-60 grid-cols-1 gap-x-density overflow-y-auto min-[400px]:grid-cols-2">
+              {targets
+                // The living, and anybody already on it — a plan still naming a
+                // sold calf has to be able to let go of him.
+                .filter(
+                  (entry) =>
+                    entry.id !== targetId &&
+                    ((entry as Animal).status === "active" || alsoFeeds.includes(entry.id)),
+                )
+                .map((entry) => (
+                  <Checkbox
+                    key={entry.id}
+                    label={displayName(entry as Animal)}
+                    checked={alsoFeeds.includes(entry.id)}
+                    onChange={() =>
+                      setAlsoFeeds(
+                        alsoFeeds.includes(entry.id)
+                          ? alsoFeeds.filter((id) => id !== entry.id)
+                          : [...alsoFeeds, entry.id],
+                      )
+                    }
+                  />
+                ))}
+            </div>
+          </fieldset>
+        ) : null}
+
+        {target === "animal" && company.length === 0 ? null : (
           <Select
             label="The amounts below are"
             hint={
               target === "zone"
                 ? "Per head: 40 lb on a pen of four is 160 lb. Shared: one mineral tub, however many are in."
-                : "Shared is for what the whole place works through at a fixed rate."
+                : target === "animal"
+                  ? "Per head: each of them gets this. Shared: one bowl between them."
+                  : "Shared is for what the whole place works through at a fixed rate."
             }
             value={portion}
             onChange={(event) => setPortion(event.target.value as Portion)}
@@ -863,7 +914,12 @@ export function PlanForm({
               { value: "per_head", label: "What each animal gets" },
               {
                 value: "shared",
-                label: target === "zone" ? "Shared by the zone" : "Shared by the whole group",
+                label:
+                  target === "zone"
+                    ? "Shared by the zone"
+                    : target === "animal"
+                      ? "Shared between them"
+                      : "Shared by the whole group",
               },
             ]}
           />

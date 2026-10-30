@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   Button,
@@ -31,6 +31,7 @@ import {
 } from "@galaxy-farm/core";
 import { penAssignments } from "@galaxy-farm/module-pets";
 
+import { noteAddress } from "@/app/(admin)/_components/back-link";
 import { useMutations } from "@/lib/local/mutations";
 
 import {
@@ -81,6 +82,7 @@ interface Draft {
   readonly waterSourceIds: readonly Ulid[];
   readonly customInstructions: string;
   readonly resting: boolean;
+  readonly active: boolean;
 }
 
 const BLANK: Draft = {
@@ -93,7 +95,38 @@ const BLANK: Draft = {
   waterSourceIds: [],
   customInstructions: "",
   resting: false,
+  active: true,
 };
+
+/**
+ * The draft, as the schema wants it.
+ *
+ * An empty box means "not recorded", and it travels as an explicit
+ * `undefined` rather than being left out — on an edit, a field the patch never
+ * mentions keeps its old value, so a capacity somebody cleared would come
+ * straight back the moment the panel closed. Exported for the test that pins
+ * exactly that.
+ */
+export function zoneFields(draft: Draft) {
+  const capacity = draft.capacity.trim();
+  const instructions = draft.customInstructions.trim();
+  return {
+    name: draft.name.trim(),
+    type: draft.type,
+    // Cleared travels as undefined, or a zone taken out of a group would
+    // stay in it — the patch would simply never mention the field.
+    parentZoneId: draft.parentZoneId === "" ? undefined : (draft.parentZoneId as Ulid),
+    indoor: draft.indoor,
+    baselineSafetyLevel: draft.baselineSafetyLevel,
+    waterSourceIds: draft.waterSourceIds,
+    resting: draft.resting,
+    active: draft.active,
+    capacity: capacity === "" ? undefined : Number(capacity),
+    customInstructions: instructions === "" ? undefined : instructions,
+  };
+}
+
+export type ZoneDraft = Draft;
 
 export function ZonesPanel({
   zones,
@@ -103,6 +136,7 @@ export function ZonesPanel({
   loading,
   propertyId,
   actorId,
+  initialZoneId,
 }: {
   readonly zones: readonly Zone[];
   readonly water: readonly WaterSource[];
@@ -111,9 +145,31 @@ export function ZonesPanel({
   readonly loading: boolean;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /**
+   * A zone to open on arrival — `?zone=` — which is how the property map's
+   * "Edit zone details" lands on the one editor a zone has, rather than on a
+   * second copy of it that would drift.
+   */
+  readonly initialZoneId?: Ulid | undefined;
 }) {
+  /**
+   * Lookups built once per change of the records, not once per row.
+   *
+   * Every row asks who is standing in it and what it drinks from; answered
+   * with a scan of every assignment and every tank, a list of zones is
+   * zones × assignments work on each render, and each keystroke in the editor
+   * is a render.
+   */
+  const animalsById = useMemo(
+    () => new Map(animals.map((animal) => [animal.id, animal] as const)),
+    [animals],
+  );
+  const waterById = useMemo(
+    () => new Map(water.map((source) => [source.id, source] as const)),
+    [water],
+  );
   const animalName = (id: Ulid) => {
-    const animal = animals.find((candidate) => candidate.id === id);
+    const animal = animalsById.get(id);
     return animal?.name ?? animal?.tagNumber ?? "Untagged animal";
   };
 
@@ -124,9 +180,17 @@ export function ZonesPanel({
    * a pasture's capacity, or naming one in the dialog that asks whether the
    * pasture may be deleted, is counting something that is not there.
    */
-  const placements = penAssignments(assignments, animals);
-  const occupantsOf = (zone: Zone) =>
-    placements.filter((a) => a.zoneId === zone.id && a.periodTo === undefined);
+  const occupancy = useMemo(() => {
+    const byZone = new Map<Ulid, ZoneAssignment[]>();
+    for (const placement of penAssignments(assignments, animals)) {
+      if (placement.periodTo !== undefined) continue;
+      const list = byZone.get(placement.zoneId);
+      if (list === undefined) byZone.set(placement.zoneId, [placement]);
+      else list.push(placement);
+    }
+    return byZone;
+  }, [assignments, animals]);
+  const occupantsOf = (zone: Zone): readonly ZoneAssignment[] => occupancy.get(zone.id) ?? [];
 
   const mutations = useMutations<Zone>("zones", "zones", zoneSchema, propertyId, actorId);
   const confirmDelete = useConfirmDelete();
@@ -135,6 +199,40 @@ export function ZonesPanel({
   const [editing, setEditing] = useState<Zone | undefined>();
   const [draft, setDraft] = useState<Draft | undefined>();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  /** A save in flight: a second tap on Add zone must not add a second zone. */
+  const [busy, setBusy] = useState(false);
+
+  /**
+   * Open the zone the address names, once it has arrived.
+   *
+   * The records come from a live query, so the first render may not have it
+   * yet; the ref keeps a later redraw — the save that just closed the panel —
+   * from opening it all over again.
+   */
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current || initialZoneId === undefined) return;
+    const zone = zones.find((candidate) => candidate.id === initialZoneId);
+    if (zone === undefined) return;
+    opened.current = true;
+    startEdit(zone);
+  }, [initialZoneId, zones]);
+
+  /**
+   * Close the editor, and take `?zone=` off the address with it — or a reload,
+   * or coming Back to this list, would open the zone somebody just closed.
+   */
+  function closeEditor() {
+    setDraft(undefined);
+    setEditing(undefined);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("zone")) {
+      url.searchParams.delete("zone");
+      const href = `${url.pathname}${url.search}`;
+      window.history.replaceState(window.history.state, "", href);
+      noteAddress(href);
+    }
+  }
 
   /**
    * What this zone could be put in.
@@ -167,34 +265,20 @@ export function ZonesPanel({
       waterSourceIds: zone.waterSourceIds,
       customInstructions: zone.customInstructions ?? "",
       resting: zone.resting,
+      active: zone.active,
     });
     setErrors({});
   }
 
   async function save() {
-    if (draft === undefined) return;
+    if (draft === undefined || busy) return;
 
-    const fields = {
-      name: draft.name.trim(),
-      type: draft.type,
-      // Cleared travels as undefined, or a zone taken out of a group would
-      // stay in it — the patch would simply never mention the field.
-      parentZoneId: draft.parentZoneId === "" ? undefined : (draft.parentZoneId as Ulid),
-      indoor: draft.indoor,
-      baselineSafetyLevel: draft.baselineSafetyLevel,
-      waterSourceIds: draft.waterSourceIds,
-      resting: draft.resting,
-      active: editing?.active ?? true,
-      ...(draft.capacity.trim() === "" ? {} : { capacity: Number(draft.capacity) }),
-      ...(draft.customInstructions.trim() === ""
-        ? {}
-        : { customInstructions: draft.customInstructions.trim() }),
-    };
+    const fields = zoneFields(draft);
 
-    const result =
-      editing === undefined
-        ? await mutations.create(fields)
-        : await mutations.update(editing.id, fields);
+    setBusy(true);
+    const result = await (
+      editing === undefined ? mutations.create(fields) : mutations.update(editing.id, fields)
+    ).finally(() => setBusy(false));
 
     if (!result.ok) {
       // §4.5 clause 2: per field, not a banner. A form that says "invalid" and
@@ -210,8 +294,7 @@ export function ZonesPanel({
     }
 
     show({ message: editing === undefined ? "Zone added" : "Zone saved", tone: "success" });
-    setDraft(undefined);
-    setEditing(undefined);
+    closeEditor();
   }
 
   /**
@@ -284,7 +367,7 @@ export function ZonesPanel({
   function lineFor(zone: Zone): string {
     const count = occupantsOf(zone).length;
     const drinksFrom = zone.waterSourceIds
-      .map((id) => water.find((source) => source.id === id)?.name ?? "Unknown")
+      .map((id) => waterById.get(id)?.name ?? "Unknown")
       .join(", ");
     return [
       capitalise(typeLabel(zone)),
@@ -309,6 +392,8 @@ export function ZonesPanel({
 
   /** The one chip: over capacity before resting, because it is a problem. */
   function chipFor(zone: Zone): RowChip | undefined {
+    // Retired first: nothing else about a zone nobody uses any more matters.
+    if (!zone.active) return { tone: "neutral", label: "Not in use" };
     if (isOverCapacity(zone, occupantsOf(zone).length)) {
       return { tone: "danger", label: "Over capacity" };
     }
@@ -425,7 +510,7 @@ export function ZonesPanel({
                       openLabel={`Edit ${zone.name}`}
                       line={lineFor(zone)}
                       chip={chipFor(zone)}
-                      quiet={zone.resting}
+                      quiet={zone.resting || !zone.active}
                       onOpen={() => startEdit(zone)}
                       action={
                         <RowAction
@@ -450,13 +535,13 @@ export function ZonesPanel({
           placement="side"
           title={editing === undefined ? "New zone" : `Editing ${editing.name}`}
           description="A pen, a trap, a pasture — anywhere an animal can be."
-          onClose={() => setDraft(undefined)}
+          onClose={closeEditor}
           footer={
             <>
-              <Button variant="primary" onClick={() => void save()}>
+              <Button variant="primary" busy={busy} onClick={() => void save()}>
                 {editing === undefined ? "Add zone" : "Save changes"}
               </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              <Button onClick={closeEditor}>Cancel</Button>
               {editing === undefined ? null : (
                 // Delete lives here now the row has no room for it. The editor
                 // closes first, so the typed confirmation is the only dialog
@@ -466,8 +551,7 @@ export function ZonesPanel({
                   className="ml-auto"
                   onClick={() => {
                     const zone = editing;
-                    setDraft(undefined);
-                    setEditing(undefined);
+                    closeEditor();
                     void remove(zone);
                   }}
                 >
@@ -583,6 +667,19 @@ export function ZonesPanel({
               hint="Out of rotation — no animals should be here."
               checked={draft.resting}
               onChange={(event) => setDraft({ ...draft, resting: event.target.checked })}
+            />
+            {/*
+              Retiring rather than deleting: a pen pulled down last spring
+              still has the animals that stood in it in their history, and a
+              delete would take that history's place name with it. A zone not
+              in use drops out of the counts, the chores and the move lists,
+              and stays here, dimmed, to be brought back.
+            */}
+            <Checkbox
+              label="In use"
+              hint="Untick for a pen taken down — its history keeps the name."
+              checked={draft.active}
+              onChange={(event) => setDraft({ ...draft, active: event.target.checked })}
             />
 
             <TextArea

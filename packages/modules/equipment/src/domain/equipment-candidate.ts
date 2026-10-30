@@ -74,6 +74,8 @@ export function pricePerMile(
   detail: Pick<EquipmentCandidateDetail, "mileage">,
 ): Money | undefined {
   if (detail.mileage === undefined || detail.mileage <= 0) return undefined;
+  // No asking price means no all-in figure to divide — only the costs on top.
+  if (candidate.askingPrice === undefined) return undefined;
   return { cents: totalAcquisitionCost(candidate).cents / detail.mileage };
 }
 
@@ -82,6 +84,7 @@ export function pricePerHour(
   detail: Pick<EquipmentCandidateDetail, "engineHours">,
 ): Money | undefined {
   if (detail.engineHours === undefined || detail.engineHours <= 0) return undefined;
+  if (candidate.askingPrice === undefined) return undefined;
   return { cents: totalAcquisitionCost(candidate).cents / detail.engineHours };
 }
 

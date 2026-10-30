@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Button, EmptyState } from "@galaxy-farm/ui";
 import type { FeedProjection, FeedType } from "@galaxy-farm/module-feed";
@@ -12,7 +12,9 @@ import { formatDate, line, qty, unitLabel } from "./feed-format";
  *
  * One row a feed: how much is left, a small gauge, and "Restock" opening the
  * purchase form already on that feed. The row itself counts the feed — a
- * correction, which is where the projection restarts. The logs behind the
+ * correction, which is where the projection restarts. "Add a feed" sits in
+ * the header whatever the shed holds — it used to appear only on an empty
+ * shed, so the second feed anybody bought had nowhere to go. The logs behind the
  * numbers (purchases, counts, feed types, cost a head) fold underneath, as
  * `history`, because they are looked at when something does not add up rather
  * than every time somebody restocks.
@@ -78,16 +80,27 @@ export function ShedView({
   readonly onRestock: (feed?: FeedType) => void;
   /** Count one feed, or the whole shed. */
   readonly onCount: (feed?: FeedType) => void;
-  /** A new feed type — the first thing an empty shed needs. */
+  /** A new feed type: the first thing an empty shed needs, and always on offer. */
   readonly onAddFeed: () => void;
   readonly history: ReactNode;
 }) {
+  // The logs mount only once opened. Folded, they were still rendered — every
+  // purchase and count, re-rendered on every save — for nobody to see.
+  const [historyOpen, setHistoryOpen] = useState(false);
   return (
     <div className="flex flex-col gap-density">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted">Bought, less logged, less what the plans ate</p>
-        <span className="flex gap-2">
-          <Button onClick={() => onCount()}>Count the shed</Button>
+        <span className="flex flex-wrap gap-2">
+          {/* The empty shed's own call to action says the same thing. */}
+          {!loading && rows.length === 0 ? null : (
+            <Button aria-haspopup="dialog" onClick={onAddFeed}>
+              <span aria-hidden="true">+</span> Add a feed
+            </Button>
+          )}
+          <Button aria-haspopup="dialog" onClick={() => onCount()}>
+            Count the shed
+          </Button>
           <span className="hidden sm:block">
             <Button variant="primary" aria-haspopup="dialog" onClick={() => onRestock()}>
               <span aria-hidden="true">+</span> Record purchase
@@ -162,14 +175,17 @@ export function ShedView({
 
       {/* The logs behind the numbers, folded: every purchase, count and feed
           type is still here to correct, just not in the way of a restock. */}
-      <details className="group rounded-density border border-rule bg-panel">
+      <details
+        className="group rounded-density border border-rule bg-panel"
+        onToggle={(event) => setHistoryOpen(event.currentTarget.open)}
+      >
         <summary className="flex min-h-target cursor-pointer list-none flex-wrap items-center justify-between gap-x-2 px-4 py-2 text-density font-semibold text-ink">
           History
           <span className="text-sm font-normal text-muted">
             Purchases, counts, feed types, cost
           </span>
         </summary>
-        <div className="border-t border-rule p-density">{history}</div>
+        <div className="border-t border-rule p-density">{historyOpen ? history : null}</div>
       </details>
     </div>
   );

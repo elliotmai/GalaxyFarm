@@ -3,10 +3,20 @@ import type { FeedConsumption, FeedPurchase } from "@galaxy-farm/module-feed";
 
 /** The formatting the feed screen, its lists and its forms share. */
 
+/**
+ * Built once. `toLocaleDateString` with options builds a fresh formatter on
+ * every call, and the lists here call it per row on every re-render — it was
+ * the costliest frame in a profile of a purchase save.
+ */
+const DATE = new Intl.DateTimeFormat(undefined, {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+const QUANTITY = new Intl.NumberFormat();
+
 export function formatDate(value: Date | undefined): string {
-  return value === undefined
-    ? "—"
-    : value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return value === undefined ? "—" : DATE.format(value);
 }
 
 export function money(value: Money | undefined): string {
@@ -15,7 +25,7 @@ export function money(value: Money | undefined): string {
 
 /** Round to a tenth — feed is bales and bags, not milligrams. */
 export function qty(value: number): string {
-  return (Math.round(value * 10) / 10).toLocaleString();
+  return QUANTITY.format(Math.round(value * 10) / 10);
 }
 
 export function unitLabel(unit: string): string {

@@ -13,7 +13,8 @@ import {
 import {
   allocateFeedCost,
   costPerHead,
-  weightedAverageCost,
+  feedCost,
+  purchaseTotal,
   type FeedConsumption,
   type FeedPurchase,
   type FeedType,
@@ -78,9 +79,14 @@ export function PurchasesTab({
                   title={feed?.name ?? "Unknown feed"}
                   line={line(
                     formatDate(purchase.purchasedOn),
-                    `${qty(purchase.quantity)} × ${money(purchase.unitCost)}`,
-                    money({ cents: Math.round(purchase.unitCost.cents * purchase.quantity) }),
+                    // No price is said as such, never as $0 — see
+                    // `FeedPurchase.unitCost`.
+                    purchase.unitCost === undefined
+                      ? `${qty(purchase.quantity)} ${unitLabel(feed?.unit ?? "unit")}`
+                      : `${qty(purchase.quantity)} × ${money(purchase.unitCost)}`,
+                    purchase.unitCost === undefined ? undefined : money(purchaseTotal(purchase)),
                   )}
+                  chip={purchase.unitCost === undefined ? <Pill>no price</Pill> : null}
                   onOpen={() => onEdit(purchase)}
                   openLabel={`Edit the ${feed?.name ?? "feed"} purchase of ${formatDate(purchase.purchasedOn)}`}
                 />
@@ -110,6 +116,12 @@ export function UsedTab({
   readonly onEdit: (entry: FeedConsumption) => void;
 }) {
   const byId = useMemo(() => new Map(feeds.map((feed) => [feed.id, feed])), [feeds]);
+  // Looked up per row, so a map rather than a scan of every pen and animal.
+  const zoneById = useMemo(() => new Map(zones.map((zone) => [zone.id, zone])), [zones]);
+  const animalById = useMemo(
+    () => new Map(animals.map((animal) => [animal.id, animal])),
+    [animals],
+  );
 
   return (
     <div className="flex flex-col gap-density">
@@ -130,8 +142,9 @@ export function UsedTab({
             .sort((a, b) => b.usedOn.getTime() - a.usedOn.getTime())
             .map((entry) => {
               const feed = byId.get(entry.feedTypeId);
-              const zone = zones.find((candidate) => candidate.id === entry.zoneId);
-              const animal = animals.find((candidate) => candidate.id === entry.animalId);
+              const zone = entry.zoneId === undefined ? undefined : zoneById.get(entry.zoneId);
+              const animal =
+                entry.animalId === undefined ? undefined : animalById.get(entry.animalId);
               return (
                 <KitRow
                   key={entry.id}
@@ -262,6 +275,8 @@ export function CostPerHeadTab({
   const clientCalves = fed.filter((a) => byId.get(a.animalId)?.ownership === "client");
   const perHead = costPerHead(fed);
   const incomplete = fed.filter((allocation) => !allocation.costComplete);
+  // Nothing priced at all: a per-head figure would be a confident $0.
+  const anyCost = fed.some((allocation) => allocation.cost.cents > 0);
 
   const columns: readonly Column<(typeof fed)[number]>[] = [
     {
@@ -298,11 +313,13 @@ export function CostPerHeadTab({
       render: (row) =>
         row.costComplete ? (
           money(row.cost)
+        ) : row.cost.cents === 0 ? (
+          // Feed with no priced purchase is valued at nothing. Saying so beats
+          // a confident $0.
+          <span className="text-muted">Missing a cost</span>
         ) : (
-          // Feed with no purchase behind it is valued at nothing, which
-          // understates the animal rather than overstating it. Saying so beats
-          // showing a confident wrong number.
-          <span className="text-muted">{money(row.cost)}, a feed has no purchase</span>
+          // Some of it priced: a floor, not the bill.
+          <span className="text-muted">{money(row.cost)} so far, missing a cost</span>
         ),
     },
   ];
@@ -313,7 +330,7 @@ export function CostPerHeadTab({
         {/* The four tiles, as one line of facts. */}
         <p className="text-sm text-muted">
           {line(
-            `${money(perHead)} a head`,
+            anyCost ? `${money(perHead)} a head` : "No cost yet",
             `${fed.length} fed`,
             clientCalves.length === 0
               ? undefined
@@ -351,13 +368,23 @@ export function CostPerHeadTab({
       <KitList label="What a unit is worth">
         {feeds
           .filter((feed) => feed.active)
-          .map((feed) => (
-            <KitRow
-              key={feed.id}
-              title={feed.name}
-              line={`${money(weightedAverageCost(feed.id, purchases))} a ${unitLabel(feed.unit)}, on average paid`}
-            />
-          ))}
+          .map((feed) => {
+            const cost = feedCost(feed.id, purchases);
+            return (
+              <KitRow
+                key={feed.id}
+                title={feed.name}
+                line={
+                  cost.average === undefined
+                    ? "No priced purchase yet"
+                    : line(
+                        `${money(cost.average)} a ${unitLabel(feed.unit)}, on average paid`,
+                        !cost.complete && "some loads have no price",
+                      )
+                }
+              />
+            );
+          })}
       </KitList>
     </div>
   );

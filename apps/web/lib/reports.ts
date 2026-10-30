@@ -29,6 +29,7 @@ import {
 import {
   allocateFeedCost,
   poundsOf,
+  purchaseTotal,
   type FeedPurchase,
   type FeedType,
 } from "@galaxy-farm/module-feed";
@@ -152,8 +153,14 @@ export interface FeedSpendRow {
   readonly quantity: number;
   /** Pounds, where the feed knows what a unit of it weighs. */
   readonly pounds?: number | undefined;
+  /** What the priced purchases came to. Unpriced ones add nothing here. */
   readonly spend: Money;
+  /** Over the priced purchases only — an unpriced load is not a free one. */
   readonly averageUnitCost?: Money | undefined;
+  /** Purchases in the window with no price entered, so `spend` is short. */
+  readonly unpriced: number;
+  /** Quantity across the priced purchases, which the average divides by. */
+  readonly pricedQuantity: number;
 }
 
 /**
@@ -176,7 +183,7 @@ export function feedSpend(
 
     const feed = feeds.find((held) => held.id === purchase.feedTypeId);
     const existing = rows.get(purchase.feedTypeId);
-    const spend = { cents: Math.round(purchase.unitCost.cents * purchase.quantity) };
+    const spend = purchaseTotal(purchase);
 
     const next: FeedSpendRow = {
       feedTypeId: purchase.feedTypeId,
@@ -185,7 +192,10 @@ export function feedSpend(
       unit: feed?.unit ?? "unit",
       purchases: (existing?.purchases ?? 0) + 1,
       quantity: (existing?.quantity ?? 0) + purchase.quantity,
-      spend: { cents: (existing?.spend.cents ?? 0) + spend.cents },
+      spend: { cents: (existing?.spend.cents ?? 0) + (spend?.cents ?? 0) },
+      unpriced: (existing?.unpriced ?? 0) + (spend === undefined ? 1 : 0),
+      pricedQuantity:
+        (existing?.pricedQuantity ?? 0) + (spend === undefined ? 0 : purchase.quantity),
     };
 
     rows.set(purchase.feedTypeId, next);
@@ -200,7 +210,9 @@ export function feedSpend(
         ...row,
         ...(pounds === undefined ? {} : { pounds }),
         averageUnitCost:
-          row.quantity === 0 ? undefined : { cents: Math.round(row.spend.cents / row.quantity) },
+          row.pricedQuantity === 0
+            ? undefined
+            : { cents: Math.round(row.spend.cents / row.pricedQuantity) },
       };
     })
     .sort((left, right) => right.spend.cents - left.spend.cents);
@@ -431,7 +443,9 @@ export function operatingCost(sources: OperatingCostSources, range: ReportRange)
       "Feed",
       sources.purchases,
       (record) => record.purchasedOn,
-      (record) => ({ cents: Math.round(record.unitCost.cents * record.quantity) }),
+      // Undefined for a load bought without a price, which `unpriced` counts
+      // rather than adding as $0.
+      (record) => purchaseTotal(record),
     ),
     line(
       "Health and medicine",

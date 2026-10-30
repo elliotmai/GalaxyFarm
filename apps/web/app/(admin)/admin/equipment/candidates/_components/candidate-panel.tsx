@@ -6,6 +6,7 @@ import { Button, Modal, Pill, Select, optionLabel } from "@galaxy-farm/ui";
 import {
   CANDIDATE_STATUSES,
   formatMoney,
+  isPriced,
   totalAcquisitionCost,
   type CandidateStatus,
   type PurchaseCandidate,
@@ -90,7 +91,11 @@ export function CandidatePanel({
       <dl className="flex flex-col divide-y divide-rule text-sm">
         <div className="flex justify-between gap-2 py-2">
           <dt className="text-muted">Asking</dt>
-          <dd className="gf-numeric">{formatMoney(candidate.askingPrice)}</dd>
+          <dd className="gf-numeric">
+            {candidate.askingPrice === undefined
+              ? "No price yet"
+              : formatMoney(candidate.askingPrice)}
+          </dd>
         </div>
         {candidate.additionalCosts.map((cost) => (
           <div key={cost.label} className="flex justify-between gap-2 py-2">
@@ -98,10 +103,13 @@ export function CandidatePanel({
             <dd className="gf-numeric">{formatMoney(cost.amount)}</dd>
           </div>
         ))}
-        <div className="flex justify-between gap-2 py-2 font-semibold">
-          <dt>All in</dt>
-          <dd className="gf-numeric">{formatMoney(totalAcquisitionCost(candidate))}</dd>
-        </div>
+        {/* No all-in figure without an asking price to add the costs to. */}
+        {isPriced(candidate) ? (
+          <div className="flex justify-between gap-2 py-2 font-semibold">
+            <dt>All in</dt>
+            <dd className="gf-numeric">{formatMoney(totalAcquisitionCost(candidate))}</dd>
+          </div>
+        ) : null}
       </dl>
 
       {flags.length === 0 ? (

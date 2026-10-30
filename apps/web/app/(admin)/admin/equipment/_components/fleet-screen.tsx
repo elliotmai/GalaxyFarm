@@ -1,34 +1,16 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
+import { Button, EmptyState, PageBody, Pill, useToast } from "@galaxy-farm/ui";
+import { formatMoney, type Money, type Ulid } from "@galaxy-farm/core";
 import {
-  Button,
-  EmptyState,
-  Modal,
-  PageBody,
-  Pill,
-  Select,
-  TextInput,
-  useConfirmDelete,
-  useToast,
-  optionLabel,
-} from "@galaxy-farm/ui";
-import { formatMoney, fromDollars, type Money, type Ulid } from "@galaxy-farm/core";
-import {
-  costOfOwnership,
-  currentMeter,
-  EQUIPMENT_CATEGORIES,
-  EQUIPMENT_STATUSES,
-  equipmentSchema,
-  fuelLogSchema,
+  latestReadings,
   maintenanceDue,
-  maintenanceLogSchema,
-  maintenanceRuleSchema,
-  meterReadingSchema,
+  meterKey,
   type Equipment,
-  type EquipmentCategory,
   type EquipmentStatus,
   type FuelLog,
   type MaintenanceLog,
@@ -36,10 +18,19 @@ import {
   type MeterReading,
 } from "@galaxy-farm/module-equipment";
 
-import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
 import { AddFab, ChipRow, FilteredLine, KitHeader, KitList, KitRow } from "./kit-controls";
+import { MachineForm } from "./machine-form";
+import { useMachineRemoval } from "./machine-removal";
+
+/**
+ * One formatter, built once. `toLocaleDateString` with options builds a new
+ * `Intl.DateTimeFormat` on every call — about a tenth of a millisecond each,
+ * which on a list of a few hundred rows, dated twice a row, was most of the
+ * time a save spent re-rendering the list behind its panel.
+ */
+const DAY = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
 
 /**
  * The fleet (spec §5.6, §7's `/admin/equipment`).
@@ -55,14 +46,14 @@ import { AddFab, ChipRow, FilteredLine, KitHeader, KitList, KitRow } from "./kit
  * Everything about one machine — its meters, its rules, its service and its
  * fuel — lives on its own page. This one holds what you need to decide which
  * page to open: a row per machine with its next job on the muted line, and
- * one chip only when something is wrong. Adding a machine is a side panel, so
- * the form never pushes the fleet down the page.
+ * one chip only when something is wrong. Adding a machine, and the pencil on a
+ * row, open the same side panel (`machine-form.tsx`) — every field, the status,
+ * and Delete — so the form never pushes the fleet down the page and nothing
+ * about a machine needs its page opened first to change.
  */
 
 function formatDate(value: Date | undefined): string {
-  return value === undefined
-    ? "—"
-    : value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return value === undefined ? "—" : DAY.format(value);
 }
 
 /** Hours read to a tenth; miles do not. */
@@ -76,42 +67,11 @@ function describe(machine: Equipment): string {
   return [machine.year, machine.make, machine.model].filter(Boolean).join(" ");
 }
 
-const STATUS_OPTIONS = EQUIPMENT_STATUSES.map((value) => ({
-  value,
-  label: optionLabel(value),
-}));
-
 const STATUS_TONE: Record<EquipmentStatus, "calm" | "danger" | "neutral"> = {
   in_service: "calm",
   down: "danger",
   sold: "neutral",
   retired: "neutral",
-};
-
-interface Draft {
-  readonly name: string;
-  readonly category: EquipmentCategory;
-  readonly make: string;
-  readonly model: string;
-  readonly year: string;
-  readonly vin: string;
-  readonly status: EquipmentStatus;
-  readonly purchasedOn: string;
-  readonly purchasePrice: string;
-  readonly notes: string;
-}
-
-const BLANK: Draft = {
-  name: "",
-  category: "implement",
-  make: "",
-  model: "",
-  year: "",
-  vin: "",
-  status: "in_service",
-  purchasedOn: "",
-  purchasePrice: "",
-  notes: "",
 };
 
 export function FleetScreen({
@@ -128,71 +88,51 @@ export function FleetScreen({
   const { records: logs } = useRecords<MaintenanceLog>("maintenanceLogs", query);
   const { records: fuel } = useRecords<FuelLog>("fuelLogs", query);
 
-  const api = useMutations<Equipment>(
-    "equipment",
-    "equipment",
-    equipmentSchema,
-    propertyId,
-    actorId,
-  );
-  // The ledgers hanging off a machine, so deleting one can take them with it.
-  const readingsApi = useMutations<MeterReading>(
-    "meterReadings",
-    "meterReadings",
-    meterReadingSchema,
-    propertyId,
-    actorId,
-  );
-  const rulesApi = useMutations<MaintenanceRule>(
-    "maintenanceRules",
-    "maintenanceRules",
-    maintenanceRuleSchema,
-    propertyId,
-    actorId,
-  );
-  const logsApi = useMutations<MaintenanceLog>(
-    "maintenanceLogs",
-    "maintenanceLogs",
-    maintenanceLogSchema,
-    propertyId,
-    actorId,
-  );
-  const fuelApi = useMutations<FuelLog>("fuelLogs", "fuelLogs", fuelLogSchema, propertyId, actorId);
-
-  const confirmDelete = useConfirmDelete();
+  const router = useRouter();
   const { show } = useToast();
 
-  const [draft, setDraft] = useState<Draft>(BLANK);
-  const [error, setError] = useState<string | undefined>();
-  const [busy, setBusy] = useState(false);
-  const [creating, setCreating] = useState(false);
-  /** The machine whose status-and-delete panel is open. */
-  const [managing, setManaging] = useState<Equipment | undefined>();
+  /** Which side panel is open: adding a machine, or editing one. */
+  const [panel, setPanel] = useState<
+    { readonly kind: "add" } | { readonly kind: "edit"; readonly machine: Equipment } | undefined
+  >();
   /** The chip that is on: a status, "overdue", "gone", or "" for the lot. */
   const [view, setView] = useState("");
-  const formId = useId();
+
+  // Asks first — the typed confirmation lives in the hook — then cascades.
+  const confirmRemoveMachine = useMachineRemoval({
+    propertyId,
+    actorId,
+    ledgers: { readings, rules, logs, fuel },
+  });
 
   const now = new Date();
 
   /**
-   * What is due, per machine.
+   * What is due, per machine, and what each meter last read.
    *
    * Computed over the whole fleet in one pass and grouped afterwards rather
-   * than per card: `maintenanceDue` reads the meter history for every rule it
-   * is given, and calling it once per machine would walk the same readings
-   * once per machine.
+   * than per row: `maintenanceDue` indexes the meter history once for every
+   * rule it is given, and asking per machine would index it per machine. The
+   * meters are indexed once here too, for the muted lines, instead of each row
+   * filtering and sorting the whole reading history for its own two numbers.
    *
-   * Not memoised. It depends on `now`, which is a new object every render, so
-   * a memo would recompute anyway while looking as though it did not — this is
-   * a handful of machines over a few hundred readings.
+   * Memoised on the ledgers, with the day as part of the key — "due" is a
+   * date comparison, so it has to move at midnight but not on every render.
+   * Typing in the add panel no longer re-renders this screen at all, since the
+   * panel keeps its own draft.
    */
-  const dueByEquipment = new Map<Ulid, ReturnType<typeof maintenanceDue>>();
-  for (const entry of maintenanceDue(rules, logs, readings, now)) {
-    dueByEquipment.set(entry.rule.equipmentId, [
-      ...(dueByEquipment.get(entry.rule.equipmentId) ?? []),
-      entry,
-    ]);
-  }
+  const day = now.toDateString();
+  const dueByEquipment = useMemo(() => {
+    const grouped = new Map<Ulid, ReturnType<typeof maintenanceDue>>();
+    for (const entry of maintenanceDue(rules, logs, readings, new Date())) {
+      const held = grouped.get(entry.rule.equipmentId);
+      if (held === undefined) grouped.set(entry.rule.equipmentId, [entry]);
+      else held.push(entry);
+    }
+    return grouped;
+    // `day` is the clock's part in this: recompute when the date turns over.
+  }, [rules, logs, readings, day]);
+  const meters = useMemo(() => latestReadings(readings), [readings]);
 
   const overdue = [...dueByEquipment.entries()].flatMap(([equipmentId, entries]) =>
     entries.filter((entry) => entry.overdue).map((entry) => ({ equipmentId, entry })),
@@ -201,151 +141,23 @@ export function FleetScreen({
   const running = fleet.filter((machine) => machine.status === "in_service");
   const down = fleet.filter((machine) => machine.status === "down");
 
-  const spend: Money = {
-    cents: fleet.reduce(
-      (total, machine) => total + costOfOwnership(machine.id, logs, fuel).cents,
-      0,
-    ),
-  };
+  // Fuel and service across every machine still on the books — one pass over
+  // each ledger rather than `costOfOwnership` once per machine, which walked
+  // both ledgers end to end for every row.
+  const spend: Money = useMemo(() => {
+    const live = new Set(fleet.map((machine) => machine.id));
+    let cents = 0;
+    for (const log of logs) if (live.has(log.equipmentId)) cents += log.cost?.cents ?? 0;
+    for (const log of fuel) if (live.has(log.equipmentId)) cents += log.cost?.cents ?? 0;
+    return { cents };
+  }, [fleet, logs, fuel]);
 
-  function reset() {
-    setDraft(BLANK);
-    setError(undefined);
-  }
-
-  function startCreate() {
-    reset();
-    setCreating(true);
-  }
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(undefined);
-    setBusy(true);
-
-    try {
-      const payload = {
-        name: draft.name.trim(),
-        category: draft.category,
-        make: draft.make.trim() === "" ? undefined : draft.make.trim(),
-        model: draft.model.trim() === "" ? undefined : draft.model.trim(),
-        year: draft.year === "" ? undefined : Number(draft.year),
-        vin: draft.vin.trim() === "" ? undefined : draft.vin.trim(),
-        status: draft.status,
-        purchasedOn:
-          draft.purchasedOn === "" ? undefined : new Date(`${draft.purchasedOn}T12:00:00`),
-        purchasePrice:
-          draft.purchasePrice === "" ? undefined : fromDollars(Number(draft.purchasePrice)),
-        photoKeys: [],
-        notes: draft.notes.trim() === "" ? undefined : draft.notes.trim(),
-      };
-
-      const result = await api.create(payload as never);
-
-      if (!result.ok) {
-        setError(
-          result.error.kind === "validation"
-            ? (result.error.issues[0]?.message ?? "That is not valid")
-            : "Could not save that",
-        );
-        return;
-      }
-
-      show({ message: `${payload.name} added` });
-      reset();
-      setCreating(false);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function setStatus(machine: Equipment, status: EquipmentStatus) {
-    await api.update(machine.id, { status } as Partial<Equipment>);
-    show({
-      message: `${machine.name} · ${status.replace(/_/g, " ")}`,
-      tone: status === "down" ? "warning" : "success",
-    });
-  }
-
-  /**
-   * Cascade, not restrict (§4.5).
-   *
-   * A meter reading, a service entry and a tank of diesel are facts about one
-   * machine and about nothing else — leaving them behind would put a fuel log
-   * on the cost-of-ownership figure for a truck that is no longer in the app.
-   * Every one of them is a tombstone, so the undo puts the whole machine back,
-   * ledgers and all, and that is the only reason cascading here is honest.
-   */
-  async function remove(machine: Equipment) {
-    const mine = <T extends { readonly equipmentId: Ulid }>(entries: readonly T[]) =>
-      entries.filter((entry) => entry.equipmentId === machine.id);
-
-    // Each child paired with the store that owns it, so the delete and the
-    // undo both walk one list rather than four repeated filters.
-    const children = [
-      ...mine(readings).map((entry) => ({
-        api: readingsApi,
-        id: entry.id,
-        entity: "Meter reading",
-        label: `${num(entry.value, 1)} ${entry.kind}`,
-      })),
-      ...mine(rules).map((entry) => ({
-        api: rulesApi,
-        id: entry.id,
-        entity: "Maintenance rule",
-        label: entry.task,
-      })),
-      ...mine(logs).map((entry) => ({
-        api: logsApi,
-        id: entry.id,
-        entity: "Service entry",
-        label: `${entry.task}, ${formatDate(entry.performedOn)}`,
-      })),
-      ...mine(fuel).map((entry) => ({
-        api: fuelApi,
-        id: entry.id,
-        entity: "Fuel log",
-        label: `${num(entry.gallons, 1)} gal, ${formatDate(entry.filledOn)}`,
-      })),
-    ];
-
-    const confirmed = await confirmDelete({
-      tier: "typed",
-      recordName: machine.name,
-      entity: "machine",
-      dependents: children.map((child) => ({
-        entity: child.entity,
-        label: child.label,
-        effect: "deleted" as const,
-      })),
-      consequence:
-        "Its meters, rules, service history and fuel go to Trash with it, and come back together if you restore it.",
-    });
-    if (!confirmed) return;
-
-    const reason = `Deleted with ${machine.name}`;
-    for (const child of children) await child.api.remove(child.id, reason);
-    await api.remove(machine.id, "Removed from the fleet");
-
-    show({
-      message: `${machine.name} deleted`,
-      tone: "danger",
-      action: {
-        label: "Undo",
-        onAct: () => {
-          void (async () => {
-            await api.restoreRecord(machine.id);
-            for (const child of children) await child.api.restoreRecord(child.id);
-          })();
-        },
-      },
-    });
-  }
+  const startCreate = () => setPanel({ kind: "add" });
 
   /** The one line under a name: what it is, what the meters read, what is next. */
   function lineFor(machine: Equipment): string {
-    const hours = currentMeter(readings, machine.id, "hours");
-    const miles = currentMeter(readings, machine.id, "miles");
+    const hours = meters.get(meterKey(machine.id, "hours"))?.value;
+    const miles = meters.get(meterKey(machine.id, "miles"))?.value;
     const next = (dueByEquipment.get(machine.id) ?? [])[0];
     return [
       describe(machine) === "" ? machine.category : describe(machine),
@@ -510,8 +322,8 @@ export function FleetScreen({
                 href={`/admin/equipment/${machine.id}`}
                 line={lineFor(machine)}
                 chip={chipFor(machine)}
-                onEdit={() => setManaging(machine)}
-                editLabel={`Status or delete ${machine.name}`}
+                onEdit={() => setPanel({ kind: "edit", machine })}
+                editLabel={`Edit ${machine.name}`}
               />
             ))}
           </KitList>
@@ -520,149 +332,38 @@ export function FleetScreen({
         <AddFab label="Add machine" onClick={startCreate} />
       </div>
 
-      {creating ? (
-        <Modal
-          title="Add a machine"
-          placement="side"
-          onClose={() => setCreating(false)}
-          footer={
-            <>
-              <Button type="submit" form={formId} variant="primary" busy={busy}>
-                Add machine
-              </Button>
-              <Button onClick={() => setCreating(false)}>Cancel</Button>
-            </>
+      {panel?.kind === "add" ? (
+        <MachineForm
+          key="new"
+          propertyId={propertyId}
+          actorId={actorId}
+          onClose={() => setPanel(undefined)}
+          onCreated={(created) =>
+            show({
+              message: `${created.name} added`,
+              action: {
+                label: "Open it",
+                onAct: () => router.push(`/admin/equipment/${created.id}`),
+              },
+            })
           }
-        >
-          <form
-            id={formId}
-            onSubmit={(event) => void submit(event)}
-            className="flex flex-col gap-density sm:grid sm:grid-cols-2"
-          >
-            <TextInput
-              label="Name"
-              hint="What it is called in the barn, not its model number."
-              className="sm:col-span-2"
-              value={draft.name}
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-              required
-            />
-            <Select
-              label="Category"
-              value={draft.category}
-              onChange={(event) =>
-                setDraft({ ...draft, category: event.target.value as EquipmentCategory })
-              }
-              options={EQUIPMENT_CATEGORIES.map((value) => ({ value, label: value }))}
-            />
-            <Select
-              label="Status"
-              value={draft.status}
-              onChange={(event) =>
-                setDraft({ ...draft, status: event.target.value as EquipmentStatus })
-              }
-              options={STATUS_OPTIONS}
-            />
-            <TextInput
-              label="Make"
-              value={draft.make}
-              onChange={(event) => setDraft({ ...draft, make: event.target.value })}
-            />
-            <TextInput
-              label="Model"
-              value={draft.model}
-              onChange={(event) => setDraft({ ...draft, model: event.target.value })}
-            />
-            <TextInput
-              label="Year"
-              type="number"
-              inputMode="numeric"
-              numeric
-              value={draft.year}
-              onChange={(event) => setDraft({ ...draft, year: event.target.value })}
-            />
-            <TextInput
-              label="VIN or serial"
-              value={draft.vin}
-              onChange={(event) => setDraft({ ...draft, vin: event.target.value })}
-            />
-            <TextInput
-              label="Bought"
-              type="date"
-              value={draft.purchasedOn}
-              onChange={(event) => setDraft({ ...draft, purchasedOn: event.target.value })}
-            />
-            <TextInput
-              label="Paid ($)"
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              numeric
-              value={draft.purchasePrice}
-              onChange={(event) => setDraft({ ...draft, purchasePrice: event.target.value })}
-            />
-            <TextInput
-              label="Notes"
-              className="sm:col-span-2"
-              value={draft.notes}
-              onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-            />
-            {error === undefined ? null : (
-              <p role="alert" className="text-sm text-danger sm:col-span-2">
-                {error}
-              </p>
-            )}
-          </form>
-        </Modal>
+        />
+      ) : panel?.kind === "edit" ? (
+        <MachineForm
+          key={panel.machine.id}
+          machine={panel.machine}
+          propertyId={propertyId}
+          actorId={actorId}
+          onClose={() => setPanel(undefined)}
+          // The panel closes first, so the typed confirmation is the only
+          // dialog on screen.
+          onDelete={() => {
+            const machine = panel.machine;
+            setPanel(undefined);
+            void confirmRemoveMachine(machine);
+          }}
+        />
       ) : null}
-
-      {/*
-        Status and delete, which used to sit on every card. A status change is
-        the only edit the fleet list makes — everything else about a machine is
-        on its own page — so the panel is small, and the delete closes it first
-        so the typed confirmation is the only dialog on screen.
-      */}
-      {managing === undefined ? null : (
-        <Modal
-          title={managing.name}
-          description={describe(managing) === "" ? managing.category : describe(managing)}
-          placement="side"
-          onClose={() => setManaging(undefined)}
-          footer={
-            <>
-              <Button onClick={() => setManaging(undefined)}>Done</Button>
-              <Button
-                variant="danger"
-                className="ml-auto"
-                onClick={() => {
-                  const machine = managing;
-                  setManaging(undefined);
-                  void remove(machine);
-                }}
-              >
-                Delete
-              </Button>
-            </>
-          }
-        >
-          <Select
-            label={`Status for ${managing.name}`}
-            value={managing.status}
-            onChange={(event) => {
-              const status = event.target.value as EquipmentStatus;
-              void setStatus(managing, status);
-              setManaging({ ...managing, status });
-            }}
-            options={STATUS_OPTIONS}
-          />
-          <Link
-            href={`/admin/equipment/${managing.id}`}
-            className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
-          >
-            Meters, rules, service and fuel →
-          </Link>
-        </Modal>
-      )}
     </PageBody>
   );
 }

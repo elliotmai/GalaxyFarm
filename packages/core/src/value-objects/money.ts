@@ -71,5 +71,25 @@ export function compareMoney(left: Money, right: Money): number {
 }
 
 export function formatMoney(value: Money, currency = "USD", locale = "en-US"): string {
-  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(toDollars(value));
+  return currencyFormat(currency, locale).format(toDollars(value));
+}
+
+/**
+ * One `Intl.NumberFormat` per currency and locale, built on first use.
+ *
+ * Constructing one is the expensive part of formatting — tens of microseconds,
+ * against well under one to format with it — and every list with a price on
+ * each row was paying it per row, per render. There are only ever a couple of
+ * pairs in play, so the cache never needs evicting.
+ */
+const currencyFormats = new Map<string, Intl.NumberFormat>();
+
+function currencyFormat(currency: string, locale: string): Intl.NumberFormat {
+  const key = `${locale}|${currency}`;
+  let format = currencyFormats.get(key);
+  if (format === undefined) {
+    format = new Intl.NumberFormat(locale, { style: "currency", currency });
+    currencyFormats.set(key, format);
+  }
+  return format;
 }

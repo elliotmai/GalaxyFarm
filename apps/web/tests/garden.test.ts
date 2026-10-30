@@ -4,6 +4,8 @@ import type { Ulid } from "@galaxy-farm/core";
 import type { Crop, Planting, PreservationLog, Variety } from "@galaxy-farm/module-garden";
 
 import {
+  byId,
+  cropFields,
   familyHistory,
   familyOf,
   pantryByMethod,
@@ -300,5 +302,66 @@ describe("what is put by, by method", () => {
     expect(totals.get("canned")).toBe(12);
     expect(totals.get("frozen")).toBe(4);
     expect(totals.get("dried")).toBeUndefined();
+  });
+});
+
+describe("the family, inferred", () => {
+  const at = new Date("2026-06-15T12:00:00Z");
+  const crop = (id: string, extra: Partial<Crop>) =>
+    ({ id, propertyId: "p", createdAt: at, updatedAt: at, name: "Tomato", ...extra }) as Crop;
+  const variety = { id: "v1", cropId: "c1", name: "Roma" } as unknown as Variety;
+
+  it("is read from the crop's name when the crop stores none", () => {
+    expect(familyOf("v1" as Ulid, [variety], [crop("c1", {})])).toBe("Solanaceae");
+  });
+
+  it("is the stored one when there is one", () => {
+    expect(familyOf("v1" as Ulid, [variety], [crop("c1", { family: "Rosaceae" })])).toBe(
+      "Rosaceae",
+    );
+  });
+
+  it("is stored only when it says something the table would not", () => {
+    expect(cropFields({ name: "Tomato", scientificName: "", family: "Solanaceae" }).family).toBe(
+      undefined,
+    );
+    expect(cropFields({ name: "Tomato", scientificName: "", family: "rosaceae" }).family).toBe(
+      "Rosaceae",
+    );
+    // GBIF's family for a plant the table does not know is kept.
+    expect(
+      cropFields({ name: "Lantana", scientificName: "Lantana camara", family: "Verbenaceae" }),
+    ).toMatchObject({ family: "Verbenaceae", scientificName: "Lantana camara" });
+  });
+});
+
+describe("byId", () => {
+  it("builds one index per list and reuses it", () => {
+    const rows = [{ id: "a" as Ulid }, { id: "b" as Ulid }];
+    expect(byId(rows).get("b" as Ulid)).toBe(rows[1]);
+    expect(byId(rows)).toBe(byId(rows));
+    expect(byId([...rows])).not.toBe(byId(rows));
+  });
+});
+
+describe("pantryShelf with uncounted batches", () => {
+  it("adds what was counted and says the rest was not", () => {
+    const at = new Date("2026-07-01T12:00:00Z");
+    const batch = (id: string, quantity: number | undefined) =>
+      ({
+        id,
+        propertyId: "p",
+        createdAt: at,
+        updatedAt: at,
+        label: "Salsa",
+        method: "canned",
+        unit: "jar",
+        preservedOn: at,
+        ...(quantity === undefined ? {} : { quantity }),
+      }) as PreservationLog;
+
+    const [line] = pantryShelf([batch("a", 6), batch("b", undefined)]);
+    expect(line).toMatchObject({ quantity: 6, uncounted: true });
+    expect(pantryShelf([batch("a", 6)])[0]?.uncounted).toBe(false);
   });
 });

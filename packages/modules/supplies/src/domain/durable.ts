@@ -103,3 +103,21 @@ export function inService(
 
   return total - goneCount;
 }
+
+/**
+ * How many of each item are retired or lost, keyed by item, in one pass.
+ *
+ * `inService` answers for one item by walking every assignment; a shelf of
+ * durables asks it once per row, so the screens ask this instead and subtract.
+ */
+export function goneByItem(assignments: readonly DurableAssignment[]): Map<Ulid, number> {
+  const gone = new Map<Ulid, number>();
+  for (const assignment of assignments) {
+    if (assignment.condition !== "retired" && assignment.condition !== "lost") continue;
+    gone.set(
+      assignment.supplyItemId,
+      (gone.get(assignment.supplyItemId) ?? 0) + assignment.quantity,
+    );
+  }
+  return gone;
+}

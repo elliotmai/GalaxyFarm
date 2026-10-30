@@ -138,7 +138,10 @@ export function CarePanel({
   const [logging, setLogging] = useState(false);
   const formId = useId();
 
-  const zoneName = (id: Ulid) => zones.find((zone) => zone.id === id)?.name ?? "Unknown zone";
+  // One lookup per change of the zones, not a scan of them for every row of
+  // the history — two per row, with the title and the edit label.
+  const zonesById = useMemo(() => new Map(zones.map((zone) => [zone.id, zone] as const)), [zones]);
+  const zoneName = (id: Ulid) => zonesById.get(id)?.name ?? "Unknown zone";
 
   /**
    * Which zone the form is actually on.
@@ -281,9 +284,12 @@ export function CarePanel({
   }
 
   async function saveEdit() {
-    if (editing === undefined || editDraft === undefined) return;
+    if (editing === undefined || editDraft === undefined || busy) return;
 
-    const result = await mutations.update(editing.id, fields(editDraft));
+    setBusy(true);
+    const result = await mutations
+      .update(editing.id, fields(editDraft))
+      .finally(() => setBusy(false));
 
     if (!result.ok) {
       reportErrors(result.error);
@@ -548,7 +554,7 @@ export function CarePanel({
           onClose={closeEdit}
           footer={
             <>
-              <Button variant="primary" onClick={() => void saveEdit()}>
+              <Button variant="primary" busy={busy} onClick={() => void saveEdit()}>
                 Save changes
               </Button>
               <Button onClick={closeEdit}>Cancel</Button>

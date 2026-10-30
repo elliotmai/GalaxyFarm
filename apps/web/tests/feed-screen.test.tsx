@@ -53,6 +53,8 @@ const ACTOR = "01ARZ3NDEKTSV4RRFFQ69G5FU1" as Ulid;
 const HAY = "01ARZ3NDEKTSV4RRFFQ69G5F01" as Ulid;
 const BISCUIT = "01ARZ3NDEKTSV4RRFFQ69G5A01" as Ulid;
 const PLAN = "01ARZ3NDEKTSV4RRFFQ69G5P01" as Ulid;
+const PLAN_2 = "01ARZ3NDEKTSV4RRFFQ69G5P02" as Ulid;
+const PEPPER = "01ARZ3NDEKTSV4RRFFQ69G5A02" as Ulid;
 
 const base = (id: string) => ({
   id: id as Ulid,
@@ -113,6 +115,18 @@ function farm(extra: Record<string, readonly unknown[]> = {}) {
       },
     ],
     ...extra,
+  };
+}
+
+/** A second horse, for rations that feed more than one. */
+function pepper() {
+  return {
+    ...base(PEPPER),
+    name: "Pepper",
+    species: "horse",
+    sex: "female",
+    status: "active",
+    ownership: "owned",
   };
 }
 
@@ -207,17 +221,81 @@ describe("Farm › Feed › Plan", () => {
     expect(saved.updated[0]).toMatchObject({ id: PLAN, patch: { targetId: BISCUIT } });
   });
 
-  it("sends a shared bowl to the pets screen rather than flattening it", () => {
+  it("adjusts a shared bowl here without dropping the second animal off it", async () => {
+    const user = userEvent.setup();
     farm();
     const plans = stored.current["feedingPlans"] as Record<string, unknown>[];
     stored.current = {
       ...stored.current,
-      feedingPlans: [{ ...plans[0], alsoFeeds: ["01ARZ3NDEKTSV4RRFFQ69G5A02"] }],
+      animals: [...(stored.current["animals"] ?? []), pepper()],
+      feedingPlans: [{ ...plans[0], alsoFeeds: [PEPPER], portion: "shared" }],
     };
     wrap(<FeedScreen propertyId={PROPERTY} actorId={ACTOR} initialView="plan" />);
 
-    const link = screen.getByRole("link", { name: "Adjust Biscuit's hay on Pets" });
-    expect(link.getAttribute("href")).toBe("/admin/pets");
+    // One ration, both of them as its detail.
+    const card = screen.getByRole("region", { name: "Biscuit's hay" });
+    expect(within(card).getByText("Biscuit, Pepper")).toBeTruthy();
+
+    await user.click(within(card).getByRole("button", { name: "Adjust Biscuit's hay" }));
+    const panel = screen.getByRole("dialog", { name: "Edit Biscuit's hay" });
+    expect((within(panel).getByLabelText("Pepper") as HTMLInputElement).checked).toBe(true);
+
+    await user.click(within(panel).getByRole("button", { name: "Save changes" }));
+    // The editor used to write `alsoFeeds: []` on every save.
+    expect(saved.updated[0]).toMatchObject({
+      id: PLAN,
+      patch: { targetId: BISCUIT, alsoFeeds: [PEPPER], portion: "shared" },
+    });
+  });
+
+  it("writes one plan for several animals", async () => {
+    const user = userEvent.setup();
+    farm();
+    stored.current = {
+      ...stored.current,
+      animals: [...(stored.current["animals"] ?? []), pepper()],
+    };
+    wrap(<FeedScreen propertyId={PROPERTY} actorId={ACTOR} initialView="plan" />);
+
+    await user.click(screen.getAllByRole("button", { name: /Add plan/ })[0] as HTMLElement);
+    const panel = screen.getByRole("dialog", { name: "Add a plan" });
+    await user.type(within(panel).getByLabelText(/^Plan name/), "Morning hay");
+    await user.selectOptions(within(panel).getByLabelText(/^Feeds/), "animal");
+    await user.selectOptions(within(panel).getByLabelText(/^Animal/), BISCUIT);
+    await user.click(within(panel).getByLabelText("Pepper"));
+    await user.selectOptions(within(panel).getByLabelText(/^Feed(?!s)/), HAY);
+    await user.type(within(panel).getByLabelText(/^Amount/), "0.5");
+    await user.click(within(panel).getByRole("button", { name: "Add plan" }));
+
+    expect(saved.created[0]).toMatchObject({
+      name: "Morning hay",
+      target: "animal",
+      targetId: BISCUIT,
+      alsoFeeds: [PEPPER],
+    });
+  });
+
+  it("lists a ration written twice once, with everybody it feeds as the detail", async () => {
+    const user = userEvent.setup();
+    farm();
+    const plans = stored.current["feedingPlans"] as Record<string, unknown>[];
+    stored.current = {
+      ...stored.current,
+      animals: [...(stored.current["animals"] ?? []), pepper()],
+      feedingPlans: [...plans, { ...plans[0], id: PLAN_2, name: "Pepper's hay", targetId: PEPPER }],
+    };
+    wrap(<FeedScreen propertyId={PROPERTY} actorId={ACTOR} initialView="plan" />);
+
+    // Named differently, fed the same: one card, titled by what is in it.
+    const cards = screen.getAllByRole("region");
+    expect(cards).toHaveLength(1);
+    const card = screen.getByRole("region", { name: "Grass hay" });
+    expect(within(card).getByText("Biscuit · Pepper")).toBeTruthy();
+    expect(within(card).getAllByText("0.5 round bale")).toHaveLength(1);
+
+    // Still two records, each adjusted on its own.
+    await user.click(within(card).getByRole("button", { name: "Adjust Pepper's hay (Pepper)" }));
+    expect(screen.getByRole("dialog", { name: "Edit Pepper's hay" })).toBeTruthy();
   });
 });
 
@@ -233,6 +311,60 @@ describe("Farm › Feed › Shed", () => {
     await user.click(within(shed).getByRole("button", { name: "Restock Grass hay" }));
     const panel = screen.getByRole("dialog", { name: "Record a purchase" });
     expect((within(panel).getByLabelText(/^Feed/) as HTMLSelectElement).value).toBe(HAY);
+  });
+
+  it("offers Add a feed when the shed already has feed in it", async () => {
+    const user = userEvent.setup();
+    farm();
+    wrap(<FeedScreen propertyId={PROPERTY} actorId={ACTOR} initialView="shed" />);
+
+    await user.click(screen.getByRole("button", { name: "Add a feed" }));
+    const panel = screen.getByRole("dialog", { name: "Add a feed" });
+    await user.type(within(panel).getByLabelText(/^Name/), "Sweet feed");
+    // The lead time is not required: blank is a week.
+    await user.clear(within(panel).getByLabelText(/^Reorder lead/));
+    await user.click(within(panel).getByRole("button", { name: "Add feed" }));
+
+    expect(saved.created[0]).toMatchObject({ name: "Sweet feed", reorderLeadDays: 7 });
+  });
+
+  it("records a purchase with no price as unpriced, not as $0", async () => {
+    const user = userEvent.setup();
+    farm();
+    wrap(<FeedScreen propertyId={PROPERTY} actorId={ACTOR} initialView="shed" />);
+
+    await user.click(screen.getByRole("button", { name: "Restock Grass hay" }));
+    const panel = screen.getByRole("dialog", { name: "Record a purchase" });
+    expect((within(panel).getByLabelText(/^Cost each/) as HTMLInputElement).required).toBe(false);
+    await user.type(within(panel).getByLabelText(/^Quantity/), "3");
+    await user.click(within(panel).getByRole("button", { name: "Record purchase" }));
+
+    expect(saved.created[0]).toMatchObject({ feedTypeId: HAY, quantity: 3 });
+    expect(saved.created[0]?.["unitCost"]).toBeUndefined();
+  });
+
+  it("says an unpriced purchase has no price, and counts it in the shed", async () => {
+    const user = userEvent.setup();
+    farm();
+    const purchases = stored.current["feedPurchases"] as Record<string, unknown>[];
+    stored.current = {
+      ...stored.current,
+      feedPurchases: [{ ...purchases[0], unitCost: undefined }],
+    };
+    wrap(<FeedScreen propertyId={PROPERTY} actorId={ACTOR} initialView="shed" />);
+
+    const shed = screen.getByRole("list", { name: "In the shed" });
+    expect(within(shed).getByText(/2 round bale/)).toBeTruthy();
+
+    await user.click(screen.getByText("History"));
+    const list = screen.getByRole("list", { name: "Feed purchases" });
+    expect(within(list).getByText("no price")).toBeTruthy();
+    expect(within(list).queryByText(/\$0/)).toBeNull();
+
+    await user.click(screen.getByRole("tab", { name: "Cost per head" }));
+    expect(screen.getByText(/No cost yet/)).toBeTruthy();
+    expect(screen.getAllByText("Missing a cost").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/\$0\.00/)).toBeNull();
   });
 
   it("keeps the purchase and count logs behind History", async () => {

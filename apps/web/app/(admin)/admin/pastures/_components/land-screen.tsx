@@ -35,9 +35,12 @@ import { useRecords } from "@/lib/local/use-records";
 export function LandScreen({
   propertyId,
   actorId,
+  initialZoneId,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /** `?zone=`: open on the Zones tab with that zone's editor up. */
+  readonly initialZoneId?: Ulid | undefined;
 }) {
   const query = { propertyId };
   const { records: zones, loading } = useRecords<Zone>("zones", query);
@@ -140,6 +143,7 @@ export function LandScreen({
               loading={loading}
               propertyId={propertyId}
               actorId={actorId}
+              initialZoneId={initialZoneId}
             />
           ) : active === "water" ? (
             <WaterPanel

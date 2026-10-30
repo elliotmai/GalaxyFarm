@@ -281,7 +281,7 @@ export function HorseCandidatesScreen({
       title: candidate.title,
       roadmapItemId: candidate.roadmapItemId ?? "",
       status: candidate.status,
-      asking: String(toDollars(candidate.askingPrice)),
+      asking: candidate.askingPrice === undefined ? "" : String(toDollars(candidate.askingPrice)),
       haul: costOf(candidate, COST_HAUL),
       exam: costOf(candidate, COST_EXAM),
       location: candidate.location ?? "",
@@ -666,7 +666,13 @@ export function HorseCandidatesScreen({
 
           <DetailList
             items={[
-              { label: "Asking", value: formatMoney(looking.askingPrice) },
+              {
+                label: "Asking",
+                value:
+                  looking.askingPrice === undefined
+                    ? "No price yet"
+                    : formatMoney(looking.askingPrice),
+              },
               {
                 label: "All in",
                 value: (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   Button,
@@ -98,6 +99,7 @@ export function GardenLayoutScreen({
   readonly actorId: Ulid;
 }) {
   const { show } = useToast();
+  const router = useRouter();
   const query = useMemo(() => ({ propertyId }), [propertyId]);
 
   const { records: beds, loading: bedsLoading } = useRecords<Bed>("beds", query);
@@ -374,6 +376,68 @@ export function GardenLayoutScreen({
 
   const drawn = inZone.filter(isDrawn).length;
 
+  /**
+   * The beds in this garden, each one tap from its record.
+   *
+   * Drawn whether or not the plan can be: a garden with no corner to hang
+   * from still has beds, and this list is the way through to them.
+   *
+   * Position is measured in feet from the garden's north-west corner, east
+   * then south — the same numbers the plan draws.
+   */
+  const bedsSection = (
+    <Section title="Beds">
+      {inZone.length === 0 ? (
+        <EmptyState
+          title="No beds in this garden yet"
+          detail="Add them under Plantings → Beds. This screen draws the beds that already exist."
+        />
+      ) : (
+        <RowList label="Beds and where they sit">
+          {inZone.map((bed) => (
+            <LandRow
+              key={bed.id}
+              title={bed.name}
+              // The record lives under Plantings → Beds; this opens it
+              // there, and the global Back link returns to the plan.
+              openLabel={`Edit ${bed.name}`}
+              onOpen={() =>
+                router.push(`/admin/garden/plantings?tab=beds&bed=${encodeURIComponent(bed.id)}`)
+              }
+              // Drawn means all four numbers, which is what
+              // `bedBoundary` needs — a row saying "drawn" over a bed
+              // the plan leaves out would be the one place the two
+              // views disagree.
+              line={
+                <>
+                  {bed.lengthFt === undefined || bed.widthFt === undefined ? (
+                    "No size"
+                  ) : (
+                    <span>
+                      {bed.lengthFt}′ × {bed.widthFt}′
+                    </span>
+                  )}
+                  {isDrawn(bed) ? (
+                    <>
+                      {" · "}
+                      <span>
+                        {bed.x}′ east, {bed.y}′ south
+                      </span>
+                    </>
+                  ) : null}
+                </>
+              }
+              chip={isDrawn(bed) ? undefined : { tone: "neutral", label: "Not drawn" }}
+              quiet={!bed.active}
+              // Nothing to draw against until the garden has a corner.
+              action={origin === undefined ? undefined : drawAction(bed)}
+            />
+          ))}
+        </RowList>
+      )}
+    </Section>
+  );
+
   if (bedsLoading) return <p className="text-muted">Loading the garden…</p>;
 
   return (
@@ -394,7 +458,11 @@ export function GardenLayoutScreen({
           Trace {zone?.name ?? "the garden"} on the property map, or set the property&rsquo;s
           coordinates under Settings → Property, so the beds have a corner to measure from.
         </Callout>
-      ) : (
+      ) : null}
+
+      {places.length > 0 && origin === undefined ? bedsSection : null}
+
+      {places.length === 0 || origin === undefined ? null : (
         <>
           {places.length === 1 ? null : (
             <Select
@@ -550,51 +618,7 @@ export function GardenLayoutScreen({
             )}
           </Section>
 
-          {/* Position is measured in feet from the garden's north-west
-              corner, east then south — the same numbers the plan draws. */}
-          <Section title="Beds">
-            {inZone.length === 0 ? (
-              <EmptyState
-                title="No beds in this garden yet"
-                detail="Add them under Plantings → Beds. This screen draws the beds that already exist."
-              />
-            ) : (
-              <RowList label="Beds and where they sit">
-                {inZone.map((bed) => (
-                  <LandRow
-                    key={bed.id}
-                    title={bed.name}
-                    // Drawn means all four numbers, which is what
-                    // `bedBoundary` needs — a row saying "drawn" over a bed
-                    // the plan leaves out would be the one place the two
-                    // views disagree.
-                    line={
-                      <>
-                        {bed.lengthFt === undefined || bed.widthFt === undefined ? (
-                          "No size"
-                        ) : (
-                          <span>
-                            {bed.lengthFt}′ × {bed.widthFt}′
-                          </span>
-                        )}
-                        {isDrawn(bed) ? (
-                          <>
-                            {" · "}
-                            <span>
-                              {bed.x}′ east, {bed.y}′ south
-                            </span>
-                          </>
-                        ) : null}
-                      </>
-                    }
-                    chip={isDrawn(bed) ? undefined : { tone: "neutral", label: "Not drawn" }}
-                    quiet={!bed.active}
-                    action={drawAction(bed)}
-                  />
-                ))}
-              </RowList>
-            )}
-          </Section>
+          {bedsSection}
         </>
       )}
 

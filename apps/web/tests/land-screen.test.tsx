@@ -86,11 +86,11 @@ const TANK: WaterSource = {
   active: true,
 } as WaterSource;
 
-function view() {
+function view(initialZoneId?: Ulid) {
   render(
     <ToastProvider>
       <ConfirmProvider>
-        <LandScreen propertyId={PROPERTY} actorId={ACTOR} />
+        <LandScreen propertyId={PROPERTY} actorId={ACTOR} initialZoneId={initialZoneId} />
       </ConfirmProvider>
     </ToastProvider>,
   );
@@ -171,6 +171,52 @@ describe("zones", () => {
   });
 });
 
+describe("zone editor", () => {
+  it("clears a capacity rather than leaving the old one standing", async () => {
+    // A patch that never mentions the field keeps the old value, so an
+    // emptied box has to travel as an explicit undefined.
+    stored.current["zones"] = [NORTH, { ...TRAP, capacity: 6, customInstructions: "Gate sticks" }];
+    const user = userEvent.setup();
+    view();
+
+    await user.click(screen.getByRole("button", { name: "Edit North Trap" }));
+    await user.clear(screen.getByLabelText("Capacity"));
+    await user.clear(screen.getByLabelText("Care instructions"));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    const patch = writes.updated.find((write) => write.id === TRAP.id)?.patch ?? {};
+    expect(patch).toHaveProperty("capacity", undefined);
+    expect(patch).toHaveProperty("customInstructions", undefined);
+  });
+
+  it("takes a zone out of use without deleting it", async () => {
+    const user = userEvent.setup();
+    view();
+
+    await user.click(screen.getByRole("button", { name: "Edit North Trap" }));
+    await user.click(screen.getByLabelText("In use"));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(writes.updated.find((write) => write.id === TRAP.id)?.patch).toMatchObject({
+      active: false,
+    });
+    expect(writes.removed).toEqual([]);
+  });
+
+  it("shows a zone out of use, dimmed, with the reason", () => {
+    stored.current["zones"] = [NORTH, { ...TRAP, active: false }];
+    view();
+
+    expect(screen.getByText("Not in use")).toBeInTheDocument();
+  });
+
+  it("opens the zone the address names — the map's way in", async () => {
+    view(TRAP.id);
+
+    expect(await screen.findByRole("dialog", { name: /Editing North Trap/ })).toBeInTheDocument();
+  });
+});
+
 describe("water", () => {
   it("puts a cover on in one tap", async () => {
     const user = userEvent.setup();
@@ -183,6 +229,38 @@ describe("water", () => {
       store: "waterSources",
       id: TANK.id,
       patch: { cover: "on" },
+    });
+  });
+});
+
+describe("deleting a tank", () => {
+  it("takes it off every zone that drank from it", async () => {
+    const PEN = {
+      ...TRAP,
+      id: id(3),
+      name: "South Pen",
+      waterSourceIds: [TANK.id, id(11)],
+    } as Zone;
+    stored.current["zones"] = [NORTH, TRAP, PEN];
+    const user = userEvent.setup();
+    view();
+
+    await user.click(screen.getByRole("tab", { name: "Water" }));
+    await user.click(screen.getByRole("button", { name: "Edit Trap tank" }));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    const confirm = await screen.findByRole("dialog");
+    await user.click(within(confirm).getByRole("button", { name: /^Delete/ }));
+
+    expect(writes.removed).toContainEqual({ store: "waterSources", id: TANK.id });
+    expect(writes.updated).toContainEqual({
+      store: "zones",
+      id: TRAP.id,
+      patch: { waterSourceIds: [] },
+    });
+    expect(writes.updated).toContainEqual({
+      store: "zones",
+      id: PEN.id,
+      patch: { waterSourceIds: [id(11)] },
     });
   });
 });

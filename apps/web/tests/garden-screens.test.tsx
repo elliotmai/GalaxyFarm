@@ -222,3 +222,154 @@ describe("harvest", () => {
     });
   });
 });
+
+describe("optional amounts", () => {
+  it("records a picking nobody weighed", async () => {
+    const user = userEvent.setup();
+    wrap(<HarvestScreen propertyId={PROPERTY} actorId={ACTOR} />);
+
+    await user.click(screen.getByRole("tab", { name: "Harvest log" }));
+    await user.click(screen.getAllByRole("button", { name: /Record harvest/ })[0] as HTMLElement);
+    await user.click(screen.getByRole("button", { name: "Record it" }));
+
+    expect(writes.created).toHaveLength(1);
+    expect(writes.created[0]).toMatchObject({ store: "harvestLogs", plantingId: GROWING.id });
+    expect(writes.created[0]?.["quantity"]).toBeUndefined();
+  });
+
+  it("adds seed without a count", async () => {
+    const user = userEvent.setup();
+    wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
+
+    await user.click(screen.getAllByRole("button", { name: /Add seed/ })[0] as HTMLElement);
+    const dialog = within(await screen.findByRole("dialog"));
+    await user.selectOptions(dialog.getByLabelText(/Variety/), CHEROKEE.id);
+    await user.clear(dialog.getByLabelText(/Quantity/));
+    await user.click(dialog.getByRole("button", { name: "Add seed" }));
+
+    expect(writes.created[0]).toMatchObject({ store: "seedInventory", varietyId: CHEROKEE.id });
+    expect(writes.created[0]?.["quantity"]).toBeUndefined();
+  });
+
+  it("goes from a picking straight to a pantry batch that names it", async () => {
+    const user = userEvent.setup();
+    wrap(<HarvestScreen propertyId={PROPERTY} actorId={ACTOR} />);
+
+    await user.click(screen.getByRole("tab", { name: "Harvest log" }));
+    await user.click(screen.getByRole("button", { name: /^Edit 4 lb of Cherokee Purple/ }));
+    await user.click(screen.getByRole("button", { name: "Put some by" }));
+
+    const dialog = within(await screen.findByRole("dialog"));
+    expect(dialog.getByLabelText(/Label/)).toHaveValue("Cherokee Purple");
+    expect(dialog.getByLabelText(/From which harvest/)).toHaveValue(PICKING.id);
+    await user.click(dialog.getByRole("button", { name: "Put it by" }));
+    expect(writes.created[0]).toMatchObject({
+      store: "preservationLogs",
+      harvestLogId: PICKING.id,
+      label: "Cherokee Purple",
+    });
+  });
+});
+
+describe("crops — the family is inferred", () => {
+  beforeEach(() => {
+    // The plant search's server half is not running in a unit test: it fails,
+    // and the form must carry on with the built-in table.
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("offline"));
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  it("saves a crop by name alone, and shows the family it worked out", async () => {
+    const user = userEvent.setup();
+    wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await user.click(screen.getByRole("tab", { name: /Crops/ }));
+    await user.click(screen.getByRole("button", { name: /Add crop/ }));
+
+    const dialog = within(await screen.findByRole("dialog"));
+    // Nothing asks for the family up front.
+    expect(dialog.getByLabelText(/Botanical family/).closest("details")).not.toHaveAttribute(
+      "open",
+    );
+    await user.type(dialog.getByLabelText(/^Name/), "Pepper");
+    expect(dialog.getByText("Solanaceae")).toBeInTheDocument();
+    expect(dialog.getByText("(worked out from the name)")).toBeInTheDocument();
+
+    await user.click(dialog.getByRole("button", { name: "Add crop" }));
+    expect(writes.created[0]).toMatchObject({ store: "crops", name: "Pepper" });
+    // Derived, not stored: the family stays the table's answer.
+    expect(writes.created[0]?.["family"]).toBeUndefined();
+  });
+
+  it("fills name, scientific name and family from a picked match", async () => {
+    const user = userEvent.setup();
+    wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await user.click(screen.getByRole("tab", { name: /Crops/ }));
+    await user.click(screen.getByRole("button", { name: /Add crop/ }));
+
+    const dialog = within(await screen.findByRole("dialog"));
+    await user.type(dialog.getByLabelText(/^Name/), "zucch");
+    const matches = within(dialog.getByRole("list", { name: "Plants matching the name" }));
+    await user.click(matches.getByRole("button", { name: /^Squash/ }));
+
+    expect(dialog.getByLabelText(/^Name/)).toHaveValue("Squash");
+    expect(dialog.getByLabelText(/Scientific name/)).toHaveValue("Cucurbita pepo");
+    await user.click(dialog.getByRole("button", { name: "Add crop" }));
+    expect(writes.created[0]).toMatchObject({
+      store: "crops",
+      name: "Squash",
+      scientificName: "Cucurbita pepo",
+    });
+  });
+
+  it("lets the family be overridden behind the disclosure", async () => {
+    const user = userEvent.setup();
+    wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await user.click(screen.getByRole("tab", { name: /Crops/ }));
+    await user.click(screen.getByRole("button", { name: /Add crop/ }));
+
+    const dialog = within(await screen.findByRole("dialog"));
+    await user.type(dialog.getByLabelText(/^Name/), "Moonflower");
+    expect(dialog.getByText("not known")).toBeInTheDocument();
+    await user.click(dialog.getByText("Change"));
+    await user.type(dialog.getByLabelText(/Botanical family/), "convolvulaceae");
+    await user.click(dialog.getByRole("button", { name: "Add crop" }));
+
+    expect(writes.created[0]).toMatchObject({ name: "Moonflower", family: "Convolvulaceae" });
+  });
+
+  it("files a found plant under a new crop when the list has none", async () => {
+    const user = userEvent.setup();
+    wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await user.click(screen.getByRole("tab", { name: /Crops/ }));
+    await user.click(screen.getAllByRole("button", { name: /Add variety/ })[0] as HTMLElement);
+
+    const dialog = within(await screen.findByRole("dialog"));
+    await user.type(dialog.getByLabelText(/Find the plant/), "okra");
+    await user.click(dialog.getByRole("button", { name: /^Okra/ }));
+    expect(dialog.getByLabelText(/^Crop/)).toHaveDisplayValue(/Okra — new crop \(Malvaceae\)/);
+    await user.type(dialog.getByLabelText(/^Name/), "Clemson Spineless");
+    await user.click(dialog.getByRole("button", { name: "Add variety" }));
+
+    expect(writes.created.map((row) => row["store"])).toEqual(["crops", "varieties"]);
+    expect(writes.created[0]).toMatchObject({
+      name: "Okra",
+      scientificName: "Abelmoschus esculentus",
+    });
+    expect(writes.created[1]).toMatchObject({
+      name: "Clemson Spineless",
+      cropId: "01ARZ3NDEKTSV4RRFFQ69G5GZZ",
+    });
+  });
+
+  it("picks the existing crop for a plant already on the list", async () => {
+    const user = userEvent.setup();
+    wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await user.click(screen.getByRole("tab", { name: /Crops/ }));
+    await user.click(screen.getAllByRole("button", { name: /Add variety/ })[0] as HTMLElement);
+
+    const dialog = within(await screen.findByRole("dialog"));
+    await user.type(dialog.getByLabelText(/Find the plant/), "tomato");
+    await user.click(dialog.getAllByRole("button", { name: /^Tomato/ })[0] as HTMLElement);
+    expect(dialog.getByLabelText(/^Crop/)).toHaveValue(TOMATO.id);
+  });
+});

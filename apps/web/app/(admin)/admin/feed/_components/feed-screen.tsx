@@ -10,6 +10,7 @@ import {
   taskSchema,
   type Animal,
   type ChoreEntry,
+  type Contact,
   type FeedingPlan,
   type Task,
   type Ulid,
@@ -116,11 +117,21 @@ export function FeedScreen({
   const { records: zones } = useRecords<Zone>("zones", query);
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
   const { records: tasks } = useRecords<Task>("tasks", query);
+  const { records: contacts } = useRecords<Contact>("contacts", query);
 
   const [view, setView] = useState<FeedView>(initialView);
   const [panel, setPanel] = useState<Panel | undefined>();
 
   const now = new Date();
+  /**
+   * The minute, as a memo key.
+   *
+   * The projections below depend on the time, and a fresh `Date` every render
+   * would recompute them on every render — opening a panel, a keystroke that
+   * re-renders the screen, each round of a sync pull. A minute is finer than
+   * anything shown (run-out is a day, "overdue" is a feeding time).
+   */
+  const minute = Math.floor(now.getTime() / 60_000);
   const activePlans = useMemo(() => plans.filter((plan) => plan.active), [plans]);
   const liveAnimals = useMemo(
     () => animals.filter((animal) => animal.status === "active"),
@@ -156,22 +167,24 @@ export function FeedScreen({
     [animalScopes, activePlans, feeds, propertyId],
   );
 
-  // Not memoised. It depends on `now`, which is a new object every render, so
-  // a memo would recompute anyway while looking as though it did not. This is
-  // a dozen feed types over a few hundred purchases — the honest cheap thing.
-  const shed = feeds
-    .filter((feed) => feed.active)
-    .map((feed) => ({
-      feed,
-      projection: projectFeed(feed, purchases, consumption, demand.perDay, now),
-    }))
-    .sort((left, right) => {
-      // Soonest problem first: something to order today outranks a bale count
-      // that is fine for another two months.
-      const l = left.projection.orderBy?.getTime() ?? Number.POSITIVE_INFINITY;
-      const r = right.projection.orderBy?.getTime() ?? Number.POSITIVE_INFINITY;
-      return l - r;
-    });
+  // Memoised to the minute (see `minute`), so a re-render that changed none of
+  // the inputs does not walk every purchase and entry once per feed again.
+  const shed = useMemo(() => {
+    const at = new Date(minute * 60_000);
+    return feeds
+      .filter((feed) => feed.active)
+      .map((feed) => ({
+        feed,
+        projection: projectFeed(feed, purchases, consumption, demand.perDay, at),
+      }))
+      .sort((left, right) => {
+        // Soonest problem first: something to order today outranks a bale count
+        // that is fine for another two months.
+        const l = left.projection.orderBy?.getTime() ?? Number.POSITIVE_INFINITY;
+        const r = right.projection.orderBy?.getTime() ?? Number.POSITIVE_INFINITY;
+        return l - r;
+      });
+  }, [feeds, purchases, consumption, demand, minute]);
   const low = shed.filter((row) => isLow(row, now));
 
   /* ------------------------------------------------------------- today */
@@ -185,20 +198,22 @@ export function FeedScreen({
    * its `sourceKey`, which is how it is told apart from a template's chore.
    */
   const today = startOfDay(now);
-  const derived = feedingChoresFor(
-    plans,
-    feedingChoreText({ zones, feeds, propertyId }),
-    today,
-    now,
-  );
-  const feedingRows = new Set(
-    tasks.filter((task) => task.sourceKey?.startsWith("feeding:")).map((task) => task.id),
-  );
-  const feedings = choreDaySheet({ tasks, templates: [], derived }, today, now).filter(
-    (entry) =>
-      entry.id.startsWith("feeding:") ||
-      (entry.taskId !== undefined && feedingRows.has(entry.taskId)),
-  );
+  // Memoised to the minute: `tasks` is every chore the place has ever had, and
+  // this walks all of it. It used to run on every render of the screen.
+  const feedings = useMemo(() => {
+    const at = new Date(minute * 60_000);
+    const day = startOfDay(at);
+    const derived = feedingChoresFor(
+      plans,
+      feedingChoreText({ zones, feeds, propertyId }),
+      day,
+      at,
+    );
+    // Only the feeding rows go in. The sheet otherwise carries every chore
+    // still owed from any day before, to be thrown away by the filter after.
+    const feedingTasks = tasks.filter((task) => task.sourceKey?.startsWith("feeding:"));
+    return choreDaySheet({ tasks: feedingTasks, templates: [], derived }, day, at);
+  }, [plans, zones, feeds, propertyId, tasks, minute]);
   const fed = feedings.filter((entry) => entry.completedAt !== undefined).length;
 
   const tasksApi = useMutations<Task>("tasks", "tasks", taskSchema, propertyId, actorId);
@@ -474,6 +489,7 @@ export function FeedScreen({
         <PurchaseForm
           key={panel.purchase?.id ?? `new-${panel.start?.feedTypeId ?? ""}`}
           feeds={feeds}
+          contacts={contacts}
           editing={panel.purchase}
           start={panel.start}
           propertyId={propertyId}

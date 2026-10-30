@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   Button,
@@ -24,7 +24,12 @@ import {
   type Planting,
 } from "@galaxy-farm/module-garden";
 
-import { BED_TYPE_LABEL, BED_TYPE_OPTIONS } from "@/app/(admin)/admin/garden/_components/labels";
+import {
+  BED_TYPE_LABEL,
+  BED_TYPE_OPTIONS,
+  optionalNumber,
+  optionalText,
+} from "@/app/(admin)/admin/garden/_components/labels";
 import {
   AddAction,
   LandRow,
@@ -32,6 +37,7 @@ import {
   RowList,
   StatusLine,
 } from "@/app/(admin)/admin/pastures/_components/land-kit";
+import { byId } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -78,6 +84,7 @@ export function BedsPanel({
   propertyId,
   actorId,
   onPlantHere,
+  openBedId,
 }: {
   readonly beds: readonly Bed[];
   readonly zones: readonly Zone[];
@@ -87,6 +94,8 @@ export function BedsPanel({
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
   readonly onPlantHere: (bed: Bed) => void;
+  /** A bed to open for editing on arrival — the layout's rows link here. */
+  readonly openBedId?: Ulid | undefined;
 }) {
   const api = useMutations<Bed>("beds", "beds", bedSchema, propertyId, actorId);
   // Deleting a bed takes its care log with it, which is a write to another
@@ -124,7 +133,26 @@ export function BedsPanel({
           : 0,
   );
 
-  const zoneName = (id: Ulid) => zones.find((zone) => zone.id === id)?.name;
+  const zoneName = (id: Ulid) => byId(zones).get(id)?.name;
+
+  // Arriving from the layout's "Edit" on a bed: open that bed, once it has
+  // loaded. Only once per arrival, so closing the editor keeps it closed.
+  const [opened, setOpened] = useState<Ulid | undefined>();
+  useEffect(() => {
+    if (openBedId === undefined || opened === openBedId) return;
+    const bed = byId(beds).get(openBedId);
+    if (bed === undefined) return;
+    setOpened(openBedId);
+    startEdit(bed);
+    // `startEdit` is a plain function of this render; what matters is the bed.
+  }, [openBedId, opened, beds]);
+
+  /** What is growing in each bed, counted once rather than per row. */
+  const growingIn = new Map<Ulid, number>();
+  for (const planting of plantings) {
+    if (planting.status !== "growing" && planting.status !== "harvesting") continue;
+    growingIn.set(planting.bedId, (growingIn.get(planting.bedId) ?? 0) + 1);
+  }
 
   function startCreate() {
     setEditing(undefined);
@@ -158,14 +186,14 @@ export function BedsPanel({
     if (draft === undefined) return;
     setErrors({});
 
-    const number = (value: string) => (value.trim() === "" ? undefined : Number(value.trim()));
+    const number = optionalNumber;
     const fields = {
       zoneId: draft.zoneId as Ulid,
       name: draft.name.trim(),
       type: draft.type,
       lengthFt: number(draft.lengthFt),
       widthFt: number(draft.widthFt),
-      soilNotes: draft.soilNotes.trim() === "" ? undefined : draft.soilNotes.trim(),
+      soilNotes: optionalText(draft.soilNotes),
       active: draft.active,
     };
 
@@ -231,7 +259,8 @@ export function BedsPanel({
       return;
     }
 
-    for (const entry of logs) await careApi.remove(entry.id, `Bed ${bed.name} deleted`);
+    // Together: each is a local write, and none waits on another.
+    await Promise.all(logs.map((entry) => careApi.remove(entry.id, `Bed ${bed.name} deleted`)));
 
     show({
       message: `${bed.name} deleted`,
@@ -240,7 +269,7 @@ export function BedsPanel({
         onAct: () => {
           void (async () => {
             await api.restoreRecord(bed.id);
-            for (const entry of logs) await careApi.restoreRecord(entry.id);
+            await Promise.all(logs.map((entry) => careApi.restoreRecord(entry.id)));
           })();
         },
       },
@@ -252,16 +281,12 @@ export function BedsPanel({
   /** The one line: what it is, where, how big, what is in it. */
   function lineFor(bed: Bed): string {
     const area = bedAreaSqFt(bed);
-    const inIt = plantings.filter(
-      (planting) =>
-        planting.bedId === bed.id &&
-        (planting.status === "growing" || planting.status === "harvesting"),
-    );
+    const inIt = growingIn.get(bed.id) ?? 0;
     return [
       BED_TYPE_LABEL[bed.type],
       zoneName(bed.zoneId),
       area === undefined ? "no dimensions" : `${bed.lengthFt}′ × ${bed.widthFt}′ · ${area} sq ft`,
-      inIt.length === 0 ? "empty" : `${inIt.length} growing`,
+      inIt === 0 ? "empty" : `${inIt} growing`,
     ]
       .filter((part) => part !== undefined)
       .join(" · ");

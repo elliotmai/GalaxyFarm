@@ -57,12 +57,13 @@ describe("beds and crops", () => {
     expect(bedAreaSqFt({ lengthFt: 8 })).toBeUndefined();
   });
 
-  it("demands a botanical family on a crop", () => {
-    // Tomatoes and peppers are both nightshades, and a rotation checked on the
-    // crop name would happily follow one with the other.
-    const crop = { id: id(2), ...base, name: "Tomato", family: "" };
-    expect(cropSchema.safeParse(crop).success).toBe(false);
+  it("does not demand a botanical family on a crop — it is inferred from the name", () => {
+    // The family is still what rotation runs on (tomatoes and peppers are both
+    // nightshades), but nobody is asked to know it: `cropFamily` works it out.
+    const crop = { id: id(2), ...base, name: "Tomato" };
+    expect(cropSchema.safeParse(crop).success).toBe(true);
     expect(cropSchema.safeParse({ ...crop, family: "Solanaceae" }).success).toBe(true);
+    expect(cropSchema.safeParse({ ...crop, name: "" }).success).toBe(false);
   });
 
   it("accepts a variety with nothing but a name", () => {
@@ -86,6 +87,12 @@ describe("isStaleSeed", () => {
   it("accepts an empty packet, since zero is a real count", () => {
     const seed = { id: id(4), ...base, varietyId: id(3), quantity: 0, unit: "packet" as const };
     expect(seedInventorySchema.safeParse(seed).success).toBe(true);
+  });
+
+  it("accepts a packet nobody has counted", () => {
+    const seed = { id: id(4), ...base, varietyId: id(3), unit: "packet" as const };
+    expect(seedInventorySchema.safeParse(seed).success).toBe(true);
+    expect(seedInventorySchema.safeParse({ ...seed, quantity: -1 }).success).toBe(false);
   });
 });
 
@@ -197,6 +204,30 @@ describe("harvest and preservation", () => {
       preservedOn: new Date("2027-07-12"),
     };
     expect(preservationLogSchema.safeParse(jars).success).toBe(true);
+  });
+
+  it("takes amounts as optional: a picking nobody weighed, a batch eaten to nothing", () => {
+    const { quantity: _weight, ...unweighed } = harvest;
+    expect(harvestLogSchema.safeParse(unweighed).success).toBe(true);
+    expect(harvestLogSchema.safeParse({ ...harvest, quantity: 0 }).success).toBe(false);
+
+    const batch = {
+      id: id(31),
+      ...base,
+      label: "Salsa",
+      method: "canned" as const,
+      unit: "jar" as const,
+      preservedOn: new Date("2027-07-12"),
+    };
+    expect(preservationLogSchema.safeParse(batch).success).toBe(true);
+    expect(preservationLogSchema.safeParse({ ...batch, quantity: 0 }).success).toBe(true);
+    expect(preservationLogSchema.safeParse({ ...batch, quantity: -2 }).success).toBe(false);
+  });
+
+  it("counts an unweighed picking towards no total", () => {
+    const { quantity: _weight, ...unweighed } = harvest;
+    const totals = totalHarvest([harvest, { ...unweighed, id: id(23) }], id(10));
+    expect(totals.get("lb")).toBe(harvest.quantity);
   });
 
   it("refuses a care log attached to neither a bed nor a planting", () => {

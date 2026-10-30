@@ -87,13 +87,14 @@ export function SuppliesDetails({ propertyId, actorId, onSaved }: DetailsProps) 
           ? await feedApi.create({
               feedTypeId: itemId as Ulid,
               quantity: Number(quantity),
-              unitCost: fromDollars(Number(unitCost)),
+              unitCost: unitCost.trim() === "" ? undefined : fromDollars(Number(unitCost)),
               purchasedOn: atNoon(purchasedOn),
             } as never)
           : await suppliesApi.create({
               supplyItemId: itemId as Ulid,
               quantity: Number(quantity),
-              unitCost: fromDollars(Number(unitCost)),
+              // Blank is "not priced", never $0 (§5.11, migration 0038).
+              unitCost: unitCost.trim() === "" ? undefined : fromDollars(Number(unitCost)),
               vendorContactId: vendorContactId === "" ? undefined : (vendorContactId as Ulid),
               purchasedOn: atNoon(purchasedOn),
               notes: notes.trim() === "" ? undefined : notes.trim(),
@@ -166,7 +167,6 @@ export function SuppliesDetails({ propertyId, actorId, onSaved }: DetailsProps) 
           numeric
           value={unitCost}
           onChange={(event) => setUnitCost(event.target.value)}
-          required
         />
       </div>
       <TextInput

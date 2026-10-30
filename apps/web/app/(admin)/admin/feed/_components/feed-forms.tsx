@@ -10,7 +10,14 @@ import {
   useToast,
   toOptions,
 } from "@galaxy-farm/ui";
-import { displayName, fromDollars, type Animal, type Ulid, type Zone } from "@galaxy-farm/core";
+import {
+  displayName,
+  fromDollars,
+  type Animal,
+  type Contact,
+  type Ulid,
+  type Zone,
+} from "@galaxy-farm/core";
 import {
   CONSUMPTION_KINDS,
   FEED_CATEGORIES,
@@ -52,6 +59,29 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * The feeds a picker offers: the ones still bought, plus the one this record
+ * already names. "Still bought" off is the feed type's own promise — it hides
+ * the feed from the pickers — and an edit of an old purchase must not blank
+ * its feed because that feed has since been retired.
+ */
+export function pickableFeeds(
+  feeds: readonly FeedType[],
+  current: string | undefined,
+): readonly FeedType[] {
+  return feeds.filter((feed) => feed.active || feed.id === current);
+}
+
+/** Blank is "not given"; anything else is a number, however it was typed. */
+function optionalNumber(value: string): number | undefined {
+  return value.trim() === "" ? undefined : Number(value);
+}
+
+/** Blank notes are no notes, not an empty string stored forever. */
+function optionalText(value: string): string | undefined {
+  return value.trim() === "" ? undefined : value.trim();
+}
+
 function validationMessage(error: {
   kind: string;
   issues?: readonly { message: string }[];
@@ -65,6 +95,7 @@ function validationMessage(error: {
 
 export function PurchaseForm({
   feeds,
+  contacts,
   editing,
   propertyId,
   actorId,
@@ -73,6 +104,8 @@ export function PurchaseForm({
   start,
 }: Common & {
   readonly feeds: readonly FeedType[];
+  /** Who it came from — the feed store, or the neighbour with hay. */
+  readonly contacts: readonly Contact[];
   readonly editing?: FeedPurchase | undefined;
   /** Where a new purchase starts — "Restock" from a feed's row in the shed. */
   readonly start?: { readonly feedTypeId?: Ulid } | undefined;
@@ -91,11 +124,13 @@ export function PurchaseForm({
   );
   const [quantity, setQuantity] = useState(editing === undefined ? "" : String(editing.quantity));
   const [unitCost, setUnitCost] = useState(
-    editing === undefined ? "" : (editing.unitCost.cents / 100).toFixed(2),
+    editing?.unitCost === undefined ? "" : (editing.unitCost.cents / 100).toFixed(2),
   );
   const [purchasedOn, setPurchasedOn] = useState(
     editing === undefined ? today() : editing.purchasedOn.toISOString().slice(0, 10),
   );
+  const [vendorContactId, setVendorContactId] = useState<string>(editing?.vendorContactId ?? "");
+  const [notes, setNotes] = useState(editing?.notes ?? "");
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
@@ -110,11 +145,17 @@ export function PurchaseForm({
 
     setBusy(true);
     try {
+      const cost = optionalNumber(unitCost);
+      // Every optional field is named even when blank. A patch carries the
+      // fields that changed, and clearing a price has to travel as a change.
       const payload = {
         feedTypeId: feedTypeId as Ulid,
         quantity: Number(quantity),
-        unitCost: fromDollars(Number(unitCost)),
+        // Blank is "not priced yet", never $0 — see `FeedPurchase.unitCost`.
+        unitCost: cost === undefined ? undefined : fromDollars(cost),
+        vendorContactId: vendorContactId === "" ? undefined : (vendorContactId as Ulid),
         purchasedOn: new Date(`${purchasedOn}T12:00:00`),
+        notes: optionalText(notes),
       };
 
       const result =
@@ -149,7 +190,7 @@ export function PurchaseForm({
         className="sm:col-span-2"
         value={feedTypeId}
         placeholder="Choose a feed"
-        options={feeds.map((feed) => ({
+        options={pickableFeeds(feeds, editing?.feedTypeId ?? start?.feedTypeId).map((feed) => ({
           value: feed.id,
           label: `${feed.name} (${unitLabel(feed.unit)})`,
         }))}
@@ -168,13 +209,14 @@ export function PurchaseForm({
       />
       <TextInput
         label="Cost each"
+        hint="Leave blank until the bill comes."
         type="number"
         inputMode="decimal"
         step="0.01"
+        min="0"
         numeric
         value={unitCost}
         onChange={(event) => setUnitCost(event.target.value)}
-        required
       />
       <TextInput
         label="Bought"
@@ -182,6 +224,19 @@ export function PurchaseForm({
         value={purchasedOn}
         onChange={(event) => setPurchasedOn(event.target.value)}
         required
+      />
+      <Select
+        label="From"
+        value={vendorContactId}
+        placeholder="Not recorded"
+        options={contacts.map((contact) => ({ value: contact.id, label: contact.name }))}
+        onChange={(event) => setVendorContactId(event.target.value)}
+      />
+      <TextInput
+        label="Notes"
+        className="sm:col-span-2"
+        value={notes}
+        onChange={(event) => setNotes(event.target.value)}
       />
     </FormPanel>
   );
@@ -226,6 +281,7 @@ export function UseForm({
   );
   const [zoneId, setZoneId] = useState<string>(editing?.zoneId ?? "");
   const [animalId, setAnimalId] = useState<string>(editing?.animalId ?? "");
+  const [notes, setNotes] = useState(editing?.notes ?? "");
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
@@ -247,6 +303,7 @@ export function UseForm({
         usedOn: new Date(`${usedOn}T12:00:00`),
         zoneId: zoneId === "" ? undefined : (zoneId as Ulid),
         animalId: animalId === "" ? undefined : (animalId as Ulid),
+        notes: optionalText(notes),
       };
 
       const result =
@@ -287,22 +344,28 @@ export function UseForm({
         label="Feed"
         value={feedTypeId}
         placeholder="Choose a feed"
-        options={feeds.map((feed) => ({ value: feed.id, label: feed.name }))}
+        options={pickableFeeds(feeds, editing?.feedTypeId ?? start?.feedTypeId).map((feed) => ({
+          value: feed.id,
+          label: `${feed.name} (${unitLabel(feed.unit)})`,
+        }))}
         onChange={(event) => setFeedTypeId(event.target.value)}
         required
       />
       <Select
         label="Kind"
         // The one easy mistake here: a correction is a count, not a use.
-        hint="A correction is a count of the barn; the projection restarts from it."
+        hint="A correction is a count of the barn: what is there now. The projection restarts from it."
         value={kind}
         options={toOptions(CONSUMPTION_KINDS)}
         onChange={(event) => setKind(event.target.value as ConsumptionKind)}
       />
       <TextInput
         label={counting ? "On hand" : "Quantity"}
+        // Zero is a real count: the shed is empty.
+        hint={counting ? "What you counted, in the feed's own unit. 0 if it is gone." : undefined}
         type="number"
         inputMode="decimal"
+        min="0"
         numeric
         value={quantity}
         onChange={(event) => setQuantity(event.target.value)}
@@ -333,6 +396,12 @@ export function UseForm({
           .map((animal) => ({ value: animal.id, label: displayName(animal) }))}
         onChange={(event) => setAnimalId(event.target.value)}
       />
+      <TextInput
+        label="Notes"
+        className="sm:col-span-2"
+        value={notes}
+        onChange={(event) => setNotes(event.target.value)}
+      />
     </FormPanel>
   );
 }
@@ -347,7 +416,11 @@ const BLANK_TYPE = {
   reorderLeadDays: "7",
   reorderThreshold: "",
   active: true,
+  notes: "",
 };
+
+/** What a blank lead time means: a week, the commonest answer at a feed store. */
+const DEFAULT_LEAD_DAYS = 7;
 
 export function TypeForm({
   editing,
@@ -372,6 +445,7 @@ export function TypeForm({
           reorderThreshold:
             editing.reorderThreshold === undefined ? "" : String(editing.reorderThreshold),
           active: editing.active,
+          notes: editing.notes ?? "",
         },
   );
   const [error, setError] = useState<string | undefined>();
@@ -387,12 +461,11 @@ export function TypeForm({
         name: draft.name.trim(),
         category: draft.category,
         unit: draft.unit,
-        estWeightLbPerUnit:
-          draft.estWeightLbPerUnit === "" ? undefined : Number(draft.estWeightLbPerUnit),
-        reorderLeadDays: Number(draft.reorderLeadDays),
-        reorderThreshold:
-          draft.reorderThreshold === "" ? undefined : Number(draft.reorderThreshold),
+        estWeightLbPerUnit: optionalNumber(draft.estWeightLbPerUnit),
+        reorderLeadDays: optionalNumber(draft.reorderLeadDays) ?? DEFAULT_LEAD_DAYS,
+        reorderThreshold: optionalNumber(draft.reorderThreshold),
         active: draft.active,
+        notes: optionalText(draft.notes),
       };
 
       const result =
@@ -452,13 +525,13 @@ export function TypeForm({
       />
       <TextInput
         label="Reorder lead (days)"
-        hint="How long the supplier takes."
+        hint="How long the supplier takes. Blank is a week."
         type="number"
         inputMode="numeric"
+        min="0"
         numeric
         value={draft.reorderLeadDays}
         onChange={(event) => setDraft({ ...draft, reorderLeadDays: event.target.value })}
-        required
       />
       <TextInput
         label="Reorder threshold"
@@ -474,6 +547,12 @@ export function TypeForm({
         hint="Off hides it from the pickers and keeps every record that names it."
         checked={draft.active}
         onChange={(event) => setDraft({ ...draft, active: event.target.checked })}
+      />
+      <TextInput
+        label="Notes"
+        className="sm:col-span-2"
+        value={draft.notes}
+        onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
       />
     </FormPanel>
   );

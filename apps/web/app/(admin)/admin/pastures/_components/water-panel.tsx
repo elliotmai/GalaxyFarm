@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   Button,
@@ -126,9 +126,25 @@ export function WaterPanel({
   const [editing, setEditing] = useState<WaterSource | undefined>();
   const [draft, setDraft] = useState<Draft | undefined>();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  /** A save in flight: a second tap on Add tank must not add a second tank. */
+  const [busy, setBusy] = useState(false);
 
-  const servedBy = (source: WaterSource) =>
-    zones.filter((zone) => zone.waterSourceIds.includes(source.id));
+  /**
+   * Which zones drink from each tank, worked out once per change of the zones
+   * rather than by a scan of every zone for every row, chip and status line.
+   */
+  const drinkersByTank = useMemo(() => {
+    const byTank = new Map<Ulid, Zone[]>();
+    for (const zone of zones) {
+      for (const id of zone.waterSourceIds) {
+        const list = byTank.get(id);
+        if (list === undefined) byTank.set(id, [zone]);
+        else list.push(zone);
+      }
+    }
+    return byTank;
+  }, [zones]);
+  const servedBy = (source: WaterSource): readonly Zone[] => drinkersByTank.get(source.id) ?? [];
 
   /** What §6 will raise a chore for tonight, and which of those have no heater. */
   const targets = freezeCheckTargets(
@@ -166,7 +182,7 @@ export function WaterPanel({
   }
 
   async function save() {
-    if (draft === undefined) return;
+    if (draft === undefined || busy) return;
 
     const fields = {
       name: draft.name.trim(),
@@ -174,13 +190,15 @@ export function WaterPanel({
       hasHeater: draft.hasHeater,
       cover: draft.cover,
       active: draft.active,
-      ...(draft.notes.trim() === "" ? {} : { notes: draft.notes.trim() }),
+      // Explicitly undefined when emptied: an edit's patch that never
+      // mentioned the notes would leave the old ones standing.
+      notes: draft.notes.trim() === "" ? undefined : draft.notes.trim(),
     };
 
-    const result =
-      editing === undefined
-        ? await mutations.create(fields)
-        : await mutations.update(editing.id, fields);
+    setBusy(true);
+    const result = await (
+      editing === undefined ? mutations.create(fields) : mutations.update(editing.id, fields)
+    ).finally(() => setBusy(false));
 
     if (!result.ok) {
       // §4.5 clause 2: per field, so nobody has to guess which input the
@@ -278,12 +296,17 @@ export function WaterPanel({
       return;
     }
 
-    // Take it off the zones, so nothing is left pointing at a tombstone.
-    for (const zone of drinkers) {
-      await zoneMutations.update(zone.id, {
-        waterSourceIds: zone.waterSourceIds.filter((id) => id !== source.id),
-      });
-    }
+    // Take it off the zones, so nothing is left pointing at a tombstone. Side
+    // by side rather than one after another: each is its own record and its
+    // own patch, and a tank serving six zones should not cost six round trips
+    // to the device store before the toast can say it is done.
+    await Promise.all(
+      drinkers.map((zone) =>
+        zoneMutations.update(zone.id, {
+          waterSourceIds: zone.waterSourceIds.filter((id) => id !== source.id),
+        }),
+      ),
+    );
 
     show({
       message: `${source.name} deleted`,
@@ -295,9 +318,11 @@ export function WaterPanel({
         onAct: () => {
           void (async () => {
             await mutations.restoreRecord(source.id);
-            for (const zone of drinkers) {
-              await zoneMutations.update(zone.id, { waterSourceIds: zone.waterSourceIds });
-            }
+            await Promise.all(
+              drinkers.map((zone) =>
+                zoneMutations.update(zone.id, { waterSourceIds: zone.waterSourceIds }),
+              ),
+            );
           })();
         },
       },
@@ -460,7 +485,7 @@ export function WaterPanel({
           onClose={() => setDraft(undefined)}
           footer={
             <>
-              <Button variant="primary" onClick={() => void save()}>
+              <Button variant="primary" busy={busy} onClick={() => void save()}>
                 {editing === undefined ? "Add tank" : "Save changes"}
               </Button>
               <Button onClick={() => setDraft(undefined)}>Cancel</Button>

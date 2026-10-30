@@ -304,7 +304,9 @@ export function CattleCandidatesScreen({
                   // actually made on, and what the list is sorted by.
                   line={[
                     `${formatMoney(totalAcquisitionCost(candidate))} all in`,
-                    `${formatMoney(candidate.askingPrice)} asking`,
+                    candidate.askingPrice === undefined
+                      ? "no price yet"
+                      : `${formatMoney(candidate.askingPrice)} asking`,
                     candidate.status.replace(/_/g, " "),
                     candidate.location,
                   ]}
@@ -370,7 +372,13 @@ export function CattleCandidatesScreen({
           <DetailList
             items={[
               { label: "All in", value: formatMoney(totalAcquisitionCost(opened)) },
-              { label: "Asking", value: formatMoney(opened.askingPrice) },
+              {
+                label: "Asking",
+                value:
+                  opened.askingPrice === undefined
+                    ? "No price yet"
+                    : formatMoney(opened.askingPrice),
+              },
               ...opened.additionalCosts.map((cost) => ({
                 label: cost.label,
                 value: formatMoney(cost.amount),

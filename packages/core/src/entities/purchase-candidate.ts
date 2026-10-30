@@ -53,7 +53,15 @@ export interface PurchaseCandidate extends BaseRecord, PlannedRecord {
   readonly roadmapItemId?: Ulid | undefined;
   readonly title: string;
   readonly status: CandidateStatus;
-  readonly askingPrice: Money;
+  /**
+   * What the seller wants, once they have said.
+   *
+   * Optional because a candidate is often written down before there is a
+   * number — "price on request", a sale-barn lot, a neighbour who has not
+   * decided. Absent is not zero: an unpriced candidate is not the cheapest
+   * one, and every screen says "no price yet" rather than "$0".
+   */
+  readonly askingPrice?: Money | undefined;
   /** Hauling, inspection, immediate repairs, commission. */
   readonly additionalCosts: readonly AdditionalCost[];
   readonly listingUrl?: string | undefined;
@@ -83,7 +91,7 @@ export const purchaseCandidateSchema = baseRecordSchema.extend({
   roadmapItemId: ulidSchema.optional(),
   title: z.string().min(1, "A candidate needs a title").max(160),
   status: z.enum(CANDIDATE_STATUSES),
-  askingPrice: moneySchema,
+  askingPrice: moneySchema.optional(),
   additionalCosts: z.array(additionalCostSchema),
   listingUrl: z.string().url("That does not look like a link").optional(),
   sellerId: ulidSchema.optional(),
@@ -113,9 +121,20 @@ export function totalAcquisitionCost(
   candidate: Pick<PurchaseCandidate, "askingPrice" | "additionalCosts">,
 ): Money {
   return addMoney(
-    candidate.askingPrice,
+    candidate.askingPrice ?? money(0),
     sumMoney(candidate.additionalCosts.map((cost) => cost.amount)),
   );
+}
+
+/**
+ * Whether there is an asking price to add the costs to.
+ *
+ * Without one, `totalAcquisitionCost` is only the costs on top — a real sum,
+ * but not an all-in figure — so a screen that ranks or compares on it asks
+ * this first and says "no price yet" instead.
+ */
+export function isPriced(candidate: Pick<PurchaseCandidate, "askingPrice">): boolean {
+  return candidate.askingPrice !== undefined;
 }
 
 export interface BudgetComparison {

@@ -357,7 +357,7 @@ export function ServiceForm({
         ruleId: ruleId === "" ? undefined : (ruleId as Ulid),
         task: task.trim(),
         performedOn: atNoon(performedOn),
-        cost: cost === "" ? undefined : fromDollars(Number(cost)),
+        cost: cost.trim() === "" ? undefined : fromDollars(Number(cost)),
         parts: parts.trim() === "" ? undefined : parts.trim(),
         hours: atHours === "" ? undefined : Number(atHours),
         miles: atMiles === "" ? undefined : Number(atMiles),
@@ -478,7 +478,7 @@ export function FuelForm({
 
   const [gallons, setGallons] = useState(editing === undefined ? "" : String(editing.gallons));
   const [cost, setCost] = useState(
-    editing === undefined ? "" : (editing.cost.cents / 100).toFixed(2),
+    editing?.cost === undefined ? "" : (editing.cost.cents / 100).toFixed(2),
   );
   const [filledOn, setFilledOn] = useState(
     editing === undefined ? today() : editing.filledOn.toISOString().slice(0, 10),
@@ -500,7 +500,8 @@ export function FuelForm({
       const payload = {
         equipmentId: machine.id,
         gallons: Number(gallons),
-        cost: fromDollars(Number(cost)),
+        // Blank is "no receipt" — bulk-tank diesel — not a free tank.
+        cost: cost.trim() === "" ? undefined : fromDollars(Number(cost)),
         filledOn: atNoon(filledOn),
         hours: atHours === "" ? undefined : Number(atHours),
         miles: atMiles === "" ? undefined : Number(atMiles),
@@ -548,13 +549,14 @@ export function FuelForm({
       />
       <TextInput
         label="Cost ($)"
+        hint="Blank for the farm tank."
         type="number"
         inputMode="decimal"
         step="0.01"
+        min="0"
         numeric
         value={cost}
         onChange={(event) => setCost(event.target.value)}
-        required
       />
       <TextInput
         label="Filled"
