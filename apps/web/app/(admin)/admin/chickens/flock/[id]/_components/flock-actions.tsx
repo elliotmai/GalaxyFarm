@@ -127,7 +127,9 @@ function PhotoTile({
         id={id}
         type="file"
         accept="image/*"
-        capture="environment"
+        // No `capture`: it forces the camera, and a phone then never offers
+        // its photo library — a picture already taken could not be added.
+        // Without it the phone asks "Take Photo or Choose from Library".
         multiple
         aria-label="Photo"
         aria-busy={intake.busy}

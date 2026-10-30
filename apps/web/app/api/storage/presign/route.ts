@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import type { Actor } from "@galaxy-farm/core";
 import {
   keyBelongsToProperty,
   presignDownloadSchema,
@@ -10,16 +9,19 @@ import {
 } from "@galaxy-farm/core";
 
 import { currentActor } from "@/lib/auth";
+import { storageWriter } from "@/lib/storage-writer";
 import { fileStorage, storageConfig } from "@/lib/storage";
 
 /**
  * /api/storage/presign — an address to PUT a photo to, and one to read it back
  * from (spec §4.2, §4.5).
  *
- * Presigned URLs rather than bytes through the app: §4.2 has photos
- * "compressed client-side, queued, uploaded to R2 via presigned URLs", and a
- * phone in a barn uploading through a serverless function would pay for the
- * round trip twice — once on the way up and once on the way across.
+ * The upload address points at this app's own relay rather than at the
+ * bucket (decision 43, amending §4.2's presigned PUT): a photo is compressed
+ * to about 300 KB on the device first, so paying for the trip twice costs
+ * little, and it removes the bucket CORS rule that every origin would
+ * otherwise need. Reads are still signed bucket URLs, which an `<img>` loads
+ * without CORS.
  *
  * **The key is derived here, never accepted.** The body names the record the
  * photo belongs to; the property comes from the session, and the two are put
@@ -36,6 +38,13 @@ import { fileStorage, storageConfig } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
+/** Where the device sends the bytes: the relay, on whatever host it asked. */
+function relayUrl(request: Request, key: string): string {
+  const url = new URL("/api/storage/upload", request.url);
+  url.searchParams.set("key", key);
+  return url.toString();
+}
+
 /**
  * Storage is not configured.
  *
@@ -50,29 +59,8 @@ function unconfigured(reason: string): NextResponse {
   return NextResponse.json({ error: reason, kind: "storage-unconfigured" }, { status: 503 });
 }
 
-/**
- * Photos are ordinary records, so writing one needs an account that writes.
- *
- * Returns either the actor or the refusal to send back, rather than throwing:
- * a route handler reads better when the unhappy path is a value it returns
- * than when it is an exception something further out has to recognise.
- */
-async function writer(): Promise<Actor | NextResponse> {
-  const actor = await currentActor();
-  if (actor === undefined) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-
-  // §4.3: a kiosk's writes are three whitelisted actions through dedicated
-  // server actions, and taking photographs is not one of them. A housesitter
-  // reads the guide and ticks off chores.
-  if (actor.role !== "owner" && actor.role !== "member") {
-    return NextResponse.json({ error: "Not permitted to upload" }, { status: 403 });
-  }
-
-  return actor;
-}
-
 export async function POST(request: Request) {
-  const caller = await writer();
+  const caller = await storageWriter();
   if (caller instanceof NextResponse) return caller;
 
   let body: unknown;
@@ -108,8 +96,14 @@ export async function POST(request: Request) {
     bytes: parsed.value.bytes,
   });
 
+  // The address handed back is this app's own upload route, not the bucket's
+  // signed URL. A browser PUT straight to R2 needs a CORS rule on the bucket
+  // for every origin the app is served from — the farm's domain, each deploy
+  // preview, a laptop — and without one every photo sat queued on the phone
+  // forever. The route relays the bytes server to server, where CORS does not
+  // apply; see `/api/storage/upload`.
   return NextResponse.json({
-    url: upload.url,
+    url: relayUrl(request, upload.key),
     method: upload.method,
     headers: upload.headers,
     expiresAt: upload.expiresAt.toISOString(),

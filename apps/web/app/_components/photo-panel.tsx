@@ -240,11 +240,6 @@ export function PhotoQuickCapture({
   const intake = useAttachPhotos({ propertyId, actorId, ownerEntity, ownerId });
 
   return (
-    <PhotoCapture
-      onPick={(files) => void intake.attach(files)}
-      busy={intake.busy}
-      camera
-      label={label}
-    />
+    <PhotoCapture onPick={(files) => void intake.attach(files)} busy={intake.busy} label={label} />
   );
 }

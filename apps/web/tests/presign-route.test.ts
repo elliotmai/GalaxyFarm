@@ -139,6 +139,19 @@ describe("the key it signs for", () => {
     expect(answer.key).toBe(bucket.signed[0]?.key);
     expect(answer.method).toBe("PUT");
   });
+
+  it("points the device at the app's own relay, never at the bucket", async () => {
+    // A browser PUT straight to R2 needs a bucket CORS rule for every origin;
+    // the relay forwards server to server, where CORS does not apply.
+    const response = await post(body);
+    const answer = (await response.json()) as { url: string };
+    const url = new URL(answer.url);
+
+    expect(url.origin).toBe("https://farm.example");
+    expect(url.pathname).toBe("/api/storage/upload");
+    expect(url.searchParams.get("key")).toBe(bucket.signed[0]?.key);
+    expect(answer.url).not.toContain("bucket.example");
+  });
 });
 
 describe("what it refuses to sign", () => {
