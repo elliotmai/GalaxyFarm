@@ -49,6 +49,8 @@ export interface CattleCandidateDetail {
   /** The sale's name, which is the seller on an online sale. */
   readonly saleName?: string | undefined;
   readonly dobText?: string | undefined;
+  /** The breed as the listing words it, e.g. "1/2 Simmental". */
+  readonly breedText?: string | undefined;
   /** The parents as the listing names them, shown when they do not match anything in the catalog. */
   readonly sireName?: string | undefined;
   readonly damName?: string | undefined;
@@ -77,6 +79,7 @@ export const cattleCandidateSchema = z
     videoUrl: z.string().url().max(500).optional(),
     saleName: z.string().max(160).optional(),
     dobText: z.string().max(60).optional(),
+    breedText: z.string().max(80).optional(),
     sireName: z.string().max(120).optional(),
     damName: z.string().max(120).optional(),
   })

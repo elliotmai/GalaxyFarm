@@ -192,6 +192,7 @@ describe("candidateFromListing", () => {
       sire: { kind: "external", id: SIRE_ID },
       dam: undefined,
       dobText: "January 2026",
+      breedText: "Purebred Simmental",
     });
   });
 

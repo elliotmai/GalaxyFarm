@@ -224,6 +224,7 @@ export function candidateFromListing(input: SaleListingInput): ListedCandidate {
       pictureUrl: lot.pictureUrl,
       videoUrl: lot.videoUrl,
       dobText: fields["DOB"],
+      breedText: breed,
     },
   };
 }
