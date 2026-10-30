@@ -25,3 +25,7 @@ packages/infrastructure/db/migrations/
 # blob a few hundred kilobytes long — there is nothing in here for Prettier to
 # make more readable, and wrapping it would only make the diffs enormous.
 tools/webfonts.css
+
+# Saved animal pages, copied out of a browser as they were printed. Reformatting
+# them would stop them matching the page a parser was written against.
+packages/modules/cattle/tests/fixtures/*.html
