@@ -7,7 +7,8 @@ Usage:
 The saved watch list page lists each lot with its sale ID and lot ID. The lot
 pages themselves render as skeletons and fill in from the same JSON listing the
 page loads (/Lots/Index/<saleId>), so this script reads that listing once per
-sale and matches each watch item to its lot. The listing is public; the watch
+sale and matches each watch item to its lot. Sale-level details (date, end time,
+location, seller, welcome statement) come from each sale's listing page. The listing is public; the watch
 list page itself needs the logged-in session, which is why the input is saved HTML.
 
 Standard library only.
@@ -104,6 +105,32 @@ def fetch_json(base, path):
             time.sleep(2 ** attempt)
 
 
+def fetch_text(base, path):
+    request = urllib.request.Request(base + path, headers={"User-Agent": USER_AGENT})
+    for attempt in range(1, ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return response.read().decode("utf-8", errors="replace")
+        except (urllib.error.URLError, TimeoutError):
+            if attempt == ATTEMPTS:
+                raise
+            time.sleep(2 ** attempt)
+
+
+def parse_sale_info(page):
+    """Read the sale header block (title, date, end time, location, contacts, welcome text)."""
+    info = {}
+    title = re.search(r'<div id="sale-details">\s*<h1[^>]*>(.*?)</h1>', page, re.S)
+    date = re.search(r'<div id="sale-details">\s*<h1[^>]*>.*?</h1>\s*<h3[^>]*>(.*?)</h3>', page, re.S)
+    info["title"] = to_text(title.group(1)) if title else None
+    info["date"] = to_text(date.group(1)) if date else None
+    for label, value in re.findall(r"<h4[^>]*>\s*<span>([^<]*)</span>(.*?)</h4>", page, re.S):
+        info[label.strip().rstrip(":").strip().lower().replace(" ", "_")] = to_text(value)
+    welcome = re.search(r'id="welcome-statement".*?ckeditor-content[^"]*">(.*?)</section>', page, re.S)
+    info["welcome_statement"] = to_text(welcome.group(1)) if welcome else None
+    return info
+
+
 def build_record(item, lot, base):
     details, extras = parse_item_details(lot.get("ItemDetails") or [])
     return {
@@ -128,9 +155,24 @@ def format_money(value):
     return f"${value:,.2f}" if isinstance(value, (int, float)) else "-"
 
 
+def print_sale(sale_id, sale):
+    if "error" in sale:
+        print(f"=== Sale {sale_id}: sale page unavailable ({sale['error']})")
+        return
+    print(f"=== {sale['title']} (sale {sale_id})")
+    print(f"    {sale.get('date', '-')} | Ends: {sale.get('sale_end_time', '-')}")
+    print(f"    Location: {sale.get('location', '-')}")
+    print(f"    Seller: {sale.get('seller', '-')} | Sale rep: {sale.get('sale_rep', '-')}")
+
+
 def print_summary(records):
+    last_sale = None
     for record in records:
-        head = f"Lot {record['lot_number']}: {record['lot_name']} (sale {record['sale_id']})"
+        if record["sale_id"] != last_sale:
+            print_sale(record["sale_id"], record["sale"])
+            print()
+            last_sale = record["sale_id"]
+        head = f"Lot {record['lot_number']}: {record['lot_name']}"
         if record["error"]:
             print(f"{head}\n    ERROR: {record['error']}")
             continue
@@ -173,12 +215,23 @@ def main():
             print(f"Sale {sale_id}: could not load listing ({exc})", file=sys.stderr)
         time.sleep(REQUEST_DELAY_SECONDS)
 
+    sales = {}
+    for sale_id in sorted({item["sale_id"] for item in items}):
+        try:
+            sales[sale_id] = parse_sale_info(fetch_text(args.base, f"/Bids/AuctionsListing/{sale_id}"))
+        except (urllib.error.URLError, TimeoutError) as exc:
+            sales[sale_id] = {"error": str(exc)}
+            print(f"Sale {sale_id}: could not load sale page ({exc})", file=sys.stderr)
+        time.sleep(REQUEST_DELAY_SECONDS)
+
     for item in sorted(items, key=lambda i: (i["sale_id"], i["lot_number"] or "")):
         lot = listings[item["sale_id"]].get(item["lot_id"])
         if lot is None:
-            records.append({**item, "lot_url": None, "error": "lot not in public listing for this sale"})
+            record = {**item, "lot_url": None, "error": "lot not in public listing for this sale"}
         else:
-            records.append(build_record(item, lot, args.base))
+            record = build_record(item, lot, args.base)
+        record["sale"] = sales[item["sale_id"]]
+        records.append(record)
 
     print_summary(records)
     failed = sum(1 for record in records if record["error"])
