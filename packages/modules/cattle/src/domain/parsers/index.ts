@@ -1,5 +1,6 @@
 import { parseAngusPage, parseAngusUrl } from "./angus.js";
 import { parseDigitalBeefPage, parseDigitalBeefUrl } from "./digital-beef.js";
+import { parseSimmentalPage, parseSimmentalUrl } from "./simmental.js";
 import type { ImportedAnimal } from "./page.js";
 
 export * from "./angus.js";
@@ -9,6 +10,7 @@ export * from "./digital-beef-breed.js";
 export * from "./maine-anjou.js";
 export * from "./page.js";
 export * from "./shorthorn.js";
+export * from "./simmental.js";
 
 /**
  * One door onto every association this app can read (spec §5.2).
@@ -39,6 +41,9 @@ export function parseAnimalUrl(
     };
   }
 
+  const simmental = parseSimmentalUrl(input);
+  if (simmental.ok) return { ok: true, ref: simmental.ref };
+
   const digitalBeef = parseDigitalBeefUrl(input);
   if (digitalBeef.ok) return { ok: true, ref: digitalBeef.ref };
 
@@ -50,7 +55,11 @@ export function parseAnimalUrl(
 
 /** Read a page with whichever parser its association calls for. */
 export function parseAnimalPage(html: string, ref: PageRef): ImportedAnimal {
-  return ref.association === "Angus"
-    ? parseAngusPage(html, { registration: ref.registration, url: ref.url })
-    : parseDigitalBeefPage(html, ref as never);
+  if (ref.association === "Angus") {
+    return parseAngusPage(html, { registration: ref.registration, url: ref.url });
+  }
+  if (ref.association === "Simmental") {
+    return parseSimmentalPage(html, { registration: ref.registration, url: ref.url });
+  }
+  return parseDigitalBeefPage(html, ref as never);
 }
