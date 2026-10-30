@@ -43,6 +43,15 @@ export interface CattleCandidateDetail {
   readonly saleType: CattleSaleType;
   readonly lotNumber?: string | undefined;
   readonly saleDate?: Date | undefined;
+  /** What the listing prints, kept as the seller wrote it so it survives the sale page going. */
+  readonly pictureUrl?: string | undefined;
+  readonly videoUrl?: string | undefined;
+  /** The sale's name, which is the seller on an online sale. */
+  readonly saleName?: string | undefined;
+  readonly dobText?: string | undefined;
+  /** The parents as the listing names them, shown when they do not match anything in the catalog. */
+  readonly sireName?: string | undefined;
+  readonly damName?: string | undefined;
 }
 
 export const cattleCandidateSchema = z
@@ -64,6 +73,12 @@ export const cattleCandidateSchema = z
     saleType: z.enum(CATTLE_SALE_TYPES),
     lotNumber: z.string().max(40).optional(),
     saleDate: z.coerce.date().optional(),
+    pictureUrl: z.string().url().max(500).optional(),
+    videoUrl: z.string().url().max(500).optional(),
+    saleName: z.string().max(160).optional(),
+    dobText: z.string().max(60).optional(),
+    sireName: z.string().max(120).optional(),
+    damName: z.string().max(120).optional(),
   })
   .refine((detail) => !detail.unpapered || detail.regNumber === undefined, {
     // Both at once means somebody ticked the box and then typed a number, and

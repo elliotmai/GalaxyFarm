@@ -42,6 +42,7 @@ export * from "./domain/registration-rules.js";
 export * from "./domain/registries.js";
 export * from "./domain/risks.js";
 export * from "./domain/profit-and-loss.js";
+export * from "./domain/sale-listing.js";
 export * from "./domain/sale-watch.js";
 export * from "./domain/semen-inventory.js";
 export * from "./domain/sync-protocol.js";
