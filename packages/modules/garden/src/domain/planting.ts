@@ -96,7 +96,8 @@ export const gardenCareLogSchema = baseRecordSchema
 export interface HarvestLog extends BaseRecord {
   readonly plantingId: Ulid;
   readonly harvestedOn: Date;
-  readonly quantity: number;
+  /** Optional: a picking nobody weighed is still a picking, and the date is the point. */
+  readonly quantity?: number | undefined;
   readonly unit: "lb" | "oz" | "each" | "bunch" | "quart";
   readonly notes?: string | undefined;
 }
@@ -104,7 +105,7 @@ export interface HarvestLog extends BaseRecord {
 export const harvestLogSchema = baseRecordSchema.extend({
   plantingId: ulidSchema,
   harvestedOn: z.coerce.date(),
-  quantity: z.number().positive(),
+  quantity: z.number().positive().optional(),
   unit: z.enum(["lb", "oz", "each", "bunch", "quart"]),
   notes: z.string().max(1000).optional(),
 }) as unknown as z.ZodType<HarvestLog>;
@@ -116,7 +117,11 @@ export interface PreservationLog extends BaseRecord {
   readonly harvestLogId?: Ulid | undefined;
   readonly label: string;
   readonly method: PreservationMethod;
-  readonly quantity: number;
+  /**
+   * Optional, and may reach zero: the count is edited down as jars are eaten,
+   * and a batch eaten to nothing is still a batch that was made.
+   */
+  readonly quantity?: number | undefined;
   readonly unit: "jar" | "quart" | "pint" | "bag" | "lb";
   readonly preservedOn: Date;
   readonly storageLocation?: string | undefined;
@@ -127,7 +132,7 @@ export const preservationLogSchema = baseRecordSchema.extend({
   harvestLogId: ulidSchema.optional(),
   label: z.string().min(1, "Label the jar").max(120),
   method: z.enum(PRESERVATION_METHODS),
-  quantity: z.number().positive(),
+  quantity: z.number().min(0).optional(),
   unit: z.enum(["jar", "quart", "pint", "bag", "lb"]),
   preservedOn: z.coerce.date(),
   storageLocation: z.string().max(160).optional(),
@@ -189,7 +194,11 @@ export function rotationWarning(
   return { bedId, family, lastPlantedOn: previous.plantedOn, yearsSince };
 }
 
-/** Everything harvested from one planting, which is the yield picture. */
+/**
+ * Everything harvested from one planting, which is the yield picture.
+ *
+ * A picking with no amount counts towards nothing: it says when, not how much.
+ */
 export function totalHarvest(
   logs: readonly HarvestLog[],
   plantingId: Ulid,
@@ -197,7 +206,7 @@ export function totalHarvest(
   const totals = new Map<HarvestLog["unit"], number>();
 
   for (const log of logs) {
-    if (log.plantingId !== plantingId) continue;
+    if (log.plantingId !== plantingId || log.quantity === undefined) continue;
     totals.set(log.unit, (totals.get(log.unit) ?? 0) + log.quantity);
   }
 

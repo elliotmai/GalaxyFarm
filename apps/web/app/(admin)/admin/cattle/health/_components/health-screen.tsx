@@ -2,25 +2,20 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import {
   Button,
-  Card,
-  CardGrid,
-  DataTable,
   EmptyState,
+  Modal,
   PageBody,
-  PageHeader,
   Pill,
-  RecordCard,
   Section,
   Select,
   TextInput,
-  Tile,
   useConfirmDelete,
   useToast,
-  type Column,
+  toOptions,
 } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -39,6 +34,16 @@ import {
   type MedInventory,
 } from "@galaxy-farm/module-cattle";
 
+import {
+  AddFab,
+  Chip,
+  ChipRow,
+  facts,
+  FilteredLine,
+  Row,
+  Rows,
+  ScreenHeader,
+} from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
 import { animalHref } from "@/lib/animal-slug";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
@@ -101,9 +106,14 @@ export function HealthScreen({
   const records = records_;
 
   // #17: logging a treatment is two taps from the animal. Her page links here
-  // with `?animal=`, and the form opens with her already chosen.
+  // with `?animal=`, and the panel opens with her already chosen — so the
+  // second tap is Record.
   const prefilledAnimal = useSearchParams().get("animal") ?? "";
-  const [editing, setEditing] = useState<HealthRecord | undefined>();
+  /** The panel: closed, recording a new one, or editing one. */
+  const [panel, setPanel] = useState<"closed" | "new" | HealthRecord>(
+    prefilledAnimal === "" ? "closed" : "new",
+  );
+  const [filter, setFilter] = useState<Filter>("all");
 
   // Every cow with an unexpired withdrawal, from the domain rather than from a
   // filter written here — the same function the sale screen will ask.
@@ -144,193 +154,217 @@ export function HealthScreen({
     show({ message: "Health record deleted", tone: "danger" });
   }
 
-  const columns: readonly Column<HealthRecord>[] = [
-    {
-      key: "animal",
-      header: "Animal",
-      primary: true,
-      render: (record) => {
-        const animal = byId.get(record.animalId);
-        return animal === undefined ? (
-          <span className="text-muted">Unknown</span>
-        ) : (
-          <Link
-            href={animalHref(animal)}
-            className="font-medium text-ink underline decoration-edge underline-offset-4 hover:decoration-action"
-          >
-            {displayName(animal)}
-          </Link>
-        );
-      },
-    },
-    { key: "type", header: "Type", render: (record) => record.type },
-    { key: "date", header: "Date", render: (record) => formatDate(record.date) },
-    { key: "product", header: "Product", render: (record) => record.product ?? "—" },
-    {
-      key: "withdrawal",
-      header: "Withdrawal",
-      render: (record) => {
-        const ends = withdrawalEndDate(record);
-        if (ends === undefined) return <span className="text-muted">None</span>;
-        return isUnderWithdrawal(record, now) ? (
-          <Pill tone="danger" dot>
-            until {formatDate(ends)}
-          </Pill>
-        ) : (
-          <Pill tone="calm">cleared {formatDate(ends)}</Pill>
-        );
-      },
-    },
-    { key: "by", header: "By", render: (record) => record.administeredBy ?? "—" },
-    {
-      key: "actions",
-      header: "",
-      render: (record) => (
-        <span className="flex gap-2">
-          <Button variant="ghost" onClick={() => setEditing(record)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void remove(record)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
+  const sorted = [...records].sort((a, b) => b.date.getTime() - a.date.getTime());
+  const shown = sorted.filter((record) => FILTERS[filter].keep(record, now));
+  const nameOf = (id: Ulid) => {
+    const animal = byId.get(id);
+    return animal === undefined ? "Unknown animal" : displayName(animal);
+  };
+
+  const add = (
+    <Button variant="primary" aria-haspopup="dialog" onClick={() => setPanel("new")}>
+      <span aria-hidden="true">+</span> Record treatment
+    </Button>
+  );
 
   return (
+    // Bottom clearance on a phone, so the floating button never covers a row.
     <PageBody>
-      <PageHeader
-        eyebrow="Cattle"
-        title="Health"
-        subtitle="Treatments, and the withdrawal clock they start. The clearance date is computed from the treatment, so correcting one moves the other."
-      />
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile label="Treatments" value={records.length} />
-        <Tile
-          label="Under withdrawal"
-          value={held.length}
-          tone={held.length > 0 ? "danger" : "calm"}
-          emphasis={held.length > 0}
-          hint={held.length > 0 ? "Not clear for sale" : "All clear"}
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <ScreenHeader
+          title="Health"
+          facts={facts(
+            `${records.length} treatment${records.length === 1 ? "" : "s"}`,
+            held.length > 0 && `${held.length} under withdrawal`,
+            boosters.length > 0 &&
+              `${boosters.length} booster${boosters.length === 1 ? "" : "s"} due`,
+          )}
+          action={<span className="hidden sm:block">{add}</span>}
         />
-        <Tile label="Boosters due" value={boosters.length} tone="action" hint="Within 30 days" />
-        <Tile label="In the fridge" value={meds.length} tone="identity" />
-      </div>
 
-      {held.length === 0 ? null : (
-        <Section
-          title="Not clear for sale"
-          description="These animals are inside a withdrawal period. Nothing here is a suggestion."
-        >
-          <CardGrid columns={3}>
-            {held.map((status) => {
-              const animal = byId.get(status.animalId);
+        {/*
+          The exceptions, and only when there are some. A withdrawal is the
+          one derived value here with a legal edge on it, so the animals under
+          one are listed by name above everything else — and a day with none
+          says so in one quiet line rather than a green box.
+        */}
+        {held.length === 0 && boosters.length === 0 ? (
+          loading || records.length === 0 ? null : (
+            <p className="text-sm text-calm">
+              Nobody under withdrawal. No boosters due in 30 days.
+            </p>
+          )
+        ) : null}
 
-              return (
-                <RecordCard
-                  key={status.animalId}
-                  tone="danger"
-                  title={
-                    animal === undefined ? (
-                      "Unknown animal"
-                    ) : (
-                      <Link
-                        href={animalHref(animal)}
-                        className="underline decoration-edge underline-offset-4 hover:decoration-action"
-                      >
-                        {displayName(animal)}
-                      </Link>
-                    )
-                  }
-                  subtitle={status.product}
-                  actions={
-                    <Pill tone="danger" dot>
-                      {status.daysRemaining} d
-                    </Pill>
-                  }
-                  meta={<Pill>clears {formatDate(status.clearsOn)}</Pill>}
-                />
-              );
-            })}
-          </CardGrid>
-        </Section>
-      )}
+        {held.length === 0 ? null : (
+          <Section title="Not clear for sale">
+            <Rows label="Under withdrawal">
+              {held.map((status) => {
+                const animal = byId.get(status.animalId);
+                return (
+                  <Row
+                    key={status.animalId}
+                    title={nameOf(status.animalId)}
+                    href={animal === undefined ? undefined : animalHref(animal)}
+                    line={facts(status.product, `clears ${formatDate(status.clearsOn)}`)}
+                    chip={
+                      <Pill tone="danger" dot>
+                        {status.daysRemaining} d
+                      </Pill>
+                    }
+                  />
+                );
+              })}
+            </Rows>
+          </Section>
+        )}
 
-      {boosters.length === 0 ? null : (
-        <Section title="Boosters due" description="A second shot the first one is waiting on.">
-          <CardGrid columns={3}>
-            {boosters.map((entry) => {
-              const animal = byId.get(entry.record.animalId);
-              return (
-                <RecordCard
-                  key={entry.record.id}
-                  tone={entry.overdue ? "danger" : "action"}
-                  title={animal === undefined ? "Unknown animal" : displayName(animal)}
-                  subtitle={entry.record.product ?? entry.record.type}
-                  meta={
-                    <Pill tone={entry.overdue ? "danger" : "action"} dot={entry.overdue}>
-                      {entry.overdue ? "overdue" : "due"} {formatDate(entry.dueOn)}
-                    </Pill>
-                  }
-                />
-              );
-            })}
-          </CardGrid>
-        </Section>
-      )}
+        {boosters.length === 0 ? null : (
+          <Section title="Boosters due" description="Within 30 days">
+            <Rows label="Boosters due">
+              {boosters.map((entry) => {
+                const animal = byId.get(entry.record.animalId);
+                return (
+                  <Row
+                    key={entry.record.id}
+                    title={nameOf(entry.record.animalId)}
+                    href={animal === undefined ? undefined : animalHref(animal)}
+                    line={entry.record.product ?? entry.record.type}
+                    chip={
+                      <Pill tone={entry.overdue ? "danger" : "action"} dot={entry.overdue}>
+                        {entry.overdue ? "Overdue" : "Due"} {formatDate(entry.dueOn)}
+                      </Pill>
+                    }
+                  />
+                );
+              })}
+            </Rows>
+          </Section>
+        )}
 
-      <Section
-        title={editing === undefined ? "Record a treatment" : "Edit this treatment"}
-        description={
-          editing === undefined
-            ? undefined
-            : "Changing the date or the withdrawal days moves the clearance date with it — nothing is stored twice."
-        }
-      >
-        <AddHealth
-          key={editing?.id ?? "new"}
-          animals={animals}
-          meds={meds}
-          api={api}
-          fridge={fridge}
-          heldSet={heldSet}
-          records={records}
-          {...(editing === undefined ? {} : { editing })}
-          onDone={() => setEditing(undefined)}
-          defaultAnimalId={prefilledAnimal}
-        />
-      </Section>
+        <Section title="Treatments">
+          <ChipRow label="Show">
+            {(Object.keys(FILTERS) as Filter[]).map((key) => (
+              <Chip
+                key={key}
+                on={filter === key}
+                // Pressing the one already on goes back to all of them.
+                onClick={() => setFilter(filter === key ? "all" : key)}
+              >
+                {FILTERS[key].label}
+              </Chip>
+            ))}
+          </ChipRow>
 
-      <Section title="Everything recorded">
-        {loading ? (
-          <p className="text-muted">Looking…</p>
-        ) : (
-          <Card>
-            <DataTable
-              caption="Health records"
-              columns={columns}
-              rows={[...records].sort((a, b) => b.date.getTime() - a.date.getTime())}
-              rowKey={(record) => record.id}
-              empty={
-                <EmptyState
-                  title="Nothing recorded yet"
-                  detail="Record a vaccination or treatment above. Anything carrying a withdrawal period flags the animal until it clears."
-                />
+          {filter === "all" ? null : (
+            <FilteredLine
+              shown={shown.length}
+              total={records.length}
+              what={FILTERS[filter].label}
+              onClear={() => setFilter("all")}
+            />
+          )}
+
+          {loading ? (
+            <p className="text-muted">Looking…</p>
+          ) : shown.length === 0 ? (
+            <EmptyState
+              title={records.length === 0 ? "Nothing recorded yet" : "None match"}
+              detail={
+                records.length === 0
+                  ? "Anything carrying a withdrawal period flags the animal until it clears."
+                  : undefined
+              }
+              action={
+                records.length === 0 ? (
+                  <Button variant="primary" onClick={() => setPanel("new")}>
+                    Record a treatment
+                  </Button>
+                ) : (
+                  <Button onClick={() => setFilter("all")}>Show all</Button>
+                )
               }
             />
-          </Card>
+          ) : (
+            <Rows label="Health records">
+              {shown.map((record) => {
+                const ends = withdrawalEndDate(record);
+                const under = ends !== undefined && isUnderWithdrawal(record, now);
+                return (
+                  <Row
+                    key={record.id}
+                    title={nameOf(record.animalId)}
+                    onSelect={() => setPanel(record)}
+                    selectLabel={`Edit ${record.type} for ${nameOf(record.animalId)} on ${formatDate(record.date)}`}
+                    line={facts(
+                      record.type,
+                      record.product,
+                      formatDate(record.date),
+                      record.administeredBy,
+                      ends !== undefined && !under && `cleared ${formatDate(ends)}`,
+                    )}
+                    chip={
+                      under ? (
+                        <Pill tone="danger" dot>
+                          Until {formatDate(ends)}
+                        </Pill>
+                      ) : undefined
+                    }
+                  />
+                );
+              })}
+            </Rows>
+          )}
+        </Section>
+
+        <AddFab onClick={() => setPanel("new")}>Record</AddFab>
+
+        {panel === "closed" ? null : (
+          <AddHealth
+            key={panel === "new" ? "new" : panel.id}
+            animals={animals}
+            meds={meds}
+            api={api}
+            fridge={fridge}
+            heldSet={heldSet}
+            records={records}
+            {...(panel === "new" ? {} : { editing: panel })}
+            onDone={() => setPanel("closed")}
+            onDelete={(record) => {
+              // The panel closes first, so the typed confirmation is the only
+              // dialog on screen rather than a second one stacked on this.
+              setPanel("closed");
+              void remove(record);
+            }}
+            defaultAnimalId={prefilledAnimal}
+          />
         )}
-      </Section>
+      </div>
     </PageBody>
   );
 }
 
+type Filter = "all" | "held" | "vaccination" | "treatment";
+
+/** The chips over the log: the cuts people ask for out loud. */
+const FILTERS: Record<
+  Filter,
+  { readonly label: string; readonly keep: (record: HealthRecord, now: Date) => boolean }
+> = {
+  all: { label: "All", keep: () => true },
+  held: { label: "Under withdrawal", keep: (record, now) => isUnderWithdrawal(record, now) },
+  vaccination: { label: "Vaccinations", keep: (record) => record.type === "vaccination" },
+  treatment: { label: "Treatments", keep: (record) => record.type === "treatment" },
+};
+
 type Api = ReturnType<typeof useMutations<HealthRecord>>;
 
 /**
- * The form.
+ * The form, in a side panel (a bottom sheet on a phone).
+ *
+ * A new treatment leaves the panel open after it saves, with the animal and
+ * the bottle still chosen: a round of blackleg is forty calves in a row, and
+ * reopening the panel forty times is forty taps nobody needs.
  *
  * Choosing a product from the fridge fills in its withdrawal days — copied,
  * not linked, so a label change next year cannot move a date somebody has
@@ -346,6 +380,7 @@ function AddHealth({
   records,
   editing,
   onDone,
+  onDelete,
   defaultAnimalId,
 }: {
   readonly animals: readonly Animal[];
@@ -356,9 +391,13 @@ function AddHealth({
   readonly records: readonly HealthRecord[];
   readonly editing?: HealthRecord;
   readonly onDone: () => void;
+  readonly onDelete: (record: HealthRecord) => void;
   readonly defaultAnimalId: string;
 }) {
   const { show } = useToast();
+  // The save button lives in the panel's footer, outside the form, and names
+  // the form so Enter in a field and the button are the same submit.
+  const formId = useId();
 
   /**
    * The last product used, and the fridge entry it came from.
@@ -510,8 +549,33 @@ function AddHealth({
   const animal = animals.find((entry) => entry.id === animalId);
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-      <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+    <Modal
+      placement="side"
+      title={editing === undefined ? "Record a treatment" : "Edit this treatment"}
+      // Said only on an edit, where it is the thing people worry about.
+      {...(editing === undefined
+        ? {}
+        : { description: "Changing the date or the withdrawal days moves the clearance date." })}
+      onClose={onDone}
+      footer={
+        <>
+          <Button variant="primary" type="submit" form={formId} busy={busy}>
+            {editing === undefined ? "Record treatment" : "Save treatment"}
+          </Button>
+          <Button onClick={onDone}>{editing === undefined ? "Done" : "Cancel"}</Button>
+          {editing === undefined ? null : (
+            <Button variant="danger" className="ml-auto" onClick={() => onDelete(editing)}>
+              Delete
+            </Button>
+          )}
+        </>
+      }
+    >
+      <form
+        id={formId}
+        onSubmit={(event) => void submit(event)}
+        className="flex flex-col gap-density sm:grid sm:grid-cols-2"
+      >
         <Select
           label="Animal"
           value={animalId}
@@ -521,7 +585,7 @@ function AddHealth({
           // writes to the same table, so an unfiltered list offers the dogs on
           // the screen that draws a dose out of the cattle fridge. The record
           // being edited stays in the list whatever it is, or opening a pet's
-          // row from the table below would blank the field it came in with.
+          // row from the log would blank the field it came in with.
           options={animals
             .filter(
               (entry) =>
@@ -538,7 +602,7 @@ function AddHealth({
           label="Type"
           value={type}
           onChange={(event) => setType(event.target.value as HealthRecordType)}
-          options={HEALTH_RECORD_TYPES.map((value) => ({ value, label: value }))}
+          options={toOptions(HEALTH_RECORD_TYPES)}
         />
         <TextInput
           label="Date"
@@ -567,15 +631,15 @@ function AddHealth({
           label="Route"
           value={route}
           onChange={(event) => setRoute(event.target.value as AdministrationRoute)}
-          options={ROUTES.map((value) => ({ value, label: value }))}
+          options={toOptions(ROUTES)}
         />
         <TextInput
           label={chosenMed === undefined ? "Dose" : `Dose (${chosenMed.onHand.unit})`}
           hint={
             editing !== undefined
-              ? "An edit does not draw a second dose, or put the first one back."
+              ? "An edit does not draw a second dose, or put the first back."
               : chosenMed === undefined
-                ? "Choose from the fridge to draw the dose out of stock."
+                ? "Choose from the fridge to draw it out of stock."
                 : `Comes off the ${chosenMed.onHand.amount} ${chosenMed.onHand.unit} on hand.`
           }
           type="number"
@@ -595,7 +659,6 @@ function AddHealth({
         />
         <TextInput
           label="Administered by"
-          hint="Not every hand is a user account."
           value={by}
           onChange={(event) => setBy(event.target.value)}
         />
@@ -605,31 +668,38 @@ function AddHealth({
           value={booster}
           onChange={(event) => setBooster(event.target.value)}
         />
-        <TextInput label="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
-      </div>
+        <TextInput
+          label="Notes"
+          className="sm:col-span-2"
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+        />
 
-      {error === undefined ? null : (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      )}
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" busy={busy}>
-          {editing === undefined ? "Record treatment" : "Save treatment"}
-        </Button>
-        {editing === undefined ? null : (
-          <Button variant="ghost" onClick={onDone}>
-            Cancel
-          </Button>
-        )}
+        {/* Shown before saving, because the clearance date is the point of the
+            record and a mistyped withdrawal is invisible until somebody tries
+            to sell her. */}
         {clears === undefined ? null : (
-          <p className="text-sm text-muted">
+          <p className="text-sm text-muted sm:col-span-2">
             {animal === undefined ? "This animal" : displayName(animal)} will not be clear for sale
             until <span className="font-medium text-ink">{formatDate(clears)}</span>
           </p>
         )}
-      </div>
-    </form>
+
+        {error === undefined ? null : (
+          <p role="alert" className="text-sm text-danger sm:col-span-2">
+            {error}
+          </p>
+        )}
+
+        {editing === undefined || animal === undefined ? null : (
+          <Link
+            href={animalHref(animal)}
+            className="inline-flex min-h-target items-center text-sm text-action underline-offset-2 hover:underline sm:col-span-2"
+          >
+            Open {displayName(animal)}&rsquo;s page
+          </Link>
+        )}
+      </form>
+    </Modal>
   );
 }

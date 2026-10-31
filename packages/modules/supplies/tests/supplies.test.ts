@@ -4,7 +4,10 @@ import { fromDollars, type Ulid } from "@galaxy-farm/core";
 
 import {
   isLowStock,
+  purchaseTotal,
+  stockByItem,
   stockOnHand,
+  supplySpend,
   supplyItemSchema,
   supplyPurchaseSchema,
   supplyUsageSchema,
@@ -17,6 +20,7 @@ import {
   assignedTo,
   currentlyAssigned,
   durableAssignmentSchema,
+  goneByItem,
   inService,
   type DurableAssignment,
 } from "../src/domain/durable.js";
@@ -188,5 +192,72 @@ describe("durable assignments", () => {
     });
 
     expect(inService(id(2), 24, [assignment(), scrapped])).toBe(22);
+  });
+});
+
+describe("a purchase with no price", () => {
+  // The neighbour's pallet of shavings, or a bag bought on the run with no
+  // receipt: it moves the count, and it is not free (migration 0038).
+  const unpriced = purchase({ id: id(12), quantity: 8, unitCost: undefined });
+
+  it("is a valid purchase", () => {
+    expect(supplyPurchaseSchema.safeParse(unpriced).success).toBe(true);
+  });
+
+  it("still moves the count", () => {
+    expect(stockOnHand(shavings, [purchase(), unpriced], [])).toBe(40);
+  });
+
+  it("has no total, and is left out of the spend rather than counted as $0", () => {
+    expect(purchaseTotal(unpriced)).toBeUndefined();
+    expect(purchaseTotal(purchase())).toEqual(fromDollars(90));
+    expect(supplySpend([purchase(), unpriced])).toEqual(fromDollars(90));
+  });
+
+  it("does not drag down the cost a calf is charged", () => {
+    // 12 bags at $7.50 priced, 8 unpriced: still $7.50 a bag, not $4.50.
+    const used = usage({ animalId: id(5), quantity: 2 });
+    expect(usageCostFor(id(5), [used], [purchase(), unpriced])).toEqual(fromDollars(15));
+  });
+});
+
+describe("stockByItem", () => {
+  it("agrees with stockOnHand for every item, in one pass", () => {
+    const purchases = [
+      purchase(),
+      purchase({ id: id(11), supplyItemId: id(2), quantity: 6 }),
+      purchase({ id: id(12), quantity: 3, unitCost: undefined }),
+    ];
+    const used = [usage(), usage({ id: id(21), supplyItemId: id(2), quantity: 1 })];
+    const stock = stockByItem([shavings, panels], purchases, used);
+
+    expect(stock.get(shavings.id)).toBe(stockOnHand(shavings, purchases, used));
+    expect(stock.get(panels.id)).toBe(stockOnHand(panels, purchases, used));
+  });
+
+  it("ignores records naming an item that is not on the list", () => {
+    const stray = purchase({ id: id(13), supplyItemId: id(9) });
+    expect([...stockByItem([shavings], [stray], []).keys()]).toEqual([shavings.id]);
+  });
+});
+
+describe("goneByItem", () => {
+  it("counts retired and lost per item, the same as inService subtracts", () => {
+    const scrapped = assignment({
+      id: id(31),
+      quantity: 2,
+      condition: "retired",
+      periodTo: new Date("2026-07-01"),
+    });
+    const lost = assignment({
+      id: id(32),
+      quantity: 1,
+      condition: "lost",
+      periodTo: new Date("2026-07-02"),
+    });
+    const gone = goneByItem([assignment(), scrapped, lost]);
+
+    expect(gone.get(id(2))).toBe(3);
+    expect(24 - (gone.get(id(2)) ?? 0)).toBe(inService(id(2), 24, [assignment(), scrapped, lost]));
   });
 });

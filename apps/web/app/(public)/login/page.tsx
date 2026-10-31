@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { Logomark } from "@galaxy-farm/ui";
+import { AuthShell } from "@/app/(public)/_components/public-shell";
 
 import { LoginForm } from "./login-form";
 import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
@@ -60,17 +60,8 @@ export default async function LoginPage({
   const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME;
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-density p-6">
-      <div className="flex flex-col items-center gap-2">
-        <Logomark size="large" decorative />
-        <h1 className="text-ink">{farmName}</h1>
-      </div>
-
+    <AuthShell farmName={farmName} footer="No public sign-up — the farm creates accounts.">
       <LoginForm next={next} />
-
-      <p className="max-w-sm text-center text-sm text-muted">
-        Accounts are created by the farm owner — there is no public sign-up.
-      </p>
-    </main>
+    </AuthShell>
   );
 }

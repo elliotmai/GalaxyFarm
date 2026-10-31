@@ -38,6 +38,43 @@ export const TIME_OF_DAY_LABELS: Readonly<Record<TimeOfDay, string>> = {
   night: "Night",
 };
 
+/**
+ * The weather a chore can wait for (spec §6).
+ *
+ * Some jobs are only jobs on certain days: tank covers before a hard freeze,
+ * row cover on a frost night, hay under cover before rain, tarps and loose
+ * panels tied down before a wind. A template that names one of these
+ * generates on the days the forecast shows it and on no other, so a mild week
+ * does not put "covers on" on the board every morning until people learn to
+ * tick it without looking.
+ *
+ * Each reads off the forecast with the property's own thresholds:
+ * `freeze_tonight` and `frost_tonight` are the coming night's low against the
+ * hard-freeze and frost lines, `freezing_today` is today's, and `heat_today` a
+ * high at or above the heat line. `rain_coming` and `wind_coming` are *before*
+ * jobs: rain likely, or high winds, between the morning and noon tomorrow —
+ * so weather arriving overnight puts the job on the evening before, and
+ * weather arriving mid-afternoon moves its deadline up to meet it.
+ */
+export const CHORE_WEATHER = [
+  "freeze_tonight",
+  "frost_tonight",
+  "freezing_today",
+  "rain_coming",
+  "wind_coming",
+  "heat_today",
+] as const;
+export type ChoreWeather = (typeof CHORE_WEATHER)[number];
+
+export const CHORE_WEATHER_LABELS: Readonly<Record<ChoreWeather, string>> = {
+  freeze_tonight: "Before a hard freeze tonight",
+  frost_tonight: "On a frost night",
+  freezing_today: "On a freezing day",
+  rain_coming: "Before rain",
+  wind_coming: "Before high winds",
+  heat_today: "On a hot day",
+};
+
 export function timeOfDayDeadline(date: Date, timeOfDay: TimeOfDay): Date {
   const { hour, minute } = TIME_OF_DAY_DEADLINES[timeOfDay];
   const at = startOfDay(date);
@@ -60,6 +97,13 @@ export interface ChoreTemplate extends BaseRecord {
    * late at eleven, not at midnight, the same arithmetic a feeding line uses.
    */
   readonly timeOfDay?: TimeOfDay | undefined;
+  /**
+   * The weather it waits for, when it waits for any (see `CHORE_WEATHER`).
+   *
+   * Absent means the recurrence alone decides, which is what every template
+   * meant before this field existed.
+   */
+  readonly weather?: ChoreWeather | undefined;
   readonly zoneId?: Ulid | undefined;
   readonly animalId?: Ulid | undefined;
   readonly active: boolean;
@@ -94,6 +138,7 @@ export const choreTemplateSchema = baseRecordSchema.extend({
   recurrence: z.enum(RECURRENCES),
   recurrenceDays: z.array(z.number().int().min(0).max(31)),
   timeOfDay: z.enum(TIMES_OF_DAY).optional(),
+  weather: z.enum(CHORE_WEATHER).optional(),
   zoneId: ulidSchema.optional(),
   animalId: ulidSchema.optional(),
   active: z.boolean(),
@@ -230,6 +275,29 @@ export interface ChoreDayInput {
    * and so a feeding chore is late by the same arithmetic as every other one.
    */
   readonly derived?: readonly ChoreEntry[];
+  /**
+   * The weather the forecast shows for the day, for templates that wait on it.
+   *
+   * Absent means nobody could ask — offline, or no coordinates — and then a
+   * weather template is kept rather than dropped: a cover put on a night that
+   * stayed mild costs a walk, and one left off on the night it froze costs a
+   * tank.
+   */
+  readonly weather?: ReadonlySet<ChoreWeather> | undefined;
+  /**
+   * When the weather a "before" template waits for arrives on the day, if it
+   * does. That template's chore is then due by then rather than by its usual
+   * deadline: hay put under cover after the rain started is wet hay.
+   */
+  readonly weatherArrives?: Partial<Readonly<Record<ChoreWeather, Date>>> | undefined;
+}
+
+/** Does the day's weather call for this template? Unknown weather keeps it. */
+export function weatherAllows(
+  template: Pick<ChoreTemplate, "weather">,
+  weather: ReadonlySet<ChoreWeather> | undefined,
+): boolean {
+  return template.weather === undefined || weather === undefined || weather.has(template.weather);
 }
 
 /** The derived id of an occurrence that has no stored row yet. */
@@ -327,9 +395,13 @@ export function choreDaySheet(input: ChoreDayInput, date: Date, now: Date): Chor
 
   const generated = input.templates
     .filter((template) => occursOn(template, date))
+    .filter((template) => weatherAllows(template, input.weather))
     .filter((template) => !materialised.has(occurrenceId(template.id, date)))
     .map((template): ChoreEntry => {
-      const dueAt = templateDueAt(template, date);
+      const usual = templateDueAt(template, date);
+      const arrives =
+        template.weather === undefined ? undefined : input.weatherArrives?.[template.weather];
+      const dueAt = arrives !== undefined && arrives < usual ? arrives : usual;
       return {
         id: occurrenceId(template.id, date),
         title: template.title,

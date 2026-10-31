@@ -144,7 +144,28 @@ export function ToastProvider({ children, setTimer, clearTimer }: ToastProviderP
     timers.current.clear();
   };
 
-  const release = () => setHeld(false);
+  /**
+   * Start the clocks again once the pointer or focus has gone.
+   *
+   * Holding cleared every timer, and letting go used to restart none of them,
+   * so a toast brushed past once stayed for good. On a phone that is worse
+   * than untidy: a tap near the bottom of the screen counts as a hover, and
+   * the toast it froze then sat on top of the confirmation sheet's Delete
+   * button. Each one gets its whole time back — whoever let go was looking
+   * at it a moment ago.
+   */
+  const release = () => {
+    setHeld(false);
+    for (const toast of toasts) {
+      if (timers.current.has(toast.id)) continue;
+      const ms =
+        toast.durationMs ?? (toast.action === undefined ? DEFAULT_TOAST_MS : ACTIONABLE_TOAST_MS);
+      timers.current.set(
+        toast.id,
+        schedule(() => dismiss(toast.id), ms),
+      );
+    }
+  };
 
   return (
     <ToastContext.Provider value={api}>

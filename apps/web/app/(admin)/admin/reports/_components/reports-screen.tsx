@@ -4,15 +4,13 @@ import { useState } from "react";
 
 import {
   Button,
-  Card,
-  Callout,
   DataTable,
   EmptyState,
   PageBody,
   PageHeader,
   Pill,
   Section,
-  Select,
+  StatRow,
   Tabs,
   TextInput,
   Tile,
@@ -65,6 +63,10 @@ import { useRecords } from "@/lib/local/use-records";
  * does not sync to devices yet are named at the bottom rather than left as a
  * gap somebody has to work out for themselves.
  *
+ * The window is a row of chips rather than a select in the header: it is the
+ * one control every visit touches, and the dates it resolves to are the
+ * header's only line, so what the figures cover is never a click away.
+ *
  * **Every report states its window and what it could not price.** A herd whose
  * feed has never been catalogued shows a flattering profit; a total that did
  * not say so would be arithmetically right and practically misleading, and
@@ -72,11 +74,17 @@ import { useRecords } from "@/lib/local/use-records";
  */
 
 const PERIODS = [
-  { value: "30", label: "Last 30 days" },
-  { value: "90", label: "Last 90 days" },
-  { value: "365", label: "Last 12 months" },
-  { value: "custom", label: "Between two dates" },
+  { value: "30", label: "30 days" },
+  { value: "90", label: "90 days" },
+  { value: "365", label: "12 months" },
+  { value: "custom", label: "Dates" },
 ] as const;
+
+/**
+ * A table's frame on a laptop only. On a phone `DataTable` draws its own
+ * bordered list, and a card around that is a box in a box.
+ */
+const TABLE_FRAME = "sm:rounded-density sm:border sm:border-rule sm:bg-panel sm:px-density sm:py-2";
 
 const dateInput = (value: Date): string => value.toISOString().slice(0, 10);
 const percent = (value: number | undefined): string =>
@@ -178,7 +186,15 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
       header: "Average unit",
       render: (row) => (row.averageUnitCost === undefined ? "—" : formatMoney(row.averageUnitCost)),
     },
-    { key: "spend", header: "Spend", render: (row) => formatMoney(row.spend) },
+    {
+      key: "spend",
+      header: "Spend",
+      // Short by the loads bought without a price, and it says so.
+      render: (row) =>
+        row.unpriced === 0
+          ? formatMoney(row.spend)
+          : `${formatMoney(row.spend)} + ${row.unpriced} unpriced`,
+    },
   ];
 
   const yieldColumns: readonly Column<YieldRow>[] = [
@@ -255,43 +271,56 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
     <PageBody>
       <PageHeader
         title="Reports"
-        subtitle="Computed from the records, never stored. Correct a cost anywhere and the number here moves."
-        actions={
-          <div className="flex flex-wrap items-end gap-2">
-            <Select
-              label="Period"
-              hideLabel
-              value={period}
-              options={PERIODS.map((entry) => ({ value: entry.value, label: entry.label }))}
-              onChange={(event) => setPeriod(event.target.value)}
-            />
-            {period !== "custom" ? null : (
-              <>
-                <TextInput
-                  label="From"
-                  type="date"
-                  value={from}
-                  onChange={(event) => setFrom(event.target.value)}
-                />
-                <TextInput
-                  label="Until"
-                  type="date"
-                  value={to}
-                  onChange={(event) => setTo(event.target.value)}
-                />
-              </>
-            )}
-          </div>
-        }
-        meta={`${formatDate(range.from)} – ${formatDate(range.to)} · ${daysBetween(range)} days`}
+        subtitle={`${formatDate(range.from)} – ${formatDate(range.to)} · ${daysBetween(range)} days`}
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="flex flex-wrap items-end gap-2">
+        <div role="group" aria-label="Period" className="flex flex-wrap items-center gap-1">
+          {PERIODS.map((entry) => {
+            const on = period === entry.value;
+            return (
+              <button
+                key={entry.value}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setPeriod(entry.value)}
+                className={[
+                  "inline-flex min-h-target shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-sm",
+                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action",
+                  on
+                    ? "bg-action/15 font-semibold text-action"
+                    : "font-medium text-muted hover:bg-raised hover:text-ink",
+                ].join(" ")}
+              >
+                {entry.label}
+              </button>
+            );
+          })}
+        </div>
+        {period !== "custom" ? null : (
+          <div className="flex flex-wrap items-end gap-2">
+            <TextInput
+              label="From"
+              type="date"
+              value={from}
+              onChange={(event) => setFrom(event.target.value)}
+            />
+            <TextInput
+              label="Until"
+              type="date"
+              value={to}
+              onChange={(event) => setTo(event.target.value)}
+            />
+          </div>
+        )}
+      </div>
+
+      <StatRow>
         <Tile
           label="Spent"
           value={formatMoney({ cents: spent })}
           tone="action"
-          hint={unpriced === 0 ? "Everything priced" : `${unpriced} records with no figure`}
+          hint={unpriced === 0 ? undefined : `${unpriced} with no figure`}
         />
         <Tile
           label="Herd net"
@@ -302,23 +331,22 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
         <Tile
           label="Cost per head"
           value={formatMoney(pnl.rollup.costPerHead)}
-          tone="neutral"
           hint={`${pnl.rollup.animals} head`}
         />
         <Tile
           label="Fully costed"
           value={`${pnl.rollup.completeAnimals}/${pnl.rollup.animals}`}
-          tone={pnl.rollup.completeAnimals === pnl.rollup.animals ? "calm" : "action"}
-          hint="Every input behind the figure"
+          tone={pnl.rollup.completeAnimals === pnl.rollup.animals ? "neutral" : "action"}
         />
-      </div>
+      </StatRow>
 
+      {/* The one caveat that changes how every figure below reads, as one
+          line rather than a box: feed nobody bought is valued at nothing. */}
       {pnl.feedIncomplete === 0 ? null : (
-        <Callout tone="action" title="Feed is not fully costed">
-          {pnl.feedIncomplete} {pnl.feedIncomplete === 1 ? "animal is" : "animals are"} eating a
-          feed with no purchase recorded against it, so it is valued at nothing. Every figure below
-          that includes feed is a floor, not the answer.
-        </Callout>
+        <p className="text-sm text-action">
+          {pnl.feedIncomplete} {pnl.feedIncomplete === 1 ? "animal eats" : "animals eat"} a feed
+          with no purchase recorded — feed figures are a floor.
+        </p>
       )}
 
       <Tabs
@@ -335,7 +363,7 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
           active === "pnl" ? (
             <Section
               title="Per animal, worst first"
-              description="Acquisition, feed, health and processing against sale, cut and packer revenue. Feed is allocated over this window from the plans in force — the screen is not extrapolating it across a year the plans never covered."
+              description="Acquisition, feed, health and processing against sale, cut and packer revenue. Feed is allocated over this window from the plans in force."
               actions={
                 <Button
                   onClick={() =>
@@ -365,25 +393,20 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
                 </Button>
               }
             >
-              <Card>
+              <div className={TABLE_FRAME}>
                 <DataTable
                   caption="Per-animal profit and loss"
                   columns={pnlColumns}
                   rows={pnl.rows}
                   rowKey={(row) => row.animalId}
-                  empty={
-                    <EmptyState
-                      title="No cattle in this window"
-                      detail="Acquisitions, sales, treatments and processing inside the dates above are what this adds up."
-                    />
-                  }
+                  empty={<EmptyState title="No cattle in this window" />}
                 />
-              </Card>
+              </div>
             </Section>
           ) : active === "feed" ? (
             <Section
               title="Feed spend"
-              description="What was bought, what it averaged, and what it weighs where the feed knows."
+              description="Bought, average unit cost, and pounds where known."
               actions={
                 <Button
                   onClick={() =>
@@ -407,7 +430,7 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
                 </Button>
               }
             >
-              <Card>
+              <div className={TABLE_FRAME}>
                 <DataTable
                   caption="Feed spend by feed"
                   columns={feedColumns}
@@ -420,12 +443,12 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
                     />
                   }
                 />
-              </Card>
+              </div>
             </Section>
           ) : active === "yields" ? (
             <Section
               title="Processing yields"
-              description="Dressing percentage against the rail, cutting yield against the box, and what a pound actually realised. Sixty to sixty-four percent is the ordinary dressing range for a finished beef animal."
+              description="Dressing against the rail, cutting yield against the box, and what a pound realised. 60–64% is an ordinary dressing range for finished beef."
               actions={
                 <Button
                   onClick={() =>
@@ -454,7 +477,7 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
                 </Button>
               }
             >
-              <Card>
+              <div className={TABLE_FRAME}>
                 <DataTable
                   caption="Processing yields"
                   columns={yieldColumns}
@@ -467,13 +490,13 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
                     />
                   }
                 />
-              </Card>
+              </div>
             </Section>
           ) : active === "roadmap" ? (
             <div className="flex flex-col gap-density">
               <Section
                 title="Herd growth against the roadmap"
-                description="Headcount at each milestone's year, read against the target in its title."
+                description="Head at each milestone's year, against its target."
                 actions={
                   <Button
                     onClick={() =>
@@ -493,7 +516,7 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
                   </Button>
                 }
               >
-                <Card>
+                <div className={TABLE_FRAME}>
                   <DataTable
                     caption="Herd growth against target"
                     columns={growthColumns}
@@ -502,16 +525,16 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
                     empty={
                       <EmptyState
                         title="No milestones set"
-                        detail="Herd-size milestones live on the cattle roadmap. One with a year and a head count in its title appears here."
+                        detail="Add a herd-size milestone with a year and a head count on the cattle roadmap."
                       />
                     }
                   />
-                </Card>
+                </div>
               </Section>
 
               <Section
                 title="Capital planning"
-                description="Open wants, what was budgeted, and the cheapest true cost among the listings still in the running — hauling, inspection and immediate repairs included, because the sticker price never settles a purchase."
+                description="Open wants against budget, and the cheapest true cost still in the running — hauling, inspection and repairs included."
                 actions={
                   <Button
                     onClick={() =>
@@ -537,7 +560,7 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
                   </Button>
                 }
               >
-                <Card>
+                <div className={TABLE_FRAME}>
                   <DataTable
                     caption="Open wants and what is being looked at"
                     columns={capitalColumns}
@@ -546,17 +569,17 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
                     empty={
                       <EmptyState
                         title="Nothing on the wishlist"
-                        detail="Wants live on the cattle, horse and equipment roadmaps. The candidates against them come from the candidate screens."
+                        detail="Wants live on the cattle, horse and equipment roadmaps."
                       />
                     }
                   />
-                </Card>
+                </div>
               </Section>
             </div>
           ) : (
             <Section
               title="What the place cost to run"
-              description="Every category that has a record in this window. Records carrying no figure are counted and named rather than treated as free — the total is a floor wherever that count is not zero."
+              description="Every category with a record in this window. Records with no figure are counted, not treated as free, so a total beside an unpriced count is a floor."
               actions={
                 <Button
                   onClick={() =>
@@ -576,32 +599,29 @@ export function ReportsScreen({ propertyId }: { readonly propertyId: Ulid }) {
                 </Button>
               }
             >
-              <Card>
+              <div className={TABLE_FRAME}>
                 <DataTable
                   caption="Operating cost by category"
                   columns={operatingColumns}
                   rows={operating}
                   rowKey={(row) => row.category}
-                  empty={
-                    <EmptyState
-                      title="Nothing spent in this window"
-                      detail="Feed purchases, treatments, animals bought, processing and pasture care all land here."
-                    />
-                  }
+                  empty={<EmptyState title="Nothing spent in this window" />}
                 />
-              </Card>
+              </div>
 
-              <p className="mt-density text-sm text-muted">
-                Not whole-farm yet. These reports are waiting on a module whose records do not reach
-                a device:
-              </p>
-              <ul className="mt-1 flex flex-col gap-1 text-sm text-muted">
-                {REPORTS_AWAITING_MODULES.map((entry) => (
-                  <li key={entry.report}>
-                    <span className="text-ink">{entry.report}</span> — {entry.waitingOn}
-                  </li>
-                ))}
-              </ul>
+              {/* Named rather than left as a gap, but folded: it is read once. */}
+              <details className="mt-density text-sm text-muted">
+                <summary className="inline-flex min-h-target cursor-pointer items-center font-medium text-ink">
+                  {REPORTS_AWAITING_MODULES.length} reports waiting on other modules
+                </summary>
+                <ul className="mt-1 flex flex-col gap-1">
+                  {REPORTS_AWAITING_MODULES.map((entry) => (
+                    <li key={entry.report}>
+                      <span className="text-ink">{entry.report}</span> — {entry.waitingOn}
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </Section>
           )
         }

@@ -1,19 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
-import {
-  Card,
-  CardGrid,
-  EmptyState,
-  PageBody,
-  PageHeader,
-  Pill,
-  RecordCard,
-  Section,
-  Tile,
-} from "@galaxy-farm/ui";
+import { Button, EmptyState, Modal, PageBody, Pill } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
   assessRisks,
@@ -27,6 +17,15 @@ import {
   type RiskSeverity,
 } from "@galaxy-farm/module-cattle";
 
+import {
+  Chip,
+  ChipRow,
+  facts,
+  FilteredLine,
+  Row,
+  Rows,
+  ScreenHeader,
+} from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
 import { animalHref } from "@/lib/animal-slug";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -43,8 +42,10 @@ import { useRecords } from "@/lib/local/use-records";
  * times, and that reads as one story only when the three findings sit
  * together.
  *
- * An empty page is a real answer here and gets said properly, rather than
- * being left as a blank screen that looks broken.
+ * Each animal is a row; her findings open in a side panel, where the detail
+ * and the threshold behind each one can be read together. An empty page is a
+ * real answer here and gets said properly, rather than being left as a blank
+ * screen that looks broken.
  */
 
 const TONE: Record<RiskSeverity, "danger" | "action" | "neutral"> = {
@@ -53,6 +54,14 @@ const TONE: Record<RiskSeverity, "danger" | "action" | "neutral"> = {
   watch: "neutral",
 };
 
+const SEVERITY_LABEL: Record<RiskSeverity, string> = {
+  serious: "Serious",
+  concern: "Concern",
+  watch: "Watch",
+};
+
+type RiskKind = (typeof RISK_KINDS)[number];
+
 export function RisksScreen({ propertyId }: { readonly propertyId: Ulid }) {
   const query = { propertyId };
   const { records: animals, loading } = useRecords<Animal>("animals", query);
@@ -60,6 +69,11 @@ export function RisksScreen({ propertyId }: { readonly propertyId: Ulid }) {
   const { records: breedings } = useRecords<BreedingRecord>("breedingRecords", query);
   const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", query);
   const { records: health } = useRecords<HealthRecord>("healthRecords", query);
+
+  /** One check to narrow to, or "" for every animal with anything. */
+  const [kind, setKind] = useState<RiskKind | "">("");
+  /** The animal whose findings are open in the side panel. */
+  const [open, setOpen] = useState<Ulid | undefined>();
 
   const cattle = useMemo(() => animals.filter((animal) => animal.species === "cattle"), [animals]);
 
@@ -92,123 +106,155 @@ export function RisksScreen({ propertyId }: { readonly propertyId: Ulid }) {
   }, [report]);
 
   const serious = report.risks.filter((risk) => risk.severity === "serious").length;
+  const shown =
+    kind === "" ? flagged : flagged.filter(({ risks }) => risks.some((risk) => risk.kind === kind));
+  // Only the checks that found something get a chip. The rest are a result
+  // too — said once, quietly, at the foot of the page.
+  const firing = RISK_KINDS.filter((entry) => report.counts[entry] > 0);
+  const quiet = RISK_KINDS.length - firing.length;
+
+  const nameOf = (animalId: Ulid) => {
+    const animal = byId.get(animalId);
+    return animal === undefined ? "Unknown animal" : displayName(animal);
+  };
+  const openRisks = open === undefined ? undefined : report.byAnimal.get(open);
+  const openAnimal = open === undefined ? undefined : byId.get(open);
 
   if (loading) return <p className="text-muted">Looking…</p>;
 
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Cattle"
+      <ScreenHeader
         title="Worth a look"
-        subtitle="Eight questions asked about every animal at once. Nothing here is a verdict — it is the herd pointing at something."
+        facts={facts(
+          `${flagged.length} of ${cattle.length} head flagged`,
+          serious > 0 && `${serious} serious`,
+        )}
       />
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile
-          label="Animals flagged"
-          value={flagged.length}
-          tone={flagged.length > 0 ? "action" : "calm"}
-        />
-        <Tile
-          label="Serious"
-          value={serious}
-          tone={serious > 0 ? "danger" : "calm"}
-          emphasis={serious > 0}
-        />
-        <Tile label="Findings" value={report.risks.length} />
-        <Tile label="Head checked" value={cattle.length} tone="identity" />
-      </div>
 
       {report.risks.length === 0 ? (
         <EmptyState
           title="Nothing to flag"
           detail={
             cattle.length === 0
-              ? "There are no cattle on file yet. Add the herd and these checks start running against it."
-              : "Every check came back clean against what is recorded. That is worth knowing — but a check can only see what has been written down, so a thin record and a good record look the same from here."
+              ? "No cattle on file yet. These checks run once the herd is added."
+              : "Every check came back clean — against what is recorded, which is all a check can see."
           }
         />
       ) : (
         <>
-          <Section
-            title="By animal"
-            description="One animal's findings read together, because that is how a decision gets made about it."
-          >
-            <CardGrid columns={2}>
-              {flagged.map(({ animalId, risks }) => {
-                const animal = byId.get(animalId);
-                const worst = risks.some((risk) => risk.severity === "serious")
-                  ? "serious"
-                  : risks.some((risk) => risk.severity === "concern")
-                    ? "concern"
-                    : "watch";
+          {/*
+            Grouped by animal rather than by check, because the animal is the
+            unit a decision gets made about. The checks are the chips: the way
+            in when the question is "who is open twice", not "what is wrong
+            with her".
+          */}
+          <ChipRow label="Filter by check">
+            <Chip on={kind === ""} onClick={() => setKind("")}>
+              All
+            </Chip>
+            {firing.map((entry) => (
+              <Chip
+                key={entry}
+                on={kind === entry}
+                onClick={() => setKind(kind === entry ? "" : entry)}
+              >
+                {RISK_LABELS[entry]}
+                <span className="gf-numeric text-xs opacity-80">{report.counts[entry]}</span>
+              </Chip>
+            ))}
+          </ChipRow>
 
-                return (
-                  <RecordCard
-                    key={animalId}
-                    tone={TONE[worst as RiskSeverity]}
-                    title={
-                      animal === undefined ? (
-                        "Unknown animal"
-                      ) : (
-                        <Link
-                          href={animalHref(animal)}
-                          className="underline decoration-edge underline-offset-4 hover:decoration-action"
-                        >
-                          {displayName(animal)}
-                        </Link>
-                      )
-                    }
-                    subtitle={animal?.tagNumber}
-                    actions={
-                      <Pill tone={TONE[worst as RiskSeverity]} dot={worst === "serious"}>
-                        {risks.length} finding{risks.length === 1 ? "" : "s"}
-                      </Pill>
-                    }
-                  >
-                    <div className="flex flex-col gap-3">
-                      {risks.map((risk) => (
-                        <div key={`${risk.kind}-${risk.detail}`} className="flex flex-col gap-1">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <Pill tone={TONE[risk.severity]}>{RISK_LABELS[risk.kind]}</Pill>
-                          </span>
-                          <p className="text-density text-ink">{risk.detail}</p>
-                          {risk.measure === undefined ? null : (
-                            // The threshold is shown so it can be argued with.
-                            // A warning whose rule is hidden is a warning
-                            // nobody can decide is wrong.
-                            <p className="text-sm text-muted">{risk.measure}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </RecordCard>
-                );
-              })}
-            </CardGrid>
-          </Section>
+          {kind === "" ? null : (
+            <FilteredLine
+              shown={shown.length}
+              total={flagged.length}
+              what={RISK_LABELS[kind]}
+              onClear={() => setKind("")}
+            />
+          )}
 
-          <Section
-            title="What is being checked"
-            description="Every check, and how many animals it found. A check finding nothing is as much a result as one finding something."
-          >
-            <Card>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {RISK_KINDS.map((kind) => (
-                  <div
-                    key={kind}
-                    className="flex items-center justify-between gap-3 border-t border-edge pt-3 first:border-t-0 first:pt-0 sm:[&:nth-child(2)]:border-t-0 sm:[&:nth-child(2)]:pt-0"
-                  >
-                    <span className="text-density text-ink">{RISK_LABELS[kind]}</span>
-                    <Pill tone={report.counts[kind] > 0 ? "action" : "calm"}>
-                      {report.counts[kind]}
+          <Rows label="Flagged animals">
+            {shown.map(({ animalId, risks }) => {
+              const worst: RiskSeverity = risks.some((risk) => risk.severity === "serious")
+                ? "serious"
+                : risks.some((risk) => risk.severity === "concern")
+                  ? "concern"
+                  : "watch";
+              return (
+                <Row
+                  key={animalId}
+                  title={nameOf(animalId)}
+                  onSelect={() => setOpen(animalId)}
+                  selectLabel={`${nameOf(animalId)}: ${risks.length} finding${risks.length === 1 ? "" : "s"}`}
+                  line={facts(
+                    byId.get(animalId)?.tagNumber,
+                    ...[...new Set(risks.map((risk) => RISK_LABELS[risk.kind]))],
+                  )}
+                  chip={
+                    <Pill tone={TONE[worst]} dot={worst === "serious"}>
+                      {SEVERITY_LABEL[worst]}
                     </Pill>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </Section>
+                  }
+                />
+              );
+            })}
+          </Rows>
+
+          <p className="text-sm text-muted">
+            {quiet === 0
+              ? `All ${RISK_KINDS.length} checks found something.`
+              : `${quiet} of ${RISK_KINDS.length} checks found nothing: ${RISK_KINDS.filter(
+                  (entry) => report.counts[entry] === 0,
+                )
+                  .map((entry) => RISK_LABELS[entry])
+                  .join(", ")}.`}
+          </p>
         </>
+      )}
+
+      {openRisks === undefined || open === undefined ? null : (
+        <Modal
+          placement="side"
+          title={nameOf(open)}
+          onClose={() => setOpen(undefined)}
+          footer={
+            <>
+              {openAnimal === undefined ? null : (
+                <Link
+                  href={animalHref(openAnimal)}
+                  className="inline-flex min-h-target items-center rounded-density bg-action px-4 font-medium text-action-ink hover:opacity-90"
+                >
+                  Open profile
+                </Link>
+              )}
+              <Button onClick={() => setOpen(undefined)}>Close</Button>
+            </>
+          }
+        >
+          {/* One animal's findings read together, because three findings
+              about one cow are one story. */}
+          <ul className="flex flex-col divide-y divide-rule">
+            {openRisks.map((risk) => (
+              <li
+                key={`${risk.kind}-${risk.detail}`}
+                className="flex flex-col gap-1 py-3 first:pt-0"
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-ink">{RISK_LABELS[risk.kind]}</span>
+                  <Pill tone={TONE[risk.severity]}>{SEVERITY_LABEL[risk.severity]}</Pill>
+                </span>
+                <p className="text-density text-ink">{risk.detail}</p>
+                {risk.measure === undefined ? null : (
+                  // The threshold is shown so it can be argued with. A
+                  // warning whose rule is hidden is a warning nobody can
+                  // decide is wrong.
+                  <p className="text-sm text-muted">{risk.measure}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Modal>
       )}
     </PageBody>
   );

@@ -105,11 +105,16 @@ function view() {
 
 const named = (label: string) => new RegExp(`^${label}\\b`);
 
+/** Adding a cane is a side panel, opened from the header. */
+async function openAddPanel(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getAllByRole("button", { name: "Add a sire" })[0] as HTMLElement);
+}
+
 /**
  * Pick a sire in one of the pickers on the screen.
  *
- * `which` because the tab carries two: the form that adds a cane, and the one
- * that appears on a card to join a cane already in the tank.
+ * `which` because there are two: the panel that adds a cane, and the one a
+ * cane already in the tank opens to join it to a sire.
  */
 async function pickSire(
   user: ReturnType<typeof userEvent.setup>,
@@ -128,6 +133,7 @@ async function pickSire(
 async function addStraws(typed: string, option: RegExp) {
   const user = userEvent.setup();
   view();
+  await openAddPanel(user);
 
   await pickSire(user, typed, option);
   await user.type(screen.getByLabelText(named("Straws")), "6");
@@ -173,6 +179,7 @@ describe("Adding a cane to the tank", () => {
   it("offers the ancestors rather than making somebody remember the spelling", async () => {
     const user = userEvent.setup();
     view();
+    await openAddPanel(user);
 
     const [box] = screen.getAllByRole("combobox", { name: named("Sire") });
     await user.click(box as HTMLElement);
@@ -224,5 +231,26 @@ describe("A cane already in the tank", () => {
 
     expect(screen.getByText(/Maine-Anjou MA364424/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Join to a sire" })).toBeNull();
+  });
+});
+
+describe("Drawing a straw", () => {
+  it("is one tap on the row", async () => {
+    stored.current = {
+      ...stored.current,
+      semenInventory: [
+        { ...base, id: CANE_ID, sireName: "ZNT Montego Bay", strawsOnHand: 3 } as SemenInventory,
+      ],
+    };
+    const user = userEvent.setup();
+    view();
+
+    await user.click(screen.getByRole("button", { name: "Draw one straw of ZNT Montego Bay" }));
+
+    expect(saved.updated).toContainEqual({
+      store: "semenInventory",
+      id: CANE_ID,
+      patch: { strawsOnHand: 2 },
+    });
   });
 });

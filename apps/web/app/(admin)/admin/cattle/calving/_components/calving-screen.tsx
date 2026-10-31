@@ -2,26 +2,24 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import {
   Badge,
   Button,
-  Card,
   Checkbox,
   DataTable,
-  DetailList,
   EmptyState,
+  Modal,
   PageBody,
   PageHeader,
   Section,
   Select,
-  StatRow,
-  Tile,
   TextInput,
   useConfirmDelete,
   useToast,
   type Column,
+  toOptions,
 } from "@galaxy-farm/ui";
 import {
   animalSchema,
@@ -62,9 +60,13 @@ import { useRecords } from "@/lib/local/use-records";
  * announces `CalvingRecorded` for the feed module to answer with a creep plan.
  * None of that is a step somebody has to remember.
  *
- * `?dam=<id>` prefills the cow, which is what makes this two taps from her
- * profile and from the calving-watch card rather than a form to fill in from
- * the top.
+ * `?dam=<id>` opens the form with the cow already chosen, which is what makes
+ * this two taps from her profile and from the calving-watch card rather than a
+ * form to fill in from the top.
+ *
+ * The log leads; the form is a side panel (a bottom sheet on a phone) opened
+ * from the header or from a cow in the window, so filling it in never pushes
+ * the list about.
  */
 
 function formatDate(value: Date | undefined): string {
@@ -72,6 +74,9 @@ function formatDate(value: Date | undefined): string {
     ? "—"
     : value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
+
+const LINK =
+  "font-medium text-ink underline decoration-edge underline-offset-4 hover:decoration-action";
 
 const EASE_LABELS: Readonly<Record<CalvingEase, string>> = {
   1: "1 — unassisted",
@@ -108,6 +113,14 @@ export function CalvingScreen({
 
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
+
+  // Which cow the open form is for — "" for none chosen yet — or undefined
+  // while it is closed. Opened at once when the link carried a cow, since
+  // that link exists to land on her form.
+  const [recordingFor, setRecordingFor] = useState<string | undefined>(() => {
+    const dam = params.get("dam");
+    return dam === null ? undefined : dam;
+  });
 
   const now = new Date();
   const byId = useMemo(() => new Map(animals.map((animal) => [animal.id, animal])), [animals]);
@@ -170,10 +183,7 @@ export function CalvingScreen({
         return dam === undefined ? (
           <span className="text-muted">Unknown</span>
         ) : (
-          <Link
-            href={animalHref(dam)}
-            className="font-medium text-ink underline decoration-edge underline-offset-4 hover:decoration-action"
-          >
+          <Link href={animalHref(dam)} className={LINK}>
             {displayName(dam)}
           </Link>
         );
@@ -183,47 +193,42 @@ export function CalvingScreen({
     {
       key: "calf",
       header: "Calf",
+      // The calf and its birth weight together: the weight is a fact about
+      // the calf, and a column of its own was mostly dashes.
       render: (record) => {
+        const weight =
+          record.birthWeightLb === undefined ? null : (
+            <span className="gf-numeric text-muted">{record.birthWeightLb} lb</span>
+          );
         if (record.calfAnimalId === undefined) {
           return <span className="text-muted">{producedLiveCalf(record) ? "—" : "Stillborn"}</span>;
         }
         const calf = byId.get(record.calfAnimalId);
-        return calf === undefined ? (
-          <span className="text-muted">—</span>
-        ) : (
-          <Link
-            href={animalHref(calf)}
-            className="text-ink underline decoration-edge underline-offset-4 hover:decoration-action"
-          >
-            {displayName(calf)}
-          </Link>
+        return (
+          <span className="flex flex-wrap items-baseline gap-x-2">
+            {calf === undefined ? (
+              <span className="text-muted">—</span>
+            ) : (
+              <Link href={animalHref(calf)} className={LINK}>
+                {displayName(calf)}
+              </Link>
+            )}
+            {weight}
+          </span>
         );
       },
     },
-    {
-      key: "ease",
-      header: "Ease",
-      render: (record) => (
-        <span className="[font-variant-numeric:tabular-nums]">{record.calvingEase}</span>
-      ),
-    },
-    {
-      key: "weight",
-      header: "Birth wt",
-      render: (record) => (
-        <span className="[font-variant-numeric:tabular-nums]">
-          {record.birthWeightLb === undefined ? "—" : `${record.birthWeightLb} lb`}
-        </span>
-      ),
-    },
+    { key: "ease", header: "Ease", numeric: true, render: (record) => record.calvingEase },
     {
       key: "vigour",
       header: "Vigour",
+      // A chip only when it is news. A vigorous calf is the ordinary case, and
+      // a column of green chips is a column nobody reads.
       render: (record) =>
         record.vigour === "stillborn" ? (
           <Badge tone="danger">Stillborn</Badge>
         ) : record.vigour === "vigorous" ? (
-          <Badge tone="calm">Vigorous</Badge>
+          <span className="text-muted">vigorous</span>
         ) : (
           <Badge tone="action">{record.vigour}</Badge>
         ),
@@ -248,7 +253,7 @@ export function CalvingScreen({
               {service.method} {formatDate(service.date)}
             </span>
             {carried === undefined ? null : (
-              <span className="text-muted [font-variant-numeric:tabular-nums]">{carried} d</span>
+              <span className="gf-numeric text-muted">{carried} d</span>
             )}
           </span>
         );
@@ -264,7 +269,7 @@ export function CalvingScreen({
         return days === undefined ? (
           <span className="text-muted">—</span>
         ) : (
-          <span className="[font-variant-numeric:tabular-nums]">{days} d</span>
+          <span className="gf-numeric">{days} d</span>
         );
       },
     },
@@ -279,92 +284,75 @@ export function CalvingScreen({
     },
   ];
 
+  const unassisted =
+    calvings.length === 0
+      ? undefined
+      : Math.round((calvings.filter((r) => !r.assisted).length / calvings.length) * 100);
+
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Cattle"
-        title="Calving"
-        subtitle="Recording a calving creates the calf, wires its pedigree to the dam and the service sire, and files the birth weight. None of that is a second step."
-      />
-
-      <StatRow>
-        <Tile label="Calvings" value={calvings.length} />
-        <Tile label="Live calves" value={live.length} />
-        <Tile
-          label="Being watched"
-          value={watching.length}
-          emphasis={watching.length > 0}
-          hint={watching.length > 0 ? "In the window now" : undefined}
-        />
-        <Tile
-          label="Unassisted"
-          value={
-            calvings.length === 0
-              ? "—"
-              : `${Math.round((calvings.filter((r) => !r.assisted).length / calvings.length) * 100)}%`
+      {/* Bottom clearance on a phone, for the floating button and the tab bar. */}
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <PageHeader
+          eyebrow="Cattle"
+          title="Calving"
+          subtitle={[
+            `${calvings.length} calving${calvings.length === 1 ? "" : "s"}`,
+            `${live.length} live`,
+            ...(unassisted === undefined ? [] : [`${unassisted}% unassisted`]),
+          ].join(" · ")}
+          actions={
+            // A wrapper hides it on a phone: the button's own `inline-flex`
+            // would win over a `hidden` passed to it.
+            <span className="hidden sm:block">
+              <Button variant="primary" onClick={() => setRecordingFor("")}>
+                <span aria-hidden="true">+</span> Record a calving
+              </Button>
+            </span>
           }
         />
-      </StatRow>
 
-      {watching.length === 0 ? null : (
-        <Section
-          title="Due now"
-          description="In the calving window. Recording from here fills in the cow."
-        >
-          <div className="grid grid-cols-1 gap-density lg:grid-cols-2">
-            {watching.map((record) => {
-              const dam = byId.get(record.damId);
-              return (
-                <Card key={record.id}>
-                  <DetailList
-                    columns={2}
-                    items={[
-                      { label: "Dam", value: dam === undefined ? undefined : displayName(dam) },
-                      { label: "Due", value: formatDate(projectedDueDate(record)) },
-                    ]}
-                  />
-                  <div className="pt-density">
+        {/*
+          The cows in the window, only when there are any — a quiet week is no
+          section at all. Each row opens the form with her already chosen.
+        */}
+        {watching.length === 0 ? null : (
+          <Section title="Due now" description={`${watching.length} in the calving window`}>
+            <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
+              {watching.map((record) => {
+                const dam = byId.get(record.damId);
+                const name = dam === undefined ? "Unknown" : displayName(dam);
+                return (
+                  <li key={record.id} className="flex items-center gap-3 py-2 pl-density pr-2">
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      {dam === undefined ? (
+                        <span className="font-semibold text-muted">{name}</span>
+                      ) : (
+                        <Link href={animalHref(dam)} className={`${LINK} truncate font-semibold`}>
+                          {name}
+                        </Link>
+                      )}
+                      <span className="text-sm text-muted">
+                        Due {formatDate(projectedDueDate(record))}
+                      </span>
+                    </span>
                     <Button
-                      onClick={() => {
-                        document
-                          .querySelector("#record-calving")
-                          ?.scrollIntoView({ behavior: "smooth" });
-                      }}
+                      aria-label={`Record ${name}'s calving`}
+                      onClick={() => setRecordingFor(record.damId)}
                     >
-                      Record her calving
+                      Record
                     </Button>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </Section>
-      )}
+                  </li>
+                );
+              })}
+            </ul>
+          </Section>
+        )}
 
-      <Section title="Record a calving" id="record-calving">
-        <RecordCalving
-          dams={dams}
-          existingTags={tagsInUse}
-          breedings={breedings}
-          calvings={calvings}
-          defaultDamId={params.get("dam") ?? ""}
-          propertyId={propertyId}
-          actorId={actorId}
-          onDamLevel={async (dam, level) => {
-            await animalsApi.update(dam.id, {
-              safetyLevel: level,
-              safetyNotes: `Calf at side since ${formatDate(new Date())} — protective. Clear this when the calf is weaned.`,
-            } as Partial<Animal>);
-            show({ message: `${displayName(dam)} raised to level ${level}` });
-          }}
-        />
-      </Section>
-
-      <Section title="Every calving">
-        {loading ? (
-          <p className="text-muted">Looking…</p>
-        ) : (
-          <Card>
+        <Section title="Every calving">
+          {loading ? (
+            <p className="text-muted">Looking…</p>
+          ) : (
             <DataTable
               caption="Calving records"
               columns={columns}
@@ -373,13 +361,50 @@ export function CalvingScreen({
               empty={
                 <EmptyState
                   title="Nothing has calved yet"
-                  detail="Andromeda is the first, due 24 November. Recording her calving here creates the calf with its pedigree already wired."
+                  detail="Recording a calving creates the calf with its pedigree already wired."
+                  action={
+                    <Button variant="primary" onClick={() => setRecordingFor("")}>
+                      Record a calving
+                    </Button>
+                  }
                 />
               }
             />
-          </Card>
-        )}
-      </Section>
+          )}
+        </Section>
+
+        <button
+          type="button"
+          onClick={() => setRecordingFor("")}
+          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
+        >
+          <span aria-hidden="true" className="text-xl leading-none">
+            +
+          </span>
+          Record a calving
+        </button>
+      </div>
+
+      {recordingFor === undefined ? null : (
+        <RecordCalving
+          key={recordingFor}
+          dams={dams}
+          existingTags={tagsInUse}
+          breedings={breedings}
+          calvings={calvings}
+          defaultDamId={recordingFor}
+          propertyId={propertyId}
+          actorId={actorId}
+          onClose={() => setRecordingFor(undefined)}
+          onDamLevel={async (dam, level) => {
+            await animalsApi.update(dam.id, {
+              safetyLevel: level,
+              safetyNotes: `Calf at side since ${formatDate(new Date())} — protective. Clear this when the calf is weaned.`,
+            } as Partial<Animal>);
+            show({ message: `${displayName(dam)} raised to level ${level}` });
+          }}
+        />
+      )}
     </PageBody>
   );
 }
@@ -392,6 +417,10 @@ export function CalvingScreen({
  * neither a name nor a tag fails validation and would have made the whole flow
  * unsaveable. And the sire is shown, not asked for: it comes off the service,
  * and showing it is what tells somebody the pedigree is about to be right.
+ *
+ * Once saved, the panel turns into what was recorded — the calf, and the
+ * dam's safety suggestion — rather than closing on it, because that
+ * suggestion is the one follow-up §5.1 asks somebody to decide.
  */
 function RecordCalving({
   dams,
@@ -401,6 +430,7 @@ function RecordCalving({
   defaultDamId,
   propertyId,
   actorId,
+  onClose,
   onDamLevel,
 }: {
   readonly dams: readonly Animal[];
@@ -412,9 +442,11 @@ function RecordCalving({
   readonly defaultDamId: string;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  readonly onClose: () => void;
   readonly onDamLevel: (dam: Animal, level: SafetyLevel) => Promise<void>;
 }) {
   const { show } = useToast();
+  const formId = useId();
   const record = useRecordCalving(propertyId, actorId);
 
   const [damId, setDamId] = useState(defaultDamId);
@@ -497,28 +529,80 @@ function RecordCalving({
     }
   }
 
+  if (outcome !== undefined) {
+    return (
+      <Modal
+        title="Recorded"
+        placement="side"
+        onClose={onClose}
+        footer={
+          <>
+            <Button variant="primary" onClick={onClose}>
+              Done
+            </Button>
+            <Button
+              onClick={() => {
+                setOutcome(undefined);
+                setDamId("");
+              }}
+            >
+              Record another
+            </Button>
+          </>
+        }
+      >
+        <AfterCalving outcome={outcome} dam={dam} onDamLevel={onDamLevel} />
+      </Modal>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-density">
-      <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-        <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-          <Select
-            label="Dam"
-            value={damId}
-            onChange={(event) => setDamId(event.target.value)}
-            placeholder="Choose a cow"
-            options={dams.map((animal) => ({ value: animal.id, label: displayName(animal) }))}
-            required
-          />
-          <TextInput
-            label="Date calved"
-            type="date"
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
-            required
-          />
+    <Modal
+      title="Record a calving"
+      placement="side"
+      onClose={onClose}
+      footer={
+        <>
+          {/* Tied to the form by `form`, so it stays pinned while fields scroll. */}
+          <Button type="submit" form={formId} variant="primary" busy={busy}>
+            Record calving
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        onSubmit={(event) => void submit(event)}
+        className="flex flex-col gap-density"
+      >
+        <Select
+          label="Dam"
+          value={damId}
+          onChange={(event) => setDamId(event.target.value)}
+          placeholder="Choose a cow"
+          options={dams.map((animal) => ({ value: animal.id, label: displayName(animal) }))}
+          required
+        />
+        {/* Where the calf's sire will come from, said before it is saved. */}
+        {damId === "" ? null : (
+          <p className="-mt-2 text-sm text-muted">
+            {service === undefined
+              ? "No service on file — the sire stays blank, not guessed."
+              : `Sire from the ${service.method} service on ${formatDate(service.date)}. ` +
+                `${describeGestation(service, new Date(`${date}T12:00:00`))}`}
+          </p>
+        )}
+        <TextInput
+          label="Date calved"
+          type="date"
+          value={date}
+          onChange={(event) => setDate(event.target.value)}
+          required
+        />
+        <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
           <Select
             label="Calving ease"
-            hint="The industry 1–5 scale."
             value={String(ease)}
             onChange={(event) => setEase(Number(event.target.value) as CalvingEase)}
             options={CALVING_EASE.map((value) => ({
@@ -530,7 +614,7 @@ function RecordCalving({
             label="Vigour"
             value={vigour}
             onChange={(event) => setVigour(event.target.value as CalfVigour)}
-            options={CALF_VIGOUR.map((value) => ({ value, label: value }))}
+            options={toOptions(CALF_VIGOUR)}
           />
           {vigour === "stillborn" ? null : (
             <>
@@ -548,7 +632,7 @@ function RecordCalving({
               />
               <TextInput
                 label="Calf tag"
-                hint="Year digit, calf number, year letter — the next one free."
+                hint="The next one free."
                 value={calfTag}
                 onChange={(event) => {
                   setTagTouched(true);
@@ -560,7 +644,7 @@ function RecordCalving({
           )}
           <TextInput
             label="Birth weight (lb)"
-            hint="Filed as a weight record, not a loose field."
+            hint="Filed as a weight record."
             type="number"
             value={birthWeight}
             onChange={(event) => setBirthWeight(event.target.value)}
@@ -592,26 +676,8 @@ function RecordCalving({
             {error}
           </p>
         )}
-
-        <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" busy={busy}>
-            Record calving
-          </Button>
-          {damId === "" ? null : (
-            <p className="text-sm text-muted">
-              {service === undefined
-                ? "No service on file — the calf's sire will be blank rather than guessed."
-                : `Sire from the ${service.method} service on ${formatDate(service.date)}. ` +
-                  `${describeGestation(service, new Date(`${date}T12:00:00`))}`}
-            </p>
-          )}
-        </div>
       </form>
-
-      {outcome === undefined ? null : (
-        <AfterCalving outcome={outcome} dam={dam} onDamLevel={onDamLevel} />
-      )}
-    </div>
+    </Modal>
   );
 }
 
@@ -636,49 +702,41 @@ function AfterCalving({
   const suggested = outcome.suggestedDamLevel;
 
   return (
-    <Card title="Recorded">
-      <DetailList
-        columns={2}
-        items={[
-          { label: "Calving", value: formatDate(outcome.calving?.date) },
-          {
-            label: "Calf",
-            value:
-              outcome.calf === undefined ? (
-                "None — stillborn"
-              ) : (
-                <Link
-                  href={animalHref(outcome.calf)}
-                  className="text-ink underline decoration-edge underline-offset-4"
-                >
-                  {displayName(outcome.calf)}
-                </Link>
-              ),
-          },
-        ]}
-      />
+    <div className="flex flex-col gap-density">
+      <p className="text-density text-ink">
+        {outcome.calf === undefined ? (
+          "No calf — stillborn"
+        ) : (
+          <Link href={animalHref(outcome.calf)} className={`${LINK} font-semibold`}>
+            {displayName(outcome.calf)}
+          </Link>
+        )}
+        <span className="text-muted"> · calved {formatDate(outcome.calving?.date)}</span>
+      </p>
 
       {dam === undefined ||
       suggested === undefined ||
       suggested <= dam.safetyLevel ||
       done ? null : (
-        <div className="mt-density flex flex-wrap items-center gap-3 border-t border-edge pt-density">
-          <p className="text-sm text-muted">
-            {displayName(dam)} is at level {dam.safetyLevel}. A cow with a calf at side gets
-            protective — §5.1 suggests level {suggested} until the calf is weaned.
+        <div className="flex flex-col gap-3 rounded-density bg-raised p-density">
+          <p className="text-sm text-ink">
+            {displayName(dam)} is at level {dam.safetyLevel}. With a calf at side, §5.1 suggests
+            level {suggested} until weaning.
           </p>
-          <Button
-            onClick={() => {
-              void onDamLevel(dam, suggested).then(() => setDone(true));
-            }}
-          >
-            Raise her to level {suggested}
-          </Button>
-          <Button variant="ghost" onClick={() => setDone(true)}>
-            Leave her at {dam.safetyLevel}
-          </Button>
+          <span className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => {
+                void onDamLevel(dam, suggested).then(() => setDone(true));
+              }}
+            >
+              Raise her to level {suggested}
+            </Button>
+            <Button variant="ghost" onClick={() => setDone(true)}>
+              Leave her at {dam.safetyLevel}
+            </Button>
+          </span>
         </div>
       )}
-    </Card>
+    </div>
   );
 }

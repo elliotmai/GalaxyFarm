@@ -5,14 +5,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Animal, Task, Ulid, Zone } from "@galaxy-farm/core";
 
 /**
- * The compact kiosk chore board (spec §4.4, §5.1, §5.10).
+ * The kiosk chore board (spec §4.4, §5.1, §5.10).
  *
  * Today's Chores and Housesitter Mode render the same day through the same
  * component, and the thing worth pinning down is the shape it renders in: a
- * day laid out as columns of one-line rows, not a column of cards. A card per
- * chore reads well with four chores and scrolls the evening round off the
- * screen with fourteen — which on a barn screen is the evening round not
- * happening.
+ * day laid out as parts of the day, each chore one big tick row rather than a
+ * card and a button, finished rows saying who and when, and a finished day
+ * collapsing to one green line instead of a wall of struck-through rows.
  *
  * The tick is asserted the way a gloved hand meets it: the row moves on the
  * tap, before the server action has answered. That is the whole reason the
@@ -49,6 +48,7 @@ vi.mock("@/app/(kiosk)/kiosk/_actions", () => ({
 }));
 
 const { ToastProvider } = await import("@galaxy-farm/ui");
+const { act } = await import("@testing-library/react");
 const { ChoresBoardScreen } = await import("../app/(kiosk)/kiosk/chores/chores-board-screen.js");
 
 const base = {
@@ -84,12 +84,16 @@ const RINSE = {
   animalId: ANDROMEDA.id,
 } as Task;
 
+/** Who ticked the hens off — a person, as the server names them. */
+const SAM = "01ARZ3NDEKTSV4RRFFQ69G5U01" as Ulid;
+
 const SCRATCH = {
   ...base,
   id: "01ARZ3NDEKTSV4RRFFQ69G5T03" as Ulid,
   title: "Scratch grain to the hens",
   dueAt: new Date(2026, 10, 12, 8, 30),
   completedAt: new Date(2026, 10, 12, 8, 40),
+  completedBy: SAM,
 } as Task;
 
 beforeEach(() => {
@@ -101,10 +105,10 @@ beforeEach(() => {
   stored.current = { tasks: [ICE, RINSE, SCRATCH], zones: [NORTH], animals: [ANDROMEDA] };
 });
 
-function view() {
+function view(names?: Promise<Readonly<Record<string, string>>>) {
   return render(
     <ToastProvider>
-      <ChoresBoardScreen propertyId={PROPERTY} />
+      <ChoresBoardScreen propertyId={PROPERTY} names={names} />
     </ToastProvider>,
   );
 }
@@ -210,6 +214,47 @@ describe("Today's Chores on a kiosk", () => {
     expect(screen.getByRole("button", { name: /Rinse and blow out/ })).toHaveAttribute(
       "aria-pressed",
       "false",
+    );
+  });
+
+  it("says who ticked a finished chore, once the server has named them", async () => {
+    const names = Promise.resolve({ [SAM]: "Sam" });
+    await act(async () => {
+      view(names);
+      await names;
+    });
+
+    const row = screen.getByRole("button", { name: /Scratch grain to the hens/ });
+    expect(row).toHaveAttribute("aria-pressed", "true");
+    expect(row).toHaveTextContent(/Done by Sam · 8:40/);
+  });
+
+  it("still says when a chore was done while the names are unavailable", () => {
+    view();
+
+    expect(screen.getByRole("button", { name: /Scratch grain to the hens/ })).toHaveTextContent(
+      /Done · 8:40/,
+    );
+  });
+
+  it("folds a finished day to one green line, with the record a tap away", async () => {
+    stored.current = {
+      tasks: [{ ...ICE, completedAt: new Date(2026, 10, 12, 8, 50) }, SCRATCH],
+      zones: [NORTH],
+      animals: [ANDROMEDA],
+    };
+    view();
+
+    expect(screen.getByText("All done for today")).toBeInTheDocument();
+    // Status by exception: nothing left means no rows in the way of the news.
+    expect(screen.queryByRole("button", { name: /Break ice/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+
+    // Who did what is still there for whoever wants it.
+    await userEvent.click(section("Morning").getByRole("button", { name: "Show 2" }));
+    expect(screen.getByRole("button", { name: /Break ice/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
   });
 });

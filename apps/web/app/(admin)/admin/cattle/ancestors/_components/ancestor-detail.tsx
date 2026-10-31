@@ -11,7 +11,6 @@ import {
   PedigreeChart,
   Pill,
   Section,
-  Tile,
   type Ancestor,
 } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
@@ -200,30 +199,27 @@ export function AncestorDetail({
           );
         })}
         {animal.status === undefined ? null : <Pill>{animal.status}</Pill>}
+        {/* The house rule, as one chip — a carrier gets the callout below. */}
+        {house.carried.length > 0 ? null : (
+          <Pill tone={house.clean ? "calm" : "neutral"}>
+            {house.clean ? "house rule clean" : "untested"}
+          </Pill>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile
-          label="Papers"
-          value={papers.length}
-          hint={papers.length > 1 ? "Registered twice" : undefined}
-          tone="identity"
-        />
-        <Tile label="Pedigree" value={depth} hint="generations on file" />
-        <Tile label="Descendants" value={descendants.length} />
-        <Tile
-          label="House rule"
-          value={house.clean ? "clean" : house.carried.length > 0 ? "carrier" : "untested"}
-          tone={house.clean ? "calm" : house.carried.length > 0 ? "danger" : "neutral"}
-          emphasis={house.carried.length > 0}
-        />
-      </div>
+      {/* What the old row of tiles counted, as one line of facts. */}
+      <p className="text-sm text-muted">
+        {depth} generation{depth === 1 ? "" : "s"} on file · {descendants.length} descendant
+        {descendants.length === 1 ? "" : "s"}
+        {papers.length > 1 ? " · registered twice" : ""}
+      </p>
 
+      {/* No carrier comes onto this place: anything out of it is at least a
+          coin toss to carry it too, and a carrier on the other side of a
+          pairing makes a quarter of the calves affected. */}
       {house.carried.length === 0 ? null : (
         <Callout tone="danger" title={`Carries ${house.carried.join(", ")}`}>
-          The rule on this place is that no carrier comes onto it. Anything out of this animal is at
-          least a coin toss to carry it too, and any pairing that puts another carrier on the other
-          side is a quarter affected.
+          Against the house rule — no carrier comes onto this place.
         </Callout>
       )}
 
@@ -324,7 +320,7 @@ export function AncestorDetail({
 
       <Section
         title="Genetics"
-        description="Every defect, listed whether or not there is a result — an absent row reads as clear, and that is how a carrier gets bought."
+        description="Every defect, result or not — an absent row reads as clear."
       >
         <Card>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -361,7 +357,7 @@ export function AncestorDetail({
         </Card>
       </Section>
 
-      <Section title="Pedigree" description="Click any of them to follow the line up.">
+      <Section title="Pedigree" description="Tap a parent to follow the line up.">
         <div className="flex flex-wrap gap-2">
           {(["sire", "dam"] as const).map((which) => {
             const parent = parentOf(which);
@@ -387,7 +383,7 @@ export function AncestorDetail({
         {tree === undefined || depth === 0 ? (
           <EmptyState
             title="No pedigree yet"
-            detail="Set its sire and dam and everything above them follows from the ancestors already on file. Importing the association page fills in four generations at once."
+            detail="Set its sire and dam, or import the association page for four generations at once."
           />
         ) : (
           <PedigreeChart
@@ -398,11 +394,11 @@ export function AncestorDetail({
         )}
       </Section>
 
-      <Section title="Progeny" description="Everything on file that names this animal as a parent.">
+      <Section title="Progeny" description="What names this animal as a parent.">
         {descendants.length === 0 ? (
           <EmptyState
             title="Nothing points at it"
-            detail="No pedigree names this animal, which also means it can be deleted without breaking anything."
+            detail="Nothing names it, so it can be deleted safely."
           />
         ) : (
           <Card>
@@ -437,8 +433,10 @@ export function AncestorDetail({
         )}
       </Section>
 
-      <div className="flex flex-wrap gap-2 border-t border-edge pt-density">
-        <Button onClick={onEdit}>Edit</Button>
+      <div className="flex flex-wrap gap-2 border-t border-rule pt-density">
+        <Button variant="primary" onClick={onEdit}>
+          Edit
+        </Button>
         {papers.length === 0 ? null : (
           <Button variant="ghost" onClick={onRefresh}>
             Check against the association

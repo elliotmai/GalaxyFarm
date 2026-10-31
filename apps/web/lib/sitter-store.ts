@@ -6,12 +6,15 @@ import {
   systemClock,
   taskFromTemplate,
   type Animal,
+  type ChoreEntry,
   type ChoreTemplate,
+  type ChoreWeather,
   type Contact,
   type FeedingPlan,
   type FieldValue,
   type Task,
   type Ulid,
+  type WaterSource,
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
@@ -19,11 +22,14 @@ import { repositoryFor, type Database } from "@galaxy-farm/infra-db";
 import type { CareGuide, GuideSection } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
+import type { Planting } from "@galaxy-farm/module-garden";
 import { isPet } from "@galaxy-farm/module-pets";
 
 import { guideForSitter, guideIncludes, visibleToSitter } from "@/lib/care-guide-selection";
 import { database } from "@/lib/credential-store";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
+import { weatherSnapshot } from "@/lib/weather-service";
+import { choreWeatherDay, isWeatherChoreKey, weatherChores, weatherJobs } from "@/lib/weather-jobs";
 import { applyPushAndMark } from "@/lib/change-stamp";
 
 export { guideForSitter, guideIncludes, visibleToSitter };
@@ -299,6 +305,84 @@ export async function tickChore(input: TickInput, db: Database = database()): Pr
 }
 
 /**
+ * The weather's say in a sitter's day: its own chores, and what the forecast
+ * shows for templates that wait on it. Never throws — a sitter with no
+ * forecast gets the weather templates kept and no weather chores, the same
+ * as an offline phone.
+ */
+export async function sitterWeather(
+  propertyId: Ulid,
+  date: Date,
+  at: Date,
+): Promise<{
+  readonly derived: readonly ChoreEntry[];
+  readonly weather: ReadonlySet<ChoreWeather> | undefined;
+  readonly arrives: Partial<Record<ChoreWeather, Date>>;
+}> {
+  try {
+    const snapshot = await weatherSnapshot(propertyId);
+    return {
+      derived: await weatherOccurrences(propertyId, date, at, database(), snapshot),
+      ...choreWeatherDay(snapshot.forecast, snapshot.settings, date, snapshot.alerts),
+    };
+  } catch (error) {
+    console.error("[sitter:weather]", error);
+    return { derived: [], weather: undefined, arrives: {} };
+  }
+}
+
+/** A day's feeding trips, rebuilt from the property's own plans. */
+async function feedingOccurrences(
+  propertyId: Ulid,
+  date: Date,
+  at: Date,
+  db: Database,
+): Promise<ChoreEntry[]> {
+  const [plans, zones, feeds] = await Promise.all([
+    repositoryFor<FeedingPlan>(db, "feedingPlans").list({ propertyId }),
+    repositoryFor<Zone>(db, "zones").list({ propertyId }),
+    repositoryFor<FeedType>(db, "feedTypes").list({ propertyId }),
+  ]);
+
+  return feedingChoresFor(plans, feedingChoreText({ zones, feeds, propertyId }), date, at);
+}
+
+/**
+ * A day's weather chores — covers, ice, the garden — rebuilt from the same
+ * forecast and records the screens read, so a tick from the barn is checked
+ * against what the weather actually asked for that day.
+ */
+async function weatherOccurrences(
+  propertyId: Ulid,
+  date: Date,
+  at: Date,
+  db: Database,
+  known?: Awaited<ReturnType<typeof weatherSnapshot>>,
+): Promise<ChoreEntry[]> {
+  const [snapshot, water, zones, plantings] = await Promise.all([
+    known ?? weatherSnapshot(propertyId),
+    repositoryFor<WaterSource>(db, "waterSources").list({ propertyId }),
+    repositoryFor<Zone>(db, "zones").list({ propertyId }),
+    repositoryFor<Planting>(db, "plantings").list({ propertyId }),
+  ]);
+
+  const jobs = weatherJobs({
+    forecast: snapshot.forecast,
+    settings: snapshot.settings,
+    water,
+    zones: zones.map((zone) => ({
+      id: zone.id,
+      name: zone.name,
+      waterSourceIds: zone.waterSourceIds,
+      active: zone.active,
+    })),
+    plantings,
+    now: date,
+  });
+  return weatherChores(jobs, date, at);
+}
+
+/**
  * Ticking a feeding trip off (spec §2, §5.1).
  *
  * A feeding chore is derived, so there is no template to look up — the plans
@@ -331,20 +415,15 @@ async function tickFeedingOccurrence(
     return { ok: false, reason: "That chore had not been ticked." };
   }
 
-  const [plans, zones, feeds] = await Promise.all([
-    repositoryFor<FeedingPlan>(db, "feedingPlans").list({ propertyId }),
-    repositoryFor<Zone>(db, "zones").list({ propertyId }),
-    repositoryFor<FeedType>(db, "feedTypes").list({ propertyId }),
-  ]);
-
-  const entry = feedingChoresFor(
-    plans,
-    feedingChoreText({ zones, feeds, propertyId }),
-    date,
-    at,
-  ).find((occurrence) => occurrence.id === sourceKey);
+  const entry = isWeatherChoreKey(sourceKey)
+    ? (await weatherOccurrences(propertyId, date, at, db)).find(
+        (occurrence) => occurrence.id === sourceKey,
+      )
+    : (await feedingOccurrences(propertyId, date, at, db)).find(
+        (occurrence) => occurrence.id === sourceKey,
+      );
   if (entry === undefined) {
-    return { ok: false, reason: "That feeding trip is not on that day's list." };
+    return { ok: false, reason: "That chore is not on that day's list." };
   }
 
   const record: Task = {

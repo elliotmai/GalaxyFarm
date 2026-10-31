@@ -31,10 +31,25 @@ export function Inspector({
 }) {
   if (draft !== undefined) {
     const corners = draft.boundary.length;
+    const subject = draft.label ?? draftShape?.label ?? `this ${palette.shapeNoun.one}`;
+    if (draft.open === true) {
+      return (
+        <aside className="rounded-density border border-rule bg-panel p-density text-density text-ink">
+          <p className="m-0">
+            {`Drawing ${subject}. `}
+            {corners === 0
+              ? "Click where the line starts, then where it ends."
+              : corners < 2
+                ? "Now click where it ends."
+                : `${corners} points. Drag one to move it, or keep clicking to follow a contour.`}
+          </p>
+        </aside>
+      );
+    }
     return (
       <aside className="rounded-density border border-rule bg-panel p-density text-density text-ink">
         <p className="m-0">
-          {`Drawing ${draftShape?.label ?? `this ${palette.shapeNoun.one}`}. `}
+          {`Drawing ${subject}. `}
           {corners === 0
             ? "Click each corner. Three is the fewest that enclose any ground."
             : corners < 3

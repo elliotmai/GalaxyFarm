@@ -3,7 +3,11 @@ import { redirect } from "next/navigation";
 
 import { ConfirmProvider, ToastProvider } from "@galaxy-farm/ui";
 
-import { AdminNav } from "@/app/(admin)/_components/admin-nav";
+import { AdminNav, BottomTabs } from "@/app/(admin)/_components/admin-nav";
+import { BackLink } from "@/app/(admin)/_components/back-link";
+import { SearchPaletteProvider } from "@/app/(admin)/_components/search-palette";
+import { ThemeSync } from "@/app/(admin)/_components/theme-sync";
+import { APPEARANCE_BOOT_SCRIPT } from "@/lib/appearance";
 import { Refreshable } from "@/app/(admin)/_components/refreshable";
 import { SectionStrip } from "@/app/(admin)/_components/section-strip";
 import { PwaShell } from "@/app/_components/pwa-shell";
@@ -14,21 +18,17 @@ import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
 /**
  * The browser chrome, matched to the surface (spec §8 v0.9).
  *
- * This surface runs `flying-auto`, so on a device set to dark the page is the
- * night canvas — and the root layout's light chrome would sit above it as a
- * bar of the wrong colour across the top of every screen. Overridden here
- * rather than at the root because `/account` and the public pages stay light
- * whatever the device says.
+ * Light, because the surface is light unless a device opts out in Settings —
+ * and a dark bar over a light page, which is what following the device's own
+ * scheme gave a phone set to dark, reads as a broken page.
  */
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0F1419" },
-    { media: "(prefers-color-scheme: light)", color: "#F5F6F8" },
-  ],
+  themeColor: "#F5F6F8",
 };
 
 /**
- * The admin surface. Theme is fixed per surface (spec §8): flying-day.
+ * The admin surface. Light by default; each device can choose dark or "match
+ * the device" in Settings (see `lib/appearance.ts`).
  *
  * The session is checked here as well as in the middleware. Middleware is a
  * routing concern and can be bypassed by anything that reaches a server
@@ -47,19 +47,26 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME;
 
   return (
-    <div data-surface="admin" data-theme="flying-auto">
+    // Light unless this device chose otherwise in Settings › Appearance. The
+    // first child script applies a stored choice before paint; `ThemeSync`
+    // follows changes after that. The attribute is expected to differ from
+    // the server's on a device set to dark, hence the suppressed warning.
+    <div data-surface="admin" data-theme="flying-day" suppressHydrationWarning>
+      <script dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOT_SCRIPT }} />
+      <ThemeSync />
       <SyncProvider>
         <ToastProvider>
           <ConfirmProvider>
-            <div className="flex min-h-screen flex-col md:flex-row">
-              {/*
+            <SearchPaletteProvider propertyId={actor.propertyId}>
+              <div className="flex min-h-screen flex-col md:flex-row">
+                {/*
                 Sticky and full height so the sidebar scrolls in its own right.
                 That is what preserves its position across a navigation: the
                 layout does not remount, so the scrolled element survives — and
                 a nav that jumps back to the top every time you click a link is
                 the thing that makes a long list unusable.
               */}
-              {/*
+                {/*
                 Sticky on both, for two different reasons. On a laptop it is a
                 full-height column that scrolls in its own right, which is what
                 preserves its position across a navigation — the layout does
@@ -71,25 +78,35 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 on screen forty rows into the herd, rather than back at the top
                 where you would have to scroll to reach it.
               */}
-              <aside className="sticky top-0 z-20 border-b border-edge bg-panel md:h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
-                <AdminNav propertyId={actor.propertyId} farmName={farmName} />
-              </aside>
-              {/* Tighter gutters on a phone: 14px of padding either side of a
+                <aside className="sticky top-0 z-20 border-b border-rule bg-panel md:h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
+                  <AdminNav propertyId={actor.propertyId} farmName={farmName} />
+                </aside>
+                {/* Tighter gutters on a phone: 14px of padding either side of a
                   375px screen is 7% of the width, and every table and form
                   inside is competing for the rest. */}
-              <main className="min-w-0 flex-1 px-3 py-density md:p-density">
-                <Refreshable>
-                  {/*
+                {/* The bottom padding on a phone clears the tab bar, the floating
+                  add button above it and the home-indicator inset, so the last
+                  row of a list scrolls clear of both rather than under them. */}
+                <main className="min-w-0 flex-1 px-3 pb-[calc(9rem+env(safe-area-inset-bottom))] pt-density md:p-density md:pb-density">
+                  <Refreshable>
+                    {/*
                     In the layout rather than in each screen, so a page cannot
                     forget it and so it survives a navigation without
                     remounting — which is what keeps a thirteen-tab strip from
                     losing its scroll every time you change view.
                   */}
-                  <SectionStrip />
-                  {children}
-                </Refreshable>
-              </main>
-            </div>
+                    {/*
+                    The way back, in the same place on every page that has one
+                    — above the strip, where a thumb looks for it.
+                  */}
+                    <BackLink />
+                    <SectionStrip />
+                    {children}
+                  </Refreshable>
+                </main>
+              </div>
+              <BottomTabs />
+            </SearchPaletteProvider>
           </ConfirmProvider>
         </ToastProvider>
       </SyncProvider>

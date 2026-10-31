@@ -150,7 +150,7 @@
     --gf-touch-target: 36px;
     --gf-text-size: 15px;
     --gf-gap: 12px;
-    --gf-radius: 3px;
+    --gf-radius: 8px;
     --gf-font-display: var(--font-serif-loaded, "Source Serif 4"), Georgia, serif;
     --gf-font-ui: var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif;
     --gf-font-numeric: var(--font-serif-loaded, "Source Serif 4"), Georgia, serif;
@@ -162,7 +162,7 @@
   --gf-touch-target: 36px;
   --gf-text-size: 15px;
   --gf-gap: 12px;
-  --gf-radius: 3px;
+  --gf-radius: 8px;
   --gf-font-display: var(--font-serif-loaded, "Source Serif 4"), Georgia, serif;
   --gf-font-ui: var(--font-sans-loaded, "IBM Plex Sans"), system-ui, sans-serif;
   --gf-font-numeric: var(--font-serif-loaded, "Source Serif 4"), Georgia, serif;
@@ -512,5 +512,43 @@
   figure,
   table {
     break-inside: avoid-page;
+  }
+}
+
+/*
+ * A rank of stat tiles (see `StatRow` in `primitives/layout.tsx`).
+ *
+ * One row that scrolls sideways on a phone, four up on a laptop. A class as
+ * well as a component, because thirty screens lay their tiles out by hand and
+ * a component would have meant rewriting every closing tag to adopt it.
+ */
+.gf-stat-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-inline: -0.75rem;
+  padding: 0 0.75rem 0.25rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 0.75rem;
+  scrollbar-width: none;
+}
+
+.gf-stat-row::-webkit-scrollbar {
+  display: none;
+}
+
+@media (min-width: 48rem) {
+  .gf-stat-row {
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+}
+
+@media (min-width: 64rem) {
+  .gf-stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    overflow: visible;
   }
 }

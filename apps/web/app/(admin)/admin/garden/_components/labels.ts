@@ -104,8 +104,18 @@ export const PANTRY_UNITS: readonly PreservationLog["unit"][] = [
 
 export const PANTRY_UNIT_OPTIONS = PANTRY_UNITS.map((unit) => ({ value: unit, label: unit }));
 
-/** "6 jars", "1 packet" — the unit pluralised only when it is a countable one. */
-export function quantityLabel(quantity: number, unit: string): string {
+/**
+ * "6 jars", "1 packet" — the unit pluralised only when it is a countable one.
+ *
+ * Amounts are optional (a picking nobody weighed, a packet nobody counted), so
+ * an absent one reads as `missing` rather than as "undefined lb".
+ */
+export function quantityLabel(
+  quantity: number | undefined,
+  unit: string,
+  missing = "amount not noted",
+): string {
+  if (quantity === undefined) return missing;
   const rounded = Number.isInteger(quantity) ? String(quantity) : quantity.toFixed(2);
   const countable = ["packet", "seed", "jar", "quart", "pint", "bag", "bunch"].includes(unit);
   return `${rounded} ${countable && quantity !== 1 ? `${unit}s` : unit}`;
@@ -113,6 +123,16 @@ export function quantityLabel(quantity: number, unit: string): string {
 
 export function formatDate(value: Date): string {
   return value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** An optional number field: blank is "not given", not zero and not an error. */
+export function optionalNumber(value: string): number | undefined {
+  return value.trim() === "" ? undefined : Number(value.trim());
+}
+
+/** An optional text field: blank, or only spaces, is not a value. */
+export function optionalText(value: string): string | undefined {
+  return value.trim() === "" ? undefined : value.trim();
 }
 
 /** What a `<input type="date">` wants, in UTC so the day does not shift west. */

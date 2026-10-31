@@ -9,7 +9,7 @@ import {
 } from "@galaxy-farm/core";
 
 import { inFeedUnit, type FeedType } from "./feed-type.js";
-import { weightedAverageCost, type FeedPurchase } from "./inventory.js";
+import { feedCost, type FeedCost, type FeedPurchase } from "./inventory.js";
 
 /**
  * Who the feed bill belongs to (spec §5.3, "cost per head").
@@ -51,10 +51,11 @@ export interface AnimalAllocation {
   readonly quantityByFeedType: ReadonlyMap<Ulid, number>;
   readonly cost: Money;
   /**
-   * False when a feed type in the plan has no purchase behind it.
+   * False when a feed type in the plan has no priced purchase behind it — none
+   * bought, or a load bought with no price entered.
    *
-   * Feed with no recorded purchase is valued at nothing, which understates the
-   * animal. §5.2's P&L carries the same distinction for the same reason.
+   * Feed with no price is valued at nothing, which understates the animal.
+   * §5.2's P&L carries the same distinction for the same reason.
    */
   readonly costComplete: boolean;
 }
@@ -246,12 +247,14 @@ export function herdDemand(input: {
  * happening in the barn.
  */
 export function allocateFeedCost(input: AllocationInput): AnimalAllocation[] {
-  const costCache = new Map<Ulid, Money | undefined>();
-  const costOf = (feedTypeId: Ulid): Money | undefined => {
-    if (!costCache.has(feedTypeId)) {
-      costCache.set(feedTypeId, weightedAverageCost(feedTypeId, input.purchases));
+  const costCache = new Map<Ulid, FeedCost>();
+  const costOf = (feedTypeId: Ulid): FeedCost => {
+    let cost = costCache.get(feedTypeId);
+    if (cost === undefined) {
+      cost = feedCost(feedTypeId, input.purchases);
+      costCache.set(feedTypeId, cost);
     }
-    return costCache.get(feedTypeId);
+    return cost;
   };
 
   const feedById = new Map((input.feeds ?? []).map((feed) => [feed.id, feed]));
@@ -304,12 +307,12 @@ export function allocateFeedCost(input: AllocationInput): AnimalAllocation[] {
       const quantity = daily * input.days;
       quantityByFeedType.set(feedTypeId, quantity);
 
-      const unitCost = costOf(feedTypeId);
-      if (unitCost === undefined) {
-        complete = false;
-        continue;
-      }
-      cents += unitCost.cents * quantity;
+      // A load with no price leaves the figure incomplete but not empty: the
+      // loads that were priced still say what this feed costs.
+      const { average, complete: priced } = costOf(feedTypeId);
+      if (!priced) complete = false;
+      if (average === undefined) continue;
+      cents += average.cents * quantity;
     }
 
     return {

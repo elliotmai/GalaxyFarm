@@ -49,68 +49,76 @@ export default async function AdminSettingsPage() {
   const mayManageBranding = can(actor, "branding.manage", now);
   const mayManageDevices = can(actor, "devices.manage", now);
 
+  const push = pushConfig();
+
+  // The three database reads run side by side, not one after another. Each
+  // has its own deadline, so in series a database that is down cost three of
+  // them before the page rendered — long enough to look like the app had
+  // hung, and long enough to time out the e2e suite under load.
+  const [peopleRead, devicesRead, notificationsRead] = await Promise.allSettled([
+    mayManagePeople
+      ? withDeadline(
+          Promise.all([listUsers(actor.propertyId, now), listDeletedUsers(actor.propertyId, now)]),
+          "the people list",
+        )
+      : Promise.resolve([[], []] as const),
+    mayManageDevices
+      ? withDeadline(
+          Promise.all([
+            listDevices(actor.propertyId),
+            listDeletedDevices(actor.propertyId),
+            hasKioskPin(actor.propertyId),
+          ]),
+          "the kiosk device list",
+        )
+      : Promise.resolve([[], [], false] as const),
+    /**
+     * The push half of the notification settings.
+     *
+     * Read for everybody, not gated on a capability: these are a person's own
+     * devices and their own preferences, and a member has as much business
+     * turning notifications on for their phone as an owner does. `kiosk` never
+     * reaches this page — `/admin` is closed to it (§4.4) — and the actions
+     * refuse the role besides.
+     */
+    withDeadline(
+      Promise.all([listPushDevices(actor.id), settingsFor(actor.propertyId, actor.id)]),
+      "your notification settings",
+    ),
+  ]);
+
   let people: readonly PersonRow[] = [];
   let deleted: readonly PersonRow[] = [];
   let unavailable: string | undefined;
-
-  if (mayManagePeople) {
-    try {
-      [people, deleted] = await withDeadline(
-        Promise.all([listUsers(actor.propertyId, now), listDeletedUsers(actor.propertyId, now)]),
-        "the people list",
-      );
-    } catch (error) {
-      // Logged, because a page that renders an apology and records nothing can
-      // only be diagnosed by reproducing it.
-      console.error("[settings:people]", error);
-      unavailable =
-        "Could not reach the database, so the list of people is not here. Everything else on this page is read from this device and is unaffected.";
-    }
+  if (peopleRead.status === "fulfilled") {
+    [people, deleted] = peopleRead.value;
+  } else {
+    // Logged, because a page that renders an apology and records nothing can
+    // only be diagnosed by reproducing it.
+    console.error("[settings:people]", peopleRead.reason);
+    unavailable =
+      "Could not reach the database, so the list of people is not here. Everything else on this page is read from this device and is unaffected.";
   }
 
   let devices: readonly KioskDevice[] = [];
   let deletedDevices: readonly KioskDevice[] = [];
   let pinSet = false;
   let devicesUnavailable: string | undefined;
-
-  if (mayManageDevices) {
-    try {
-      [devices, deletedDevices, pinSet] = await withDeadline(
-        Promise.all([
-          listDevices(actor.propertyId),
-          listDeletedDevices(actor.propertyId),
-          hasKioskPin(actor.propertyId),
-        ]),
-        "the kiosk device list",
-      );
-    } catch (error) {
-      console.error("[settings:devices]", error);
-      devicesUnavailable =
-        "Could not reach the database, so the list of kiosk devices is not here. Everything else on this page is read from this device and is unaffected.";
-    }
+  if (devicesRead.status === "fulfilled") {
+    [devices, deletedDevices, pinSet] = devicesRead.value;
+  } else {
+    console.error("[settings:devices]", devicesRead.reason);
+    devicesUnavailable =
+      "Could not reach the database, so the list of kiosk devices is not here. Everything else on this page is read from this device and is unaffected.";
   }
 
-  /**
-   * The push half of the notification settings.
-   *
-   * Read for everybody, not gated on a capability: these are a person's own
-   * devices and their own preferences, and a member has as much business
-   * turning notifications on for their phone as an owner does. `kiosk` never
-   * reaches this page — `/admin` is closed to it (§4.4) — and the actions
-   * refuse the role besides.
-   */
-  const push = pushConfig();
   let pushDevices: readonly PushDevice[] = [];
   let notificationSettings: readonly NotificationSetting[] = [];
   let notificationsUnavailable: string | undefined;
-
-  try {
-    [pushDevices, notificationSettings] = await withDeadline(
-      Promise.all([listPushDevices(actor.id), settingsFor(actor.propertyId, actor.id)]),
-      "your notification settings",
-    );
-  } catch (error) {
-    console.error("[settings:notifications]", error);
+  if (notificationsRead.status === "fulfilled") {
+    [pushDevices, notificationSettings] = notificationsRead.value;
+  } else {
+    console.error("[settings:notifications]", notificationsRead.reason);
     notificationsUnavailable =
       "Could not reach the database, so your notification settings are not here. Everything else on this page is read from this device and is unaffected.";
   }

@@ -176,6 +176,9 @@ export interface WeaningWatchInput {
   readonly batchWindowDays?: number | undefined;
 }
 
+/** Older than this, an animal is weaned whether or not anybody wrote it down. */
+export const WEANED_BY_DAYS = 365;
+
 const addDays = (from: Date, days: number): Date => new Date(from.getTime() + days * 86_400_000);
 
 const daysApart = (left: Date, right: Date): number =>
@@ -188,7 +191,7 @@ const daysApart = (left: Date, right: Date): number =>
  * until its youngest member is ready, so the calves that are *not* yet due are
  * exactly the ones that decide when the batch is.
  *
- * Four things keep a calf off this list, each a real state rather than an
+ * Five things keep a calf off this list, each a real state rather than an
  * oversight to paper over:
  *
  * - **Already weaned.** `weanedOn` is set and the job is done.
@@ -196,6 +199,9 @@ const daysApart = (left: Date, right: Date): number =>
  * - **No birthday.** There is no honest countdown without one, and a guessed
  *   weaning date on a calf whose age nobody knows would be acted on.
  * - **Not cattle.** One Animal model serves every species (§2).
+ * - **Past a year old.** Nothing that age is still on its dam; a grown cow
+ *   with no weaning date is a record nobody back-filled, not a calf. Without
+ *   this every cow entered on the first day lit "calves to wean" forever.
  */
 export function weaningCandidates(input: WeaningWatchInput): WeaningCandidate[] {
   const earliest = input.earliestDays ?? DEFAULT_WEANING_EARLIEST_DAYS;
@@ -217,6 +223,7 @@ export function weaningCandidates(input: WeaningWatchInput): WeaningCandidate[] 
 
     const ageDays = ageInDays(animal, input.asOf);
     if (ageDays === undefined || animal.dob === undefined) continue;
+    if (ageDays > WEANED_BY_DAYS) continue;
 
     // The pedigree dam, which is only the right answer for an ordinary calf.
     const pedigreeDam =

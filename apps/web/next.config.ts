@@ -20,6 +20,18 @@ const nextConfig: NextConfig = {
   typedRoutes: false,
 
   /**
+   * Addresses that moved when every species got its own page (decisions 44,
+   * 46), so an old bookmark or a link in an old email still lands somewhere
+   * sensible. A query (`?tab=health`) is carried across.
+   */
+  async redirects() {
+    return [
+      { source: "/admin/pets", destination: "/admin/pets/dogs/care", permanent: false },
+      { source: "/admin/horses/herd", destination: "/admin/horses", permanent: false },
+    ];
+  },
+
+  /**
    * Keep a visited route in the client router cache (spec §4.2).
    *
    * Next's default for a dynamically-rendered segment is zero: the payload

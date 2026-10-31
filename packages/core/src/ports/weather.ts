@@ -18,7 +18,26 @@ export interface HourlyWeather {
   /** Surface pressure. The calving watch is looking for a fall in this. */
   readonly pressureHpa?: number | undefined;
   readonly windMph?: number | undefined;
+  /** The strongest gust in the hour — what takes a tarp or a gate, not the mean. */
+  readonly gustMph?: number | undefined;
   readonly precipitationChance?: number | undefined;
+  /** The WMO weather code — clear, cloud, rain, storm. See `weatherCodeLabel`. */
+  readonly weatherCode?: number | undefined;
+}
+
+/**
+ * The weather right now, as the provider last observed or modelled it.
+ *
+ * Separate from the hours because it is fresher — a quarter-hour reading, not
+ * the hour's forecast — and because a board on a barn wall is asked "what is
+ * it doing out there" far more often than "what will it do".
+ */
+export interface CurrentWeather {
+  readonly at: Date;
+  readonly temperatureF: number;
+  readonly weatherCode?: number | undefined;
+  readonly windMph?: number | undefined;
+  readonly gustMph?: number | undefined;
 }
 
 export interface DailyWeather {
@@ -44,6 +63,8 @@ export interface Forecast {
   readonly longitude: number;
   /** When this was fetched, so a cached forecast can say how stale it is. */
   readonly retrievedAt: Date;
+  /** Not every provider has one; the weather service's forecast does not. */
+  readonly current?: CurrentWeather | undefined;
   readonly hourly: readonly HourlyWeather[];
   readonly daily: readonly DailyWeather[];
 }

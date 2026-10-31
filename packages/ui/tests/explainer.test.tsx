@@ -5,17 +5,16 @@ import { describe, expect, it } from "vitest";
 import { PageHeader, Section } from "../src/primitives/layout.js";
 
 /**
- * Folded explanations (spec §8 v0.9).
+ * Explanations behind a `?` (spec §8 v0.9).
  *
- * `subtitle` and `description` are both documented as one line and were both
- * being handed paragraphs. The fold is what lets that stay true on screen
- * without deleting anything, so what is worth testing is the part a reader
- * would notice if it broke: that the naming sentence is always visible, that
- * the rest is reachable, and that nothing is lost either way.
+ * A header carries facts; an explanation waits beside the title until it is
+ * asked for. What is worth testing is what a reader would notice if it broke:
+ * that a fact stays on screen, that an explanation is one click away and never
+ * lost, and that the heading itself is never folded.
  */
 
 describe("PageHeader", () => {
-  it("shows the first sentence and folds the rest", async () => {
+  it("puts an explanation behind the ? beside the title", async () => {
     render(
       <PageHeader
         title="Supplies"
@@ -23,27 +22,21 @@ describe("PageHeader", () => {
       />,
     );
 
-    expect(screen.getByText(/Shavings through show sticks\./)).toBeVisible();
+    const help = screen.getByText(/On hand is the opening count/);
+    expect(help.closest("details")).not.toHaveAttribute("open");
 
-    const rest = screen.getByText(/On hand is the opening count/);
-    expect(rest).toBeInTheDocument();
-    // jsdom does not implement `<details>` visibility, so the fold itself is
-    // asserted on the element that owns it rather than on the text.
-    expect(rest.closest("details")).not.toHaveAttribute("open");
-
-    await userEvent.click(screen.getByText("More"));
-    expect(rest.closest("details")).toHaveAttribute("open");
+    await userEvent.click(screen.getByLabelText("About Supplies"));
+    expect(help.closest("details")).toHaveAttribute("open");
   });
 
-  it("leaves a subtitle that is already one line alone", () => {
-    render(<PageHeader title="Trash" subtitle="Deleted records, and what still points at them." />);
+  it("leaves a short fact on screen", () => {
+    render(<PageHeader title="Trash" subtitle="Deleted records, and what still points at them" />);
 
-    expect(screen.getByText("Deleted records, and what still points at them.")).toBeVisible();
-    expect(screen.queryByText("More")).not.toBeInTheDocument();
+    expect(screen.getByText("Deleted records, and what still points at them")).toBeVisible();
+    expect(screen.queryByLabelText("About Trash")).not.toBeInTheDocument();
   });
 
-  it("does not try to split something that is not a string", () => {
-    // Several screens pass a count or a chip rather than prose.
+  it("always shows something a screen built from data", () => {
     render(
       <PageHeader
         title="Herd"
@@ -56,11 +49,10 @@ describe("PageHeader", () => {
     );
 
     expect(screen.getByText("42")).toBeVisible();
-    expect(screen.queryByText("More")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("About Herd")).not.toBeInTheDocument();
   });
 
-  it("does not mistake a section reference for the end of a sentence", () => {
-    // "§5.3" and "1.5 lb" both carry a full stop with no space after it.
+  it("does not mistake a section reference for a second sentence", () => {
     render(
       <Section title="Profit" description="Feed is apportioned in §5.3 and never re-derived.">
         <p>x</p>
@@ -68,12 +60,12 @@ describe("PageHeader", () => {
     );
 
     expect(screen.getByText("Feed is apportioned in §5.3 and never re-derived.")).toBeVisible();
-    expect(screen.queryByText("More")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("About Profit")).not.toBeInTheDocument();
   });
 });
 
 describe("Section", () => {
-  it("folds a long description the same way a page header does", async () => {
+  it("puts a long description behind the ? the same way a page header does", async () => {
     render(
       <Section
         title="Breed"
@@ -83,18 +75,14 @@ describe("Section", () => {
       </Section>,
     );
 
-    expect(screen.getByText(/What this one is, in words\./)).toBeVisible();
+    const help = screen.getByText(/because a crossbred animal/);
+    expect(help.closest("details")).not.toHaveAttribute("open");
 
-    const rest = screen.getByText(/because a crossbred animal/);
-    expect(rest.closest("details")).not.toHaveAttribute("open");
-
-    await userEvent.click(screen.getByText("More"));
-    expect(rest.closest("details")).toHaveAttribute("open");
+    await userEvent.click(screen.getByLabelText("About Breed"));
+    expect(help.closest("details")).toHaveAttribute("open");
   });
 
   it("keeps the heading out of the fold", () => {
-    // The title is not part of the disclosure — a collapsed section that hid
-    // its own name would be unnavigable.
     render(
       <Section title="Breed" description="One sentence. And a second one.">
         <p>x</p>

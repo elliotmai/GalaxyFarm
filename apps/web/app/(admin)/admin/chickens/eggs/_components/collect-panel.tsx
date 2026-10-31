@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Button, Callout, Section, Select, TextArea, TextInput, useToast } from "@galaxy-farm/ui";
+import { Button, Select, TextArea, TextInput, useToast } from "@galaxy-farm/ui";
 import { type CrudError, type Ulid } from "@galaxy-farm/core";
 import {
   eggLogSchema,
@@ -144,109 +144,123 @@ export function CollectPanel({
   return (
     <div className="flex flex-col gap-density">
       {flocks.length === 0 ? (
-        <Callout tone="neutral" title="No flocks yet">
-          Eggs can be logged without one — the total is all this needs. Adding a flock is what turns
-          these into eggs per bird, so the trends can say whether the coop is doing well or only
-          doing a lot.
-        </Callout>
+        // One quiet line rather than a callout: logging works without a
+        // flock, and a flock is only what turns these into eggs per bird.
+        <p className="text-sm text-muted">No flocks yet — a total is all this needs.</p>
       ) : null}
 
-      <Section
-        title="This basket"
-        description="Tap it in. The date is already today and the count is already zero, which is the whole of the fast path §8 asks for."
+      {/*
+        Tap it in. The date is already today and the count is already zero,
+        which is the whole of the fast path §8 asks for.
+      */}
+      <form
+        onSubmit={(event) => void log(event)}
+        aria-label="This basket"
+        className="flex flex-col gap-density rounded-density border border-rule bg-panel p-density"
       >
-        <form onSubmit={(event) => void log(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-            {live.length <= 1 ? null : (
-              <Select
-                label="Flock"
-                value={chosen}
-                placeholder="Whole place"
-                options={[
-                  { value: "", label: "Whole place" },
-                  ...live.map((flock) => ({ value: flock.id, label: flock.name })),
-                ]}
-                error={errors["flockId"]}
-                onChange={(event) => setFlockId(event.target.value)}
-              />
-            )}
-            <TextInput
-              label="Collected"
-              type="date"
-              required
-              value={collectedOn}
-              error={errors["collectedOn"]}
-              onChange={(event) => setCollectedOn(event.target.value)}
+        <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+          {live.length <= 1 ? null : (
+            <Select
+              label="Flock"
+              value={chosen}
+              placeholder="Whole place"
+              options={[
+                { value: "", label: "Whole place" },
+                ...live.map((flock) => ({ value: flock.id, label: flock.name })),
+              ]}
+              error={errors["flockId"]}
+              onChange={(event) => setFlockId(event.target.value)}
             />
-            <TextInput
-              label="Total"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
-              numeric
-              disabled={rows.length > 0}
-              hint={
-                rows.length > 0
-                  ? "Counted from the breakdown below."
-                  : "Type it, or use the buttons."
-              }
-              value={String(total)}
-              error={errors["total"]}
-              onChange={(event) => setTally(Math.max(0, Math.trunc(Number(event.target.value))))}
-            />
-          </div>
-
-          {rows.length > 0 ? null : (
-            <div className="flex flex-wrap items-center gap-2">
-              {STEPS.map((step) => (
-                <Button
-                  key={step}
-                  variant="primary"
-                  onClick={() => setTally(tally + step)}
-                  aria-label={`Add ${step}`}
-                >
-                  +{step}
-                </Button>
-              ))}
-              <Button
-                onClick={() => setTally(Math.max(0, tally - 1))}
-                disabled={tally === 0}
-                aria-label="Take one off"
-              >
-                −1
-              </Button>
-              <Button variant="ghost" onClick={startOver} disabled={tally === 0}>
-                Start over
-              </Button>
-            </div>
           )}
-
-          <BreakdownEditor rows={rows} onChange={setRows} error={errors["breakdown"]} />
-
-          <TextArea
-            label="Note"
-            rows={2}
-            hint="A cracked one, a nest found under the barn, the morning nobody went out."
-            value={notes}
-            error={errors["notes"]}
-            onChange={(event) => setNotes(event.target.value)}
+          <TextInput
+            label="Collected"
+            type="date"
+            required
+            value={collectedOn}
+            error={errors["collectedOn"]}
+            onChange={(event) => setCollectedOn(event.target.value)}
           />
+          <TextInput
+            label="Total"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            numeric
+            disabled={rows.length > 0}
+            hint={rows.length > 0 ? "Counted from the breakdown." : undefined}
+            value={String(total)}
+            error={errors["total"]}
+            onChange={(event) => setTally(Math.max(0, Math.trunc(Number(event.target.value))))}
+          />
+        </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" variant="primary" busy={busy} disabled={total === 0}>
-              Log {total} egg{total === 1 ? "" : "s"}
+        {rows.length > 0 ? null : (
+          <div className="flex flex-wrap items-center gap-2">
+            {STEPS.map((step) => (
+              <Button
+                key={step}
+                variant="primary"
+                onClick={() => setTally(tally + step)}
+                aria-label={`Add ${step}`}
+              >
+                +{step}
+              </Button>
+            ))}
+            <Button
+              onClick={() => setTally(Math.max(0, tally - 1))}
+              disabled={tally === 0}
+              aria-label="Take one off"
+            >
+              −1
             </Button>
-            {alreadyToday === 0 ? null : (
-              <span className="text-sm text-muted">
-                {alreadyToday} already logged for that day
-                {chosenFlock === undefined ? "" : ` from ${chosenFlock.name}`} — this adds to it
-                rather than replacing it.
-              </span>
-            )}
+            <Button variant="ghost" onClick={startOver} disabled={tally === 0}>
+              Start over
+            </Button>
           </div>
-        </form>
-      </Section>
+        )}
+
+        {/*
+          The breakdown and the note, folded. §5.4 makes the breakdown optional
+          and §8 says logging must be fast, so whoever is carrying a bucket in
+          from the rain never has to scroll past them. Open whenever there is
+          something in them, so nothing typed is ever hidden.
+        */}
+        <details
+          className="rounded-density border border-rule"
+          open={rows.length > 0 || notes !== "" ? true : undefined}
+        >
+          <summary className="flex min-h-target cursor-pointer items-center px-3 text-sm font-medium text-ink">
+            Breakdown and note
+            {rows.length === 0 ? "" : ` · ${rows.length} row${rows.length === 1 ? "" : "s"}`}
+          </summary>
+          <div className="flex flex-col gap-density border-t border-rule p-density">
+            <BreakdownEditor rows={rows} onChange={setRows} error={errors["breakdown"]} />
+            <TextArea
+              label="Note"
+              rows={2}
+              hint="A cracked one, a nest found under the barn."
+              value={notes}
+              error={errors["notes"]}
+              onChange={(event) => setNotes(event.target.value)}
+            />
+          </div>
+        </details>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" variant="primary" busy={busy} disabled={total === 0}>
+            Log {total} egg{total === 1 ? "" : "s"}
+          </Button>
+          {/* Adds rather than replaces — said, so a second basket is not
+              mistaken for a correction of the first. */}
+          {alreadyToday === 0 ? null : (
+            <span className="text-sm text-muted">
+              {alreadyToday} already logged that day
+              {chosenFlock === undefined ? "" : ` from ${chosenFlock.name}`}
+            </span>
+          )}
+        </div>
+      </form>
     </div>
   );
 }

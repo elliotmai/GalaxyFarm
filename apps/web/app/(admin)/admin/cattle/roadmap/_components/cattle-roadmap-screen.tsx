@@ -1,21 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 
 import {
   Button,
-  CardGrid,
+  DetailList,
   EmptyState,
+  Modal,
   PageBody,
   PageHeader,
   Pill,
-  RecordCard,
   Section,
   Select,
   TextInput,
-  Tile,
   useConfirmDelete,
   useToast,
+  toOptions,
 } from "@galaxy-farm/ui";
 import { displayName, encodeUlid, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -44,6 +44,10 @@ import { useRecords } from "@/lib/local/use-records";
  * record**, carrying the dam, method and sire across. The plan becomes the
  * fact in one tap and nothing is typed twice, which is the whole reason to
  * plan in the app rather than on a whiteboard.
+ *
+ * The matings lead, because they are what gets acted on; the goals they serve
+ * sit under them. Each is a row with one chip, and adding either is a side
+ * panel rather than a form standing open above its list.
  */
 
 function formatDate(value: Date | undefined): string {
@@ -192,142 +196,286 @@ export function CattleRoadmapScreen({
     show({ message: "Plan deleted", tone: "danger" });
   }
 
+  const [planning, setPlanning] = useState(false);
+  const [addingGoal, setAddingGoal] = useState(false);
+  const [openId, setOpenId] = useState<Ulid | undefined>();
+  const opened = plans.find((plan) => plan.id === openId);
+
+  const activeGoals = goals.filter((g) => g.active).length;
+  const committed = open.filter((plan) => plan.semenInventoryId !== undefined).length;
+
+  const damName = (plan: PlannedMating) => {
+    const dam = plan.damId === undefined ? undefined : byId.get(plan.damId);
+    return dam === undefined ? (plan.damCriteria ?? "A dam not yet chosen") : displayName(dam);
+  };
+  const strawOf = (plan: PlannedMating) =>
+    plan.semenInventoryId === undefined
+      ? undefined
+      : straws.find((entry) => entry.id === plan.semenInventoryId);
+
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Cattle"
-        title="Genetic roadmap"
-        subtitle="What the herd is being bred toward, and the matings planned to get there. Recording a plan turns it into a breeding record."
-      />
+      {/* Bottom clearance on a phone, for the floating button and the tab bar. */}
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <PageHeader
+          eyebrow="Cattle"
+          title="Genetic roadmap"
+          subtitle={[
+            `${open.length} planned`,
+            `${realised.length} realised`,
+            `${activeGoals} goal${activeGoals === 1 ? "" : "s"}`,
+            ...(committed === 0
+              ? []
+              : [`${committed} straw${committed === 1 ? "" : "s"} committed`]),
+          ].join(" · ")}
+          actions={
+            // A wrapper hides it on a phone: the button's own `inline-flex`
+            // would win over a `hidden` passed to it.
+            <span className="hidden sm:block">
+              <Button variant="primary" onClick={() => setPlanning(true)}>
+                <span aria-hidden="true">+</span> Plan a mating
+              </Button>
+            </span>
+          }
+        />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile label="Goals" value={goals.filter((g) => g.active).length} tone="identity" />
-        <Tile
-          label="Matings planned"
-          value={open.length}
-          tone="action"
-          emphasis={open.length > 0}
-        />
-        <Tile label="Realised" value={realised.length} tone="calm" />
-        <Tile
-          label="Straws committed"
-          value={open.filter((plan) => plan.semenInventoryId !== undefined).length}
-        />
+        <Section
+          title="Planned matings"
+          description="Recording one creates the breeding with dam, method and sire filled in."
+        >
+          {plans.length === 0 ? (
+            <EmptyState
+              title="Nothing planned"
+              detail="When the breeding happens, the plan becomes the record in one tap."
+              action={
+                <Button variant="primary" onClick={() => setPlanning(true)}>
+                  Plan a mating
+                </Button>
+              }
+            />
+          ) : (
+            <ul aria-label="Planned matings" className={LIST}>
+              {[...plans]
+                .sort(
+                  (left, right) =>
+                    Number(left.planStatus !== "open") - Number(right.planStatus !== "open"),
+                )
+                .map((plan) => {
+                  const name = damName(plan);
+                  return (
+                    <Row
+                      key={plan.id}
+                      title={name}
+                      line={[
+                        plan.method,
+                        strawOf(plan)?.sireName,
+                        plan.targetSeason,
+                        plan.rationale,
+                      ]}
+                      chip={
+                        plan.planStatus === "realised" ? (
+                          <Pill tone="calm">
+                            {plan.realisedAt === undefined
+                              ? "Bred"
+                              : `Bred ${formatDate(plan.realisedAt)}`}
+                          </Pill>
+                        ) : plan.planStatus === "abandoned" ? (
+                          <Pill tone="neutral">Set aside</Pill>
+                        ) : undefined
+                      }
+                    >
+                      {/* The plan-to-fact step stays one tap on the row. */}
+                      {plan.planStatus === "open" ? (
+                        <Button onClick={() => void realise(plan)}>Record as bred</Button>
+                      ) : null}
+                      <button
+                        type="button"
+                        aria-label={`More for ${name}`}
+                        onClick={() => setOpenId(plan.id)}
+                        className={ICON_BUTTON}
+                      >
+                        <MoreIcon />
+                      </button>
+                    </Row>
+                  );
+                })}
+            </ul>
+          )}
+        </Section>
+
+        <Section
+          title="What we are selecting for"
+          actions={<Button onClick={() => setAddingGoal(true)}>Add a goal</Button>}
+        >
+          {goals.length === 0 ? (
+            <EmptyState
+              title="No goals set"
+              detail="Naming what you breed toward makes a mating plan arguable rather than a hunch."
+            />
+          ) : (
+            <ul aria-label="Genetic goals" className={LIST}>
+              {goals.map((goal) => (
+                <Row
+                  key={goal.id}
+                  title={goal.trait}
+                  line={[goal.direction, goal.active ? undefined : "inactive", goal.rationale]}
+                >
+                  <button
+                    type="button"
+                    aria-label={`Delete goal ${goal.trait}`}
+                    onClick={() => void removeGoal(goal)}
+                    className={ICON_BUTTON}
+                  >
+                    <TrashIcon />
+                  </button>
+                </Row>
+              ))}
+            </ul>
+          )}
+        </Section>
+
+        <button
+          type="button"
+          onClick={() => setPlanning(true)}
+          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
+        >
+          <span aria-hidden="true" className="text-xl leading-none">
+            +
+          </span>
+          Plan a mating
+        </button>
       </div>
 
-      <Section
-        title="What we are selecting for"
-        description="Free text rather than a fixed list — every herd's traits are its own."
-      >
-        <AddGoal api={goalsApi} />
-        {goals.length === 0 ? (
-          <EmptyState
-            title="No goals set"
-            detail="Naming what you are breeding toward is what makes a mating plan arguable rather than a hunch."
-          />
-        ) : (
-          <CardGrid columns={3}>
-            {goals.map((goal) => (
-              <RecordCard
-                key={goal.id}
-                tone={goal.active ? "identity" : "neutral"}
-                title={goal.trait}
-                subtitle={goal.rationale}
-                actions={
-                  <Pill tone={goal.direction === "increase" ? "calm" : "action"}>
-                    {goal.direction}
-                  </Pill>
-                }
-              >
-                <Button variant="ghost" onClick={() => void removeGoal(goal)}>
-                  Delete
+      {planning ? (
+        <AddPlan dams={dams} straws={straws} api={plansApi} onClose={() => setPlanning(false)} />
+      ) : null}
+      {addingGoal ? <AddGoal api={goalsApi} onClose={() => setAddingGoal(false)} /> : null}
+
+      {opened === undefined ? null : (
+        <Modal
+          title={damName(opened)}
+          placement="side"
+          onClose={() => setOpenId(undefined)}
+          footer={
+            <>
+              {opened.planStatus === "open" ? (
+                <Button
+                  onClick={() => {
+                    setOpenId(undefined);
+                    void abandon(opened);
+                  }}
+                >
+                  Set aside
                 </Button>
-              </RecordCard>
-            ))}
-          </CardGrid>
-        )}
-      </Section>
-
-      <Section
-        title="Planned matings"
-        description="Recording one creates the breeding record with the dam, method and sire already filled in."
-      >
-        <AddPlan dams={dams} straws={straws} api={plansApi} />
-
-        {plans.length === 0 ? (
-          <EmptyState
-            title="Nothing planned"
-            detail="A plan carries the sire you chose and why. When the breeding happens, it becomes the record in one tap."
+              ) : (
+                <Button onClick={() => setOpenId(undefined)}>Close</Button>
+              )}
+              {/* Closed first, so the confirmation is the only dialog showing. */}
+              <Button
+                variant="danger"
+                className="ml-auto"
+                onClick={() => {
+                  setOpenId(undefined);
+                  void removePlan(opened);
+                }}
+              >
+                Delete
+              </Button>
+            </>
+          }
+        >
+          <DetailList
+            items={[
+              { label: "Status", value: opened.planStatus },
+              { label: "Method", value: opened.method },
+              { label: "Straw", value: strawOf(opened)?.sireName },
+              { label: "Target season", value: opened.targetSeason },
+              {
+                label: "Bred",
+                value: opened.realisedAt === undefined ? undefined : formatDate(opened.realisedAt),
+              },
+              { label: "Why this cross", value: opened.rationale, wide: true },
+            ]}
           />
-        ) : (
-          <CardGrid columns={2}>
-            {[...plans]
-              .sort(
-                (left, right) =>
-                  Number(left.planStatus !== "open") - Number(right.planStatus !== "open"),
-              )
-              .map((plan) => {
-                const dam = plan.damId === undefined ? undefined : byId.get(plan.damId);
-                const straw =
-                  plan.semenInventoryId === undefined
-                    ? undefined
-                    : straws.find((entry) => entry.id === plan.semenInventoryId);
-
-                return (
-                  <RecordCard
-                    key={plan.id}
-                    tone={
-                      plan.planStatus === "realised"
-                        ? "calm"
-                        : plan.planStatus === "abandoned"
-                          ? "neutral"
-                          : "action"
-                    }
-                    title={
-                      dam === undefined
-                        ? (plan.damCriteria ?? "A dam not yet chosen")
-                        : displayName(dam)
-                    }
-                    subtitle={plan.rationale}
-                    actions={<Pill tone="neutral">{plan.planStatus}</Pill>}
-                    meta={
-                      <>
-                        <Pill tone="identity">{plan.method}</Pill>
-                        {straw === undefined ? null : <Pill>{straw.sireName}</Pill>}
-                        {plan.targetSeason === undefined ? null : (
-                          <Pill tone="action">{plan.targetSeason}</Pill>
-                        )}
-                        {plan.realisedAt === undefined ? null : (
-                          <Pill tone="calm">bred {formatDate(plan.realisedAt)}</Pill>
-                        )}
-                      </>
-                    }
-                  >
-                    <div className="flex flex-wrap gap-2">
-                      {plan.planStatus === "open" ? (
-                        <>
-                          <Button onClick={() => void realise(plan)}>Record as bred</Button>
-                          <Button variant="ghost" onClick={() => void abandon(plan)}>
-                            Set aside
-                          </Button>
-                        </>
-                      ) : null}
-                      <Button variant="ghost" onClick={() => void removePlan(plan)}>
-                        Delete
-                      </Button>
-                    </div>
-                  </RecordCard>
-                );
-              })}
-          </CardGrid>
-        )}
-      </Section>
+        </Modal>
+      )}
     </PageBody>
   );
 }
 
-function AddGoal({ api }: { readonly api: ReturnType<typeof useMutations<GeneticGoal>> }) {
+const LIST =
+  "flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel";
+
+const ICON_BUTTON =
+  "inline-flex min-h-target min-w-target shrink-0 items-center justify-center rounded-full text-muted hover:bg-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-action";
+
+/** One row: a bold name, one muted line, at most one chip, and its controls. */
+function Row({
+  title,
+  line,
+  chip,
+  children,
+}: {
+  readonly title: string;
+  readonly line: readonly (string | undefined)[];
+  readonly chip?: ReactNode;
+  readonly children?: ReactNode;
+}) {
+  const facts = line.filter((part): part is string => part !== undefined && part !== "");
+  return (
+    <li className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 pl-density pr-1">
+      <span className="flex min-w-0 flex-1 basis-40 flex-col gap-0.5 py-1">
+        <span className="truncate font-semibold text-ink">{title}</span>
+        {facts.length === 0 ? null : (
+          <span className="text-sm text-muted">{facts.join(" · ")}</span>
+        )}
+      </span>
+      {chip === undefined ? null : <span className="shrink-0">{chip}</span>}
+      <span className="ml-auto flex shrink-0 items-center gap-1">{children}</span>
+    </li>
+  );
+}
+
+function MoreIcon() {
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="19" cy="12" r="2" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 7h16" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M6 7l1 13h10l1-13" />
+      <path d="M9 7V4h6v3" />
+    </svg>
+  );
+}
+
+function AddGoal({
+  api,
+  onClose,
+}: {
+  readonly api: ReturnType<typeof useMutations<GeneticGoal>>;
+  readonly onClose: () => void;
+}) {
   const { show } = useToast();
+  const formId = useId();
   const [trait, setTrait] = useState("");
   const [direction, setDirection] = useState<GeneticDirection>("increase");
   const [rationale, setRationale] = useState("");
@@ -344,8 +492,7 @@ function AddGoal({ api }: { readonly api: ReturnType<typeof useMutations<Genetic
         ...(rationale.trim() === "" ? {} : { rationale: rationale.trim() }),
       } as never);
       if (!result.ok) return;
-      setTrait("");
-      setRationale("");
+      onClose();
       show({ message: "Goal added", tone: "success" });
     } finally {
       setBusy(false);
@@ -353,33 +500,45 @@ function AddGoal({ api }: { readonly api: ReturnType<typeof useMutations<Genetic
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="flex flex-wrap items-end gap-3">
-      <div className="min-w-0 flex-1">
+    <Modal
+      title="Add a goal"
+      description="Free text — every herd's traits are its own."
+      placement="side"
+      onClose={onClose}
+      footer={
+        <>
+          <Button type="submit" form={formId} variant="primary" busy={busy}>
+            Add goal
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        onSubmit={(event) => void submit(event)}
+        className="flex flex-col gap-density"
+      >
         <TextInput
           label="Trait"
-          hint="&ldquo;calving ease&rdquo;, &ldquo;rib shape&rdquo;, &ldquo;docility&rdquo;"
+          placeholder="calving ease, rib shape, docility"
           value={trait}
           onChange={(event) => setTrait(event.target.value)}
           required
         />
-      </div>
-      <Select
-        label="Direction"
-        value={direction}
-        onChange={(event) => setDirection(event.target.value as GeneticDirection)}
-        options={GENETIC_DIRECTIONS.map((value) => ({ value, label: value }))}
-      />
-      <div className="min-w-0 flex-1">
+        <Select
+          label="Direction"
+          value={direction}
+          onChange={(event) => setDirection(event.target.value as GeneticDirection)}
+          options={toOptions(GENETIC_DIRECTIONS)}
+        />
         <TextInput
           label="Why"
           value={rationale}
           onChange={(event) => setRationale(event.target.value)}
         />
-      </div>
-      <Button type="submit" busy={busy}>
-        Add goal
-      </Button>
-    </form>
+      </form>
+    </Modal>
   );
 }
 
@@ -387,12 +546,15 @@ function AddPlan({
   dams,
   straws,
   api,
+  onClose,
 }: {
   readonly dams: readonly Animal[];
   readonly straws: readonly SemenInventory[];
   readonly api: ReturnType<typeof useMutations<PlannedMating>>;
+  readonly onClose: () => void;
 }) {
   const { show } = useToast();
+  const formId = useId();
   const [damId, setDamId] = useState("");
   const [criteria, setCriteria] = useState("");
   const [method, setMethod] = useState<BreedingMethod>("AI");
@@ -433,8 +595,7 @@ function AddPlan({
         );
         return;
       }
-      setCriteria("");
-      setRationale("");
+      onClose();
       show({ message: "Mating planned", tone: "success" });
     } finally {
       setBusy(false);
@@ -442,8 +603,25 @@ function AddPlan({
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-      <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+    <Modal
+      title="Plan a mating"
+      placement="side"
+      onClose={onClose}
+      footer={
+        <>
+          {/* Tied to the form by `form`, so it stays pinned while fields scroll. */}
+          <Button type="submit" form={formId} variant="primary" busy={busy}>
+            Plan this mating
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        onSubmit={(event) => void submit(event)}
+        className="flex flex-col gap-density"
+      >
         <Select
           label="Dam"
           value={damId}
@@ -453,16 +631,24 @@ function AddPlan({
         />
         <TextInput
           label="…or what kind"
-          hint="&ldquo;a good Chi-cross heifer&rdquo; is a real plan."
+          placeholder="a good Chi-cross heifer"
           value={criteria}
           onChange={(event) => setCriteria(event.target.value)}
         />
-        <Select
-          label="Method"
-          value={method}
-          onChange={(event) => setMethod(event.target.value as BreedingMethod)}
-          options={BREEDING_METHODS.map((value) => ({ value, label: value }))}
-        />
+        <div className="grid grid-cols-2 gap-density">
+          <Select
+            label="Method"
+            value={method}
+            onChange={(event) => setMethod(event.target.value as BreedingMethod)}
+            options={toOptions(BREEDING_METHODS)}
+          />
+          <TextInput
+            label="Target season"
+            placeholder="Spring 2027"
+            value={season}
+            onChange={(event) => setSeason(event.target.value)}
+          />
+        </div>
         <Select
           label="Straw"
           value={strawId}
@@ -474,27 +660,17 @@ function AddPlan({
           }))}
         />
         <TextInput
-          label="Target season"
-          hint="&ldquo;Spring 2027&rdquo; — how breeding is actually planned."
-          value={season}
-          onChange={(event) => setSeason(event.target.value)}
-        />
-        <TextInput
           label="Why this cross"
           value={rationale}
           onChange={(event) => setRationale(event.target.value)}
         />
-      </div>
 
-      {error === undefined ? null : (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      )}
-
-      <Button type="submit" busy={busy}>
-        Plan this mating
-      </Button>
-    </form>
+        {error === undefined ? null : (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
+      </form>
+    </Modal>
   );
 }

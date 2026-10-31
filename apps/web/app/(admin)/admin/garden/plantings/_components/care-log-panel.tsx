@@ -4,17 +4,13 @@ import { useState } from "react";
 
 import {
   Button,
-  DataTable,
   EmptyState,
   Modal,
-  Pill,
-  Section,
   Select,
   TextArea,
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import type { CrudError, Ulid } from "@galaxy-farm/core";
 import {
@@ -33,8 +29,16 @@ import {
   dateFromInput,
   dateInputValue,
   formatDate,
+  optionalText,
 } from "@/app/(admin)/admin/garden/_components/labels";
-import { varietyLabel } from "@/lib/garden";
+import {
+  AddAction,
+  ChipGroup,
+  FilteredLine,
+  LandRow,
+  RowList,
+} from "@/app/(admin)/admin/pastures/_components/land-kit";
+import { byId, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -47,6 +51,9 @@ import { useMutations } from "@/lib/local/mutations";
  * are pulled. Forcing everything onto the bed would lose which planting was
  * treated; forcing everything onto a planting would leave nowhere to record
  * the compost that went in before anything was planted at all.
+ *
+ * A planting entry is filed against its bed as well, so a bed's history is
+ * complete either way.
  */
 
 interface Draft {
@@ -96,18 +103,37 @@ export function CareLogPanel({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const bedName = (id: Ulid | undefined) =>
-    id === undefined ? undefined : beds.find((bed) => bed.id === id)?.name;
+    id === undefined ? undefined : byId(beds).get(id)?.name;
 
   const plantingName = (id: Ulid | undefined) => {
     if (id === undefined) return undefined;
-    const planting = plantings.find((row) => row.id === id);
+    const planting = byId(plantings).get(id);
     if (planting === undefined) return undefined;
-    const variety = varieties.find((row) => row.id === planting.varietyId);
+    const variety = byId(varieties).get(planting.varietyId);
     return `${varietyLabel(variety, crops)} in ${bedName(planting.bedId) ?? "a bed"}`;
   };
 
   const targetLabel = (entry: GardenCareLog) =>
     plantingName(entry.plantingId) ?? bedName(entry.bedId) ?? "Something that has been deleted";
+
+  /**
+   * The bed or planting an entry can name: what is in use, plus whatever the
+   * entry being edited already names. Spraying a planting that has since been
+   * pulled is still a fact about that planting, and opening the entry must
+   * show it rather than whatever happens to be first in the list.
+   */
+  const optionsFor = (current: string) =>
+    current === "" || options.some((option) => option.value === current)
+      ? options
+      : [
+          ...options,
+          {
+            value: current,
+            label: current.startsWith(PLANTING)
+              ? `${plantingName(current.slice(PLANTING.length) as Ulid) ?? "A planting"} (finished)`
+              : `${bedName(current.slice(BED.length) as Ulid) ?? "A bed"} (switched off)`,
+          },
+        ];
 
   const options = [
     { value: "", label: "Pick one" },
@@ -165,7 +191,7 @@ export function CareLogPanel({
 
     const isPlanting = draft.target.startsWith(PLANTING);
     const id = draft.target.slice(draft.target.indexOf(":") + 1) as Ulid;
-    const planting = isPlanting ? plantings.find((row) => row.id === id) : undefined;
+    const planting = isPlanting ? byId(plantings).get(id) : undefined;
 
     const fields = {
       // A planting entry carries its bed too, so "what has this bed had done
@@ -174,8 +200,8 @@ export function CareLogPanel({
       plantingId: isPlanting ? id : undefined,
       action: draft.action,
       performedOn: dateFromInput(draft.performedOn) ?? new Date(),
-      product: draft.product.trim() === "" ? undefined : draft.product.trim(),
-      notes: draft.notes.trim() === "" ? undefined : draft.notes.trim(),
+      product: optionalText(draft.product),
+      notes: optionalText(draft.notes),
     };
 
     const result =
@@ -219,98 +245,112 @@ export function CareLogPanel({
     });
   }
 
-  const columns: readonly Column<GardenCareLog>[] = [
-    {
-      key: "performedOn",
-      header: "When",
-      primary: true,
-      render: (row) => formatDate(row.performedOn),
-    },
-    {
-      key: "action",
-      header: "What",
-      render: (row) => <Pill tone="action">{CARE_ACTION_LABEL[row.action]}</Pill>,
-    },
-    { key: "target", header: "Where", render: (row) => targetLabel(row) },
-    {
-      key: "product",
-      header: "Product",
-      render: (row) =>
-        row.product === undefined ? <span className="text-muted">—</span> : row.product,
-    },
-    {
-      key: "notes",
-      header: "Notes",
-      render: (row) =>
-        row.notes === undefined ? <span className="text-muted">—</span> : row.notes,
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (row) => (
-        <span className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => startEdit(row)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void remove(row)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
+  const [filter, setFilter] = useState("");
 
   if (loading) return <p className="text-muted">Loading the care log…</p>;
 
+  // Only the actions that have actually been recorded, so the row of chips is
+  // this garden's habits rather than every verb the schema knows.
+  const used = CARE_ACTION_OPTIONS.filter((option) =>
+    care.some((entry) => entry.action === option.value),
+  );
+  const chips = [
+    { key: "", label: "All", count: care.length },
+    ...used.map((option) => ({
+      key: option.value,
+      label: option.label,
+      count: care.filter((entry) => entry.action === option.value).length,
+    })),
+  ];
+  const shown = [...care]
+    .filter((entry) => filter === "" || entry.action === filter)
+    .sort((left, right) => right.performedOn.getTime() - left.performedOn.getTime());
+
   return (
-    <div className="flex flex-col gap-density">
-      <Section
-        title="Care log"
-        description="Water, weeding, feeding, spray and amendments — against a bed when it is the ground being treated, against a planting when it is the crop."
-        actions={
-          <Button variant="primary" onClick={startCreate} disabled={options.length === 1}>
-            Record care
-          </Button>
-        }
-      >
-        {care.length === 0 ? (
-          <EmptyState
-            title="Nothing recorded yet"
-            detail="What went on the beds and when. The product field is what makes this worth keeping — next year's question is always which one worked."
-            action={
-              <Button variant="primary" onClick={startCreate} disabled={options.length === 1}>
-                Record the first entry
-              </Button>
-            }
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
+      {/* Against a bed when it is the ground being treated, against a
+          planting when it is the crop. */}
+      {care.length === 0 ? (
+        <EmptyState
+          title="Nothing recorded yet"
+          detail="What went on the beds and when. The product is what makes it worth keeping — next year's question is which one worked."
+          action={
+            <Button variant="primary" onClick={startCreate} disabled={options.length === 1}>
+              Record the first entry
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-density">
+            <div className="min-w-0 flex-1">
+              <ChipGroup
+                label="Filter by what was done"
+                chips={chips}
+                value={filter}
+                onChange={setFilter}
+              />
+            </div>
+            <AddAction label="Record care" onClick={startCreate} disabled={options.length === 1} />
+          </div>
+          <FilteredLine
+            shown={shown.length}
+            total={care.length}
+            labels={filter === "" ? [] : [chips.find((chip) => chip.key === filter)?.label ?? ""]}
+            onClear={() => setFilter("")}
           />
-        ) : (
-          <DataTable
-            rows={[...care].sort(
-              (left, right) => right.performedOn.getTime() - left.performedOn.getTime(),
-            )}
-            columns={columns}
-            rowKey={(row) => row.id}
-            caption="Garden care log"
-            empty="Nothing recorded yet."
-          />
-        )}
-      </Section>
+          <RowList label="Garden care log">
+            {shown.map((entry) => (
+              <LandRow
+                key={entry.id}
+                title={`${CARE_ACTION_LABEL[entry.action]} · ${targetLabel(entry)}`}
+                openLabel={`Edit ${CARE_ACTION_LABEL[entry.action]} — ${targetLabel(entry)}, ${formatDate(entry.performedOn)}`}
+                line={[formatDate(entry.performedOn), entry.product, entry.notes]
+                  .filter((part) => part !== undefined)
+                  .join(" · ")}
+                onOpen={() => startEdit(entry)}
+              />
+            ))}
+          </RowList>
+        </>
+      )}
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
-          size="wide"
+          placement="side"
           title={editing === undefined ? "Record care" : "Editing an entry"}
-          description="One entry per thing done. A planting entry is filed against its bed as well, so a bed's history is complete either way."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Record it" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const entry = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(entry);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+            <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <Select
                 label="Bed or planting"
                 required
-                hint="The bed when it is the ground being treated; the planting when it is the crop."
-                options={options}
+                hint="The bed for the ground; the planting for the crop."
+                options={optionsFor(draft.target)}
                 value={draft.target}
                 error={errors["bedId"]}
                 onChange={(event) => setDraft({ ...draft, target: event.target.value })}
@@ -334,7 +374,7 @@ export function CareLogPanel({
               />
               <TextInput
                 label="Product"
-                hint="&ldquo;Fish emulsion&rdquo;, &ldquo;Spinosad&rdquo;, &ldquo;composted manure&rdquo;."
+                placeholder="Fish emulsion, spinosad"
                 value={draft.product}
                 error={errors["product"]}
                 onChange={(event) => setDraft({ ...draft, product: event.target.value })}
@@ -344,18 +384,11 @@ export function CareLogPanel({
             <TextArea
               label="Notes"
               rows={3}
-              hint="Rate, dilution, what it was for, whether it worked."
+              placeholder="Rate, dilution, what it was for, whether it worked"
               value={draft.notes}
               error={errors["notes"]}
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Record it" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}

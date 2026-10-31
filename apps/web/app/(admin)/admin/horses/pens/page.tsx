@@ -12,7 +12,6 @@ export default async function AdminHorsesPensPage() {
   return (
     <HorseShell
       title={"Pens"}
-      route={"/admin/horses/pens"}
       holds={
         "Which horse is in which trap, and what that pen's safety level becomes with him in it."
       }

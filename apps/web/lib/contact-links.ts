@@ -6,7 +6,7 @@ import type {
   ProcessingRecord,
   SaleRecord,
 } from "@galaxy-farm/module-cattle";
-import type { FeedPurchase } from "@galaxy-farm/module-feed";
+import { purchaseTotal, type FeedPurchase } from "@galaxy-farm/module-feed";
 
 /**
  * What a contact has actually done with the farm (spec §5.1).
@@ -205,7 +205,8 @@ export function linkedHistory(contactId: Ulid, sources: ContactLinkSources): Con
       kind: "feed_purchase",
       recordId: record.id,
       date: record.purchasedOn,
-      amount: { cents: Math.round(record.unitCost.cents * record.quantity) },
+      // No price entered means no amount, not $0.
+      amount: purchaseTotal(record),
       direction: "paid",
       detail: `${record.quantity} ×`,
     });

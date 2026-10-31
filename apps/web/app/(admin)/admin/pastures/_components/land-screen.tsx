@@ -1,6 +1,8 @@
 "use client";
 
-import { PageBody, PageHeader, Tabs, Tile } from "@galaxy-farm/ui";
+import { useState } from "react";
+
+import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import {
   seasonalCareDue,
   type Animal,
@@ -13,6 +15,7 @@ import {
 
 import { CarePanel } from "@/app/(admin)/admin/pastures/_components/care-panel";
 import { WaterPanel } from "@/app/(admin)/admin/pastures/_components/water-panel";
+import { StatusLine } from "@/app/(admin)/admin/pastures/_components/land-kit";
 import { ZonesPanel } from "@/app/(admin)/admin/pastures/_components/zones-panel";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -32,9 +35,12 @@ import { useRecords } from "@/lib/local/use-records";
 export function LandScreen({
   propertyId,
   actorId,
+  initialZoneId,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /** `?zone=`: open on the Zones tab with that zone's editor up. */
+  readonly initialZoneId?: Ulid | undefined;
 }) {
   const query = { propertyId };
   const { records: zones, loading } = useRecords<Zone>("zones", query);
@@ -50,13 +56,12 @@ export function LandScreen({
   // place, and a count that says five when somebody can walk to four is a
   // count they stop reading.
   const live = zones.filter((zone) => zone.active && zone.type !== "area");
-  const groups = zones.filter((zone) => zone.active && zone.type === "area");
   const resting = live.filter((zone) => zone.resting);
   const out = water.filter((source) => source.active);
   /**
    * Covers waiting to go on, among the tanks that are out.
    *
-   * This is the tile rather than a heaterless count, because a heaterless
+   * This is the line rather than a heaterless count, because a heaterless
    * count on this place reads "4" every day of the year and there is nothing
    * to do about it — no tank here has a heater and none is wanted. What
    * changes, and what somebody can act on before a cold night, is the covers.
@@ -74,57 +79,54 @@ export function LandScreen({
     new Date(),
   ).filter((item) => item.status === "due");
 
+  const [tab, setTab] = useState("zones");
+
+  const showDue = due.length > 0 && tab !== "care";
+  const showCovers = toFit.length > 0 && tab !== "water";
+
+  // The facts, beside the title. Resting is the only qualifier worth saying,
+  // because it changes where animals may go today.
+  const facts = [
+    `${live.length} zone${live.length === 1 ? "" : "s"}`,
+    resting.length === 0 ? undefined : `${resting.length} resting`,
+    `${out.length} tank${out.length === 1 ? "" : "s"} out`,
+  ]
+    .filter((part) => part !== undefined)
+    .join(" · ");
+
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Land"
-        title="Pastures and water"
-        subtitle="The places, the tanks they drink from, and what has gone on the ground."
-      />
+      <PageHeader eyebrow="Farm" title="Pastures and water" subtitle={facts} />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile
-          label="Zones in use"
-          value={live.length}
-          tone="identity"
-          hint={
-            resting.length > 0
-              ? `${resting.length} resting`
-              : groups.length > 0
-                ? `in ${groups.length} area${groups.length === 1 ? "" : "s"}`
-                : undefined
-          }
-        />
-        <Tile
-          label="Tanks out"
-          value={out.length}
-          tone="action"
-          hint={water.length === out.length ? undefined : `${water.length - out.length} stowed`}
-        />
-        <Tile
-          label="Covers to put on"
-          value={toFit.length}
-          tone={toFit.length > 0 ? "action" : "calm"}
-          emphasis={toFit.length > 0}
-          hint={
-            uncovered.length > 0
-              ? `${uncovered.length} with no cover at all`
-              : toFit.length > 0
-                ? "Before the next hard freeze"
-                : "All fitted"
-          }
-        />
-        <Tile
-          label="Seasonal work due"
-          value={due.length}
-          tone={due.length > 0 ? "danger" : "calm"}
-          emphasis={due.length > 0}
-          hint={due.length > 0 ? "Window open now" : "Nothing open"}
-        />
-      </div>
+      {/*
+        Status by exception. The old row of four tiles said "All fitted" and
+        "Nothing open" most days of the year; what is left is one line for each
+        thing somebody can act on, and each line is the way to it — not drawn
+        on the tab that already lists the same thing by name.
+      */}
+      {!showDue && !showCovers ? null : (
+        <div className="flex flex-col gap-1">
+          {!showDue ? null : (
+            <StatusLine tone="danger">
+              {due.length} seasonal job{due.length === 1 ? "" : "s"} due now.{" "}
+              <JumpTo onClick={() => setTab("care")}>See care</JumpTo>
+            </StatusLine>
+          )}
+          {!showCovers ? null : (
+            <StatusLine tone="action">
+              {toFit.length} cover{toFit.length === 1 ? "" : "s"} to put on before the next hard
+              freeze
+              {uncovered.length === 0 ? "" : ` · ${uncovered.length} with no cover at all`}.{" "}
+              <JumpTo onClick={() => setTab("water")}>See tanks</JumpTo>
+            </StatusLine>
+          )}
+        </div>
+      )}
 
       <Tabs
         label="Land"
+        activeTab={tab}
+        onTabChange={setTab}
         tabs={[
           { id: "zones", label: "Zones" },
           { id: "water", label: "Water" },
@@ -141,6 +143,7 @@ export function LandScreen({
               loading={loading}
               propertyId={propertyId}
               actorId={actorId}
+              initialZoneId={initialZoneId}
             />
           ) : active === "water" ? (
             <WaterPanel
@@ -162,5 +165,24 @@ export function LandScreen({
         }
       </Tabs>
     </PageBody>
+  );
+}
+
+/** The link at the end of a status line, to the tab that deals with it. */
+function JumpTo({
+  onClick,
+  children,
+}: {
+  readonly onClick: () => void;
+  readonly children: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
+    >
+      {children}
+    </button>
   );
 }

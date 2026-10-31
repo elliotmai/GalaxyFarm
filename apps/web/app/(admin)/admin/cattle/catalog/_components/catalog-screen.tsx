@@ -1,29 +1,28 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import {
   Button,
   Callout,
-  Card,
-  DataTable,
   DetailList,
   EmptyState,
+  Modal,
   PageBody,
   PageHeader,
   Pill,
-  Section,
-  Select,
   TextInput,
   useToast,
-  type Column,
+  type Tone,
 } from "@galaxy-farm/ui";
 import type { Ulid } from "@galaxy-farm/core";
 import {
+  carries,
   catalogueParentPatch,
   catalogueRecord,
   describeBreed,
   externalAnimalSchema,
+  isKnownFree,
   MAX_CATALOGUE_GENERATIONS,
   mergeRegistration,
   planCatalogueImport,
@@ -31,9 +30,12 @@ import {
   registrationUrl,
   reviveRegistryAnimal,
   semenInventorySchema,
+  STATUS_LABELS,
+  DEFECT_NAMES,
   type CataloguePlan,
   type CatalogueRow,
   type ExternalAnimal,
+  type GeneticTest,
   type RegistryAnimal,
   type SemenInventory,
 } from "@galaxy-farm/module-cattle";
@@ -93,12 +95,65 @@ async function ask<T>(url: string): Promise<T> {
 const dayOf = (value: Date | string | undefined): string =>
   value === undefined ? "—" : new Date(value).toISOString().slice(0, 10);
 
+const yearOf = (value: Date | string | undefined): string | undefined =>
+  value === undefined ? undefined : String(new Date(value).getUTCFullYear());
+
+/** Every number the animal is papered under, as one string. */
+const papersOf = (animal: RegistryAnimal): string =>
+  (animal.registrations ?? [{ association: animal.association, regNumber: animal.regNumber }])
+    .map((entry) => `${entry.association} ${entry.regNumber}`)
+    .join(", ");
+
+/** Colour and horns, the two things read off a straw catalogue at a glance. */
+const lookOf = (animal: RegistryAnimal): string | undefined =>
+  [animal.colour, animal.hornStatus].filter(Boolean).join(" · ") || undefined;
+
+/**
+ * The one chip a result row carries.
+ *
+ * A defect carrier is the thing worth seeing before opening him, so it wins;
+ * "Clean" only when every test on the papers came back free. Anything else —
+ * untested, suspect, a mix — says nothing rather than something reassuring.
+ */
+function statusChip(
+  tests: readonly GeneticTest[] | undefined,
+): { label: string; tone: Tone } | undefined {
+  const all = tests ?? [];
+  const carried = all.filter((test) => carries(test.status));
+
+  const [first] = carried;
+  if (first !== undefined) {
+    return {
+      tone: "danger",
+      label:
+        carried.length === 1
+          ? `${first.defect} ${first.status === "affected" ? "affected" : "carrier"}`
+          : `Carries ${carried.map((test) => test.defect).join(", ")}`,
+    };
+  }
+  if (all.length > 0 && all.every((test) => isKnownFree(test.status))) {
+    return { tone: "calm", label: "Clean" };
+  }
+  return undefined;
+}
+
+const EXPLANATION =
+  "Every animal the crawl found in the association herdbooks. It is read-only: nothing here is yours until you bring it across, and it then lands in Ancestors, where you can correct it.";
+
+/** The chip-shaped toggle under the search box. */
+const CHIP =
+  "inline-flex min-h-target items-center rounded-full border px-4 text-sm font-medium " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
+
 export function CatalogScreen({
   propertyId,
   actorId,
+  initialText,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /** Words handed over by the global search (`?text=`), searched on arrival. */
+  readonly initialText?: string | undefined;
 }) {
   const api = useMutations<ExternalAnimal>(
     "externalAnimals",
@@ -118,7 +173,9 @@ export function CatalogScreen({
 
   const { records: onFile } = useRecords<ExternalAnimal>("externalAnimals", { propertyId });
 
-  const [search, setSearch] = useState<SearchState>(EMPTY);
+  const [search, setSearch] = useState<SearchState>({ ...EMPTY, text: initialText ?? "" });
+  const [helpOpen, setHelpOpen] = useState(false);
+  const helpId = useId();
   const [result, setResult] = useState<Found | undefined>();
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -149,26 +206,53 @@ export function CatalogScreen({
     { readonly id: Ulid; readonly name: string; readonly bull: boolean } | undefined
   >();
 
-  const runSearch = useCallback(async () => {
-    setSearching(true);
-    setError(undefined);
-    setOpened(undefined);
+  /**
+   * Search with what is in the box — or with `next`, when a chip has just
+   * changed the filters and the state holding them has not landed yet.
+   */
+  const runSearch = useCallback(
+    async (next: SearchState = search) => {
+      setSearching(true);
+      setError(undefined);
+      setOpened(undefined);
 
-    const query = new URLSearchParams();
-    if (search.text.trim() !== "") query.set("text", search.text.trim());
-    if (search.association !== "") query.set("association", search.association);
-    if (search.sex !== "") query.set("sex", search.sex);
+      const query = new URLSearchParams();
+      if (next.text.trim() !== "") query.set("text", next.text.trim());
+      if (next.association !== "") query.set("association", next.association);
+      if (next.sex !== "") query.set("sex", next.sex);
 
-    try {
-      const answer = await ask<Found>(`/api/registry/search?${query.toString()}`);
-      setResult({ ...answer, found: answer.found.map(reviveRegistryAnimal) });
-    } catch (caught) {
-      setResult(undefined);
-      setError(caught instanceof Error ? caught.message : "That search did not work.");
-    } finally {
-      setSearching(false);
-    }
-  }, [search]);
+      try {
+        const answer = await ask<Found>(`/api/registry/search?${query.toString()}`);
+        setResult({ ...answer, found: answer.found.map(reviveRegistryAnimal) });
+      } catch (caught) {
+        setResult(undefined);
+        setError(caught instanceof Error ? caught.message : "That search did not work.");
+      } finally {
+        setSearching(false);
+      }
+    },
+    [search],
+  );
+
+  // Arriving from the global search with words already typed: search them
+  // once, on the way in. A ref rather than an empty dependency list, so a
+  // re-render never searches a second time.
+  const arrived = useRef(false);
+  useEffect(() => {
+    if (arrived.current) return;
+    arrived.current = true;
+    if ((initialText ?? "").trim() !== "") void runSearch();
+  }, [initialText, runSearch]);
+
+  /**
+   * A filter changed. Once there are results on screen they are re-asked for
+   * straight away — a chip that lights up while the list under it still shows
+   * the old answer is a chip that appears not to work.
+   */
+  const refilter = (next: SearchState): void => {
+    setSearch(next);
+    if (result !== undefined) void runSearch(next);
+  };
 
   const open = useCallback(
     async (animal: RegistryAnimal, generations: number) => {
@@ -300,129 +384,189 @@ export function CatalogScreen({
     }
   }, [api, merging, onFile, opened, show]);
 
-  const columns = useMemo<Column<RegistryAnimal>[]>(
-    () => [
-      {
-        key: "name",
-        header: "Name",
-        primary: true,
-        render: (animal) => (
-          <button
-            type="button"
-            className="text-left font-medium text-action underline-offset-2 hover:underline"
-            onClick={() => void open(animal, MAX_CATALOGUE_GENERATIONS)}
-          >
-            {animal.name}
-          </button>
-        ),
-      },
-      {
-        key: "papers",
-        header: "Papers",
-        render: (animal) => (
-          <span className="flex flex-wrap gap-1">
-            {(
-              animal.registrations ?? [
-                { association: animal.association, regNumber: animal.regNumber },
-              ]
-            ).map((entry) => (
-              <Pill key={`${entry.association}-${entry.regNumber}`} tone="identity">
-                {entry.association} {entry.regNumber}
-              </Pill>
-            ))}
-          </span>
-        ),
-      },
-      { key: "sex", header: "Sex", render: (animal) => animal.sex ?? "—" },
-      { key: "dob", header: "DOB", numeric: true, render: (animal) => dayOf(animal.dob) },
-      { key: "colour", header: "Color", render: (animal) => animal.colour ?? "—" },
-      {
-        key: "breed",
-        header: "Breed",
-        render: (animal) => describeBreed(animal) || "—",
-      },
-    ],
-    [open],
-  );
+  const sexWord = search.sex === "male" ? "Bulls" : search.sex === "female" ? "Cows" : undefined;
+  const filterWords = [search.association === "" ? undefined : search.association, sexWord]
+    .filter((entry) => entry !== undefined)
+    .join(", ");
+  const hidden = result?.excludedByFilters ?? 0;
+  const unpapered = result?.unpapered ?? 0;
+  const unshown = result === undefined ? 0 : result.total - result.found.length;
 
   return (
     <PageBody>
       <PageHeader
         eyebrow="Cattle"
         title="Association catalog"
-        subtitle="Every animal the crawl found in the herdbooks. Read-only — search it, then bring what you need across into Ancestors."
+        actions={
+          <button
+            type="button"
+            aria-label="What is the catalog?"
+            aria-expanded={helpOpen}
+            aria-controls={helpId}
+            onClick={() => setHelpOpen(!helpOpen)}
+            className={[
+              "flex min-h-target min-w-target items-center justify-center rounded-full border",
+              "bg-panel text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2",
+              "focus-visible:outline-action",
+              helpOpen ? "border-action text-action" : "border-rule text-muted hover:text-ink",
+            ].join(" ")}
+          >
+            ?
+          </button>
+        }
         meta={
-          result === undefined ? undefined : (
-            <Pill tone="neutral">
-              {result.total.toLocaleString()} matching · showing {result.found.length}
-            </Pill>
-          )
+          <span className="text-sm text-muted">
+            {result === undefined
+              ? "Read-only"
+              : `${result.total.toLocaleString()} matching · showing ${result.found.length}`}
+          </span>
         }
       />
 
-      <Section
-        title="Search"
-        description="Name, registration number or tattoo — any part of any of them."
+      {helpOpen ? (
+        <p
+          id={helpId}
+          className="max-w-prose rounded-density border border-rule bg-panel p-density text-sm leading-relaxed text-ink"
+        >
+          {EXPLANATION}
+        </p>
+      ) : null}
+
+      <form
+        role="search"
+        className="flex flex-col gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void runSearch();
+        }}
       >
-        <Card>
-          <form
-            className="grid gap-density sm:grid-cols-2 lg:grid-cols-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void runSearch();
-            }}
-          >
-            <TextInput
-              label="Name, number or tattoo"
+        <div className="flex gap-2">
+          <label htmlFor={`${helpId}-q`} className="sr-only">
+            Name, number or tattoo
+          </label>
+          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-density border-2 border-action bg-panel px-3 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-action">
+            <svg
+              aria-hidden="true"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="shrink-0 text-muted"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3.5-3.5" />
+            </svg>
+            <input
+              id={`${helpId}-q`}
+              type="search"
               value={search.text}
               autoComplete="off"
+              placeholder="Name, reg # or tattoo"
               onChange={(event) => setSearch({ ...search, text: event.target.value })}
+              className="h-12 min-w-0 flex-1 bg-transparent text-lg text-ink outline-none placeholder:text-muted"
             />
-            <Select
-              label="Registry"
-              placeholder="All registries"
-              value={search.association}
-              options={READABLE_REGISTRIES.map((code) => ({ value: code, label: code }))}
-              onChange={(event) => setSearch({ ...search, association: event.target.value })}
-            />
-            <Select
-              label="Sex"
-              placeholder="Bulls and cows"
-              value={search.sex}
-              options={[
-                { value: "male", label: "Bulls" },
-                { value: "female", label: "Cows" },
-              ]}
-              onChange={(event) => setSearch({ ...search, sex: event.target.value })}
-              // A sire picked out of a list that includes cows is how a cow
-              // ends up in a sire slot, and everything drawn from it afterwards
-              // looks perfectly ordinary and is nonsense.
-              hint="Worth setting when you are looking for a sire."
-            />
-            <div className="flex items-end gap-2">
-              <Button type="submit" disabled={searching}>
-                {searching ? "Searching…" : "Search"}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setSearch(EMPTY);
-                  setResult(undefined);
-                  setOpened(undefined);
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </form>
-        </Card>
-      </Section>
+          </div>
+          <Button type="submit" variant="primary" busy={searching}>
+            {searching ? "Searching…" : "Search"}
+          </Button>
+        </div>
 
-      {error === undefined ? null : (
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor={`${helpId}-reg`} className="sr-only">
+            Registry
+          </label>
+          <select
+            id={`${helpId}-reg`}
+            value={search.association}
+            onChange={(event) => refilter({ ...search, association: event.target.value })}
+            className={[
+              CHIP,
+              "bg-panel text-ink",
+              search.association === "" ? "border-edge" : "border-2 border-action",
+            ].join(" ")}
+          >
+            <option value="">Any registry</option>
+            {READABLE_REGISTRIES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
+          {/*
+            A sire picked out of a list that includes cows is how a cow ends up
+            in a sire slot, and everything drawn from it afterwards looks
+            perfectly ordinary and is nonsense — so Bulls is one tap away.
+            Pressing the chip already on clears it.
+          */}
+          {(
+            [
+              { value: "male", label: "Bulls" },
+              { value: "female", label: "Cows" },
+            ] as const
+          ).map((option) => {
+            const on = search.sex === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={on}
+                onClick={() => refilter({ ...search, sex: on ? "" : option.value })}
+                className={[
+                  CHIP,
+                  on
+                    ? "border-action bg-action text-action-ink"
+                    : "border-edge bg-panel text-ink hover:bg-canvas",
+                ].join(" ")}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+          {search.text === "" &&
+          search.association === "" &&
+          search.sex === "" &&
+          result === undefined ? null : (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSearch(EMPTY);
+                setResult(undefined);
+                setOpened(undefined);
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+      </form>
+
+      {error === undefined || opened !== undefined ? null : (
         <Callout tone="danger" title="The catalog could not be reached">
           {error}
         </Callout>
+      )}
+
+      {result === undefined ? null : result.found.length === 0 ? (
+        <EmptyState
+          title={
+            search.text.trim() === ""
+              ? "Nothing matched"
+              : `Nothing matches “${search.text.trim()}”`
+          }
+          detail={
+            unpapered > 0
+              ? "Nothing with papers, at least. The crawl knows these animals by name but has not read their registrations yet."
+              : "Try the registration number or tattoo, or fewer words of the name. An animal from another association is imported from its own page on Ancestors."
+          }
+        />
+      ) : (
+        <ResultList
+          found={result.found}
+          onOpen={(animal) => void open(animal, MAX_CATALOGUE_GENERATIONS)}
+        />
       )}
 
       {/*
@@ -446,79 +590,33 @@ export function CatalogScreen({
         not have, so asking for bulls hides every animal whose sex was never
         read off a page.
       */}
-      {result === undefined || (result.excludedByFilters ?? 0) === 0 ? null : (
-        <Callout
-          tone="danger"
-          title={`${result.excludedByFilters} matched the words, then the filters removed them`}
-        >
-          <p>
-            {[
-              search.association === "" ? undefined : `Registry: ${search.association}`,
-              search.sex === "" ? undefined : `Sex: ${search.sex}`,
-            ]
-              .filter((entry) => entry !== undefined)
-              .join(" · ")}{" "}
-            — a registry matches the number searched for, so an animal papered in two associations
-            is hidden under the other one; and a sex the crawl never read off a page matches neither
-            bull nor cow.
-          </p>
-          <div className="mt-2">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setSearch({ ...search, association: "", sex: "" });
-                setResult(undefined);
-              }}
-            >
-              Drop the filters
-            </Button>
-          </div>
-        </Callout>
+      {result === undefined || (hidden === 0 && unpapered === 0 && unshown <= 0) ? null : (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+          {hidden === 0 ? null : (
+            <span className="inline-flex flex-wrap items-center gap-x-1">
+              {hidden.toLocaleString()} more hidden by “{filterWords}” ·
+              <button
+                type="button"
+                onClick={() => refilter({ ...search, association: "", sex: "" })}
+                className="min-h-target px-1 font-semibold text-action hover:underline"
+              >
+                Show them
+              </button>
+            </span>
+          )}
+          {unpapered === 0 ? null : (
+            <span>{unpapered.toLocaleString()} more match with no papers yet</span>
+          )}
+          {unshown <= 0 ? null : (
+            <span>{unshown.toLocaleString()} more not shown · narrow the search</span>
+          )}
+        </p>
       )}
 
-      {result === undefined || (result.unpapered ?? 0) === 0 ? null : (
-        <Callout
-          tone="neutral"
-          title={`${result.unpapered} more match, with no papers in the crawl yet`}
-        >
-          They exist in the graph — named on somebody else&apos;s pedigree — but the crawl has not
-          reached their own registration. Nothing here can open or copy an animal without an
-          association and a number, so they are counted rather than listed. Re-run the crawl over
-          those animals and they will appear.
-        </Callout>
-      )}
-
-      {result === undefined ? null : result.found.length === 0 ? (
-        <EmptyState
-          title="Nothing matched"
-          detail={
-            (result.unpapered ?? 0) > 0
-              ? "Nothing with papers, at least — see above. The crawl knows these animals by name but has not yet read their registrations."
-              : "Check the spelling, and try a registration number or a tattoo. The crawl covers the registries this farm papers with; an animal from another association will not be in it — import that one from its own page on the Ancestors screen."
-          }
-        />
-      ) : (
-        <Section
-          title="Results"
-          description={
-            result.total > result.found.length
-              ? `${result.total.toLocaleString()} animals match. The first ${result.found.length} are below — narrow the search to see the rest.`
-              : undefined
-          }
-        >
-          <DataTable
-            caption="Catalog search results"
-            columns={columns}
-            rows={result.found}
-            rowKey={(animal) => `${animal.association}:${animal.regNumber}`}
-          />
-        </Section>
-      )}
-
-      {opening ? (
-        <Callout tone="neutral" title="Reading the pedigree…">
-          Walking back {MAX_CATALOGUE_GENERATIONS} generations.
-        </Callout>
+      {opening && opened === undefined ? (
+        <p role="status" className="text-sm text-muted">
+          Reading the pedigree, {MAX_CATALOGUE_GENERATIONS} generations back…
+        </p>
       ) : null}
 
       {brought === undefined || !brought.bull ? null : (
@@ -554,11 +652,100 @@ export function CatalogScreen({
           merging={merging}
           setMerging={setMerging}
           busy={bringing}
-          onCancel={() => setOpened(undefined)}
+          reading={opening}
+          error={error}
+          onGenerations={(generations) => void open(opened.animal, generations)}
+          onCancel={() => {
+            if (!bringing) setOpened(undefined);
+          }}
           onConfirm={() => void bringAcross()}
         />
       )}
     </PageBody>
+  );
+}
+
+/**
+ * The results, one compact row each.
+ *
+ * A list of buttons rather than a table of links: the whole row opens the
+ * animal, which is a 44px target on a phone instead of a name-sized one. On a
+ * laptop the same rows line up into columns under a header.
+ */
+function ResultList({
+  found,
+  onOpen,
+}: {
+  readonly found: readonly RegistryAnimal[];
+  readonly onOpen: (animal: RegistryAnimal) => void;
+}) {
+  const id = useId();
+  const columns =
+    "md:grid-cols-[minmax(12rem,2.2fr)_minmax(9rem,1.4fr)_minmax(8rem,1.2fr)_4.5rem_7.5rem]";
+
+  return (
+    <div className="overflow-hidden rounded-density border border-rule bg-panel">
+      <div
+        aria-hidden="true"
+        className={`hidden gap-4 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted md:grid ${columns}`}
+      >
+        <span>Name</span>
+        <span>Registration</span>
+        <span>Colour · horn</span>
+        <span>Born</span>
+        <span>Tests</span>
+      </div>
+      <ul aria-label="Catalog search results" className="flex flex-col">
+        {found.map((animal, index) => {
+          const chip = statusChip(animal.geneticTests);
+          const papers = papersOf(animal);
+          const look = lookOf(animal);
+          const year = yearOf(animal.dob);
+          const nameId = `${id}-${index}-name`;
+          const factsId = `${id}-${index}-facts`;
+
+          return (
+            <li
+              key={`${animal.association}:${animal.regNumber}`}
+              className="border-t border-rule first:border-t-0 md:first:border-t"
+            >
+              <button
+                type="button"
+                aria-labelledby={nameId}
+                aria-describedby={factsId}
+                onClick={() => onOpen(animal)}
+                className={[
+                  "grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-2.5 text-left",
+                  "hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action",
+                  `md:min-h-14 md:gap-x-4 ${columns}`,
+                ].join(" ")}
+              >
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span id={nameId} className="truncate font-semibold text-ink">
+                    {animal.name}
+                  </span>
+                  <span id={factsId} className="truncate text-sm text-muted md:hidden">
+                    {[papers, look, year].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+                <span aria-hidden="true" className="hidden truncate text-sm md:block">
+                  {papers}
+                </span>
+                <span aria-hidden="true" className="hidden truncate text-sm text-muted md:block">
+                  {look ?? "—"}
+                </span>
+                <span aria-hidden="true" className="hidden text-sm tabular-nums md:block">
+                  {year ?? "—"}
+                </span>
+                <span className="justify-self-end md:justify-self-start">
+                  {chip === undefined ? null : <Pill tone={chip.tone}>{chip.label}</Pill>}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -586,10 +773,7 @@ function AddToTank({
 
   return (
     <Callout tone="identity" title={`${name} is on file. Straws of him in the tank?`}>
-      <p>
-        The tank is where a breeding finds him: pick the cane in the chute and the breeding record
-        keeps his pedigree without anybody typing his name again.
-      </p>
+      <p>A breeding picks him from the tank and keeps his pedigree, with no name typed twice.</p>
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <TextInput
           label="Straws"
@@ -599,6 +783,7 @@ function AddToTank({
           onChange={(event) => setStraws(event.target.value)}
         />
         <Button
+          variant="primary"
           disabled={!valid || busy}
           onClick={() => {
             setBusy(true);
@@ -622,12 +807,19 @@ function AddToTank({
  * guessing at — before a single record is created. A wrong merge welds two
  * animals' descendants together and nothing looks unusual afterwards, so the
  * guesses are ticked by a person and the certainties are not asked about.
+ *
+ * In a side panel rather than under the list: opened from a row near the foot
+ * of fifty results, a preview rendered below them appeared to do nothing. On a
+ * phone the same panel is a bottom sheet.
  */
 function BringAcross({
   opened,
   merging,
   setMerging,
   busy,
+  reading,
+  error,
+  onGenerations,
   onCancel,
   onConfirm,
 }: {
@@ -635,11 +827,17 @@ function BringAcross({
   readonly merging: ReadonlySet<string>;
   readonly setMerging: (next: ReadonlySet<string>) => void;
   readonly busy: boolean;
+  /** The pedigree is being read again, to a different depth. */
+  readonly reading: boolean;
+  readonly error: string | undefined;
+  readonly onGenerations: (generations: number) => void;
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
 }) {
-  const { animal, plan } = opened;
+  const { animal, plan, generations } = opened;
   const url = registrationUrl(animal.association, animal.regNumber);
+  const generationsId = useId();
+  const tests = animal.geneticTests ?? [];
 
   const newRecords = plan.rows.filter(
     (row) =>
@@ -655,74 +853,131 @@ function BringAcross({
   };
 
   return (
-    <Section
+    <Modal
       title={animal.name}
-      description={`${animal.association} ${animal.regNumber} · ${plan.rows.length} animals in this pedigree, ${plan.known} of them already on file.`}
-      actions={
-        <span className="flex gap-2">
-          <Button variant="ghost" onClick={onCancel} disabled={busy}>
-            Cancel
-          </Button>
-          <Button onClick={onConfirm} disabled={busy}>
-            {busy ? "Bringing across…" : `Bring ${newRecords} across`}
-          </Button>
-        </span>
+      description={[`${animal.association} ${animal.regNumber}`, lookOf(animal), yearOf(animal.dob)]
+        .filter(Boolean)
+        .join(" · ")}
+      placement="side"
+      onClose={onCancel}
+      footer={
+        <div className="flex w-full flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor={generationsId} className="text-sm text-ink">
+              Bring with
+            </label>
+            <select
+              id={generationsId}
+              value={generations}
+              disabled={busy || reading}
+              onChange={(event) => onGenerations(Number(event.target.value))}
+              className="min-h-target rounded-density border border-edge bg-panel px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-action"
+            >
+              {Array.from({ length: MAX_CATALOGUE_GENERATIONS + 1 }, (_, count) => (
+                <option key={count} value={count}>
+                  {count === 0 ? "No ancestors" : `${count} generation${count === 1 ? "" : "s"}`}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" onClick={onCancel} disabled={busy}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={onConfirm} disabled={busy || reading}>
+              {busy ? "Bringing across…" : `Bring ${newRecords} across to Ancestors`}
+            </Button>
+          </div>
+        </div>
       }
     >
-      <Card>
-        <DetailList
-          items={[
-            { label: "Sex", value: animal.sex ?? "—" },
-            { label: "DOB", value: dayOf(animal.dob) },
-            { label: "Color", value: animal.colour ?? "—" },
-            { label: "Horns", value: animal.hornStatus ?? "—" },
-            { label: "Tattoo", value: animal.tattoo ?? "—" },
-            { label: "Class on the papers", value: animal.classification ?? "—" },
-            { label: "Breed", value: describeBreed(animal) || "—" },
-            {
-              label: "On the association's site",
-              value:
-                url === undefined ? (
-                  "—"
-                ) : (
-                  <a className="text-action underline" href={url} target="_blank" rel="noreferrer">
-                    {animal.association} {animal.regNumber}
-                  </a>
-                ),
-            },
-          ]}
-        />
-      </Card>
+      {error === undefined ? null : (
+        <Callout tone="danger" title="That did not work">
+          {error}
+        </Callout>
+      )}
 
-      <ul className="flex flex-col gap-2">
-        {plan.rows.map((row) => (
-          <li
-            key={row.key}
-            className="flex flex-wrap items-baseline gap-2 rounded-density border border-edge bg-panel px-3 py-2"
-          >
-            <span className="font-medium text-ink">{row.animal.name}</span>
-            <Pill tone="identity">
-              {row.animal.association} {row.animal.regNumber}
+      <div className="flex flex-wrap gap-2">
+        {tests.length === 0 ? (
+          <Pill tone="neutral">No tests on file</Pill>
+        ) : (
+          tests.map((test) => (
+            <Pill
+              key={test.defect}
+              tone={carries(test.status) ? "danger" : isKnownFree(test.status) ? "calm" : "neutral"}
+              title={DEFECT_NAMES[test.defect]}
+            >
+              {test.defect} {STATUS_LABELS[test.status].toLowerCase()}
             </Pill>
-            <span className="text-sm text-muted">{row.position ?? "the animal itself"}</span>
+          ))
+        )}
+      </div>
 
-            {row.match === undefined ? (
-              <Pill tone="action">New</Pill>
-            ) : row.match.confidence === "certain" ? (
-              <Pill tone="calm">Already on file</Pill>
-            ) : (
-              <label className="flex items-center gap-2 text-sm text-muted">
-                <input
-                  type="checkbox"
-                  checked={merging.has(row.key)}
-                  onChange={() => toggle(row.key)}
-                />
-                <span>{row.match.reason}</span>
-              </label>
-            )}
-          </li>
-        ))}
-      </ul>
-    </Section>
+      <DetailList
+        items={[
+          { label: "Sex", value: animal.sex ?? "—" },
+          { label: "DOB", value: dayOf(animal.dob) },
+          { label: "Color", value: animal.colour ?? "—" },
+          { label: "Horns", value: animal.hornStatus ?? "—" },
+          { label: "Tattoo", value: animal.tattoo ?? "—" },
+          { label: "Class on the papers", value: animal.classification ?? "—" },
+          { label: "Breed", value: describeBreed(animal) || "—" },
+          {
+            label: "On the association's site",
+            value:
+              url === undefined ? (
+                "—"
+              ) : (
+                <a className="text-action underline" href={url} target="_blank" rel="noreferrer">
+                  {animal.association} {animal.regNumber}
+                </a>
+              ),
+          },
+        ]}
+      />
+
+      <div className="flex flex-col">
+        <div className="flex items-baseline justify-between gap-3 pb-1">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Pedigree</h3>
+          <span role="status" className="text-sm text-muted">
+            {reading
+              ? "Reading…"
+              : `${plan.rows.length} animal${plan.rows.length === 1 ? "" : "s"}, ${plan.known} on file`}
+          </span>
+        </div>
+        <ul className="flex flex-col">
+          {plan.rows.map((row) => (
+            <li
+              key={row.key}
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-rule py-2"
+            >
+              <span className="flex min-w-0 flex-col">
+                <span className="text-xs text-muted">{row.position ?? "the animal itself"}</span>
+                <span className="truncate font-medium text-ink">{row.animal.name}</span>
+                <span className="text-sm text-muted">
+                  {row.animal.association} {row.animal.regNumber}
+                </span>
+              </span>
+
+              {row.match === undefined ? (
+                <Pill tone="action">New</Pill>
+              ) : row.match.confidence === "certain" ? (
+                <Pill tone="calm">Already on file</Pill>
+              ) : (
+                <label className="flex min-h-target items-center gap-2 text-sm text-muted">
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5"
+                    checked={merging.has(row.key)}
+                    onChange={() => toggle(row.key)}
+                  />
+                  <span>{row.match.reason}</span>
+                </label>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Modal>
   );
 }

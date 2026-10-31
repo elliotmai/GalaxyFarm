@@ -82,14 +82,15 @@ function devicesScreen(props: Partial<Parameters<typeof DevicesScreen>[0]> = {})
 }
 
 /**
- * The desktop half of `DataTable`.
+ * The side panel a screen's row opens — where every action on it now lives.
  *
- * It renders a card stack and a table from the same columns — one hidden by a
- * breakpoint the other is not — so every row control is in the document twice
- * and an unscoped query finds both. Asserting against the table is arbitrary
- * but consistent; the card stack is the same `render` for the same column.
+ * Opened by the row itself, then scoped to the panel, so a query cannot reach
+ * past it into the list behind.
  */
-const rows = () => within(screen.getByRole("table"));
+async function panel(name = "Barn TV") {
+  await userEvent.click(screen.getByRole("button", { name: `Manage ${name}` }));
+  return within(await screen.findByRole("dialog"));
+}
 
 beforeEach(() => {
   actions.renamed.length = 0;
@@ -102,11 +103,11 @@ describe("renaming a paired screen", () => {
   it("saves the new name against the screen it was opened on", async () => {
     devicesScreen();
 
-    await userEvent.click(rows().getByRole("button", { name: "Rename" }));
-    const field = rows().getByLabelText("Name");
+    const opened = await panel();
+    const field = opened.getByLabelText("Name");
     await userEvent.clear(field);
     await userEvent.type(field, "Coop tablet");
-    await userEvent.click(rows().getByRole("button", { name: "Save" }));
+    await userEvent.click(opened.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
       expect(actions.renamed).toEqual([{ id: device().id, name: "Coop tablet" }]),
@@ -116,9 +117,9 @@ describe("renaming a paired screen", () => {
   it("commits on Enter, because a rename is one field", async () => {
     devicesScreen();
 
-    await userEvent.click(rows().getByRole("button", { name: "Rename" }));
-    await userEvent.clear(rows().getByLabelText("Name"));
-    await userEvent.type(rows().getByLabelText("Name"), "Coop tablet{Enter}");
+    const opened = await panel();
+    await userEvent.clear(opened.getByLabelText("Name"));
+    await userEvent.type(opened.getByLabelText("Name"), "Coop tablet{Enter}");
 
     await waitFor(() =>
       expect(actions.renamed).toEqual([{ id: device().id, name: "Coop tablet" }]),
@@ -128,12 +129,13 @@ describe("renaming a paired screen", () => {
   it("writes nothing when the edit is abandoned", async () => {
     devicesScreen();
 
-    await userEvent.click(rows().getByRole("button", { name: "Rename" }));
-    await userEvent.type(rows().getByLabelText("Name"), " and more");
-    await userEvent.click(rows().getByRole("button", { name: "Cancel" }));
+    const opened = await panel();
+    await userEvent.type(opened.getByLabelText("Name"), " and more");
+    await userEvent.click(opened.getByRole("button", { name: "Cancel" }));
 
     expect(actions.renamed).toEqual([]);
-    expect(rows().getByText("Barn TV")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Manage Barn TV" })).toHaveTextContent("Barn TV");
   });
 });
 
@@ -141,7 +143,7 @@ describe("deleting a screen", () => {
   it("names the screen in the dialog before anything is written (§4.5 clause 3)", async () => {
     devicesScreen();
 
-    await userEvent.click(rows().getByRole("button", { name: "Delete" }));
+    await userEvent.click((await panel()).getByRole("button", { name: "Delete" }));
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading")).toHaveTextContent("Barn TV");
@@ -157,7 +159,7 @@ describe("deleting a screen", () => {
   it("says a live screen goes dark, and that a restore brings it back", async () => {
     devicesScreen();
 
-    await userEvent.click(rows().getByRole("button", { name: "Delete" }));
+    await userEvent.click((await panel()).getByRole("button", { name: "Delete" }));
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/goes dark within a minute/i)).toBeInTheDocument();
@@ -169,7 +171,7 @@ describe("deleting a screen", () => {
     // people to click past this dialog.
     devicesScreen({ devices: [device({ revokedAt: new Date("2026-06-02T08:00:00Z") })] });
 
-    await userEvent.click(rows().getByRole("button", { name: "Delete" }));
+    await userEvent.click((await panel()).getByRole("button", { name: "Delete" }));
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).queryByText(/goes dark within a minute/i)).not.toBeInTheDocument();
@@ -179,7 +181,7 @@ describe("deleting a screen", () => {
   it("leaves the screen alone when the dialog is cancelled", async () => {
     devicesScreen();
 
-    await userEvent.click(rows().getByRole("button", { name: "Delete" }));
+    await userEvent.click((await panel()).getByRole("button", { name: "Delete" }));
     await userEvent.click(
       within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }),
     );
@@ -190,8 +192,9 @@ describe("deleting a screen", () => {
   it("offers the delete on a revoked screen, which has no other action left", async () => {
     devicesScreen({ devices: [device({ revokedAt: new Date("2026-06-02T08:00:00Z") })] });
 
-    expect(rows().getByRole("button", { name: "Delete" })).toBeEnabled();
-    expect(rows().queryByRole("button", { name: "Revoke" })).not.toBeInTheDocument();
+    const opened = await panel();
+    expect(opened.getByRole("button", { name: "Delete" })).toBeEnabled();
+    expect(opened.queryByRole("button", { name: "Revoke" })).not.toBeInTheDocument();
   });
 });
 

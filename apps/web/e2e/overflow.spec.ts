@@ -38,12 +38,16 @@ const ROUTES = [
   "/admin/chickens/eggs",
   "/admin/supplies",
   "/admin/contacts",
-  "/admin/pets",
+  "/admin/pets/dogs/care",
+  "/admin/pets/cats/care",
   "/admin/housesitter",
   "/admin/reports",
   "/admin/settings",
   "/admin/equipment",
   "/admin/horses",
+  "/admin/pets/dogs",
+  "/admin/pets/cats",
+  "/admin/chickens/headcount",
   "/admin/garden",
 ];
 

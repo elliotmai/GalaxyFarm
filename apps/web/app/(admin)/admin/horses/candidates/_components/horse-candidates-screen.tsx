@@ -5,24 +5,20 @@ import { useMemo, useState } from "react";
 
 import {
   Button,
-  Callout,
-  Card,
   Checkbox,
-  DataTable,
+  DetailList,
   EmptyState,
   Modal,
   PageBody,
   PageHeader,
   Pill,
-  Section,
   Select,
   TagInput,
   TextArea,
   TextInput,
-  Tile,
   useConfirmDelete,
   useToast,
-  type Column,
+  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   CANDIDATE_STATUSES,
@@ -61,6 +57,14 @@ import {
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
+import {
+  ChipRow,
+  FilteredLine,
+  ListRow,
+  PhoneAddButton,
+  RowList,
+} from "@/app/(admin)/admin/horses/_components/list-row";
+
 /**
  * Horses under consideration (spec §5.9, extending §5.1's comparison view).
  *
@@ -77,6 +81,11 @@ import { useRecords } from "@/lib/local/use-records";
  *   - **Says what to ask before driving out.** `concerns` is a list, not a
  *     score — soundness not stated is a different problem from unsound, and a
  *     number would blur them into one.
+ *
+ * The list is rows, not a table: the name, one line (status, the horse, the
+ * all-in figure) and one chip for whatever is most worth knowing. Everything
+ * else — soundness, disciplines, pros and cons, the status ladder — is on the
+ * horse's own panel, a side panel on a laptop and a bottom sheet on a phone.
  *
  * The shared aggregate holds price, seller, distance, pros and cons. The horse
  * half rides in `domainDetail` and is validated by the module's own schema,
@@ -127,6 +136,13 @@ function costOf(candidate: PurchaseCandidate, label: string): string {
 
 function isOpen(candidate: PurchaseCandidate): boolean {
   return OPEN_STATUSES.includes(candidate.status);
+}
+
+/** The status chips: the views of the comparison that get asked for. */
+type View = "all" | "open" | "ask" | "passed";
+
+function capitalise(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function daysUntil(date: Date, now: Date): number {
@@ -214,6 +230,9 @@ export function HorseCandidatesScreen({
   const [editing, setEditing] = useState<PurchaseCandidate | undefined>();
   const [draft, setDraft] = useState<Draft | undefined>();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [view, setView] = useState<View>("all");
+  /** The candidate whose panel is open, by id so it reads live. */
+  const [looked, setLooked] = useState<Ulid | undefined>();
 
   // Only the horses. The same aggregate serves cattle and equipment (§5.9).
   const candidates = useMemo(() => all.filter((candidate) => candidate.domain === "horses"), [all]);
@@ -234,6 +253,7 @@ export function HorseCandidatesScreen({
       return { candidate, found: detail === undefined ? [] : concerns(detail) };
     })
     .filter((entry) => entry.found.length > 0);
+  const askById = new Map(toAsk.map((entry) => [entry.candidate.id, entry.found]));
 
   const cheapest = open
     .map((candidate) => totalAcquisitionCost(candidate))
@@ -261,7 +281,7 @@ export function HorseCandidatesScreen({
       title: candidate.title,
       roadmapItemId: candidate.roadmapItemId ?? "",
       status: candidate.status,
-      asking: String(toDollars(candidate.askingPrice)),
+      asking: candidate.askingPrice === undefined ? "" : String(toDollars(candidate.askingPrice)),
       haul: costOf(candidate, COST_HAUL),
       exam: costOf(candidate, COST_EXAM),
       location: candidate.location ?? "",
@@ -432,123 +452,196 @@ export function HorseCandidatesScreen({
     });
   }
 
-  const columns: readonly Column<PurchaseCandidate>[] = [
-    {
-      key: "horse",
-      header: "Horse",
-      primary: true,
-      render: (candidate) => {
-        const detail = detailOf(candidate);
-        return (
-          <span className="flex flex-col">
-            <span className="font-medium text-ink">{candidate.title}</span>
-            <span className="text-xs text-muted">
-              {detail === undefined ? "details not recorded" : describeHorse(detail)}
-            </span>
-          </span>
-        );
-      },
-    },
-    {
-      key: "status",
-      header: "Status",
-      render: (candidate) => (
-        <span className="flex flex-wrap gap-1.5">
-          <Pill tone={isOpen(candidate) ? "action" : "neutral"}>
-            {candidate.status.replace(/_/g, " ")}
-          </Pill>
-          {/*
-            §6 raises a notification for a listing about to expire. It belongs
-            on the screen as well: a listing that closes on Friday is the one
-            fact on the row that stops being true on its own.
-          */}
-          {isExpiring(candidate, now) ? (
-            <Pill tone="danger" dot>
-              closes {daysUntil(candidate.expiresAt as Date, now) === 0 ? "today" : "soon"}
-            </Pill>
-          ) : null}
-        </span>
-      ),
-    },
-    {
-      key: "soundness",
-      header: "Soundness",
-      render: (candidate) => {
-        const detail = detailOf(candidate);
-        if (detail === undefined) return <span className="text-muted">—</span>;
+  /** The one chip a row may carry, in the order it matters. */
+  function chipFor(candidate: PurchaseCandidate) {
+    // §6 raises a notification for a listing about to expire. It belongs on
+    // the screen as well: a listing that closes on Friday is the one fact on
+    // the row that stops being true on its own.
+    if (isOpen(candidate) && isExpiring(candidate, now)) {
+      return (
+        <Pill tone="danger" dot>
+          closes {daysUntil(candidate.expiresAt as Date, now) === 0 ? "today" : "soon"}
+        </Pill>
+      );
+    }
+    const detail = detailOf(candidate);
+    if (detail?.soundness === "unsound") return <Pill tone="danger">unsound</Pill>;
+    const asks = askById.get(candidate.id);
+    if (asks !== undefined) return <Pill tone="action">{asks.length} to ask</Pill>;
+    return undefined;
+  }
 
-        return (
-          <span className="flex flex-wrap gap-1.5">
-            <Pill tone={SOUNDNESS_TONE[detail.soundness]}>
-              {detail.soundness.replace(/_/g, " ")}
-            </Pill>
-            {detail.vetCheckDone ? null : <Pill tone="danger">no vet check</Pill>}
-          </span>
-        );
-      },
-    },
-    {
-      key: "does",
-      header: "Does",
-      render: (candidate) => {
-        const detail = detailOf(candidate);
-        return detail === undefined || detail.disciplines.length === 0 ? (
-          // Not the same as "does nothing" — nobody has said. `disciplineFit`
-          // draws the same distinction for anyone filtering on it.
-          <span className="text-muted">not stated</span>
+  /** Status, the horse, and the number the decision is made on (§5.1). */
+  function lineFor(candidate: PurchaseCandidate) {
+    const detail = detailOf(candidate);
+    return [
+      capitalise(candidate.status.replace(/_/g, " ")),
+      detail === undefined ? "details not recorded" : describeHorse(detail),
+      `${formatMoney(totalAcquisitionCost(candidate))} all in`,
+      candidate.distanceMiles === undefined ? undefined : `${candidate.distanceMiles} mi`,
+    ];
+  }
+
+  // Sorted on total acquisition cost: a cheaper horse four hundred miles away,
+  // with an exam and a haul on top, is often not the cheaper horse.
+  const sorted = [...candidates].sort(
+    (left, right) => totalAcquisitionCost(left).cents - totalAcquisitionCost(right).cents,
+  );
+  const passedCount = candidates.filter((candidate) => candidate.status === "passed").length;
+  const shown = sorted.filter((candidate) => {
+    if (view === "open") return isOpen(candidate);
+    if (view === "ask") return askById.has(candidate.id);
+    if (view === "passed") return candidate.status === "passed";
+    return true;
+  });
+  const viewChips: readonly { key: View; label: string; count?: number }[] = [
+    { key: "all", label: "All" },
+    { key: "open", label: "In play", count: open.length },
+    ...(toAsk.length === 0 ? [] : [{ key: "ask" as const, label: "To ask", count: toAsk.length }]),
+    { key: "passed", label: "Passed", count: passedCount },
+  ];
+  const viewLabel = viewChips.find((chip) => chip.key === view)?.label ?? "";
+
+  // Read live from the list, so a status changed in the panel shows at once.
+  const looking = looked === undefined ? undefined : candidates.find((c) => c.id === looked);
+  const lookingDetail = looking === undefined ? undefined : detailOf(looking);
+  const lookingWant =
+    looking === undefined ? undefined : wants.find((item) => item.id === looking.roadmapItemId);
+
+  return (
+    // Bottom clearance on a phone for the floating add button.
+    <PageBody>
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <PageHeader
+          eyebrow="Horses"
+          title="Candidates"
+          subtitle={[
+            `${open.length} in play`,
+            cheapest === undefined ? undefined : `cheapest ${formatMoney(cheapest)} all in`,
+            passedCount === 0 ? undefined : `${passedCount} passed`,
+          ]
+            .filter((part) => part !== undefined)
+            .join(" · ")}
+          actions={
+            // Hidden on a phone by a wrapper: the button's own `inline-flex`
+            // wins over a `hidden` passed in.
+            <span className="hidden sm:block">
+              <Button variant="primary" onClick={startCreate}>
+                <span aria-hidden="true">+</span> Add a horse
+              </Button>
+            </span>
+          }
+        />
+
+        {/*
+          What to ask before driving out, as one line rather than a callout of
+          its own. The questions themselves are on each horse's panel, and the
+          line is the way to the horses concerned.
+        */}
+        {toAsk.length === 0 || view === "ask" ? null : (
+          <p className="text-sm text-action">
+            {toAsk.length} worth asking about before you drive out.{" "}
+            <button
+              type="button"
+              onClick={() => setView("ask")}
+              className="inline-flex min-h-target items-center font-semibold underline underline-offset-2"
+            >
+              Show them
+            </button>
+          </p>
+        )}
+
+        {candidates.length === 0 ? null : (
+          <ChipRow label="Filter by status" chips={viewChips} value={view} onChange={setView} />
+        )}
+
+        {view === "all" ? null : (
+          <FilteredLine
+            shown={shown.length}
+            total={candidates.length}
+            what={viewLabel}
+            onClear={() => setView("all")}
+          />
+        )}
+
+        {loading ? (
+          <p className="text-muted">Looking…</p>
+        ) : shown.length === 0 ? (
+          <EmptyState
+            title={candidates.length === 0 ? "Nothing under consideration" : "None here"}
+            {...(candidates.length === 0
+              ? {
+                  detail:
+                    "Add a horse you have seen listed. Hauling and the exam count in the total.",
+                  action: (
+                    <Button variant="primary" onClick={startCreate}>
+                      Add the first
+                    </Button>
+                  ),
+                }
+              : { action: <Button onClick={() => setView("all")}>Show all</Button> })}
+          />
         ) : (
-          <span className="flex flex-wrap gap-1.5">
-            {detail.disciplines.map((discipline) => (
-              <Pill key={discipline}>{discipline}</Pill>
+          <RowList label="Horses under consideration">
+            {shown.map((candidate) => (
+              <ListRow
+                key={candidate.id}
+                title={candidate.title}
+                line={lineFor(candidate)}
+                chip={chipFor(candidate)}
+                onOpen={() => setLooked(candidate.id)}
+              />
             ))}
-          </span>
-        );
-      },
-    },
-    {
-      key: "asking",
-      header: "Asking",
-      numeric: true,
-      render: (candidate) => formatMoney(candidate.askingPrice),
-    },
-    {
-      key: "total",
-      header: "All in",
-      numeric: true,
-      // The number the decision is actually made on (§5.1).
-      render: (candidate) => (
-        <span className="font-semibold">{formatMoney(totalAcquisitionCost(candidate))}</span>
-      ),
-    },
-    {
-      key: "where",
-      header: "Where",
-      render: (candidate) => (
-        <span className="flex flex-col">
-          <span>{candidate.location ?? "—"}</span>
-          {candidate.distanceMiles === undefined ? null : (
-            <span className="text-xs text-muted">{candidate.distanceMiles} mi</span>
-          )}
-        </span>
-      ),
-    },
-    {
-      key: "for",
-      header: "For",
-      render: (candidate) => {
-        const want = wants.find((item) => item.id === candidate.roadmapItemId);
-        return want === undefined ? (
-          <span className="text-muted">—</span>
-        ) : (
-          <Pill tone="identity">{want.title}</Pill>
-        );
-      },
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (candidate) => (
-        <span className="flex flex-wrap items-end gap-2">
+          </RowList>
+        )}
+
+        <p className="text-sm text-muted">
+          What you are shopping <em>for</em> is on the{" "}
+          <Link href="/admin/horses/roadmap" className="text-action underline underline-offset-4">
+            horse roadmap
+          </Link>
+          .
+        </p>
+
+        <PhoneAddButton onClick={startCreate}>Add a horse</PhoneAddButton>
+      </div>
+
+      {looking === undefined ? null : (
+        <Modal
+          key={looking.id}
+          placement="side"
+          title={looking.title}
+          description={
+            lookingDetail === undefined ? "Details not recorded" : describeHorse(lookingDetail)
+          }
+          onClose={() => setLooked(undefined)}
+          footer={
+            <>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setLooked(undefined);
+                  startEdit(looking);
+                }}
+              >
+                Edit
+              </Button>
+              <Button onClick={() => setLooked(undefined)}>Close</Button>
+              {/* The panel closes first, so the confirmation is the only
+                  dialog on screen rather than a second one stacked on this. */}
+              <Button
+                variant="danger"
+                className="ml-auto"
+                onClick={() => {
+                  setLooked(undefined);
+                  void remove(looking);
+                }}
+              >
+                Delete
+              </Button>
+            </>
+          }
+        >
           {/*
             A candidate walks watching → contacted → inspected → offer_made and
             ends at purchased, passed or gone. A Pass button alone would record
@@ -556,157 +649,162 @@ export function HorseCandidatesScreen({
           */}
           <Select
             label="Status"
-            hideLabel
-            value={candidate.status}
-            onChange={(event) => void setStatus(candidate, event.target.value as CandidateStatus)}
+            value={looking.status}
+            onChange={(event) => void setStatus(looking, event.target.value as CandidateStatus)}
             options={CANDIDATE_STATUSES.map((value) => ({
               value,
-              label: value.replace(/_/g, " "),
+              label: optionLabel(value),
             }))}
           />
-          <Button variant="ghost" onClick={() => startEdit(candidate)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void remove(candidate)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
 
-  return (
-    <PageBody>
-      <PageHeader
-        eyebrow="Horses"
-        title="Candidates"
-        subtitle="Horses under consideration, compared on what one would actually cost to get here. Live years before the module, because this is the purchase most worth taking slowly."
-        actions={
-          <Button variant="primary" onClick={startCreate}>
-            Add a horse
-          </Button>
-        }
-      />
+          {(askById.get(looking.id) ?? []).length === 0 ? null : (
+            <div className="rounded-density bg-action/10 px-3 py-2 text-sm text-action">
+              <p className="font-semibold">Ask before you drive out</p>
+              <p>{(askById.get(looking.id) ?? []).join(" · ")}</p>
+            </div>
+          )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile label="Under consideration" value={open.length} tone="identity" />
-        <Tile
-          label="Worth asking about"
-          value={toAsk.length}
-          tone={toAsk.length > 0 ? "action" : "calm"}
-          emphasis={toAsk.length > 0}
-          hint={toAsk.length > 0 ? "Before you drive out" : "Nothing outstanding"}
-        />
-        <Tile
-          label="Cheapest all in"
-          value={cheapest === undefined ? "—" : formatMoney(cheapest)}
-        />
-        <Tile
-          label="Passed"
-          value={candidates.filter((candidate) => candidate.status === "passed").length}
-          hint="Kept, with the reason"
-        />
-      </div>
+          <DetailList
+            items={[
+              {
+                label: "Asking",
+                value:
+                  looking.askingPrice === undefined
+                    ? "No price yet"
+                    : formatMoney(looking.askingPrice),
+              },
+              {
+                label: "All in",
+                value: (
+                  <span className="font-semibold">
+                    {formatMoney(totalAcquisitionCost(looking))}
+                  </span>
+                ),
+              },
+              {
+                label: "Where",
+                value:
+                  [
+                    looking.location,
+                    looking.distanceMiles === undefined ? undefined : `${looking.distanceMiles} mi`,
+                  ]
+                    .filter((part) => part !== undefined)
+                    .join(" · ") || "—",
+              },
+              { label: "For", value: lookingWant?.title ?? "—" },
+              {
+                label: "Soundness",
+                value:
+                  lookingDetail === undefined ? (
+                    "—"
+                  ) : (
+                    <span className="flex flex-wrap gap-1.5">
+                      <Pill tone={SOUNDNESS_TONE[lookingDetail.soundness]}>
+                        {lookingDetail.soundness.replace(/_/g, " ")}
+                      </Pill>
+                      {lookingDetail.vetCheckDone ? null : <Pill tone="danger">no vet check</Pill>}
+                    </span>
+                  ),
+              },
+              {
+                label: "Does",
+                // Not the same as "does nothing" — nobody has said.
+                // `disciplineFit` draws the same distinction for anyone
+                // filtering on it.
+                value:
+                  lookingDetail === undefined || lookingDetail.disciplines.length === 0
+                    ? "not stated"
+                    : lookingDetail.disciplines.join(", "),
+              },
+              ...(looking.expiresAt === undefined
+                ? []
+                : [{ label: "Listing closes", value: looking.expiresAt.toLocaleDateString() }]),
+              ...(looking.listingUrl === undefined
+                ? []
+                : [
+                    {
+                      label: "Listing",
+                      wide: true,
+                      value: (
+                        <a
+                          href={looking.listingUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="break-all text-action underline underline-offset-4"
+                        >
+                          {looking.listingUrl}
+                        </a>
+                      ),
+                    },
+                  ]),
+            ]}
+          />
 
-      {toAsk.length === 0 ? null : (
-        <Callout tone="action" title="Ask before you drive out">
-          <ul className="flex flex-col gap-1">
-            {toAsk.map(({ candidate, found }) => (
-              <li key={candidate.id}>
-                <span className="font-semibold">{candidate.title}</span> — {found.join(" · ")}
-              </li>
-            ))}
-          </ul>
-        </Callout>
-      )}
-
-      <Section
-        title="Comparison"
-        description="Sorted on total acquisition cost. A cheaper horse four hundred miles away, with an exam and a haul on top, is often not the cheaper horse."
-      >
-        {loading ? (
-          <p className="text-muted">Looking…</p>
-        ) : (
-          <Card>
-            <DataTable
-              caption="Horses under consideration"
-              columns={columns}
-              rows={[...candidates].sort(
-                (left, right) =>
-                  totalAcquisitionCost(left).cents - totalAcquisitionCost(right).cents,
-              )}
-              rowKey={(candidate) => candidate.id}
-              empty={
-                <EmptyState
-                  title="Nothing under consideration"
-                  detail="Add a horse you have seen listed. Hauling and the pre-purchase exam go on the record, so the comparison is on what it would really cost."
-                  action={
-                    <Button variant="primary" onClick={startCreate}>
-                      Add the first
-                    </Button>
-                  }
-                />
-              }
-            />
-          </Card>
-        )}
-      </Section>
-
-      {candidates.some((candidate) => candidate.pros.length + candidate.cons.length > 0) ? (
-        <Section
-          title="Pros and cons"
-          description="Yours, not the seller's. §5.1 puts these on the comparison because the decision gets made away from the screen."
-        >
-          <div className="grid grid-cols-1 gap-density md:grid-cols-2 xl:grid-cols-3">
-            {candidates
-              .filter((candidate) => candidate.pros.length + candidate.cons.length > 0)
-              .map((candidate) => (
-                <Card key={candidate.id} title={candidate.title}>
-                  <ul className="flex flex-col gap-1 text-sm">
-                    {candidate.pros.map((pro) => (
-                      <li key={pro} className="text-ink">
-                        + {pro}
-                      </li>
-                    ))}
-                    {candidate.cons.map((con) => (
-                      <li key={con} className="text-muted">
-                        − {con}
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
+          {/* Yours, not the seller's (§5.1) — the decision gets made away
+              from the screen, so these travel with the horse. */}
+          {looking.pros.length + looking.cons.length === 0 ? null : (
+            <ul className="flex flex-col gap-1 text-sm">
+              {looking.pros.map((pro) => (
+                <li key={pro} className="text-ink">
+                  + {pro}
+                </li>
               ))}
-          </div>
-        </Section>
-      ) : null}
+              {looking.cons.map((con) => (
+                <li key={con} className="text-muted">
+                  − {con}
+                </li>
+              ))}
+            </ul>
+          )}
 
-      <p className="text-sm text-muted">
-        What you are shopping <em>for</em> lives on the{" "}
-        <Link href="/admin/horses/roadmap" className="text-action underline underline-offset-4">
-          horse roadmap
-        </Link>
-        , and each want there shows the cheapest horse standing against it.
-      </p>
+          {looking.notes === undefined ? null : (
+            <p className="whitespace-pre-line text-sm text-muted">{looking.notes}</p>
+          )}
+        </Modal>
+      )}
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
+          placement="side"
           title={editing === undefined ? "A horse worth looking at" : `Editing ${editing.title}`}
-          description="Most listings start sparse. Everything but a name and a price can be filled in after the phone call."
+          description="A name and a price is enough to start."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Add to the comparison" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const candidate = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(candidate);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
             <TextInput
               label="Which horse"
               required
-              hint="&ldquo;Bay ranch gelding, Weatherford&rdquo; — how you would refer to him out loud."
+              hint="How you would say it: “Bay ranch gelding, Weatherford”."
               value={draft.title}
               error={errors["title"]}
               onChange={(event) => setDraft({ ...draft, title: event.target.value })}
             />
             <Select
               label="Against which want"
-              hint="From the roadmap. Leaving it blank is fine — some horses turn up before the want does."
+              hint="From the roadmap. Blank is fine."
               value={draft.roadmapItemId}
               onChange={(event) => setDraft({ ...draft, roadmapItemId: event.target.value })}
               // A real option rather than a disabled placeholder, so a link
@@ -808,7 +906,7 @@ export function HorseCandidatesScreen({
                 type="number"
                 inputMode="decimal"
                 step="0.1"
-                hint="15.2 is fifteen hands two inches. A hand is four inches, so it runs .0 to .3."
+                hint="15.2 is fifteen hands two inches; runs .0 to .3."
                 value={draft.heightHands}
                 // Checked as it is typed, against the same rule the schema
                 // enforces. Waiting for the save to complain means scrolling
@@ -824,7 +922,7 @@ export function HorseCandidatesScreen({
                   { value: "", label: "Not stated" },
                   ...TRAINING_LEVELS.map((value) => ({
                     value,
-                    label: value.replace(/_/g, " "),
+                    label: optionLabel(value),
                   })),
                 ]}
               />
@@ -836,17 +934,15 @@ export function HorseCandidatesScreen({
                 }
                 options={SOUNDNESS_STATUSES.map((value) => ({
                   value,
-                  label: value.replace(/_/g, " "),
+                  label: optionLabel(value),
                 }))}
               />
             </div>
 
             <fieldset className="flex flex-col gap-2">
               <legend className="text-sm font-medium text-ink">What he is broke to do</legend>
-              <p className="text-xs text-muted">
-                Leave every box clear when the listing does not say — that reads as &ldquo;nobody
-                has said&rdquo;, not as &ldquo;none of these&rdquo;.
-              </p>
+              {/* Every box clear reads as "nobody has said", not "none of these". */}
+              <p className="text-xs text-muted">Leave clear if the listing does not say.</p>
               <div className="flex flex-wrap gap-x-density gap-y-1">
                 {DISCIPLINES.map((discipline) => (
                   <Checkbox
@@ -868,7 +964,7 @@ export function HorseCandidatesScreen({
 
             <Checkbox
               label="Pre-purchase exam done"
-              hint="Until this is ticked, he shows on the list of horses worth asking about."
+              hint="Until ticked, he stays on the list to ask about."
               checked={draft.vetCheckDone}
               error={errors["vetCheckDone"]}
               onChange={(event) =>
@@ -896,7 +992,7 @@ export function HorseCandidatesScreen({
             <TextArea
               label="Temperament"
               rows={2}
-              hint="How he was to catch, to tie, to load. The part no listing photograph shows."
+              hint="To catch, to tie, to load."
               value={draft.temperament}
               error={errors["temperament"]}
               onChange={(event) => setDraft({ ...draft, temperament: event.target.value })}
@@ -934,7 +1030,6 @@ export function HorseCandidatesScreen({
             <TextArea
               label="Notes"
               rows={3}
-              hint="What the seller said, who has ridden him, what was agreed on the phone."
               value={draft.notes}
               error={errors["notes"]}
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
@@ -948,14 +1043,14 @@ export function HorseCandidatesScreen({
               }
               options={CANDIDATE_STATUSES.map((value) => ({
                 value,
-                label: value.replace(/_/g, " "),
+                label: optionLabel(value),
               }))}
             />
 
             {draft.heightHands === "" || heightIssue !== undefined ? null : (
               <p className="text-sm text-muted">
-                {describeHeight(Number(draft.heightHands))} — said out loud, so a slip is visible
-                before it is saved.
+                {/* Said out loud, so a slip is visible before it is saved. */}
+                {describeHeight(Number(draft.heightHands))}
               </p>
             )}
 
@@ -970,13 +1065,6 @@ export function HorseCandidatesScreen({
                 {Object.values(errors).join(" · ")}
               </p>
             )}
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Add to the comparison" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}

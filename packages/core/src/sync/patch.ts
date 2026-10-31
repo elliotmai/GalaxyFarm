@@ -44,6 +44,17 @@ export function diff(
     changes.push({ field, value, at: meta.at, deviceId: meta.deviceId });
   }
 
+  // A field the new version no longer has at all was cleared, and a clear is a
+  // change like any other. `restore` removes `deletedAt` rather than setting
+  // it to undefined, and without this the undo after a delete never left the
+  // device: the server kept the tombstone and the next pull deleted the record
+  // again, a second or a minute after somebody had watched it come back.
+  for (const [field, value] of Object.entries(before)) {
+    if (RESERVED_FIELDS.has(field) || field in after) continue;
+    if (value === undefined || value === null) continue;
+    changes.push({ field, value: undefined, at: meta.at, deviceId: meta.deviceId });
+  }
+
   return changes;
 }
 

@@ -3,17 +3,14 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 
 import {
-  Badge,
   Button,
-  Callout,
   Card,
-  DataTable,
   EmptyState,
+  Pill,
   Section,
   Select,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import {
   DEFAULT_LEAD_DAYS,
@@ -242,54 +239,25 @@ export function NotificationsScreen({
 
   const subscribedHere = endpoint !== undefined;
 
-  const deviceColumns: readonly Column<PushDevice>[] = [
-    {
-      key: "deviceLabel",
-      header: "Device",
-      render: (device) => (
-        <span className="flex items-center gap-2">
-          {device.deviceLabel}
-          {device.current === true ? <Badge tone="action">This one</Badge> : null}
-        </span>
-      ),
-    },
-    { key: "createdAt", header: "Turned on", render: (device) => formatDate(device.createdAt) },
-    {
-      key: "lastSentAt",
-      header: "Last sent to",
-      render: (device) => formatDate(device.lastSentAt),
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (device) => (
-        <Button variant="danger" disabled={pending} onClick={() => void revoke(device)}>
-          Turn off
-        </Button>
-      ),
-    },
-  ];
-
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title="This device"
-        description="Alerts that arrive when the app is closed — which is the only kind that reaches you in a barn."
-      >
+      <Section title="This device" description="Alerts that arrive with the app closed.">
+        {/* One line for whichever reason push cannot work here, not a box. */}
         {pushUnavailable !== undefined ? (
-          <Callout tone="neutral" title="Push notifications are not set up for this farm">
+          <p className="text-sm text-muted">
+            <strong className="text-ink">Push notifications are not set up for this farm.</strong>{" "}
             {pushUnavailable}
-          </Callout>
+          </p>
         ) : !supported ? (
-          <Callout tone="neutral" title="This browser cannot do push notifications">
-            Email still arrives. On an iPhone, add the app to the home screen first — Safari only
-            allows notifications for an installed app.
-          </Callout>
+          <p className="text-sm text-muted">
+            <strong className="text-ink">This browser cannot do push notifications.</strong> Email
+            still arrives. On an iPhone, add the app to the home screen first.
+          </p>
         ) : denied && !subscribedHere ? (
-          <Callout tone="danger" title="Notifications are blocked for this site">
-            The browser will not ask again. Turn them back on in its own site settings, then use the
-            button below.
-          </Callout>
+          <p className="text-sm text-danger">
+            <strong>Notifications are blocked for this site.</strong> Allow them in the
+            browser&rsquo;s site settings, then turn them on below.
+          </p>
         ) : null}
 
         <Card className="flex flex-wrap items-center justify-between gap-density">
@@ -301,8 +269,8 @@ export function NotificationsScreen({
             </p>
             <p className="text-sm text-muted">
               {subscribedHere
-                ? "Turning them off here leaves your other devices alone."
-                : "You will be asked for permission once. Say no and the browser will not ask again."}
+                ? "Your other devices are unaffected."
+                : "The browser asks once — a no cannot be undone here."}
             </p>
           </div>
 
@@ -318,7 +286,7 @@ export function NotificationsScreen({
 
       <Section
         title="Your devices"
-        description="Each browser you have turned notifications on in. A phone and a laptop are two."
+        description="Each browser with notifications on. A phone and a laptop are two."
         actions={
           <Button
             disabled={pending || pushUnavailable !== undefined || devices.length === 0}
@@ -331,32 +299,44 @@ export function NotificationsScreen({
         {devices.length === 0 ? (
           <EmptyState
             title="No devices yet"
-            detail="Nothing is being pushed anywhere. Email still goes out as it always has."
+            detail="Nothing is being pushed anywhere. Email still goes out."
           />
         ) : (
-          <DataTable
-            caption="Devices receiving push notifications"
-            rows={devices.map((device) => ({ ...device, current: device.id === thisDeviceId }))}
-            columns={deviceColumns}
-            rowKey={(device) => device.id}
-          />
+          <ul
+            aria-label="Devices receiving push notifications"
+            className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
+          >
+            {devices.map((device) => (
+              <li key={device.id} className="flex items-center gap-3 py-2 pl-4 pr-2">
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate font-semibold text-ink">{device.deviceLabel}</span>
+                  <span className="truncate text-sm text-muted">
+                    On since {formatDate(device.createdAt)} · last sent{" "}
+                    {formatDate(device.lastSentAt)}
+                  </span>
+                </span>
+                {device.id === thisDeviceId ? <Pill tone="action">This one</Pill> : null}
+                <Button variant="ghost" disabled={pending} onClick={() => void revoke(device)}>
+                  Turn off
+                </Button>
+              </li>
+            ))}
+          </ul>
         )}
       </Section>
 
-      <Section
-        title="What you are told about"
-        description="Per notification, and per person — this is your list, not the farm's."
-      >
-        <div className="flex flex-col gap-2">
+      <Section title="What you are told about" description="Your list, not the farm's.">
+        {/* One list with hairlines rather than twenty-two cards. */}
+        <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
           {NOTIFICATION_TRIGGERS.map((trigger) => {
             const setting = settingFor(settings, trigger, actorId);
             return (
-              <Card
+              <li
                 key={trigger}
-                className="flex flex-wrap items-center justify-between gap-density"
+                className="flex flex-wrap items-center justify-between gap-x-density gap-y-2 px-4 py-2"
               >
-                <div className="flex min-w-0 flex-col gap-1">
-                  <p className="text-density text-ink">{TRIGGER_LABELS[trigger]}</p>
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <p className="font-semibold text-ink">{TRIGGER_LABELS[trigger]}</p>
                   <p className="text-sm text-muted">{leadLine(setting, trigger)}</p>
                 </div>
 
@@ -368,10 +348,10 @@ export function NotificationsScreen({
                   disabled={pending}
                   onChange={(event) => run(() => setTriggerChannel(trigger, event.target.value))}
                 />
-              </Card>
+              </li>
             );
           })}
-        </div>
+        </ul>
       </Section>
     </div>
   );

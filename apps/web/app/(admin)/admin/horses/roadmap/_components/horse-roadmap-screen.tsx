@@ -1,24 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import {
   Button,
-  CardGrid,
+  DetailList,
   EmptyState,
   Modal,
   PageBody,
   PageHeader,
   Pill,
-  RecordCard,
-  Section,
   Select,
   TextArea,
   TextInput,
-  Tile,
   useConfirmDelete,
   useToast,
+  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   formatMoney,
@@ -37,10 +35,12 @@ import {
   type RoadmapStatus,
   type Ulid,
 } from "@galaxy-farm/core";
-import { budgetOutlook, nextUp, shoppingFor, unshopped } from "@galaxy-farm/module-horses";
+import { budgetOutlook, nextUp, shoppingFor } from "@galaxy-farm/module-horses";
 
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
+
+import { ListRow, PhoneAddButton, RowList } from "@/app/(admin)/admin/horses/_components/list-row";
 
 /**
  * The horse roadmap (spec §5.9, §5.1's generic Roadmap with `domain: horses`).
@@ -50,6 +50,11 @@ import { useRecords } from "@/lib/local/use-records";
  * slowly", which only works if there is somewhere to put the thinking down.
  * This is that place — what the horses are for, what has to be true before one
  * arrives, and what each of those is expected to cost.
+ *
+ * Lists of rows rather than grids of cards: the shopping list first, because
+ * that is what the screen is opened for, then the reasons, then what is
+ * settled, folded. Each item's detail and its actions — achieved, dropped,
+ * edit, delete — wait on its own panel.
  *
  * No HorseRoadmap entity, because §5.9 asks for the same aggregate cattle and
  * equipment use. What is specific to horses is the reading, and that lives in
@@ -61,12 +66,6 @@ const TYPE_LABEL: Readonly<Record<RoadmapItemType, string>> = {
   milestone: "Milestone",
   wishlist: "Want",
   planned_action: "Planned",
-};
-
-const PRIORITY_TONE: Readonly<Record<Priority, "danger" | "action" | "neutral">> = {
-  need: "danger",
-  want: "action",
-  someday: "neutral",
 };
 
 /** Goals and milestones say where this is going; wants are what to shop for. */
@@ -134,13 +133,14 @@ export function HorseRoadmapScreen({
   const [editing, setEditing] = useState<RoadmapItem | undefined>();
   const [draft, setDraft] = useState<Draft | undefined>();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  /** The item whose panel is open, by id so it reads live. */
+  const [looked, setLooked] = useState<Ulid | undefined>();
 
   const now = new Date();
   const items = allItems.filter((item) => item.domain === "horses");
   const outlook = budgetOutlook(items);
   const steps = nextUp(items, now);
   const shopping = shoppingFor(items, allCandidates);
-  const notStarted = unshopped(items, allCandidates);
 
   const intent = items.filter((item) => INTENT_TYPES.includes(item.type));
   const closed = items.filter((item) => item.status === "achieved" || item.status === "dropped");
@@ -206,8 +206,8 @@ export function HorseRoadmapScreen({
   /**
    * Achieved, in one tap.
    *
-   * A roadmap nobody can tick off is a list that only grows, and the tiles
-   * above read off `status` — an item left open after it happened keeps
+   * A roadmap nobody can tick off is a list that only grows, and the totals
+   * in the header read off `status` — an item left open after it happened keeps
    * counting toward a budget that has already been spent.
    */
   async function setStatus(item: RoadmapItem, status: RoadmapStatus) {
@@ -280,238 +280,325 @@ export function HorseRoadmapScreen({
     await candidateApi.update(candidate.id, { roadmapItemId: itemId });
   }
 
+  // The panel reads the item live by id, so a status changed in it shows at once.
+  const looking = looked === undefined ? undefined : items.find((item) => item.id === looked);
+  const lookingShop =
+    looking === undefined ? undefined : shopping.find((entry) => entry.item.id === looking.id);
+  const isOverdue = (item: RoadmapItem) =>
+    steps.find((step) => step.item.id === item.id)?.overdue === true;
+
+  /** When, the way it is planned: a season, a date, or both. */
+  function whenOf(item: RoadmapItem, overdue: boolean): string | undefined {
+    const date = formatDate(item.targetDate);
+    return (
+      [item.targetSeason, date === undefined ? undefined : `${overdue ? "was" : "by"} ${date}`]
+        .filter((part) => part !== undefined)
+        .join(", ") || undefined
+    );
+  }
+
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Horses"
-        title="Roadmap"
-        subtitle="What the horses are for, what has to be true before one arrives, and what that is expected to cost. Live years before the first horse, which is the point."
-        actions={
-          <Button variant="primary" onClick={() => startCreate("wishlist")}>
-            Add a want
-          </Button>
-        }
-      />
+      {/* Bottom clearance on a phone for the floating add button. */}
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <PageHeader
+          eyebrow="Horses"
+          title="Roadmap"
+          subtitle={[
+            `${steps.length} open`,
+            `${formatMoney(outlook.total)} planned`,
+            outlook.byPriority.need.cents > 0
+              ? `${formatMoney(outlook.byPriority.need)} needs`
+              : undefined,
+            // Unpriced items are left out of the total, so say so rather than
+            // letting the sum look complete.
+            outlook.unpriced === 0 ? undefined : `${outlook.unpriced} not priced`,
+          ]
+            .filter((part) => part !== undefined)
+            .join(" · ")}
+          actions={
+            <span className="hidden sm:block">
+              <Button variant="primary" onClick={() => startCreate("wishlist")}>
+                <span aria-hidden="true">+</span> Add a want
+              </Button>
+            </span>
+          }
+        />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile label="Open" value={steps.length} tone="identity" />
-        <Tile
-          label="Needs"
-          value={formatMoney(outlook.byPriority.need)}
-          tone="danger"
-          emphasis={outlook.byPriority.need.cents > 0}
-          hint="Before the wants and the somedays"
-        />
-        <Tile
-          label="Whole plan"
-          value={formatMoney(outlook.total)}
-          hint={
-            outlook.unpriced === 0
-              ? "Everything open is priced"
-              : `${outlook.unpriced} not priced — not counted here`
+        {loading ? <p className="text-muted">Looking…</p> : null}
+
+        {/*
+          The shopping list first: it is what this screen is opened for. Each
+          want with what is being looked at against it, priced on the all-in
+          cost — the number §5.1 says decides things.
+        */}
+        <RoadmapSection
+          title="Shopping list"
+          count={shopping.length}
+          action={
+            <Button variant="ghost" onClick={() => startCreate("planned_action")}>
+              + Planned step
+            </Button>
           }
-        />
-        <Tile
-          label="Wants not started"
-          value={notStarted.length}
-          tone={notStarted.length > 0 ? "action" : "calm"}
-          hint={
-            notStarted.length > 0
-              ? "Nothing under consideration yet"
-              : "Every want has a horse against it"
+        >
+          {shopping.length === 0 ? (
+            <EmptyState
+              title="Nothing on the list"
+              detail="A want: “a quiet ranch gelding, under $6,000, by next spring”."
+              action={
+                <Button variant="primary" onClick={() => startCreate("wishlist")}>
+                  Add a want
+                </Button>
+              }
+            />
+          ) : (
+            <RowList label="Shopping list">
+              {shopping.map(({ item, live, cheapest, overBudget }) => {
+                const overdue = isOverdue(item);
+                return (
+                  <ListRow
+                    key={item.id}
+                    title={item.title}
+                    onOpen={() => setLooked(item.id)}
+                    line={[
+                      // Only the planned steps are labelled; everything else
+                      // here is a want, and "Want" beside "want" says nothing.
+                      item.type === "wishlist" ? undefined : TYPE_LABEL[item.type],
+                      capitalise(item.priority),
+                      item.budgetEstimate === undefined
+                        ? "no budget"
+                        : `${formatMoney(item.budgetEstimate)} budget`,
+                      live.length === 0
+                        ? undefined
+                        : `${live.length} looking, from ${formatMoney(
+                            totalAcquisitionCost(cheapest as PurchaseCandidate),
+                          )}`,
+                      whenOf(item, overdue),
+                    ]}
+                    chip={
+                      overBudget === true ? (
+                        <Pill tone="danger">Over budget</Pill>
+                      ) : overdue ? (
+                        <Pill tone="danger" dot>
+                          Overdue
+                        </Pill>
+                      ) : live.length === 0 ? (
+                        <Pill tone="action">Not started</Pill>
+                      ) : undefined
+                    }
+                  />
+                );
+              })}
+            </RowList>
+          )}
+        </RoadmapSection>
+
+        {/* The reasons, and what has to be in place first. A want with no
+            reason behind it is how a horse gets bought twice. */}
+        <RoadmapSection
+          title="What the horses are for"
+          count={intent.length}
+          action={
+            <Button variant="ghost" onClick={() => startCreate("goal")}>
+              + Goal or milestone
+            </Button>
           }
-        />
+        >
+          {intent.length === 0 ? (
+            <EmptyState
+              title="Nothing written down yet"
+              detail="“Everyone can ride together” is a goal; “the north trap is fenced” is a milestone."
+              action={<Button onClick={() => startCreate("goal")}>Add the first</Button>}
+            />
+          ) : (
+            <RowList label="What the horses are for">
+              {intent.map((item) => (
+                <ListRow
+                  key={item.id}
+                  title={item.title}
+                  onOpen={() => setLooked(item.id)}
+                  line={[
+                    TYPE_LABEL[item.type],
+                    capitalise(item.priority),
+                    whenOf(item, isOverdue(item)),
+                  ]}
+                  chip={
+                    item.status === "open" ? undefined : (
+                      <Pill tone={item.status === "achieved" ? "calm" : "neutral"}>
+                        {capitalise(item.status.replace(/_/g, " "))}
+                      </Pill>
+                    )
+                  }
+                />
+              ))}
+            </RowList>
+          )}
+        </RoadmapSection>
+
+        {/*
+          Achieved and dropped, kept — what was decided against is worth as
+          much next year as what was done. Folded, because it is looked back
+          at, not worked from.
+        */}
+        {closed.length === 0 ? null : (
+          <details className="group flex flex-col gap-2.5">
+            <summary className="inline-flex min-h-target cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted hover:text-ink">
+              Settled · {closed.length}
+            </summary>
+            <RowList label="Settled">
+              {closed.map((item) => (
+                <ListRow
+                  key={item.id}
+                  title={item.title}
+                  onOpen={() => setLooked(item.id)}
+                  line={[TYPE_LABEL[item.type], item.detail]}
+                  chip={
+                    <Pill tone={item.status === "achieved" ? "calm" : "neutral"}>
+                      {capitalise(item.status)}
+                    </Pill>
+                  }
+                />
+              ))}
+            </RowList>
+          </details>
+        )}
+
+        <PhoneAddButton onClick={() => startCreate("wishlist")}>Add a want</PhoneAddButton>
       </div>
 
-      {loading ? <p className="text-muted">Looking…</p> : null}
-
-      <Section
-        title="What the horses are for"
-        description="The reasons, and what has to be in place first. A want with no reason behind it is how a horse gets bought twice."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => startCreate("goal")}>Add a goal</Button>
-            <Button onClick={() => startCreate("milestone")}>Add a milestone</Button>
-          </div>
-        }
-      >
-        {intent.length === 0 ? (
-          <EmptyState
-            title="Nothing written down yet"
-            detail="&ldquo;Everyone can ride together&rdquo; is a goal; &ldquo;the north trap is fenced for horses&rdquo; is a milestone. Both are worth having before the shopping starts."
-            action={
-              <Button variant="primary" onClick={() => startCreate("goal")}>
-                Add the first
-              </Button>
-            }
-          />
-        ) : (
-          <CardGrid columns={3}>
-            {intent.map((item) => (
-              <RecordCard
-                key={item.id}
-                tone={item.status === "achieved" ? "calm" : "identity"}
-                title={item.title}
-                subtitle={item.detail}
-                actions={<Pill tone="neutral">{TYPE_LABEL[item.type]}</Pill>}
-                meta={
-                  <>
-                    <Pill tone={PRIORITY_TONE[item.priority]}>{item.priority}</Pill>
-                    {item.targetSeason === undefined ? null : <Pill>{item.targetSeason}</Pill>}
-                    {formatDate(item.targetDate) === undefined ? null : (
-                      <Pill>by {formatDate(item.targetDate)}</Pill>
-                    )}
-                    {item.status === "open" ? null : <Pill tone="calm">{item.status}</Pill>}
-                  </>
-                }
+      {looking === undefined ? null : (
+        <Modal
+          key={looking.id}
+          placement="side"
+          title={looking.title}
+          description={[TYPE_LABEL[looking.type], capitalise(looking.priority)].join(" · ")}
+          onClose={() => setLooked(undefined)}
+          footer={
+            <>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setLooked(undefined);
+                  startEdit(looking);
+                }}
               >
-                <ItemActions
-                  item={item}
-                  onEdit={startEdit}
-                  onStatus={setStatus}
-                  onDelete={remove}
-                />
-              </RecordCard>
-            ))}
-          </CardGrid>
-        )}
-      </Section>
-
-      <Section
-        title="The shopping list"
-        description="Each want with what is actually being looked at against it, priced on the all-in cost — the number §5.1 says decides things."
-        actions={<Button onClick={() => startCreate("planned_action")}>Add a planned step</Button>}
-      >
-        {shopping.length === 0 ? (
-          <EmptyState
-            title="Nothing on the list"
-            detail="A want says &ldquo;a quiet ranch gelding, under $6,000, by next spring&rdquo;. The horses you find against it go on the candidates screen."
-            action={
-              <Button variant="primary" onClick={() => startCreate("wishlist")}>
-                Add a want
+                Edit
               </Button>
-            }
-          />
-        ) : (
-          <CardGrid columns={2}>
-            {shopping.map(({ item, live, cheapest, overBudget }) => {
-              const overdue = steps.find((step) => step.item.id === item.id)?.overdue === true;
-
-              return (
-                <RecordCard
-                  key={item.id}
-                  tone={overBudget === true ? "danger" : live.length > 0 ? "action" : "neutral"}
-                  title={item.title}
-                  subtitle={item.detail}
-                  actions={<Pill tone={PRIORITY_TONE[item.priority]}>{item.priority}</Pill>}
-                  meta={
-                    <>
-                      {/*
-                        Only the planned steps are labelled. Everything else in
-                        this section is a want, and a pill reading "Want" next
-                        to a priority pill reading "want" says nothing twice.
-                      */}
-                      {item.type === "wishlist" ? null : (
-                        <Pill tone="neutral">{TYPE_LABEL[item.type]}</Pill>
-                      )}
-                      {item.budgetEstimate === undefined ? (
-                        <Pill tone="neutral">no budget set</Pill>
-                      ) : (
-                        <Pill tone="identity">{formatMoney(item.budgetEstimate)} budgeted</Pill>
-                      )}
-                      {item.targetSeason === undefined ? null : <Pill>{item.targetSeason}</Pill>}
-                      {formatDate(item.targetDate) === undefined ? null : (
-                        <Pill tone={overdue ? "danger" : "neutral"} dot={overdue}>
-                          {overdue ? "was " : "by "}
-                          {formatDate(item.targetDate)}
-                        </Pill>
-                      )}
-                    </>
-                  }
-                >
-                  <p className="text-sm text-muted">
-                    {live.length === 0 ? (
-                      <>Nothing under consideration yet.</>
-                    ) : (
-                      <>
-                        {live.length} under consideration · cheapest all in{" "}
-                        <span className="font-semibold text-ink">
-                          {formatMoney(totalAcquisitionCost(cheapest as PurchaseCandidate))}
-                        </span>
-                        {overBudget === undefined
-                          ? null
-                          : overBudget
-                            ? " — over the budget"
-                            : " — inside the budget"}
-                      </>
-                    )}
-                  </p>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      href="/admin/horses/candidates"
-                      className="inline-flex min-h-target items-center rounded-density px-3 text-density text-action underline underline-offset-4"
-                    >
-                      {live.length === 0 ? "Find one" : "Compare them"}
-                    </Link>
-                    <ItemActions
-                      item={item}
-                      onEdit={startEdit}
-                      onStatus={setStatus}
-                      onDelete={remove}
-                    />
-                  </div>
-                </RecordCard>
-              );
-            })}
-          </CardGrid>
-        )}
-      </Section>
-
-      {closed.length === 0 ? null : (
-        <Section
-          title="Settled"
-          description="Achieved and dropped, kept. What you decided against is worth as much next year as what you did."
+              <Button onClick={() => setLooked(undefined)}>Close</Button>
+              {/* The panel closes first, so the confirmation is the only
+                  dialog on screen. */}
+              <Button
+                variant="danger"
+                className="ml-auto"
+                onClick={() => {
+                  setLooked(undefined);
+                  void remove(looking);
+                }}
+              >
+                Delete
+              </Button>
+            </>
+          }
         >
-          <CardGrid columns={3}>
-            {closed.map((item) => (
-              <RecordCard
-                key={item.id}
-                tone="neutral"
-                title={item.title}
-                subtitle={item.detail}
-                actions={
-                  <Pill tone={item.status === "achieved" ? "calm" : "neutral"}>{item.status}</Pill>
-                }
+          {looking.detail === undefined ? null : (
+            <p className="whitespace-pre-line text-sm text-ink">{looking.detail}</p>
+          )}
+          <DetailList
+            items={[
+              { label: "Status", value: capitalise(looking.status.replace(/_/g, " ")) },
+              {
+                label: "Budget",
+                value:
+                  looking.budgetEstimate === undefined
+                    ? "No budget set"
+                    : formatMoney(looking.budgetEstimate),
+              },
+              { label: "When", value: whenOf(looking, isOverdue(looking)) ?? "—" },
+              ...(lookingShop === undefined
+                ? []
+                : [
+                    {
+                      label: "Under consideration",
+                      value:
+                        lookingShop.live.length === 0
+                          ? "Nothing yet"
+                          : `${lookingShop.live.length} · cheapest all in ${formatMoney(
+                              totalAcquisitionCost(lookingShop.cheapest as PurchaseCandidate),
+                            )}${
+                              lookingShop.overBudget === undefined
+                                ? ""
+                                : lookingShop.overBudget
+                                  ? " — over the budget"
+                                  : " — inside the budget"
+                            }`,
+                    },
+                  ]),
+            ]}
+          />
+          <div className="flex flex-wrap gap-2">
+            {/*
+              Achieved, in one tap. A roadmap nobody can tick off is a list
+              that only grows, and the totals read off `status`.
+            */}
+            {looking.status === "achieved" || looking.status === "dropped" ? (
+              <Button onClick={() => void setStatus(looking, "open")}>Reopen</Button>
+            ) : (
+              <>
+                <Button onClick={() => void setStatus(looking, "achieved")}>Achieved</Button>
+                <Button onClick={() => void setStatus(looking, "dropped")}>Drop it</Button>
+              </>
+            )}
+            {lookingShop === undefined ? null : (
+              <Link
+                href="/admin/horses/candidates"
+                className="inline-flex min-h-target items-center rounded-density px-3 font-semibold text-action underline-offset-4 hover:underline"
               >
-                <ItemActions
-                  item={item}
-                  onEdit={startEdit}
-                  onStatus={setStatus}
-                  onDelete={remove}
-                />
-              </RecordCard>
-            ))}
-          </CardGrid>
-        </Section>
+                {lookingShop.live.length === 0 ? "Find one" : "Compare them"}
+              </Link>
+            )}
+          </div>
+        </Modal>
       )}
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
+          placement="side"
           title={
             editing === undefined
               ? `New ${TYPE_LABEL[draft.type].toLowerCase()}`
               : `Editing ${editing.title}`
           }
-          description="Everything here is a want or a reason for one. The horses themselves go on the candidates screen."
+          description="The horses themselves go on the candidates screen."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Add it" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const item = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(item);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
             <TextInput
               label="What"
               required
-              hint="&ldquo;A quiet ranch gelding&rdquo; · &ldquo;Everyone can ride together&rdquo;"
+              hint="“A quiet ranch gelding” · “Everyone can ride together”"
               value={draft.title}
               error={errors["title"]}
               onChange={(event) => setDraft({ ...draft, title: event.target.value })}
@@ -526,7 +613,7 @@ export function HorseRoadmapScreen({
             />
             <Select
               label="How badly"
-              hint="Needs first, then wants, then somedays — the order you actually shop in."
+              hint="Needs, then wants, then somedays."
               value={draft.priority}
               onChange={(event) => setDraft({ ...draft, priority: event.target.value as Priority })}
               options={PRIORITIES.map((value) => ({ value, label: value }))}
@@ -536,14 +623,16 @@ export function HorseRoadmapScreen({
               type="number"
               inputMode="decimal"
               step="0.01"
-              hint="What you would pay all in. Leave blank rather than guessing — an unpriced want is counted as unpriced, not as free."
+              // Blank rather than a guess: an unpriced want is counted as
+              // unpriced, not as free.
+              hint="All in. Blank if unknown — it is not counted as free."
               value={draft.budget}
               error={errors["budgetEstimate"]}
               onChange={(event) => setDraft({ ...draft, budget: event.target.value })}
             />
             <TextInput
               label="Target season"
-              hint="&ldquo;Spring 2028&rdquo; — how this is actually planned."
+              hint="“Spring 2028”"
               value={draft.targetSeason}
               error={errors["targetSeason"]}
               onChange={(event) => setDraft({ ...draft, targetSeason: event.target.value })}
@@ -551,7 +640,7 @@ export function HorseRoadmapScreen({
             <TextInput
               label="Target date"
               type="date"
-              hint="Only when there is a real date. A season is usually the honest answer."
+              hint="Only for a real date."
               value={draft.targetDate}
               error={errors["targetDate"]}
               onChange={(event) => setDraft({ ...draft, targetDate: event.target.value })}
@@ -559,7 +648,6 @@ export function HorseRoadmapScreen({
             <TextArea
               label="Why"
               rows={3}
-              hint="The reasoning, so next year's version of you can argue with it."
               value={draft.detail}
               error={errors["detail"]}
               onChange={(event) => setDraft({ ...draft, detail: event.target.value })}
@@ -572,7 +660,7 @@ export function HorseRoadmapScreen({
               }
               options={ROADMAP_STATUSES.map((value) => ({
                 value,
-                label: value.replace(/_/g, " "),
+                label: optionLabel(value),
               }))}
             />
 
@@ -583,13 +671,6 @@ export function HorseRoadmapScreen({
                 {Object.values(errors).join(" · ")}
               </p>
             )}
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Add it" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}
@@ -597,41 +678,34 @@ export function HorseRoadmapScreen({
   );
 }
 
-function ItemActions({
-  item,
-  onEdit,
-  onStatus,
-  onDelete,
+/** A list heading with its count and one quiet add beside it. */
+function RoadmapSection({
+  title,
+  count,
+  action,
+  children,
 }: {
-  readonly item: RoadmapItem;
-  readonly onEdit: (item: RoadmapItem) => void;
-  readonly onStatus: (item: RoadmapItem, status: RoadmapStatus) => Promise<void>;
-  readonly onDelete: (item: RoadmapItem) => Promise<void>;
+  readonly title: string;
+  readonly count: number;
+  readonly action: ReactNode;
+  readonly children: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {item.status === "achieved" || item.status === "dropped" ? (
-        <Button variant="ghost" onClick={() => void onStatus(item, "open")}>
-          Reopen
-        </Button>
-      ) : (
-        <>
-          <Button variant="ghost" onClick={() => void onStatus(item, "achieved")}>
-            Achieved
-          </Button>
-          <Button variant="ghost" onClick={() => void onStatus(item, "dropped")}>
-            Drop it
-          </Button>
-        </>
-      )}
-      <Button variant="ghost" onClick={() => onEdit(item)}>
-        Edit
-      </Button>
-      <Button variant="ghost" onClick={() => void onDelete(item)}>
-        Delete
-      </Button>
-    </div>
+    <section className="flex flex-col gap-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
+          {title}
+          {count === 0 ? "" : ` · ${count}`}
+        </h2>
+        {action}
+      </div>
+      {children}
+    </section>
   );
+}
+
+function capitalise(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 /** `2026-08-13`, in local time — what a `type="date"` input wants. */

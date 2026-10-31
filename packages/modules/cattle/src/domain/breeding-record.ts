@@ -277,6 +277,26 @@ export function calvingFor<T extends CalvingLike>(
     .sort((left, right) => left.date.getTime() - right.date.getTime())[0];
 }
 
+/**
+ * Days she carried, as far as a day count still means anything.
+ *
+ * Counts up from the service while she is carrying, and stops at the calving:
+ * a cow that calved at day 281 stays "day 281" rather than reading day 340 a
+ * month later as if she were long overdue. Undefined when there is nothing to
+ * count — before the service date, or after a preg check found her open.
+ */
+export function daysCarried(
+  breeding: Pick<BreedingRecord, "id" | "damId" | "date" | "pregCheck">,
+  calvings: readonly CalvingLike[],
+  now: Date,
+): number | undefined {
+  if (breeding.pregCheck?.result === "open") return undefined;
+  const calving = calvingFor(calvings, breeding);
+  const until = calving === undefined || calving.date > now ? now : calving.date;
+  const day = daysBred(breeding, until);
+  return day < 0 ? undefined : day;
+}
+
 /** Has she calved to this service? */
 export function hasCalved(
   calvings: readonly CalvingLike[],

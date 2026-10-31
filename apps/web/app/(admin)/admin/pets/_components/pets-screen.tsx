@@ -1,6 +1,8 @@
 "use client";
 
-import { Callout, PageBody, PageHeader, Tabs, Tile } from "@galaxy-farm/ui";
+import { useEffect, useState } from "react";
+
+import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import {
   animalsFedBy,
   displayName,
@@ -16,6 +18,7 @@ import { outstandingPetCare, petsOnFarm } from "@galaxy-farm/module-pets";
 import { PetFeedingPanel } from "@/app/(admin)/admin/pets/_components/pet-feeding-panel";
 import { PetHealthPanel } from "@/app/(admin)/admin/pets/_components/pet-health-panel";
 import { PetPanel } from "@/app/(admin)/admin/pets/_components/pet-panel";
+import { nameList } from "@/lib/feed-lines";
 import { careRecordsFor } from "@/lib/pet-care";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -40,10 +43,25 @@ import { useRecords } from "@/lib/local/use-records";
 export function PetsScreen({
   propertyId,
   actorId,
+  species,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /**
+   * One species' care — Dog care, Cat care — each in its own species' strip,
+   * so the way to the cats' vet visits never shows the dogs beside it.
+   */
+  readonly species?: "dog" | "cat";
 }) {
+  // `?tab=health` or `?tab=feeding` opens on that tab — the Medicine and
+  // Rations buttons on the Dogs and Cats pages land here. Read off `window`
+  // once, so the page needs no Suspense boundary.
+  const [tab, setTab] = useState("pets");
+  useEffect(() => {
+    const asked = new URLSearchParams(window.location.search).get("tab");
+    if (asked === "health" || asked === "feeding") setTab(asked);
+  }, []);
+
   const query = { propertyId };
   const { records: animals, loading } = useRecords<Animal>("animals", query);
   const { records: health, loading: healthLoading } = useRecords<HealthRecord>(
@@ -54,7 +72,9 @@ export function PetsScreen({
   const { records: feeds } = useRecords<FeedType>("feedTypes", query);
   const { records: contacts } = useRecords<Contact>("contacts", query);
 
-  const pets = petsOnFarm(animals);
+  const pets = petsOnFarm(animals).filter(
+    (pet) => species === undefined || pet.species === species,
+  );
   const petIds = new Set(pets.map((pet) => pet.id));
   const petHealth = health.filter((record) => petIds.has(record.animalId));
   // `animalsFedBy`, not `targetId`: a bowl two cats share is filed under one
@@ -74,57 +94,59 @@ export function PetsScreen({
     return pet === undefined ? "a pet" : displayName(pet);
   };
 
+  const careful = pets.filter((pet) => pet.safetyLevel >= 4).length;
+
   return (
     <PageBody>
       <PageHeader
         eyebrow="Animals"
-        title="Pets"
-        subtitle="The dogs and the cats — what they eat, what they are on, and what a helper needs to know."
+        title={species === "dog" ? "Dog care" : species === "cat" ? "Cat care" : "Pet care"}
+        subtitle={[
+          `${pets.length} ${species ?? "pet"}${pets.length === 1 ? "" : "s"}`,
+          due.length === 0 ? undefined : `${due.length} care due`,
+          careful === 0 ? undefined : `${careful} handle with care`,
+        ]
+          .filter((part) => part !== undefined)
+          .join(" · ")}
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile label="Pets" value={pets.length} tone="identity" />
-        <Tile
-          label="Care due"
-          value={due.length}
-          tone={overdue.length > 0 ? "danger" : due.length > 0 ? "action" : "calm"}
-          emphasis={overdue.length > 0}
-          hint={overdue.length > 0 ? `${overdue.length} overdue` : "Next fortnight"}
-        />
-        <Tile
-          label="Without a ration"
-          value={unfed.length}
-          tone={unfed.length > 0 ? "action" : "calm"}
-          hint={unfed.length > 0 ? "Guide has nothing to say" : "All written down"}
-        />
-        <Tile
-          label="Needing care"
-          value={pets.filter((pet) => pet.safetyLevel >= 4).length}
-          tone={pets.some((pet) => pet.safetyLevel >= 4) ? "danger" : "calm"}
-          hint="Level 4 and up"
-        />
-      </div>
-
-      {overdue.length === 0 ? null : (
-        <Callout tone="danger" title="Overdue">
-          <ul className="flex flex-col gap-1">
-            {overdue.map((need) => (
-              <li key={need.recordId}>
-                {nameOf(need.animalId)} — {need.label}, due{" "}
+      {/*
+        Status by exception: one short line for each thing that is wrong, and
+        nothing at all when nothing is. Overdue care is red and named, because
+        it is the one a helper cannot fix by reading the guide; a pet with no
+        ration is a gap in the guide, said once for all of them.
+      */}
+      {overdue.length === 0 && unfed.length === 0 ? null : (
+        <ul className="flex flex-col gap-1 text-sm" aria-label="Needs attention">
+          {overdue.map((need) => (
+            <li key={need.recordId} className="text-danger">
+              <span className="font-semibold">{nameOf(need.animalId)}</span> — {need.label} overdue{" "}
+              {Math.abs(need.daysUntil)} day{Math.abs(need.daysUntil) === 1 ? "" : "s"}
+              <span className="text-muted">
+                {" "}
+                (due{" "}
                 {need.dueOn.toLocaleDateString(undefined, {
                   day: "numeric",
                   month: "short",
                   year: "numeric",
-                })}{" "}
-                ({Math.abs(need.daysUntil)} day{Math.abs(need.daysUntil) === 1 ? "" : "s"} ago)
-              </li>
-            ))}
-          </ul>
-        </Callout>
+                })}
+                )
+              </span>
+            </li>
+          ))}
+          {unfed.length === 0 ? null : (
+            <li className="text-action">
+              No ration written for {nameList(unfed.map((pet) => displayName(pet)))} — the guide has
+              nothing to say.
+            </li>
+          )}
+        </ul>
       )}
 
       <Tabs
         label="Pets"
+        activeTab={tab}
+        onTabChange={setTab}
         tabs={[
           { id: "pets", label: "Who lives here" },
           { id: "health", label: "Vet and medicine" },
@@ -137,7 +159,6 @@ export function PetsScreen({
               pets={pets}
               health={petHealth}
               plans={petPlans}
-              contacts={contacts}
               feeds={feeds}
               loading={loading}
               propertyId={propertyId}

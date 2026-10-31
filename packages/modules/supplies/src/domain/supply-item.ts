@@ -71,7 +71,16 @@ export const supplyItemSchema = baseRecordSchema
 export interface SupplyPurchase extends BaseRecord {
   readonly supplyItemId: Ulid;
   readonly quantity: number;
-  readonly unitCost: Money;
+  /**
+   * What each one cost, when somebody wrote it down.
+   *
+   * Optional because the purchase is a fact about stock before it is a fact
+   * about money: a pallet of shavings that turned up from the neighbour, or a
+   * bag bought on the run with no receipt, still moves the count. Absent is
+   * not zero — a purchase with no price is left out of the spend and out of
+   * the cost a calf is charged, rather than dragging both down as a gift.
+   */
+  readonly unitCost?: Money | undefined;
   readonly vendorContactId?: Ulid | undefined;
   readonly purchasedOn: Date;
   readonly notes?: string | undefined;
@@ -80,7 +89,7 @@ export interface SupplyPurchase extends BaseRecord {
 export const supplyPurchaseSchema = baseRecordSchema.extend({
   supplyItemId: ulidSchema,
   quantity: z.number().positive("A purchase has to be more than nothing"),
-  unitCost: moneySchema,
+  unitCost: moneySchema.optional(),
   vendorContactId: ulidSchema.optional(),
   purchasedOn: z.coerce.date(),
   notes: z.string().max(2000).optional(),
@@ -110,6 +119,49 @@ export const supplyUsageSchema = baseRecordSchema.extend({
   zoneId: ulidSchema.optional(),
   notes: z.string().max(2000).optional(),
 }) as unknown as z.ZodType<SupplyUsage>;
+
+/** What one purchase cost in all, or undefined when it carries no price. */
+export function purchaseTotal(
+  purchase: Pick<SupplyPurchase, "quantity" | "unitCost">,
+): Money | undefined {
+  return purchase.unitCost === undefined
+    ? undefined
+    : { cents: Math.round(purchase.unitCost.cents * purchase.quantity) };
+}
+
+/** Everything spent across purchases, counting only the ones with a price. */
+export function supplySpend(
+  purchases: readonly Pick<SupplyPurchase, "quantity" | "unitCost">[],
+): Money {
+  let cents = 0;
+  for (const purchase of purchases) cents += purchaseTotal(purchase)?.cents ?? 0;
+  return { cents };
+}
+
+/**
+ * On hand for every item at once, in one pass over each ledger.
+ *
+ * `stockOnHand` walks both ledgers for the one item it is asked about, which
+ * is right for one item and quadratic for a shelf: thirty items over a year of
+ * usage is thirty walks of the same twelve hundred rows on every render.
+ */
+export function stockByItem(
+  items: readonly Pick<SupplyItem, "id" | "openingQty">[],
+  purchases: readonly Pick<SupplyPurchase, "supplyItemId" | "quantity">[],
+  usage: readonly Pick<SupplyUsage, "supplyItemId" | "quantity">[],
+): Map<Ulid, number> {
+  const stock = new Map<Ulid, number>();
+  for (const item of items) stock.set(item.id, item.openingQty);
+  for (const purchase of purchases) {
+    const held = stock.get(purchase.supplyItemId);
+    if (held !== undefined) stock.set(purchase.supplyItemId, held + purchase.quantity);
+  }
+  for (const entry of usage) {
+    const held = stock.get(entry.supplyItemId);
+    if (held !== undefined) stock.set(entry.supplyItemId, held - entry.quantity);
+  }
+  return stock;
+}
 
 /** Opening count plus purchases minus usage (§4.5: the total re-derives). */
 export function stockOnHand(
@@ -152,15 +204,18 @@ export function usageCostFor(
   purchases: readonly SupplyPurchase[],
   window?: { from: Date; to: Date },
 ): Money {
+  // Only priced purchases set the average. One bought with no receipt says
+  // nothing about what a bag costs, and counting it as free would undercharge
+  // every calf that used the bags it brought in.
   const costOf = (supplyItemId: Ulid): number => {
-    const relevant = purchases.filter((purchase) => purchase.supplyItemId === supplyItemId);
-    const quantity = relevant.reduce((total, purchase) => total + purchase.quantity, 0);
-    if (quantity <= 0) return 0;
-    const cents = relevant.reduce(
-      (total, purchase) => total + purchase.unitCost.cents * purchase.quantity,
-      0,
-    );
-    return cents / quantity;
+    let quantity = 0;
+    let cents = 0;
+    for (const purchase of purchases) {
+      if (purchase.supplyItemId !== supplyItemId || purchase.unitCost === undefined) continue;
+      quantity += purchase.quantity;
+      cents += purchase.unitCost.cents * purchase.quantity;
+    }
+    return quantity <= 0 ? 0 : cents / quantity;
   };
 
   const cents = usage

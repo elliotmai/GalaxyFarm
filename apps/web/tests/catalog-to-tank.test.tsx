@@ -90,8 +90,8 @@ async function bringAcross(animal: Record<string, unknown> = BULL) {
   await user.type(screen.getByLabelText(/^Name, number or tattoo/), "Montego");
   await user.click(screen.getByRole("button", { name: "Search" }));
 
-  // Out of the results table: the name appears again in the preview below it.
-  const results = await screen.findByRole("table", { name: /Catalog search results/ });
+  // Out of the results list: the name appears again in the panel it opens.
+  const results = await screen.findByRole("list", { name: /Catalog search results/ });
   await user.click(within(results).getByRole("button", { name: animal.name as string }));
   await user.click(await screen.findByRole("button", { name: /Bring 1 across/ }));
 
@@ -137,5 +137,25 @@ describe("Bringing a bull across", () => {
 
     expect(screen.queryByText(/in the tank\?/)).toBeNull();
     expect(saved.created.filter((write) => write.store === "semenInventory")).toEqual([]);
+  });
+});
+
+describe("Arriving from the global search", () => {
+  it("searches the words it was handed, once", async () => {
+    const fetcher = serve(BULL);
+    vi.stubGlobal("fetch", fetcher);
+    render(
+      <ToastProvider>
+        <ConfirmProvider>
+          <CatalogScreen propertyId={PROPERTY} actorId={ACTOR} initialText="Montego" />
+        </ConfirmProvider>
+      </ToastProvider>,
+    );
+
+    expect(screen.getByLabelText(/^Name, number or tattoo/)).toHaveValue("Montego");
+    const results = await screen.findByRole("list", { name: /Catalog search results/ });
+    expect(within(results).getByRole("button", { name: BULL.name })).toBeTruthy();
+    expect(vi.mocked(fetcher)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetcher).mock.calls[0]?.[0]).toContain("text=Montego");
   });
 });

@@ -39,11 +39,12 @@ const purchase = (over: Partial<FeedPurchase> = {}): FeedPurchase => ({
   ...over,
 });
 
+/** Somebody counts the barn and finds what the records said: twenty. */
 const counted = (over: Partial<FeedConsumption> = {}): FeedConsumption => ({
   ...base,
   id: id(3),
   feedTypeId: id(1),
-  quantity: 0,
+  quantity: 20,
   kind: "correction",
   usedOn: new Date("2026-08-11T12:00:00Z"),
   ...over,

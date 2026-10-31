@@ -1,13 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 
-import { Card, PageBody, PageHeader, Select, useToast } from "@galaxy-farm/ui";
+import { PageBody, Select, useToast } from "@galaxy-farm/ui";
 import { dayKey, type Ulid } from "@galaxy-farm/core";
 import type { EggBreakdown, EggLog, Flock } from "@galaxy-farm/module-poultry";
 
 import { logKioskEggs } from "@/app/(kiosk)/kiosk/_actions";
+import { KioskHeader, KioskQuiet, kioskDate } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -74,16 +74,12 @@ export function EggsBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
 
   return (
     <PageBody>
-      <PageHeader
-        eyebrow={<Link href="/kiosk">← Kiosk</Link>}
-        title="Egg Quick-Entry"
-        subtitle="Tap +1 for every egg as you collect it."
-      />
+      <KioskHeader title="Egg Quick-Entry" fact={kioskDate(new Date())} />
 
       {flocksLoading || store === undefined ? (
-        <p className="text-muted">Loading…</p>
+        <KioskQuiet>Loading…</KioskQuiet>
       ) : activeFlocks.length === 0 ? (
-        <p className="text-muted">No flocks are set up yet. Add one from the admin app first.</p>
+        <KioskQuiet>No flocks yet. Add one in the admin app.</KioskQuiet>
       ) : (
         <div className="flex flex-col gap-density">
           {activeFlocks.length > 1 ? (
@@ -95,13 +91,19 @@ export function EggsBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
             />
           ) : null}
 
-          <Card className="items-center text-center">
-            <span className="text-sm uppercase tracking-wide text-muted">Today</span>
-            <p className="text-5xl text-ink">{logsLoading ? "…" : todayTotal}</p>
-            <span className="text-muted">
-              {todayTotal === 1 ? "egg collected" : "eggs collected"}
+          {/* The one number, big enough to read from the coop door. Live, so
+              it is announced as each tap lands. */}
+          <p
+            aria-live="polite"
+            className="flex flex-col items-center gap-1 rounded-density border border-rule bg-panel px-5 py-6 text-center"
+          >
+            <span className="font-numeric text-6xl font-semibold text-ink [font-variant-numeric:tabular-nums]">
+              {logsLoading ? "…" : todayTotal}
             </span>
-          </Card>
+            <span className="text-density text-muted">
+              {todayTotal === 1 ? "egg today" : "eggs today"}
+            </span>
+          </p>
 
           <div className="grid grid-cols-1 gap-density sm:grid-cols-3">
             {PRESETS.map((preset) => (
@@ -110,12 +112,12 @@ export function EggsBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
                 type="button"
                 disabled={pending}
                 onClick={() => tap(preset)}
-                className="min-h-target rounded-density border border-edge bg-panel p-density text-center hover:border-action disabled:opacity-60"
+                className="flex min-h-[8rem] flex-col items-center justify-center gap-1 rounded-density border border-edge bg-panel p-density text-center hover:bg-raised disabled:opacity-60"
               >
-                <span className="block text-3xl text-action">
+                <span className="gf-figure text-action">
                   {pending && busyLabel === preset.label ? "…" : "+1"}
                 </span>
-                <span className="text-density text-muted">{preset.label}</span>
+                <span className="text-density text-ink">{preset.label}</span>
               </button>
             ))}
           </div>

@@ -68,7 +68,7 @@ export function CalendarGrid({
               aria-pressed={key === selected}
               onClick={() => onSelect(key)}
               className={[
-                "flex min-h-24 cursor-pointer flex-col items-stretch gap-1 border-b border-r border-rule p-1.5 text-left",
+                "flex min-h-14 min-w-0 cursor-pointer flex-col items-stretch gap-1 border-b border-r border-rule p-1.5 text-left sm:min-h-24",
                 "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-action",
                 outside ? "bg-canvas" : "",
                 key === selected ? "ring-2 ring-inset ring-action" : "hover:bg-canvas",
@@ -92,18 +92,31 @@ export function CalendarGrid({
                 </span>
               </span>
 
+              {/* A phone cell is 48px wide: titles there are three ellipses,
+                  so it gets a count and the day panel gets the words. */}
+              {entries.length === 0 ? null : (
+                <span
+                  aria-hidden="true"
+                  className="gf-numeric text-xs font-semibold text-action sm:hidden"
+                >
+                  {entries.length}
+                </span>
+              )}
+
               {entries.slice(0, MAX_ROWS).map((entry) => (
                 <Pill
                   key={entry.id}
                   tone={MODULE_TONES[entry.module]}
-                  className="block truncate text-left text-xs"
+                  className="hidden truncate text-left text-xs sm:block"
                 >
                   {entry.title}
                 </Pill>
               ))}
 
               {entries.length > MAX_ROWS ? (
-                <span className="px-1 text-xs text-muted">{entries.length - MAX_ROWS} more</span>
+                <span className="hidden px-1 text-xs text-muted sm:block">
+                  {entries.length - MAX_ROWS} more
+                </span>
               ) : null}
             </button>
           );

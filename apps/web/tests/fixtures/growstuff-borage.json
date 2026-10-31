@@ -1,0 +1,26 @@
+{
+  "id": 28,
+  "name": "borage",
+  "slug": "borage",
+  "parent_id": null,
+  "perennial": false,
+  "median_lifespan": 53,
+  "median_days_to_first_harvest": 33,
+  "median_days_to_last_harvest": null,
+  "row_spacing": 30,
+  "spread": 50,
+  "height": 100,
+  "sowing_method": "Direct seed outdoors, thin to 45cm apart when seedlings are 4cm tall",
+  "sun_requirements": "Partial Sun",
+  "scientific_names": [
+    {
+      "name": "Borago officinalis"
+    }
+  ],
+  "alternate_names": [
+    {
+      "name": "starflower",
+      "language": "EN"
+    }
+  ]
+}

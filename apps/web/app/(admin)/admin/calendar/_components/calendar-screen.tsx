@@ -4,13 +4,10 @@ import { useMemo, useState } from "react";
 
 import {
   Button,
-  Card,
   Checkbox,
   Modal,
   PageBody,
   PageHeader,
-  Pill,
-  Section,
   TextArea,
   TextInput,
   useConfirmDelete,
@@ -80,7 +77,23 @@ import { useRecords } from "@/lib/local/use-records";
  *
  * Every read comes from this device's own store, so it draws in the barn with
  * no signal, like every other screen (§4.2).
+ *
+ * The header is the period and its count; under it, the views and the module
+ * filter are rows of chips, and whenever the filter narrows the calendar a
+ * line says so with a way out. Adding or editing an event is a side panel, so
+ * the grid never moves while somebody types.
  */
+
+/** The pill toggle every chip row on this screen shares. */
+function chipClass(on: boolean): string {
+  return [
+    "inline-flex min-h-target shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-sm",
+    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action",
+    on
+      ? "bg-action/15 font-semibold text-action"
+      : "font-medium text-muted hover:bg-raised hover:text-ink",
+  ].join(" ");
+}
 
 interface Draft {
   readonly id?: Ulid | undefined;
@@ -246,158 +259,211 @@ export function CalendarScreen({
   const dayEntries = selectedDay === undefined ? [] : (byGridDay.get(selectedDay) ?? []);
 
   return (
-    <PageBody>
-      <PageHeader
-        eyebrow="Today"
-        title="Calendar"
-        subtitle="Every dated thing on the place, in one list. Almost all of it is derived — correct the record it came from and the row moves."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
+    // Bottom clearance on a phone, for the floating add button.
+    <div className="pb-20 sm:pb-0">
+      <PageBody>
+        <PageHeader
+          title="Calendar"
+          subtitle={`${entries.length} ${entries.length === 1 ? "entry" : "entries"}${modules.length === 0 ? "" : " shown"}`}
+          actions={
+            // Hidden on a phone by a wrapper, not a class on the button: the
+            // button's own `inline-flex` wins over a `hidden` passed in.
+            <span className="hidden sm:block">
+              <Button variant="primary" onClick={() => setDraft(blankDraft(period.from, now))}>
+                <span aria-hidden="true">+</span> Add event
+              </Button>
+            </span>
+          }
+        />
+
+        {/* Where you are, and the way to move: the period's own name between
+          the arrows, so a step always says where it landed. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button aria-label="Previous" onClick={() => setAnchor(stepPeriod(view, anchor, -1))}>
               ‹
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setAnchor(startOfDay(new Date()));
-                setSelectedDay(undefined);
-              }}
-            >
-              Today
             </Button>
             <Button aria-label="Next" onClick={() => setAnchor(stepPeriod(view, anchor, 1))}>
               ›
             </Button>
-            <Button variant="primary" onClick={() => setDraft(blankDraft(period.from, now))}>
-              Add an event
-            </Button>
           </div>
-        }
-        meta={
-          <>
-            <Pill tone="identity">{period.title}</Pill>
-            <Pill>
-              {entries.length} {entries.length === 1 ? "entry" : "entries"}
-            </Pill>
-          </>
-        }
-      />
-
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Which view of the calendar">
-        {CALENDAR_VIEWS.map((option) => (
+          <h2 className="min-w-0 text-ink">{period.title}</h2>
           <Button
-            key={option}
-            variant={option === view ? "primary" : "secondary"}
-            aria-pressed={option === view}
+            variant="ghost"
             onClick={() => {
-              setView(option);
+              setAnchor(startOfDay(new Date()));
               setSelectedDay(undefined);
             }}
           >
-            {VIEW_LABELS[option]}
+            Today
           </Button>
-        ))}
-      </div>
-
-      <ModuleFilter available={available} selected={modules} onChange={setModules} />
-
-      {loading ? (
-        <p className="text-muted">Loading…</p>
-      ) : view === "agenda" ? (
-        <Section title="Agenda" description="What is coming, in the order it arrives.">
-          <AgendaDays byDay={byStartDay} onEdit={startEdit} onDelete={remove} />
-        </Section>
-      ) : (
-        <div className="flex flex-col gap-density">
-          <CalendarGrid
-            period={period}
-            byDay={byGridDay}
-            today={now}
-            selected={selectedDay}
-            onSelect={(day) => setSelectedDay(day === selectedDay ? undefined : day)}
-          />
-
-          {selectedDay === undefined ? (
-            <p className="text-sm text-muted">Pick a day to read its entries in full.</p>
-          ) : (
-            // Labelled, so the panel is a landmark that names the day it is
-            // about — it changes under the grid as days are picked, and a
-            // reader arriving by keyboard needs to know which one it landed on.
-            <Card title={longDay(selectedDay)} aria-label={longDay(selectedDay)}>
-              <EntryList
-                entries={dayEntries}
-                emptyTitle="Nothing on this day"
-                emptyDetail="No module projects anything here and nobody wrote anything down."
-                onEdit={startEdit}
-                onDelete={remove}
-              />
-            </Card>
-          )}
         </div>
-      )}
 
-      {draft === undefined ? null : (
-        <Modal
-          key={draft.id ?? "new"}
-          title={draft.id === undefined ? "New event" : "Edit event"}
-          description="For the things nothing else knows about — the farrier, a sale you are driving to, somebody coming out to look at a bull. Everything derived arrives on its own."
-          onClose={() => setDraft(undefined)}
+        <div
+          className="-mx-1 flex items-center gap-1 overflow-x-auto px-1"
+          role="group"
+          aria-label="Which view of the calendar"
         >
+          {CALENDAR_VIEWS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={option === view}
+              className={chipClass(option === view)}
+              onClick={() => {
+                setView(option);
+                setSelectedDay(undefined);
+              }}
+            >
+              {VIEW_LABELS[option]}
+            </button>
+          ))}
+        </div>
+
+        <ModuleFilter available={available} selected={modules} onChange={setModules} />
+
+        {/* A narrowed calendar that does not say so is a farrier who seems
+          not to be coming. */}
+        {modules.length === 0 ? null : (
+          <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted" aria-live="polite">
+            <span>
+              Showing {entries.length} of {everything.length}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>{modules.map((module) => MODULE_LABELS[module]).join(", ")}</span>
+            <button
+              type="button"
+              onClick={() => setModules([])}
+              className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
+            >
+              Clear
+            </button>
+          </p>
+        )}
+
+        {loading ? (
+          <p className="text-muted">Loading…</p>
+        ) : view === "agenda" ? (
+          <AgendaDays byDay={byStartDay} onEdit={startEdit} />
+        ) : (
           <div className="flex flex-col gap-density">
-            <TextInput
-              label="What is happening"
-              required
-              value={draft.title}
-              error={errors["title"]}
-              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-            />
-            <TextArea
-              label="Detail"
-              rows={3}
-              value={draft.detail}
-              onChange={(event) => setDraft({ ...draft, detail: event.target.value })}
-            />
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
-              <TextInput
-                label="Day"
-                type="date"
-                required
-                value={draft.day}
-                error={errors["at"]}
-                onChange={(event) => setDraft({ ...draft, day: event.target.value })}
-              />
-              <TextInput
-                label="Time"
-                type="time"
-                disabled={draft.allDay}
-                value={draft.time}
-                onChange={(event) => setDraft({ ...draft, time: event.target.value })}
-              />
-            </div>
-            <Checkbox
-              label="All day"
-              checked={draft.allDay}
-              onChange={(event) => setDraft({ ...draft, allDay: event.target.checked })}
-            />
-            <TextInput
-              label="Runs until"
-              type="date"
-              hint="Leave empty for something that happens on one day."
-              value={draft.endDay}
-              error={errors["endAt"]}
-              onChange={(event) => setDraft({ ...draft, endDay: event.target.value })}
+            <CalendarGrid
+              period={period}
+              byDay={byGridDay}
+              today={now}
+              selected={selectedDay}
+              onSelect={(day) => setSelectedDay(day === selectedDay ? undefined : day)}
             />
 
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {draft.id === undefined ? "Add event" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
+            {selectedDay === undefined ? (
+              <p className="text-sm text-muted">Pick a day to read it in full.</p>
+            ) : (
+              // Labelled, so the panel is a landmark that names the day it is
+              // about — it changes under the grid as days are picked, and a
+              // reader arriving by keyboard needs to know which one it landed on.
+              <section aria-label={longDay(selectedDay)} className="flex flex-col gap-2">
+                <h2 className="text-ink">{longDay(selectedDay)}</h2>
+                <EntryList
+                  entries={dayEntries}
+                  emptyTitle="Nothing on this day"
+                  onEdit={startEdit}
+                />
+              </section>
+            )}
           </div>
-        </Modal>
-      )}
-    </PageBody>
+        )}
+
+        {/* On a phone the add button floats where a thumb already is. */}
+        <button
+          type="button"
+          onClick={() => setDraft(blankDraft(period.from, now))}
+          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
+        >
+          <span aria-hidden="true" className="text-xl leading-none">
+            +
+          </span>
+          Add event
+        </button>
+
+        {draft === undefined ? null : (
+          <Modal
+            key={draft.id ?? "new"}
+            placement="side"
+            title={draft.id === undefined ? "New event" : "Edit event"}
+            description="For what nothing else knows about — the farrier, a sale. Everything derived arrives on its own."
+            onClose={() => setDraft(undefined)}
+            footer={
+              <>
+                <Button variant="primary" onClick={() => void save()}>
+                  {draft.id === undefined ? "Add event" : "Save changes"}
+                </Button>
+                <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+                {draft.id === undefined ? null : (
+                  // Closed first, so the confirmation is the only dialog.
+                  <Button
+                    variant="danger"
+                    className="ml-auto"
+                    onClick={() => {
+                      const entry = entries.find((held) => held.id === draft.id);
+                      setDraft(undefined);
+                      if (entry !== undefined) void remove(entry);
+                    }}
+                  >
+                    Delete
+                  </Button>
+                )}
+              </>
+            }
+          >
+            <div className="flex flex-col gap-density">
+              <TextInput
+                label="What is happening"
+                required
+                value={draft.title}
+                error={errors["title"]}
+                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+              />
+              <TextArea
+                label="Detail"
+                rows={3}
+                value={draft.detail}
+                onChange={(event) => setDraft({ ...draft, detail: event.target.value })}
+              />
+              <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+                <TextInput
+                  label="Day"
+                  type="date"
+                  required
+                  value={draft.day}
+                  error={errors["at"]}
+                  onChange={(event) => setDraft({ ...draft, day: event.target.value })}
+                />
+                <TextInput
+                  label="Time"
+                  type="time"
+                  disabled={draft.allDay}
+                  value={draft.time}
+                  onChange={(event) => setDraft({ ...draft, time: event.target.value })}
+                />
+              </div>
+              <Checkbox
+                label="All day"
+                checked={draft.allDay}
+                onChange={(event) => setDraft({ ...draft, allDay: event.target.checked })}
+              />
+              <TextInput
+                label="Runs until"
+                type="date"
+                hint="Empty for one day."
+                value={draft.endDay}
+                error={errors["endAt"]}
+                onChange={(event) => setDraft({ ...draft, endDay: event.target.value })}
+              />
+            </div>
+          </Modal>
+        )}
+      </PageBody>
+    </div>
   );
 
   function startEdit(entry: CalendarEntry) {
@@ -498,27 +564,33 @@ function ModuleFilter({
   if (available.length < 2) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by module">
-      <Button
-        variant={selected.length === 0 ? "primary" : "secondary"}
+    <div
+      className="-mx-1 flex items-center gap-1 overflow-x-auto px-1"
+      role="group"
+      aria-label="Filter by module"
+    >
+      <button
+        type="button"
         aria-pressed={selected.length === 0}
+        className={chipClass(selected.length === 0)}
         onClick={() => onChange([])}
       >
         Everything
-      </Button>
+      </button>
       {available.map((module) => {
         const on = selected.includes(module);
         return (
-          <Button
+          <button
             key={module}
-            variant={on ? "primary" : "secondary"}
+            type="button"
             aria-pressed={on}
+            className={chipClass(on)}
             onClick={() =>
               onChange(on ? selected.filter((other) => other !== module) : [...selected, module])
             }
           >
             {MODULE_LABELS[module]}
-          </Button>
+          </button>
         );
       })}
     </div>
@@ -529,34 +601,23 @@ function ModuleFilter({
 function AgendaDays({
   byDay,
   onEdit,
-  onDelete,
 }: {
   readonly byDay: ReadonlyMap<string, CalendarEntry[]>;
   readonly onEdit: (entry: CalendarEntry) => void;
-  readonly onDelete: (entry: CalendarEntry) => void;
 }) {
   if (byDay.size === 0) {
-    return (
-      <EntryList
-        entries={[]}
-        emptyTitle="Nothing ahead"
-        emptyDetail="No module projects anything into this stretch and nobody wrote anything down."
-      />
-    );
+    return <EntryList entries={[]} emptyTitle="Nothing ahead" />;
   }
 
+  // A heading and a list per day, not a card per day: a page of outlines is
+  // a page somebody has to read the boxes of before the days.
   return (
     <div className="flex flex-col gap-density">
       {[...byDay.entries()].map(([day, entries]) => (
-        <Card key={day} title={longDay(day)}>
-          <EntryList
-            entries={entries}
-            emptyTitle="Nothing on this day"
-            emptyDetail=""
-            onEdit={onEdit}
-            onDelete={onDelete}
-          />
-        </Card>
+        <section key={day} aria-label={longDay(day)} className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-muted">{longDay(day)}</h2>
+          <EntryList entries={entries} emptyTitle="Nothing on this day" onEdit={onEdit} />
+        </section>
       ))}
     </div>
   );

@@ -168,13 +168,17 @@ export function Tile({ label, value, hint, tone = "neutral", emphasis = false, b
   return (
     <div
       className={[
-        "relative flex flex-col gap-1 overflow-hidden rounded-density border border-rule bg-raised px-density py-3",
-        "before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:content-['']",
-        TONE_EDGE[tone],
+        "relative flex min-w-[9.5rem] shrink-0 snap-start flex-col gap-1 overflow-hidden rounded-density border border-rule bg-panel px-density py-3 lg:min-w-0",
+        // Only a tile with something to say gets the edge. A neutral tile
+        // wearing one too made every rank of numbers a row of coloured bars,
+        // and the tiles that mattered looked like all the others.
+        tone === "neutral"
+          ? ""
+          : `before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:content-[''] ${TONE_EDGE[tone]}`,
       ].join(" ")}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
+        <span className="text-sm text-muted">{label}</span>
         {badge}
       </div>
       <span

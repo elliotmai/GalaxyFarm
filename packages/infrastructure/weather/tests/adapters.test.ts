@@ -41,11 +41,19 @@ describe("openMeteoUrl", () => {
 
 describe("parseOpenMeteo", () => {
   const body = {
+    current: {
+      time: "2026-11-20T01:15",
+      temperature_2m: 41,
+      weather_code: 61,
+      wind_speed_10m: 9,
+      wind_gusts_10m: null,
+    },
     hourly: {
       time: ["2026-11-20T00:00", "2026-11-20T01:00", "2026-11-20T02:00"],
       temperature_2m: [42, null, 39],
       surface_pressure: [1018.2, 1017.5, null],
       wind_speed_10m: [8, 9, 10],
+      wind_gusts_10m: [21, null, 44],
       precipitation_probability: [10, null, 30],
     },
     daily: {
@@ -67,6 +75,18 @@ describe("parseOpenMeteo", () => {
     const forecast = parseOpenMeteo(body, REQUEST, new Date());
     expect(forecast.hourly[1]?.pressureHpa).toBeUndefined();
     expect(forecast.hourly[0]?.pressureHpa).toBe(1018.2);
+  });
+
+  it("reads the gusts, which are what take a tarp, not the mean wind", () => {
+    const forecast = parseOpenMeteo(body, REQUEST, new Date());
+    expect(forecast.hourly.map((hour) => hour.gustMph)).toEqual([21, 44]);
+  });
+
+  it("reads the conditions now, leaving a missing gust absent", () => {
+    const forecast = parseOpenMeteo(body, REQUEST, new Date());
+    expect(forecast.current?.temperatureF).toBe(41);
+    expect(forecast.current?.weatherCode).toBe(61);
+    expect(forecast.current?.gustMph).toBeUndefined();
   });
 
   it("drops a day missing either end of its range", () => {

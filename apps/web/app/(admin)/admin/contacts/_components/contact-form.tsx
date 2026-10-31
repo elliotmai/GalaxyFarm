@@ -126,7 +126,6 @@ export function ContactForm({
         />
         <TextInput
           label="Company"
-          hint="The practice, the feed store, the sale barn."
           value={draft.company}
           error={errors["company"]}
           onChange={(event) => onChange({ ...draft, company: event.target.value })}
@@ -136,10 +135,11 @@ export function ContactForm({
       <fieldset className="flex flex-col gap-2">
         <legend className="text-sm font-medium text-ink">What they are to the farm</legend>
         <p className="text-sm text-muted">
-          More than one is normal. Anyone tagged <em>Emergency</em> is picked up by the housesitter
-          guide automatically.
+          Tag <em>Emergency</em> to put them on the housesitter guide.
         </p>
-        <div className="grid grid-cols-2 gap-x-density sm:grid-cols-3 lg:grid-cols-4">
+        {/* Three across at most: the form sits in a side panel on a laptop,
+            which is narrower than the viewport a breakpoint reads. */}
+        <div className="grid grid-cols-2 gap-x-density sm:grid-cols-3">
           {CONTACT_TAGS.map((tag) => (
             <Checkbox
               key={tag}

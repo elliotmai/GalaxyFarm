@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { baseRecordSchema, ulidSchema, type BaseRecord, type Ulid } from "@galaxy-farm/core";
 
+import { LIFECYCLES, SEASONS, SOWING_METHODS, SUN_NEEDS, type GrowingFacts } from "./growing.js";
+
 /**
  * Beds, crops and seed (spec §5.5).
  *
@@ -46,7 +48,13 @@ export function bedAreaSqFt(bed: Pick<Bed, "lengthFt" | "widthFt">): number | un
   return bed.lengthFt * bed.widthFt;
 }
 
-export interface Crop extends BaseRecord {
+/**
+ * A crop also carries how it is grown (`GrowingFacts`): typical days to
+ * maturity and spacing, cool or warm season, sun, sowing, lifecycle and depth.
+ * Filled in from the plant search and editable; a new variety starts from the
+ * crop's days and spacing, then keeps its own off the packet.
+ */
+export interface Crop extends BaseRecord, GrowingFacts {
   readonly name: string;
   /**
    * Botanical family, which is the field the rotation guard runs on.
@@ -54,15 +62,30 @@ export interface Crop extends BaseRecord {
    * Tomatoes and peppers are both nightshades, and a rotation that only looked
    * at the crop name would happily follow one with the other — which is the
    * exact mistake rotation exists to prevent.
+   *
+   * Optional, because it is inferred: absent means "work it out from the name"
+   * (`cropFamily` in `families.ts`), and nobody is asked to know that a tomato
+   * is a Solanaceae. Stored when somebody overrides the inference or picks the
+   * crop from the plant search, and then it wins.
    */
-  readonly family: string;
+  readonly family?: string | undefined;
+  /** "Solanum lycopersicum" — from the plant search, and a second clue to the family. */
+  readonly scientificName?: string | undefined;
   readonly notes?: string | undefined;
 }
 
 export const cropSchema = baseRecordSchema.extend({
   name: z.string().min(1, "A crop needs a name").max(80),
-  family: z.string().min(1, "The family is what rotation is checked on").max(80),
+  family: z.string().max(80).optional(),
+  scientificName: z.string().max(160).optional(),
   notes: z.string().max(2000).optional(),
+  daysToMaturity: z.number().int().positive().max(1000).optional(),
+  spacingInches: z.number().positive().max(240).optional(),
+  season: z.enum(SEASONS).optional(),
+  lifecycle: z.enum(LIFECYCLES).optional(),
+  sun: z.enum(SUN_NEEDS).optional(),
+  sowing: z.enum(SOWING_METHODS).optional(),
+  depthInches: z.number().positive().max(24).optional(),
 }) as unknown as z.ZodType<Crop>;
 
 export interface Variety extends BaseRecord {
@@ -85,7 +108,8 @@ export const varietySchema = baseRecordSchema.extend({
 
 export interface SeedInventory extends BaseRecord {
   readonly varietyId: Ulid;
-  readonly quantity: number;
+  /** Optional: a packet whose count nobody knows is still in the box. */
+  readonly quantity?: number | undefined;
   readonly unit: "packet" | "gram" | "ounce" | "seed";
   readonly packedForYear?: number | undefined;
   readonly source?: string | undefined;
@@ -94,7 +118,7 @@ export interface SeedInventory extends BaseRecord {
 
 export const seedInventorySchema = baseRecordSchema.extend({
   varietyId: ulidSchema,
-  quantity: z.number().min(0),
+  quantity: z.number().min(0).optional(),
   unit: z.enum(["packet", "gram", "ounce", "seed"]),
   packedForYear: z.number().int().min(1900).max(2100).optional(),
   source: z.string().max(160).optional(),

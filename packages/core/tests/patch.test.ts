@@ -37,6 +37,22 @@ describe("diff", () => {
   it("treats a field going undefined as a change", () => {
     expect(diff({ notes: "watch her" }, { notes: undefined }, meta)).toHaveLength(1);
   });
+
+  it("treats a field removed outright as a clear — the undo after a delete", () => {
+    // `restore` deletes `deletedAt` rather than setting it to undefined. If the
+    // removal were not a change, the restore would never reach the server and
+    // the next pull would delete the record again.
+    const changes = diff(
+      { name: "Bed 1", deletedAt: new Date(5), deletedBy: "U" },
+      { name: "Bed 1" },
+      meta,
+    );
+    expect(changes.map((c) => [c.field, c.value])).toEqual([
+      ["deletedAt", undefined],
+      ["deletedBy", undefined],
+    ]);
+    expect(diff({ name: "x", gone: undefined }, { name: "x" }, meta)).toEqual([]);
+  });
 });
 
 describe("applyPatch", () => {

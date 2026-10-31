@@ -291,6 +291,39 @@ describe("pull", () => {
     expect(await repository.count({ propertyId })).toBe(1);
   });
 
+  it("keeps an edit made while the pull was in flight", async () => {
+    // A field cleared here after the last push must not be put back by the
+    // server's older copy arriving a moment later — it is still in the
+    // outbox, and the server's word on every other field still stands.
+    const id = "01ARZ3NDEKTSV4RRFFQ69G5FR1";
+    const { engine, repository } = harness({
+      pull: async () => page([cow(id, { name: "Dolly", tag: "A1" } as Partial<Cow>)]),
+    });
+    await engine.enqueue("update", {
+      entity: "Animal",
+      recordId: id as Ulid,
+      changes: [{ field: "name", value: "Dolly II", at, deviceId: "barn" }],
+    });
+
+    await engine.pull();
+
+    const saved = (await repository.findById(id as Ulid)) as Cow & { tag?: string };
+    expect(saved.name).toBe("Dolly II");
+    expect(saved.tag).toBe("A1");
+  });
+
+  it("lets the server's copy stand once nothing is waiting to go", async () => {
+    const id = "01ARZ3NDEKTSV4RRFFQ69G5FR1";
+    const { engine, repository } = harness({
+      pull: async () => page([cow(id, { name: "Dolly" })]),
+    });
+    await repository.save(cow(id, { name: "Old name" }));
+
+    await engine.pull();
+
+    expect((await repository.findById(id as Ulid))?.name).toBe("Dolly");
+  });
+
   it("advances the cursor past what it received", async () => {
     const { engine } = harness({
       pull: async () =>

@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   NAV,
   SUB_SECTIONS,
+  LOG_HREF,
   UTILITY,
+  VIEW_GROUPS,
   allNavRoutes,
   destinationFor,
   sectionFor,
@@ -36,6 +38,17 @@ describe("admin nav reachability", () => {
     expect(orphaned, "these admin routes have no way in from the nav").toEqual([]);
   });
 
+  it("puts every view of a grouped section in exactly one group", () => {
+    for (const [section, groups] of Object.entries(VIEW_GROUPS)) {
+      const grouped = groups.flatMap((group) => group.views.map((view) => view.href));
+      const views = (SUB_SECTIONS[section] ?? []).map((view) => view.href);
+
+      expect([...grouped].sort(), `${section} views missing from or doubled in a group`).toEqual(
+        [...views].sort(),
+      );
+    }
+  });
+
   it("points at nothing that does not exist", () => {
     const real = new Set(adminRoutes);
     const dangling = allNavRoutes().filter((href) => !real.has(href));
@@ -44,11 +57,11 @@ describe("admin nav reachability", () => {
   });
 
   it("keeps the sidebar short, which was the point", () => {
-    // Nine rows total. The wall it replaced was fifty-five across nine
-    // collapsing groups; if this creeps back up, the restructure has been
-    // undone one convenient addition at a time.
-    expect(NAV.length).toBe(5);
-    expect(NAV.length + UTILITY.length).toBeLessThanOrEqual(10);
+    // Four places and Log. The wall it replaced was fifty-five links across
+    // nine collapsing groups; everything else lives on the More page, which
+    // says what each thing is for. If the rail creeps back up, the
+    // restructure has been undone one convenient addition at a time.
+    expect(NAV.length).toBe(4);
   });
 
   it("puts every route under exactly one destination", () => {
@@ -68,7 +81,8 @@ describe("admin nav reachability", () => {
         (item) =>
           item.href === route || (SUB_SECTIONS[item.href] ?? []).some((sub) => sub.href === route),
       );
-      if (isUtility) continue;
+      // Log is the button between the places, not a place, so it lights none.
+      if (isUtility || route === LOG_HREF) continue;
 
       expect(owners.length, `${route} is claimed by ${owners.length} destinations`).toBe(1);
     }

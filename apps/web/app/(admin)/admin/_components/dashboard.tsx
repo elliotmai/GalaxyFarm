@@ -3,41 +3,69 @@
 import Link from "next/link";
 
 import {
-  Card,
   CardGrid,
   EmptyState,
+  PageBody,
+  PageHeader,
   Pill,
   RecordCard,
   SafetyBadge,
   SkeletonScreen,
+  StatRow,
   Tile,
 } from "@galaxy-farm/ui";
 import {
-  coversToFit,
+  addCalendarDays,
   effectiveSafetyLevel,
-  freezeCheckTargets,
+  frostRisk,
+  type Forecast,
   type Animal,
   type SafetyLevel,
+  type WatchSettings,
   type Ulid,
-  type WaterSource,
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
 import { penAssignments } from "@galaxy-farm/module-pets";
 
-import { CalvingWatchCard } from "@/app/(admin)/admin/_components/calving-watch-card";
-import { WeaningCard } from "@/app/(admin)/admin/_components/weaning-card";
-import { ChoresCard } from "@/app/(admin)/admin/_components/chores-card";
+import {
+  CalvingWatchDetail,
+  damName,
+  useCalvingWatch,
+  type CalvingWatch,
+} from "@/app/(admin)/admin/_components/calving-watch-card";
+import {
+  DayProgress,
+  TickList,
+  useChoreSheet,
+  type ChoreSheet,
+  type PeopleNames,
+} from "@/app/(admin)/admin/_components/chores-card";
+import { AllClear, NeedsYou, type Need } from "@/app/(admin)/admin/_components/needs-you";
+import {
+  WeaningPanel,
+  useWeaningWatch,
+  type WeaningWatch,
+} from "@/app/(admin)/admin/_components/weaning-card";
 import { useRecords } from "@/lib/local/use-records";
+import type { WeatherChores } from "@/lib/use-weather-chores";
+import { isForecastDay, type WeatherJobs } from "@/lib/weather-jobs";
 
 /**
- * The admin dashboard.
+ * The admin dashboard — "Today".
+ *
+ * The day's one weekly-shaped job first: how far through feeding and chores
+ * the place is, on the same list the barn kiosk ticks, so somebody away from
+ * the farm can see what got done and by whom. Then status by exception — a
+ * cow in her window, calves to wean, a cover off a tank, a chore gone overdue
+ * — and everything that is fine collapses into one green line instead of a
+ * card apiece saying so. A dashboard where every card always has something on
+ * it is one people stop reading.
  *
  * Everything here is derived from records rather than entered — the pen board
  * from assignments, the effective safety level from the animals standing in a
  * zone, the freeze list from which tanks lack heaters. §2: derive, don't
- * duplicate. A dashboard whose numbers are typed in is a dashboard that goes
- * stale the first busy week.
+ * duplicate.
  *
  * Reads come from the device's store, so this renders at the same speed with
  * no signal as with five bars.
@@ -46,114 +74,401 @@ import { useRecords } from "@/lib/local/use-records";
 export function Dashboard({
   propertyId,
   actorId,
+  names,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /** Who ticked what, resolved on the server; never rejects. */
+  readonly names?: Promise<PeopleNames> | undefined;
 }) {
   const query = { propertyId };
   const { records: zones, loading: zonesLoading } = useRecords<Zone>("zones", query);
   const { records: animals } = useRecords<Animal>("animals", query);
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
-  const { records: water } = useRecords<WaterSource>("waterSources", query);
-
-  // The heading stays put through every state. A page whose `h1` only exists
-  // once its data arrives has no heading at all while it is loading and none
-  // when it is empty — which is the state a new install spends its first week
-  // in, and the state the e2e suite found it in.
-  const heading = <h1 className="text-ink">Today</h1>;
 
   if (zonesLoading) {
     // The layout is known long before the records are, so draw it. A line of
     // grey text told the reader nothing about what was coming and let the page
-    // jump the moment it did — this holds the geometry the tiles will land in.
-    return <SkeletonScreen title="Today" stats={4} rows={5} />;
+    // jump the moment it did — this holds the geometry the rows will land in.
+    return <SkeletonScreen title="Today" stats={0} rows={5} />;
   }
+
+  if (zones.length === 0) {
+    // The heading stays put through every state. A page whose `h1` only exists
+    // once its data arrives has none when it is empty — which is the state a
+    // new install spends its first week in.
+    return (
+      <PageBody>
+        <PageHeader title="Today" />
+        <EmptyState
+          title="Nothing here yet"
+          detail="Run pnpm db:seed to load the property, or add a zone to get started."
+        />
+      </PageBody>
+    );
+  }
+
+  return (
+    <Today
+      propertyId={propertyId}
+      actorId={actorId}
+      names={names}
+      zones={zones}
+      animals={animals}
+      assignments={assignments}
+    />
+  );
+}
+
+/** "Rosie, Pearl and 2 more" — a line, not a roll call. */
+function names(list: readonly string[], max = 2): string {
+  if (list.length <= max) return list.join(" · ");
+  return `${list.slice(0, max).join(" · ")} +${list.length - max} more`;
+}
+
+/**
+ * One fact about the weather, for the header: "41°, rain from 3 PM, frost
+ * tonight".
+ *
+ * The temperature nearest now, whether wet or windy weather is on its way and
+ * when, and the night only when it matters — the same frost threshold the
+ * watch settings use, read off the coming night's low. Nothing at all without
+ * a forecast: offline is the ordinary case in a barn, and the date stands on
+ * its own.
+ */
+function weatherFact(
+  forecast: Forecast | undefined,
+  settings: WatchSettings,
+  coming: Pick<WeatherChores, "weather" | "arrives">,
+  now: Date,
+): string | undefined {
+  if (forecast === undefined) return undefined;
+
+  // Hours are on the farm's clock, read as UTC; placed on this device's clock
+  // the same way, so "nearest now" means the hour it is at the farm.
+  const nearest = [...forecast.hourly].sort(
+    (left, right) =>
+      Math.abs(farmClock(left.at).getTime() - now.getTime()) -
+      Math.abs(farmClock(right.at).getTime() - now.getTime()),
+  )[0];
+  // A day's low lands in its small hours, so tonight is tomorrow's low.
+  const tonight = forecast.daily.find((day) => isForecastDay(day.date, addCalendarDays(now, 1)));
+  const frost =
+    tonight === undefined
+      ? undefined
+      : frostRisk([tonight], { frostF: settings.frostF, hardFreezeF: settings.hardFreezeF })[0];
+
+  const parts = [
+    nearest === undefined ? undefined : `${Math.round(nearest.temperatureF)}°`,
+    coming.weather === undefined
+      ? undefined
+      : coming.weather.has("rain_coming")
+        ? arriving("rain", coming.arrives.rain_coming, now)
+        : "dry",
+    coming.weather?.has("wind_coming") === true
+      ? arriving("high winds", coming.arrives.wind_coming, now)
+      : undefined,
+    frost === undefined ? undefined : frost.hardFreeze ? "hard freeze tonight" : "frost tonight",
+  ].filter((part): part is string => part !== undefined);
+
+  return parts.length === 0 ? undefined : parts.join(", ");
+}
+
+/** A forecast hour — the farm's clock read as UTC — as a time on this device. */
+function farmClock(at: Date): Date {
+  return new Date(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate(), at.getUTCHours());
+}
+
+/** "rain from 3 PM", "high winds now", or "rain on the way" when it lands after today. */
+function arriving(what: string, at: Date | undefined, now: Date): string {
+  if (at === undefined) return `${what} on the way`;
+  if (at <= now) return `${what} now`;
+  return `${what} from ${at.toLocaleTimeString(undefined, { hour: "numeric" })}`;
+}
+
+function shortDate(date: Date): string {
+  return date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+/** "Calving, weaning and tank covers" — the things that were checked and are fine. */
+function listed(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts.join("");
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+function calvingNeed(watch: CalvingWatch): Need | undefined {
+  if (watch.cards.length === 0) return undefined;
+
+  const first = watch.cards[0];
+  const title =
+    watch.cards.length === 1 && first !== undefined
+      ? `${damName(watch, first)} due to calve`
+      : `${watch.cards.length} due to calve`;
+  // The weather leads when it matters — it is the reason to look tonight — and
+  // only its headline, not the whole sentence after the dash.
+  const signals = [
+    ...new Set(
+      watch.cards
+        .filter((card) => card.urgent)
+        .flatMap((card) => card.signals.map((signal) => signal.detail.split(" — ")[0] ?? "")),
+    ),
+  ].filter(Boolean);
+  const who = watch.cards.map(
+    (card) => `${damName(watch, card)} day ${card.dayOfGestation}, due ${shortDate(card.dueOn)}`,
+  );
+
+  return {
+    key: "calving",
+    urgency: watch.urgent ? "urgent" : "soon",
+    title,
+    line: [...signals, names(who, 1)].join(" · "),
+    action: watch.urgent ? "Watch tonight" : "Calving watch",
+    detail: <CalvingWatchDetail watch={watch} />,
+  };
+}
+
+function weaningNeed(watch: WeaningWatch, propertyId: Ulid, actorId: Ulid): Need | undefined {
+  if (watch.batches.length === 0) return undefined;
+
+  const calves = watch.batches.flatMap((batch) => batch.calves);
+  const first = watch.batches[0];
+  const when =
+    watch.late.length > 0
+      ? "past the day"
+      : first === undefined
+        ? ""
+        : first.ready
+          ? `ready now, off by ${shortDate(first.mustGoBy)}`
+          : `ready ${shortDate(first.readyOn)}`;
+
+  return {
+    key: "weaning",
+    urgency: watch.late.length > 0 ? "urgent" : "soon",
+    title: `${calves.length} ${calves.length === 1 ? "calf" : "calves"} to wean`,
+    line: [names(calves.map((calf) => calf.calfName)), when].filter(Boolean).join(" · "),
+    action: "Wean",
+    detail: <WeaningPanel propertyId={propertyId} actorId={actorId} watch={watch} />,
+  };
+}
+
+/**
+ * "Sat night" — the night a freeze lands, which is the evening before the
+ * morning its low is dated. Read in UTC because forecast dates are bare dates.
+ */
+function freezeNight(freezeOn: Date): string {
+  const night = new Date(freezeOn.getTime() - 86_400_000);
+  return `${night.toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" })} night`;
+}
+
+/** What the quiet line says about the covers when there is nothing to do. */
+function coversFine(jobs: WeatherJobs): string | undefined {
+  if (jobs.covers !== undefined) return undefined;
+  if (jobs.coversOff === 0) return "tank covers";
+  if (!jobs.known) return undefined;
+  return jobs.nextFreezeOn === undefined
+    ? "tank covers (no freeze forecast)"
+    : `tank covers (next freeze ${freezeNight(jobs.nextFreezeOn)})`;
+}
+
+function choresNeed(chores: ChoreSheet): Need | undefined {
+  const late = chores.sheet.filter((entry) => entry.completedAt === undefined && entry.overdue);
+  if (late.length === 0) return undefined;
+
+  return {
+    key: "chores",
+    urgency: "urgent",
+    title: `${late.length} chore${late.length === 1 ? "" : "s"} overdue`,
+    line: names(late.map((entry) => entry.title)),
+    action: "Open chores",
+    href: "/admin/chores",
+  };
+}
+
+function Today({
+  propertyId,
+  actorId,
+  names,
+  zones,
+  animals,
+  assignments,
+}: {
+  readonly propertyId: Ulid;
+  readonly actorId: Ulid;
+  readonly names: Promise<PeopleNames> | undefined;
+  readonly zones: readonly Zone[];
+  readonly animals: readonly Animal[];
+  readonly assignments: readonly ZoneAssignment[];
+}) {
+  const calving = useCalvingWatch(propertyId);
+  const weaning = useWeaningWatch(propertyId);
+  const chores = useChoreSheet(propertyId, actorId);
 
   // Pens hold stock, not pets (§5.8). A dog with a placement behind him — a
   // mis-drag on the property map writes one — must not put a pen "in use" or
   // hand it his handling level on the board below.
   const placements = penAssignments(assignments, animals);
-  const inUse = new Set(placements.filter((a) => a.periodTo === undefined).map((a) => a.zoneId))
-    .size;
-  /**
-   * Tanks that are out with nothing over them.
-   *
-   * Counted on the cover rather than on the heater, because no tank here has a
-   * heater and none is going to — a tile reading "4, no heater fitted" every
-   * day of the year is a tile that stops being looked at. A cover is the thing
-   * that changes and the thing somebody can go and do.
-   */
-  const uncovered = water.filter((source) => source.active && source.cover !== "on").length;
 
-  if (zones.length === 0) {
-    return (
-      <div className="flex flex-col gap-density">
-        {heading}
-        <EmptyState
-          title="Nothing here yet"
-          detail="Run pnpm db:seed to load the property, or add a zone to get started."
-        />
-      </div>
-    );
-  }
+  // Covers, ice and the garden are chores now, on this list and the kiosk's;
+  // the forecast's verdict on them is read here only for the quiet line.
+  const jobs = chores.weather.jobs;
+
+  // Ordered by the clock rather than by domain: a calving is a night's work
+  // decided by the weather, weaning a week's work decided by a date. Urgent
+  // rows rise above soon ones whichever they are.
+  const candidates = [
+    calvingNeed(calving),
+    weaningNeed(weaning, propertyId, actorId),
+    choresNeed(chores),
+  ].filter((need): need is Need => need !== undefined);
+  const needs = [
+    ...candidates.filter((need) => need.urgency === "urgent"),
+    ...candidates.filter((need) => need.urgency === "soon"),
+  ];
+
+  // What was looked at and found fine. Chores are left out: they have their
+  // own lists above, which already say how the day is going.
+  const fine = [
+    calving.cards.length === 0 ? "calving" : undefined,
+    weaning.batches.length === 0 ? "weaning" : undefined,
+    coversFine(jobs),
+  ].filter((part): part is string => part !== undefined);
+  const clear = fine.length === 0 ? undefined : `${listed(fine)}: nothing due.`;
+  const allClear = clear === undefined ? undefined : clear.charAt(0).toUpperCase() + clear.slice(1);
+
+  const now = new Date();
+  const date = now.toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const weather = weatherFact(calving.forecast, calving.settings, chores.weather, now);
 
   return (
-    <div className="flex flex-col gap-density">
-      {heading}
+    <PageBody>
+      <PageHeader title="Today" subtitle={weather === undefined ? date : `${date} · ${weather}`} />
 
-      {/*
-        First, above the pen board. §12 decision 5 pulled the calving watch
-        into Phase 1 because there is a pregnancy already underway, and a
-        card that has to be scrolled to is a card nobody reads at 2am.
-      */}
-      <CalvingWatchCard propertyId={propertyId} />
+      <DayProgress chores={chores} />
 
-      {/*
-        Under the calving watch, which is the more urgent of the two: a calving
-        is a night's work decided by the weather, weaning is a week's work
-        decided by a date. This renders nothing at all when nothing is due.
-      */}
-      <WeaningCard propertyId={propertyId} actorId={actorId} />
+      {needs.length === 0 ? null : <NeedsYou needs={needs} />}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {/*
-          Cattle, not every animal on the place. One Animal model serves every
-          species (§2), so the unfiltered list is the herd plus the flock, the
-          dogs and the horses — and a tile labelled "Cattle" that counts the
-          hens is wrong in the quietest possible way: it reads as a plausible
-          number and is the figure somebody repeats out loud.
-        */}
-        <Tile
-          label="Cattle"
-          value={animals.filter((a) => a.species === "cattle" && a.status === "active").length}
-          tone="identity"
-        />
-        <Tile
-          label="Pens in use"
-          value={inUse}
-          hint={`of ${zones.filter((z) => z.active).length} active`}
-        />
-        <Tile
-          label="Tanks uncovered"
-          value={uncovered}
-          tone={uncovered > 0 ? "danger" : "calm"}
-          emphasis={uncovered > 0}
-          hint={uncovered > 0 ? "Nothing over them" : "All covered"}
-        />
-        <Tile label="Zones resting" value={zones.filter((z) => z.resting).length} tone="calm" />
+      {chores.progress.total === 0 ? (
+        <p className="rounded-density border border-rule bg-panel px-4 py-3 text-sm text-muted">
+          Nothing on today&apos;s list.{" "}
+          <Link href="/admin/chores" className="text-action underline underline-offset-2">
+            Chores
+          </Link>
+        </p>
+      ) : (
+        /*
+          Side by side on a laptop, stacked on a phone with feeding first.
+          Flex-wrap rather than a breakpoint grid, so the pair breaks onto two
+          rows wherever the column gets too narrow for both — a side panel open
+          beside it included.
+        */
+        <div className="flex flex-wrap items-start gap-6">
+          {chores.feeding.length === 0 ? null : (
+            <div className="min-w-0 flex-[1_1_320px]">
+              <TickList
+                id="today-feeding"
+                title="Feeding"
+                entries={chores.feeding}
+                chores={chores}
+                animals={animals}
+                zones={zones}
+                actorId={actorId}
+                names={names}
+                action={{ href: "/admin/feed", label: "Feed" }}
+              />
+            </div>
+          )}
+          {chores.chores.length === 0 ? null : (
+            <div className="min-w-0 flex-[1_1_320px]">
+              <TickList
+                id="today-chores"
+                title="Chores"
+                entries={chores.chores}
+                chores={chores}
+                animals={animals}
+                zones={zones}
+                actorId={actorId}
+                names={names}
+                action={{ href: "/admin/chores", label: "All chores" }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {allClear === undefined ? null : <AllClear>{allClear}</AllClear>}
+
+      <AroundThePlace zones={zones} animals={animals} placements={placements} />
+    </PageBody>
+  );
+}
+
+/**
+ * Standing facts, folded shut at the foot of the page.
+ *
+ * Not today's work, so not on today's screen unless asked for: the counts
+ * somebody repeats on the phone and who is standing in which pen. Kept as one
+ * quiet fold rather than dropped, because nothing else in the app puts the
+ * pen board's effective safety levels side by side.
+ */
+function AroundThePlace({
+  zones,
+  animals,
+  placements,
+}: {
+  readonly zones: readonly Zone[];
+  readonly animals: readonly Animal[];
+  readonly placements: readonly ZoneAssignment[];
+}) {
+  const inUse = new Set(placements.filter((a) => a.periodTo === undefined).map((a) => a.zoneId))
+    .size;
+
+  return (
+    <details className="group rounded-density border border-rule bg-panel">
+      <summary className="flex min-h-target cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2 font-semibold text-ink">
+          <svg
+            aria-hidden
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            className="text-muted transition-transform group-open:rotate-90"
+          >
+            <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          Around the place
+        </span>
+        <span className="text-sm text-muted">{inUse} in use</span>
+      </summary>
+
+      <div className="flex flex-col gap-density border-t border-rule p-density">
+        <StatRow>
+          {/*
+            Cattle, not every animal on the place. One Animal model serves every
+            species (§2), so the unfiltered list is the herd plus the flock, the
+            dogs and the horses — and a tile labelled "Cattle" that counts the
+            hens is wrong in the quietest possible way.
+          */}
+          <Tile
+            label="Cattle"
+            value={animals.filter((a) => a.species === "cattle" && a.status === "active").length}
+            tone="identity"
+          />
+          <Tile
+            label="Pens in use"
+            value={inUse}
+            hint={`of ${zones.filter((z) => z.active).length} active`}
+          />
+          <Tile label="Zones resting" value={zones.filter((z) => z.resting).length} tone="calm" />
+        </StatRow>
+
+        <PenBoard zones={zones} animals={animals} assignments={placements} />
       </div>
-
-      {/*
-        Above the pen board, because it is the card somebody acts on. The pen
-        board answers "where is everything"; this one answers "what has not
-        been done yet", and that is the question being asked on the way out of
-        the door.
-      */}
-      <ChoresCard propertyId={propertyId} actorId={actorId} />
-
-      <PenBoard zones={zones} animals={animals} assignments={placements} />
-      <FreezeWatch zones={zones} water={water} />
-    </div>
+    </details>
   );
 }
 
@@ -211,146 +526,42 @@ function PenBoard({
       };
     });
 
-  const occupied = rows.filter((row) => row.occupants.length > 0);
-
   return (
-    <section className="flex flex-col gap-density">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-ink">Pen board</h2>
-        <span className="flex gap-1.5">
-          <Pill tone="action" dot>
-            {occupied.length} in use
-          </Pill>
-          <Pill>{rows.length - occupied.length} empty</Pill>
-        </span>
-      </div>
+    <CardGrid columns={3}>
+      {rows.map((row) => {
+        const raised = row.safety > row.zone.baselineSafetyLevel;
 
-      <CardGrid columns={3}>
-        {rows.map((row) => {
-          const raised = row.safety > row.zone.baselineSafetyLevel;
-
-          return (
-            <RecordCard
-              key={row.zone.id}
-              title={row.zone.name}
-              subtitle={row.zone.resting ? "Resting" : row.zone.indoor ? "Indoor" : undefined}
-              // Level 3 and up is the point at which somebody should not walk
-              // in without thinking, so that is where the card turns.
-              tone={row.safety >= 4 ? "danger" : row.safety >= 3 ? "identity" : "calm"}
-              actions={
-                <SafetyBadge
-                  level={row.safety}
-                  size="compact"
-                  {...(raised
-                    ? { raisedBy: row.occupants.map((a) => a.name ?? "an occupant").join(", ") }
-                    : {})}
-                />
-              }
-              meta={
-                row.occupants.length === 0 ? (
-                  <Pill>Empty</Pill>
-                ) : (
-                  row.occupants.map((animal) => (
-                    <Pill key={animal.id} tone={animal.safetyLevel >= 3 ? "danger" : "neutral"}>
-                      {animal.name ?? animal.tagNumber ?? "Untagged"}
-                    </Pill>
-                  ))
-                )
-              }
-            />
-          );
-        })}
-      </CardGrid>
-    </section>
-  );
-}
-
-/**
- * Which tanks freeze, and what stops drinking when they do.
- *
- * One row per tank, not per zone. Four tanks serve eight zones here, one of
- * them serving three — a per-zone list would send someone to the same trough
- * three times on a freeze morning, and a chore list that does that stops being
- * trusted.
- *
- * The card leads with the covers because they are the only part of this
- * anybody can act on ahead of time: no tank here is heated, so "without
- * heaters" is a constant, and a constant at the top of a watch card is
- * furniture. A cover that is off is a job, and it has to be done before the
- * cold arrives rather than after.
- */
-function FreezeWatch({
-  zones,
-  water,
-}: {
-  readonly zones: readonly Zone[];
-  readonly water: readonly WaterSource[];
-}) {
-  const targets = freezeCheckTargets(
-    water,
-    zones.map((zone) => ({
-      id: zone.id,
-      name: zone.name,
-      waterSourceIds: zone.waterSourceIds,
-      active: zone.active,
-    })),
-  );
-
-  const toFit = coversToFit(targets);
-  /**
-   * "Covers on" has to mean there are covers and they are on.
-   *
-   * Said over a set of tanks that have no covers at all it is reassurance
-   * nobody earned — the honest reading of that state is that there is nothing
-   * to put on, and the ice gets broken instead.
-   */
-  const fitted = targets.filter((target) => target.waterSource.cover === "on").length;
-
-  return (
-    <Card
-      title="Freeze watch"
-      actions={
-        toFit.length > 0 ? (
-          <Pill tone="danger" dot>
-            {toFit.length} cover{toFit.length === 1 ? "" : "s"} to put on
-          </Pill>
-        ) : fitted > 0 ? (
-          <Pill tone="calm">Covers on</Pill>
-        ) : (
-          <Pill tone="neutral">No covers to put on</Pill>
-        )
-      }
-    >
-      {targets.length === 0 ? (
-        <EmptyState
-          title="No tanks in use"
-          detail="Every water source is either stowed or serving no active zone."
-        />
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {targets.map((target) => (
-            <li key={target.waterSource.id} className="flex flex-col gap-1">
-              <span className="flex flex-wrap items-center gap-2 text-density text-ink">
-                {target.waterSource.name}
-                {target.needsCover ? <Pill tone="danger">Cover off</Pill> : null}
-                {target.waterSource.cover === "on" ? <Pill tone="calm">Covered</Pill> : null}
-                {target.vulnerable ? <Pill tone="neutral">No heater</Pill> : null}
-              </span>
-              <span className="text-sm text-muted">
-                Serves {target.zones.map((zone) => zone.name).join(", ")}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <p className="mt-density text-sm text-muted">
-        One check per tank, not per zone. Covers go on the evening before; the ice still gets
-        checked in the morning.{" "}
-        <Link href="/admin/pastures" className="text-action underline underline-offset-2">
-          Manage the tanks
-        </Link>
-      </p>
-    </Card>
+        return (
+          <RecordCard
+            key={row.zone.id}
+            title={row.zone.name}
+            subtitle={row.zone.resting ? "Resting" : row.zone.indoor ? "Indoor" : undefined}
+            // Level 3 and up is the point at which somebody should not walk
+            // in without thinking, so that is where the card turns.
+            tone={row.safety >= 4 ? "danger" : row.safety >= 3 ? "identity" : "calm"}
+            actions={
+              <SafetyBadge
+                level={row.safety}
+                size="compact"
+                {...(raised
+                  ? { raisedBy: row.occupants.map((a) => a.name ?? "an occupant").join(", ") }
+                  : {})}
+              />
+            }
+            meta={
+              row.occupants.length === 0 ? (
+                <Pill>Empty</Pill>
+              ) : (
+                row.occupants.map((animal) => (
+                  <Pill key={animal.id} tone={animal.safetyLevel >= 3 ? "danger" : "neutral"}>
+                    {animal.name ?? animal.tagNumber ?? "Untagged"}
+                  </Pill>
+                ))
+              )
+            }
+          />
+        );
+      })}
+    </CardGrid>
   );
 }

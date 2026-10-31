@@ -67,6 +67,13 @@ describe("Property", () => {
   it("knows whether it can be given to the weather service", () => {
     expect(hasCoordinates({ latitude: 32.7, longitude: -97.3 })).toBe(true);
     expect(hasCoordinates({ latitude: 32.7, longitude: undefined })).toBe(false);
+    // A database row reads an unset column as null.
+    expect(
+      hasCoordinates({ latitude: null, longitude: null } as unknown as {
+        latitude: number;
+        longitude: number;
+      }),
+    ).toBe(false);
     expect(hasCoordinates({ latitude: undefined, longitude: undefined })).toBe(false);
   });
 });

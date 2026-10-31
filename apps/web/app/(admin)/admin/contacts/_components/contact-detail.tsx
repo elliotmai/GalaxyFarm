@@ -158,9 +158,10 @@ export function ContactDetail({
 
   return (
     <div className="flex flex-col gap-density">
+      {/* One column: this is read in a side panel, narrower than the page. */}
       <DetailList
+        columns={1}
         items={[
-          { label: "Company", value: contact.company ?? "—" },
           { label: "Address", value: contact.address ?? "—" },
           {
             label: "Phones",
@@ -224,15 +225,9 @@ export function ContactDetail({
         ]}
       />
 
-      <Section
-        title="History"
-        description="Every record on the farm that names them. Nothing is typed here — it is what the rest of the app already knows."
-      >
+      <Section title="History" description="Every record that names them.">
         {links.length === 0 ? (
-          <EmptyState
-            title="Nothing recorded with them yet"
-            detail="Sales, treatments, breedings, processing and feed purchases show up here as soon as one names this contact."
-          />
+          <EmptyState title="Nothing recorded with them yet" />
         ) : (
           <div className="flex flex-col gap-density">
             <StatRow>

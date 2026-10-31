@@ -1,17 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   Button,
-  Callout,
-  CardGrid,
   Checkbox,
   EmptyState,
   Modal,
-  Pill,
-  RecordCard,
-  Section,
   Select,
   TextArea,
   TextInput,
@@ -29,7 +24,20 @@ import {
   type Planting,
 } from "@galaxy-farm/module-garden";
 
-import { BED_TYPE_LABEL, BED_TYPE_OPTIONS } from "@/app/(admin)/admin/garden/_components/labels";
+import {
+  BED_TYPE_LABEL,
+  BED_TYPE_OPTIONS,
+  optionalNumber,
+  optionalText,
+} from "@/app/(admin)/admin/garden/_components/labels";
+import {
+  AddAction,
+  LandRow,
+  RowAction,
+  RowList,
+  StatusLine,
+} from "@/app/(admin)/admin/pastures/_components/land-kit";
+import { byId } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -76,6 +84,7 @@ export function BedsPanel({
   propertyId,
   actorId,
   onPlantHere,
+  openBedId,
 }: {
   readonly beds: readonly Bed[];
   readonly zones: readonly Zone[];
@@ -85,6 +94,8 @@ export function BedsPanel({
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
   readonly onPlantHere: (bed: Bed) => void;
+  /** A bed to open for editing on arrival — the layout's rows link here. */
+  readonly openBedId?: Ulid | undefined;
 }) {
   const api = useMutations<Bed>("beds", "beds", bedSchema, propertyId, actorId);
   // Deleting a bed takes its care log with it, which is a write to another
@@ -122,7 +133,26 @@ export function BedsPanel({
           : 0,
   );
 
-  const zoneName = (id: Ulid) => zones.find((zone) => zone.id === id)?.name;
+  const zoneName = (id: Ulid) => byId(zones).get(id)?.name;
+
+  // Arriving from the layout's "Edit" on a bed: open that bed, once it has
+  // loaded. Only once per arrival, so closing the editor keeps it closed.
+  const [opened, setOpened] = useState<Ulid | undefined>();
+  useEffect(() => {
+    if (openBedId === undefined || opened === openBedId) return;
+    const bed = byId(beds).get(openBedId);
+    if (bed === undefined) return;
+    setOpened(openBedId);
+    startEdit(bed);
+    // `startEdit` is a plain function of this render; what matters is the bed.
+  }, [openBedId, opened, beds]);
+
+  /** What is growing in each bed, counted once rather than per row. */
+  const growingIn = new Map<Ulid, number>();
+  for (const planting of plantings) {
+    if (planting.status !== "growing" && planting.status !== "harvesting") continue;
+    growingIn.set(planting.bedId, (growingIn.get(planting.bedId) ?? 0) + 1);
+  }
 
   function startCreate() {
     setEditing(undefined);
@@ -156,14 +186,14 @@ export function BedsPanel({
     if (draft === undefined) return;
     setErrors({});
 
-    const number = (value: string) => (value.trim() === "" ? undefined : Number(value.trim()));
+    const number = optionalNumber;
     const fields = {
       zoneId: draft.zoneId as Ulid,
       name: draft.name.trim(),
       type: draft.type,
       lengthFt: number(draft.lengthFt),
       widthFt: number(draft.widthFt),
-      soilNotes: draft.soilNotes.trim() === "" ? undefined : draft.soilNotes.trim(),
+      soilNotes: optionalText(draft.soilNotes),
       active: draft.active,
     };
 
@@ -229,7 +259,8 @@ export function BedsPanel({
       return;
     }
 
-    for (const entry of logs) await careApi.remove(entry.id, `Bed ${bed.name} deleted`);
+    // Together: each is a local write, and none waits on another.
+    await Promise.all(logs.map((entry) => careApi.remove(entry.id, `Bed ${bed.name} deleted`)));
 
     show({
       message: `${bed.name} deleted`,
@@ -238,7 +269,7 @@ export function BedsPanel({
         onAct: () => {
           void (async () => {
             await api.restoreRecord(bed.id);
-            for (const entry of logs) await careApi.restoreRecord(entry.id);
+            await Promise.all(logs.map((entry) => careApi.restoreRecord(entry.id)));
           })();
         },
       },
@@ -247,112 +278,113 @@ export function BedsPanel({
 
   if (loading) return <p className="text-muted">Loading beds…</p>;
 
+  /** The one line: what it is, where, how big, what is in it. */
+  function lineFor(bed: Bed): string {
+    const area = bedAreaSqFt(bed);
+    const inIt = growingIn.get(bed.id) ?? 0;
+    return [
+      BED_TYPE_LABEL[bed.type],
+      zoneName(bed.zoneId),
+      area === undefined ? "no dimensions" : `${bed.lengthFt}′ × ${bed.widthFt}′ · ${area} sq ft`,
+      inIt === 0 ? "empty" : `${inIt} growing`,
+    ]
+      .filter((part) => part !== undefined)
+      .join(" · ");
+  }
+
   return (
-    <div className="flex flex-col gap-density">
-      {zones.filter((zone) => zone.active).length === 0 ? (
-        <Callout tone="action" title="No zones yet">
-          A bed sits inside a zone — the garden area it is part of. Add one under Settings →
-          Property before adding beds.
-        </Callout>
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
+      {places.length === 0 ? (
+        <StatusLine tone="action">
+          A bed sits inside a zone. Add a garden area under Settings → Property first.
+        </StatusLine>
       ) : null}
 
-      <Section
-        title="Beds"
-        description="Raised beds, rows, containers and open ground. Drawing them comes later; recording them does not have to wait for it."
-        actions={
-          <Button variant="primary" onClick={startCreate} disabled={places.length === 0}>
-            Add a bed
-          </Button>
-        }
-      >
-        {beds.length === 0 ? (
-          <EmptyState
-            title="No beds yet"
-            detail="Add the beds you have. Length and width are worth typing — the square footage is what tells you whether the tomatoes fit."
-            action={
-              <Button variant="primary" onClick={startCreate} disabled={places.length === 0}>
-                Add the first bed
-              </Button>
-            }
-          />
-        ) : (
-          <CardGrid columns={3}>
+      {/* Raised beds, rows, containers and open ground. Drawing them is the
+          layout screen's; recording them does not have to wait for it. */}
+      {beds.length === 0 ? (
+        <EmptyState
+          title="No beds yet"
+          detail="Add the beds you have. Length and width give the square footage — whether the tomatoes fit."
+          action={
+            <Button variant="primary" onClick={startCreate} disabled={places.length === 0}>
+              Add the first bed
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          <div className="flex items-center justify-end">
+            <AddAction label="Add bed" onClick={startCreate} disabled={places.length === 0} />
+          </div>
+          <RowList label="Beds">
             {[...beds]
               .sort(
                 (left, right) =>
                   Number(right.active) - Number(left.active) || left.name.localeCompare(right.name),
               )
-              .map((bed) => {
-                const area = bedAreaSqFt(bed);
-                const inIt = plantings.filter(
-                  (planting) =>
-                    planting.bedId === bed.id &&
-                    (planting.status === "growing" || planting.status === "harvesting"),
-                );
-
-                return (
-                  <RecordCard
-                    key={bed.id}
-                    tone={!bed.active ? "neutral" : inIt.length > 0 ? "calm" : "action"}
-                    title={bed.name}
-                    subtitle={`${BED_TYPE_LABEL[bed.type]}${
-                      zoneName(bed.zoneId) === undefined ? "" : ` · ${zoneName(bed.zoneId)}`
-                    }`}
-                    actions={
-                      <Pill tone={bed.active ? "calm" : "neutral"} dot={!bed.active}>
-                        {bed.active ? "in use" : "switched off"}
-                      </Pill>
-                    }
-                    meta={
-                      <>
-                        {area === undefined ? (
-                          <Pill tone="neutral">no dimensions</Pill>
-                        ) : (
-                          <Pill tone="identity">
-                            {bed.lengthFt}&prime; × {bed.widthFt}&prime; · {area} sq ft
-                          </Pill>
-                        )}
-                        <Pill tone={inIt.length === 0 ? "neutral" : "calm"}>
-                          {inIt.length === 0 ? "empty" : `${inIt.length} growing`}
-                        </Pill>
-                      </>
-                    }
-                  >
-                    {bed.soilNotes === undefined ? null : (
-                      <p className="text-sm text-muted">{bed.soilNotes}</p>
-                    )}
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="ghost" onClick={() => onPlantHere(bed)}>
-                        Plant something
-                      </Button>
-                      <Button variant="ghost" onClick={() => startEdit(bed)}>
-                        Edit
-                      </Button>
-                      <Button variant="ghost" onClick={() => void remove(bed)}>
-                        Delete
-                      </Button>
-                    </div>
-                  </RecordCard>
-                );
-              })}
-          </CardGrid>
-        )}
-      </Section>
+              .map((bed) => (
+                <LandRow
+                  key={bed.id}
+                  title={bed.name}
+                  openLabel={`Edit ${bed.name}`}
+                  line={lineFor(bed)}
+                  chip={bed.active ? undefined : { tone: "neutral", label: "Switched off" }}
+                  quiet={!bed.active}
+                  onOpen={() => startEdit(bed)}
+                  action={
+                    bed.active ? (
+                      <RowAction
+                        label={`Plant something in ${bed.name}`}
+                        onClick={() => onPlantHere(bed)}
+                      >
+                        Plant
+                      </RowAction>
+                    ) : undefined
+                  }
+                />
+              ))}
+          </RowList>
+        </>
+      )}
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
-          size="wide"
+          placement="side"
           title={editing === undefined ? "New bed" : `Editing ${editing.name}`}
-          description="Where it is, how big it is, and what the soil in it is like."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Add bed" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                // Delete lives here now the row has no room for it; the editor
+                // closes first so the confirmation (or the refusal) stands alone.
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const bed = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(bed);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+            <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <TextInput
                 label="Name"
                 required
-                hint="What you call it out loud — &ldquo;the long bed&rdquo;, &ldquo;bed 3&rdquo;."
+                placeholder="The long bed"
                 value={draft.name}
                 error={errors["name"]}
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
@@ -360,7 +392,6 @@ export function BedsPanel({
               <Select
                 label="Zone"
                 required
-                hint="The garden area it sits in. Garden areas are listed first."
                 options={places.map((zone) => ({
                   value: zone.id,
                   label: zone.type === "garden_area" ? zone.name : `${zone.name} (${zone.type})`,
@@ -404,25 +435,18 @@ export function BedsPanel({
 
             <Checkbox
               label="Still in use"
-              hint="Untick a bed you have taken out. It keeps its plantings and its history and stops being offered."
+              hint="Untick a bed taken out. It keeps its history and stops being offered."
               checked={draft.active}
               onChange={(event) => setDraft({ ...draft, active: event.target.checked })}
             />
             <TextArea
               label="Soil notes"
               rows={3}
-              hint="What is in it, what it drains like, what was amended and when."
+              placeholder="What is in it, how it drains, what was amended"
               value={draft.soilNotes}
               error={errors["soilNotes"]}
               onChange={(event) => setDraft({ ...draft, soilNotes: event.target.value })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Add bed" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}

@@ -3,15 +3,14 @@
 import { useState } from "react";
 
 import {
-  Badge,
   Button,
-  Card,
-  DataTable,
   EmptyState,
+  PageBody,
+  PageHeader,
+  Pill,
   Select,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import { DEFAULT_RETENTION_DAYS, isPurgeable, type BaseRecord, type Ulid } from "@galaxy-farm/core";
 
@@ -30,6 +29,10 @@ import { useRecords } from "@/lib/local/use-records";
  * Typed tier, and it is offered only for records already past the retention
  * window — purging something deleted this morning is almost always a mistake
  * being made twice.
+ *
+ * A row per record — its name, when and why, a chip only once it is past the
+ * window — with Restore beside it, because restoring is the whole reason
+ * anybody comes here and it should not be behind a second tap.
  */
 
 /** Human labels for the store names, which are database plurals. */
@@ -147,82 +150,64 @@ export function TrashScreen({
     show({ message: `${nameOf(row.record)} purged`, tone: "danger" });
   }
 
-  const columns: readonly Column<TrashRow>[] = [
-    { key: "name", header: "Record", render: (row) => nameOf(row.record) },
-    {
-      key: "deletedAt",
-      header: "Deleted",
-      render: (row) => row.record.deletedAt?.toLocaleDateString() ?? "—",
-    },
-    {
-      key: "reason",
-      header: "Why",
-      render: (row) => row.record.deletedReason ?? <span className="text-muted">Not given</span>,
-    },
-    {
-      key: "retention",
-      header: "Retention",
-      render: (row) =>
-        isPurgeable(row.record, now) ? (
-          <Badge tone="danger">Past {DEFAULT_RETENTION_DAYS} days</Badge>
-        ) : (
-          <Badge tone="calm">Kept</Badge>
-        ),
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (row) => (
-        <span className="flex gap-2">
-          <Button variant="ghost" busy={busy} onClick={() => void restore(row)}>
-            Restore
-          </Button>
-          {canPurge && isPurgeable(row.record, now) ? (
-            <Button variant="ghost" onClick={() => void purge(row)}>
-              Purge
-            </Button>
-          ) : null}
-        </span>
-      ),
-    },
-  ];
+  const rows = deleted.map((record) => ({ record, store }) as TrashRow);
 
   return (
-    <div className="flex flex-col gap-density">
-      <header className="flex flex-wrap items-center justify-between gap-density">
-        <h1 className="text-ink">Trash</h1>
+    <PageBody>
+      <PageHeader
+        eyebrow="Settings"
+        title="Trash"
+        subtitle={`Kept ${DEFAULT_RETENTION_DAYS} days, then purgeable${canPurge ? "" : " by the owner"}`}
+      />
+
+      <div className="max-w-xs">
         <Select
           label="Kind of record"
           options={LOCAL_STORES.map((name) => ({ value: name, label: LABELS[name] ?? name }))}
           value={store}
           onChange={(event) => setStore(event.target.value as LocalStoreName)}
         />
-      </header>
+      </div>
 
-      <p className="max-w-prose text-sm text-muted">
-        Deleted records are kept for {DEFAULT_RETENTION_DAYS} days and can be restored at any point
-        before that. Purging is permanent and only offered once the window has passed
-        {canPurge ? "" : ", and only to the owner"}.
-      </p>
-
-      <Card>
-        {loading ? (
-          <p className="text-muted">Looking…</p>
-        ) : (
-          <DataTable
-            caption={`Deleted ${LABELS[store] ?? store}`}
-            columns={columns}
-            rows={deleted.map((record) => ({ record, store }) as TrashRow)}
-            rowKey={(row) => row.record.id}
-            empty={
-              <EmptyState
-                title="Nothing deleted"
-                detail={`No ${(LABELS[store] ?? store).toLowerCase()} have been deleted.`}
-              />
-            }
-          />
-        )}
-      </Card>
-    </div>
+      {loading ? (
+        <p className="text-muted">Looking…</p>
+      ) : rows.length === 0 ? (
+        <EmptyState
+          title="Nothing deleted"
+          detail={`No ${(LABELS[store] ?? store).toLowerCase()} have been deleted.`}
+        />
+      ) : (
+        <ul
+          aria-label={`Deleted ${LABELS[store] ?? store}`}
+          className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
+        >
+          {rows.map((row) => {
+            const purgeable = isPurgeable(row.record, now);
+            return (
+              <li key={row.record.id} className="flex items-center gap-3 py-2 pl-4 pr-2">
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate font-semibold text-ink">{nameOf(row.record)}</span>
+                  <span className="truncate text-sm text-muted">
+                    Deleted {row.record.deletedAt?.toLocaleDateString() ?? "—"}
+                    {row.record.deletedReason === undefined ? "" : ` · ${row.record.deletedReason}`}
+                  </span>
+                </span>
+                {purgeable ? <Pill tone="danger">Past {DEFAULT_RETENTION_DAYS} days</Pill> : null}
+                <span className="flex shrink-0 gap-1">
+                  <Button variant="ghost" busy={busy} onClick={() => void restore(row)}>
+                    Restore
+                  </Button>
+                  {canPurge && purgeable ? (
+                    <Button variant="ghost" onClick={() => void purge(row)}>
+                      Purge
+                    </Button>
+                  ) : null}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </PageBody>
   );
 }

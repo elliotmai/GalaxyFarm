@@ -1,26 +1,19 @@
 "use client";
 
 import Link from "next/link";
-
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
-  Badge,
   Button,
-  Callout,
-  Card,
   Checkbox,
-  DataTable,
   EmptyState,
-  FilterPanel,
   Modal,
-  SafetyBadge,
   Select,
   TextArea,
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
+  toOptions,
 } from "@galaxy-farm/ui";
 import {
   ANIMAL_STATUSES,
@@ -30,6 +23,7 @@ import {
   animalsWithoutOutside,
   assignmentInSlot,
   encodeUlid,
+  isOnFarm,
   moveToZone,
   zoneAssignmentSchema,
   type Animal,
@@ -43,14 +37,15 @@ import {
 
 import {
   animalsUnderWithdrawal,
+  awaitingCalving,
   breedsInUse,
   breedsOf,
   CATTLE_CLASS_LABELS,
   CATTLE_CLASS_SINGULAR,
-  CATTLE_CLASSES,
   cattleClass,
   classCounts,
   damsThatHaveCalved,
+  projectedDueDate,
   unclassified,
   type BreedingRecord,
   type CalvingRecord,
@@ -58,9 +53,16 @@ import {
   type HealthRecord,
 } from "@galaxy-farm/module-cattle";
 
+import { SpeciesSwitcher } from "@/app/(admin)/_components/species-switcher";
+import {
+  CATTLE_ACTIONS,
+  CattleGlance,
+} from "@/app/(admin)/admin/animals/_components/species-glance";
 import { useMutations } from "@/lib/local/mutations";
 import { animalHref, animalTitle } from "@/lib/animal-slug";
 import { useRecords } from "@/lib/local/use-records";
+
+import { ageLabel, flagFor, HerdRow } from "./herd-row";
 
 /**
  * The herd (spec §5.1, §7).
@@ -73,14 +75,17 @@ import { useRecords } from "@/lib/local/use-records";
  * Moving an animal is the operation worth reading. It does not edit the
  * assignment: it closes one and opens another, so where a cow was in March
  * survives. History is free precisely because nothing is overwritten.
+ *
+ * The list is a list, not a table. Each row is the tag, the name, one line and
+ * one chip (`herd-row.tsx`); everything else is on the animal's own page or in
+ * the editor, which is a side panel on a laptop and a bottom sheet on a phone.
+ * The class chips are the filter people reach for, and the rest of the filters
+ * sit behind one button — with whatever is on always said out loud above the
+ * list, so a narrowed herd never looks like a smaller one.
  */
 
-const SEX_OPTIONS = SEXES.map((sex) => ({ value: sex, label: sex }));
-const CLASS_OPTIONS = CATTLE_CLASSES.map((name) => ({
-  value: name,
-  label: CATTLE_CLASS_LABELS[name],
-}));
-const STATUS_OPTIONS = ANIMAL_STATUSES.map((status) => ({ value: status, label: status }));
+const SEX_OPTIONS = toOptions(SEXES);
+const STATUS_OPTIONS = toOptions(ANIMAL_STATUSES);
 const SAFETY_OPTIONS = Object.values(SAFETY_LEVEL_DEFAULTS).map((level) => ({
   value: String(level.level),
   label: `${level.level} — ${level.label}`,
@@ -102,7 +107,12 @@ interface Filters {
   readonly breed: string;
   readonly safetyLevel: string;
   readonly withdrawnOnly: boolean;
+  /** Only the animals with no pen recorded — what the alert line opens. */
+  readonly unplacedOnly: boolean;
 }
+
+const ACTION_TILE =
+  "flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-density border border-rule bg-panel px-1 text-center text-[13px] font-medium text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
 
 const NO_FILTERS: Filters = {
   zoneId: "",
@@ -112,6 +122,7 @@ const NO_FILTERS: Filters = {
   breed: "",
   safetyLevel: "",
   withdrawnOnly: false,
+  unplacedOnly: false,
 };
 
 interface Draft {
@@ -161,6 +172,9 @@ export function HerdScreen({
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const { records: all, loading } = useRecords<Animal>("animals", { propertyId, search });
+  // The herd unsearched, for the headcount, the class chips and the alert. A
+  // count that shrank while somebody typed a name would stop being a count.
+  const { records: everyone } = useRecords<Animal>("animals", { propertyId });
   const { records: zones } = useRecords<Zone>("zones", { propertyId });
   const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", { propertyId });
   // Needed to see past a recipient to the donor: a donor whose every calf came
@@ -181,6 +195,7 @@ export function HerdScreen({
   );
 
   const cattle = all.filter((animal) => animal.species === "cattle");
+  const herd = useMemo(() => everyone.filter((animal) => animal.species === "cattle"), [everyone]);
 
   // Whoever is held back by a withdrawal today. Computed once for the whole
   // list rather than per row: it reads every health record, and doing that
@@ -221,13 +236,26 @@ export function HerdScreen({
   // which of the two a female is. Built from the records rather than a flag, so
   // a calving entered or corrected moves her without anything else to remember.
   const calved = useMemo(() => damsThatHaveCalved(calvings, breedings), [calvings, breedings]);
+
+  // When each cow inside her calving window is due — the earliest, should a
+  // record ever leave her with two. Built from `awaitingCalving` so a cow that
+  // has calved drops off the list instead of being "due" with a calf at side.
+  const dueByAnimal = useMemo(() => {
+    const map = new Map<Ulid, Date>();
+    for (const record of awaitingCalving(breedings, calvings, asOf)) {
+      const due = projectedDueDate(record);
+      const was = map.get(record.damId);
+      if (was === undefined || due < was) map.set(record.damId, due);
+    }
+    return map;
+  }, [breedings, calvings, asOf]);
   const classOf = (animal: Animal) =>
     cattleClass(animal, asOf, { hasCalved: calved.has(animal.id) });
 
   /*
    * Indexed once, not scanned per row.
    *
-   * Both of these are read by the table for every animal it draws, and both
+   * Both of these are read by the list for every animal it draws, and both
    * used to be a `find` over a whole table to answer for one of them — so the
    * herd list cost animals × profiles and animals × assignments, on every
    * render, including every keystroke in the search box. Assignments is the
@@ -236,7 +264,7 @@ export function HerdScreen({
    * is the one that gets slower every time an animal is moved.
    *
    * Each map keeps the *first* match, which is what `find` returned: an animal
-   * is in an outside pen and an inside pen at once (§5.1), and the column has
+   * is in an outside pen and an inside pen at once (§5.1), and the row has
    * always shown whichever assignment was written first.
    */
   const profileByAnimal = useMemo(() => {
@@ -261,6 +289,18 @@ export function HerdScreen({
 
   const currentZone = (animalId: Ulid) => openZoneByAnimal.get(animalId);
 
+  /**
+   * Cattle on the place with no pen recorded.
+   *
+   * Records written before the form asked for one, mostly. Shown rather than
+   * fixed silently: which pen an animal is in is a fact about the world that
+   * only somebody who has looked knows.
+   */
+  const unplaced = useMemo(
+    () => new Set(animalsWithoutOutside(herd, assignments, indoorZoneIds)),
+    [herd, assignments, indoorZoneIds],
+  );
+
   const animals = cattle.filter((animal) => {
     if (
       filters.zoneId !== "" &&
@@ -283,16 +323,17 @@ export function HerdScreen({
       return false;
     }
     if (filters.withdrawnOnly && !withheld.has(animal.id)) return false;
+    if (filters.unplacedOnly && !unplaced.has(animal.id)) return false;
     return true;
   });
-
-  const filtered = animals.length !== cattle.length;
 
   // Counted over the whole herd, not the filtered list: these are what the
   // filter is chosen *from*, and counts that shrank as they were used would
   // leave nothing to go back to.
-  const counts = useMemo(() => classCounts(cattle, asOf, calved), [cattle, asOf, calved]);
-  const unsexed = useMemo(() => unclassified(cattle, asOf), [cattle, asOf]);
+  const counts = useMemo(() => classCounts(herd, asOf, calved), [herd, asOf, calved]);
+  const unsexed = useMemo(() => unclassified(herd, asOf), [herd, asOf]);
+  /** Head on the place — the number the Pen Board and the rosters count. */
+  const head = herd.filter(isOnFarm).length;
 
   /** What is on, in the words the controls use — shown even when folded. */
   const activeFilters = [
@@ -307,7 +348,11 @@ export function HerdScreen({
     filters.breed === "" ? undefined : `Breed: ${filters.breed}`,
     filters.safetyLevel === "" ? undefined : `Level ${filters.safetyLevel}`,
     filters.withdrawnOnly ? "Under withdrawal" : undefined,
+    filters.unplacedOnly ? "No pen recorded" : undefined,
   ].filter((entry): entry is string => entry !== undefined);
+
+  /** How many of those live behind the Filters button rather than the chips. */
+  const panelFilters = activeFilters.length - (filters.cattleClass === "" ? 0 : 1);
 
   const mutations = useMutations<Animal>("animals", "animals", animalSchema, propertyId, actorId);
   const placements = useMutations<ZoneAssignment>(
@@ -338,18 +383,6 @@ export function HerdScreen({
     .filter((zone) => zone.active && zone.indoor)
     .map((zone) => ({ value: zone.id, label: zone.name }));
 
-  /**
-   * Cattle on the place with no pen recorded.
-   *
-   * Records written before the form asked for one, mostly. Named rather than
-   * counted, and shown rather than fixed silently: which pen an animal is in
-   * is a fact about the world that only somebody who has looked knows.
-   */
-  const unplaced = useMemo(
-    () => new Set(animalsWithoutOutside(cattle, assignments, indoorZoneIds)),
-    [cattle, assignments, indoorZoneIds],
-  );
-
   const zoneOptions = zones
     .filter((zone) => zone.active)
     .map((zone) => ({ value: zone.id, label: zone.name }));
@@ -359,6 +392,24 @@ export function HerdScreen({
     setDraft(BLANK);
     setErrors({});
   }
+
+  // `?add=1` lands on the add form — the Animals list's "+ Add animal" comes
+  // here rather than keeping a second add form. Read once, off `window`
+  // rather than `useSearchParams`, so the page needs no Suspense boundary;
+  // the flag is then dropped from the address so a reload does not reopen it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("add") !== "1") return;
+    startCreate();
+    params.delete("add");
+    const rest = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${rest === "" ? "" : `?${rest}`}`,
+    );
+    // Mount only: this is a way in, not a state to keep in step with.
+  }, []);
 
   function startEdit(animal: Animal) {
     setEditing(animal);
@@ -439,8 +490,9 @@ export function HerdScreen({
   /**
    * Put an animal in a zone, quietly.
    *
-   * The same `moveToZone` the Move button uses — which is what makes it a
-   * no-op when she is already there, rather than a second identical row.
+   * The same `moveToZone` every move on the place goes through — which is
+   * what makes it a no-op when she is already there, rather than a second
+   * identical row, and what repairs a slot that somehow holds two.
    */
   async function placeIn(animalId: Ulid, zoneId: Ulid) {
     const zone = zones.find((candidate) => candidate.id === zoneId);
@@ -466,69 +518,6 @@ export function HerdScreen({
       await placements.update(entry.id, { periodTo: entry.periodTo });
     }
     if (opened !== undefined) await placements.create(opened);
-  }
-
-  /**
-   * Move an animal to another zone.
-   *
-   * Closes the open assignment and opens a new one rather than editing the
-   * existing row. That is what makes "where was she in March" answerable, and
-   * it is also why the two writes are separate patches — a device that syncs
-   * the close but not the open must not end up with the animal nowhere.
-   */
-  async function moveTo(animal: Animal, zoneId: Ulid) {
-    const zone = zones.find((candidate) => candidate.id === zoneId);
-    if (zone === undefined) return;
-
-    const at = new Date();
-
-    // The slot is the zone's, not a question. Moving a cow into the barn
-    // leaves her pasture assignment alone; moving her to another trap closes
-    // the first one. `closed` is a list because more than one open assignment
-    // in a slot means the rule was already broken, and this is where it gets
-    // repaired rather than left for somebody to notice on the pen board.
-    const { closed, opened } = moveToZone(
-      assignments,
-      {
-        id: encodeUlid(at.getTime()) as Ulid,
-        propertyId,
-        createdAt: at,
-        updatedAt: at,
-        animalId: animal.id,
-        zoneId,
-        indoor: zone.indoor,
-        at,
-      },
-      indoorZoneIds,
-    );
-
-    // Closes first, including any duplicate rows for a zone she is already in
-    // — that is the repair, and it runs whether or not there is a move to make.
-    for (const entry of closed) {
-      await placements.update(entry.id, { periodTo: entry.periodTo });
-    }
-
-    if (opened === undefined) {
-      // Already there. Saying so is the honest answer to the button that was
-      // pressed; writing a second identical assignment was the old one.
-      show({
-        message: `${animal.name ?? "Animal"} is already in ${zone.name}`,
-        tone: "info",
-      });
-      return;
-    }
-
-    const result = await placements.create(opened);
-
-    if (!result.ok) {
-      show({ message: "Could not move that animal", tone: "danger" });
-      return;
-    }
-
-    show({
-      message: `${animal.name ?? "Animal"} moved to ${zone.name}`,
-      tone: "success",
-    });
   }
 
   async function remove(animal: Animal) {
@@ -563,111 +552,59 @@ export function HerdScreen({
     });
   }
 
-  const columns: readonly Column<Animal>[] = [
-    {
-      key: "name",
-      header: "Name",
-      // The name is the link. A row that needs a separate "open" button puts
-      // the smallest target on the screen in front of the most common action.
-      render: (animal) => (
-        <Link
-          href={animalHref(animal)}
-          className="font-medium text-ink underline decoration-edge underline-offset-4 hover:decoration-action"
-        >
-          {animalTitle(animal)}
-        </Link>
-      ),
-    },
-    {
-      key: "tag",
-      header: "Tag",
-      numeric: true,
-      render: (animal) => animal.tagNumber ?? "—",
-    },
-    { key: "sex", header: "Sex", render: (animal) => animal.sex },
-    {
-      key: "class",
-      header: "Class",
-      // The same fact the class row and the filter select on, on the row
-      // itself — so nobody has to work out why a cow is in the calf list.
-      render: (animal) => {
-        const name = classOf(animal);
-        return name === undefined ? "—" : CATTLE_CLASS_SINGULAR[name];
-      },
-    },
-    {
-      key: "breed",
-      header: "Breed",
-      render: (animal) => {
-        const breeds = breedsOf(profileOf(animal.id) ?? {});
-        return breeds.length === 0 ? (
-          <span className="text-muted">—</span>
-        ) : (
-          <span className="flex flex-wrap gap-1.5">
-            {breeds.map((breed) => (
-              <Badge key={breed} tone="neutral">
-                {breed}
-              </Badge>
-            ))}
-          </span>
-        );
-      },
-    },
-    {
-      key: "status",
-      header: "Status",
-      render: (animal) => (
-        <Badge tone={animal.status === "active" ? "calm" : "neutral"}>{animal.status}</Badge>
-      ),
-    },
-    {
-      key: "zone",
-      header: "Where",
-      render: (animal) => (
-        <Select
-          label={`Zone for ${animal.name ?? "animal"}`}
-          hideLabel
-          options={zoneOptions}
-          placeholder="Nowhere"
-          value={currentZone(animal.id)?.id ?? ""}
-          onChange={(event) => void moveTo(animal, event.target.value as Ulid)}
-        />
-      ),
-    },
-    {
-      key: "safety",
-      header: "Care",
-      render: (animal) => (
-        <span className="flex flex-wrap items-center gap-2">
-          <SafetyBadge level={animal.safetyLevel} size="compact" />
-          {/* The same fact the filter selects on, visible without selecting. */}
-          {withheld.has(animal.id) ? <Badge tone="danger">Withdrawal</Badge> : null}
-        </span>
-      ),
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (animal) => (
-        <span className="flex gap-2">
-          <Button variant="ghost" onClick={() => startEdit(animal)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void remove(animal)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  /** The one line under a name: what she is, how old, where. */
+  function lineFor(animal: Animal): string {
+    const name = classOf(animal);
+    return [
+      name === undefined ? animal.sex : CATTLE_CLASS_SINGULAR[name],
+      ageLabel(animal, asOf),
+      currentZone(animal.id)?.name,
+    ]
+      .filter((part) => part !== undefined && part !== "")
+      .join(" · ");
+  }
+
+  /** Chips for the class row: the whole herd, then each class with its count. */
+  const chips = [
+    { key: "", label: "All", count: undefined as number | undefined },
+    ...counts.map((entry) => ({ key: entry.cattleClass, label: entry.label, count: entry.count })),
   ];
 
   if (loading) return <p className="text-muted">Loading the herd…</p>;
 
   return (
-    <div className="flex flex-col gap-density">
-      <header className="flex flex-wrap items-center justify-between gap-density">
-        <h1 className="text-ink">Herd</h1>
-        <div className="flex items-center gap-2">
+    // Bottom clearance on a phone, so the floating add button and the tab bar
+    // under it never sit on top of the last row.
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
+      <header className="flex items-center justify-between gap-density">
+        {/* The count is a fact, said beside the title rather than under it. */}
+        <SpeciesSwitcher propertyId={propertyId} current="/admin/cattle" detail={`${head} head`} />
+        {/* Hidden on a phone by a wrapper, not a class on the button: the
+            button's own `inline-flex` wins over a `hidden` passed in. */}
+        <span className="hidden sm:block">
+          <Button variant="primary" onClick={startCreate}>
+            <span aria-hidden="true">+</span> Add animal
+          </Button>
+        </span>
+      </header>
+
+      {/* The cattle page's own jobs and facts (decision 45). */}
+      <nav aria-label="Quick actions for cattle" className="grid grid-cols-4 gap-2">
+        {CATTLE_ACTIONS.map((action) => (
+          <Link key={action.label} href={action.href} className={ACTION_TILE}>
+            <span aria-hidden="true" className="text-xl leading-none">
+              {action.glyph}
+            </span>
+            {action.label}
+          </Link>
+        ))}
+      </nav>
+      <CattleGlance propertyId={propertyId} />
+
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1">
           <TextInput
             label="Search"
             hideLabel
@@ -675,87 +612,201 @@ export function HerdScreen({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          <Button variant="primary" onClick={startCreate}>
-            Add an animal
-          </Button>
         </div>
-      </header>
+        <Button aria-haspopup="dialog" onClick={() => setFiltersOpen(true)}>
+          Filters{panelFilters === 0 ? "" : ` (${panelFilters})`}
+        </Button>
+      </div>
 
       {/*
-        The filters #15 asks for, in the order they get reached for. They stack
-        rather than replace each other: "bulls in the north pen still under
-        withdrawal" is one question, not three.
-      */}
-      {/*
-        The four classes, as a row of counts that are also the filter. This is
+        The classes, as one row of toggles that are also the counts. This is
         the split somebody asks for out loud — "how many steers have we got" —
         and making the answer the control means it takes one press rather than
-        opening a panel and finding the right select.
-
-        Counted over the whole herd rather than the filtered list, so the
-        numbers do not shrink as they are used.
+        opening a panel and finding the right select. A single row that scrolls
+        sideways on a phone, because a row that wraps pushes the herd down.
       */}
-      {unplaced.size === 0 ? null : (
-        <Callout tone="danger" title={`${unplaced.size} with no pen or pasture recorded`}>
-          Everything on the place stands somewhere outdoors, and these do not say where. They are
-          missing from the Pen Board and from every headcount a pen is asked for. Open each one and
-          set its pen — or use <strong>Off site</strong> if it is away.
-          <span className="mt-2 flex flex-wrap gap-2">
-            {cattle
-              .filter((animal) => unplaced.has(animal.id))
-              .map((animal) => (
-                <Button key={animal.id} variant="secondary" onClick={() => startEdit(animal)}>
-                  {animalTitle(animal)}
-                </Button>
-              ))}
+      <div
+        role="group"
+        aria-label="Filter by class"
+        className="-mx-1 flex items-center gap-1 overflow-x-auto px-1"
+      >
+        {chips.map((chip) => {
+          const on = filters.cattleClass === chip.key;
+          return (
+            <button
+              key={chip.key === "" ? "all" : chip.key}
+              type="button"
+              aria-pressed={on}
+              onClick={() =>
+                setFilters({
+                  ...filters,
+                  // Pressing the one already on goes back to the whole herd,
+                  // so the row is a way out of a part as well as a way in.
+                  cattleClass: on ? "" : chip.key,
+                })
+              }
+              className={[
+                "inline-flex min-h-target shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action",
+                on
+                  ? "bg-action/15 font-semibold text-action"
+                  : "font-medium text-muted hover:bg-raised hover:text-ink",
+              ].join(" ")}
+            >
+              {chip.label}
+              {chip.count === undefined ? null : (
+                <span className="gf-numeric text-xs opacity-80">{chip.count}</span>
+              )}
+            </button>
+          );
+        })}
+        {unsexed === 0 ? null : (
+          <span className="shrink-0 whitespace-nowrap px-2 text-xs text-muted">
+            {unsexed} with no sex recorded
           </span>
-        </Callout>
+        )}
+      </div>
+
+      {/*
+        The one alert this screen keeps, as one line. An animal with no pen is
+        missing from the Pen Board and from every headcount a pen is asked for,
+        so it is worth saying — but saying it once, and making the line the way
+        to the animals concerned, rather than a box of buttons above the herd.
+      */}
+      {unplaced.size === 0 || filters.unplacedOnly ? null : (
+        <p className="text-sm text-danger">
+          {unplaced.size} with no pen or pasture recorded.{" "}
+          <button
+            type="button"
+            onClick={() => setFilters({ ...filters, unplacedOnly: true })}
+            className="inline-flex min-h-target items-center font-semibold underline underline-offset-2"
+          >
+            Show them
+          </button>
+        </p>
       )}
 
-      <Card title="The herd, by class">
-        <div className="flex flex-wrap gap-2">
-          {counts.map((entry) => {
-            const on = filters.cattleClass === entry.cattleClass;
-            return (
-              <Button
-                key={entry.cattleClass}
-                variant={on ? "primary" : "secondary"}
-                aria-pressed={on}
-                onClick={() =>
-                  setFilters({
-                    ...filters,
-                    // Pressing the one already on clears it, so the row is a
-                    // way back to the whole herd as well as a way into a part.
-                    cattleClass: on ? "" : entry.cattleClass,
-                  })
-                }
-              >
-                {entry.label} {entry.count}
-              </Button>
-            );
-          })}
-          {unsexed === 0 ? null : (
-            <span className="self-center text-sm text-muted">
-              {unsexed} with no sex recorded, in none of these.
-            </span>
-          )}
-        </div>
-      </Card>
+      {/*
+        What is on, whenever anything is — the part of the old filter panel
+        that must never fold away. A narrowed list that does not say so is a
+        screen that lies: somebody looks for a cow, does not find her, and
+        concludes she is not on the place.
+      */}
+      {activeFilters.length === 0 ? null : (
+        <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted" aria-live="polite">
+          <span>
+            Showing {animals.length} of {herd.length}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>{activeFilters.join(" · ")}</span>
+          <button
+            type="button"
+            onClick={() => setFilters(NO_FILTERS)}
+            className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
+          >
+            Clear
+          </button>
+        </p>
+      )}
 
-      <FilterPanel
-        title="Narrow the herd"
-        active={activeFilters.length}
-        summary={activeFilters.join(" · ")}
-        count={
-          filtered ? (
-            <>
-              Showing {animals.length} of {cattle.length}.
-            </>
-          ) : undefined
-        }
-        onClear={() => setFilters(NO_FILTERS)}
+      {animals.length === 0 ? (
+        <EmptyState
+          title={
+            herd.length === 0
+              ? "No cattle yet"
+              : search !== ""
+                ? `Nothing matches "${search}"`
+                : "None match these filters"
+          }
+          detail={
+            herd.length === 0
+              ? "Add the herd here. Breeding, health, and feed all hang off these records."
+              : search !== ""
+                ? "Search looks at name, tag number, and notes."
+                : undefined
+          }
+          {...(herd.length === 0
+            ? {
+                action: (
+                  <Button variant="primary" onClick={startCreate}>
+                    Add the first animal
+                  </Button>
+                ),
+              }
+            : activeFilters.length > 0
+              ? {
+                  action: <Button onClick={() => setFilters(NO_FILTERS)}>Clear filters</Button>,
+                }
+              : {})}
+        />
+      ) : (
+        <ul
+          aria-label="Cattle on this property"
+          className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
+        >
+          {animals.map((animal) => (
+            <HerdRow
+              key={animal.id}
+              animal={animal}
+              href={animalHref(animal)}
+              title={animalTitle(animal)}
+              line={lineFor(animal)}
+              flag={flagFor({
+                animal,
+                withdrawn: withheld.has(animal.id),
+                unplaced: unplaced.has(animal.id),
+                due: dueByAnimal.get(animal.id),
+                now: asOf,
+              })}
+              onEdit={() => startEdit(animal)}
+            />
+          ))}
+        </ul>
+      )}
+
+      {/*
+        On a phone the add button floats bottom-right, where a thumb already
+        is, and clear of the tab bar below it. On anything wider it sits in the
+        header and this one is not drawn.
+      */}
+      {/* A plain button rather than `Button`: its shape and shadow are its own,
+          and overriding a primitive's radius from outside is a fight over
+          class order that the stylesheet decides, not this file. */}
+      <button
+        type="button"
+        onClick={startCreate}
+        className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
       >
-        <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-6">
+        <span aria-hidden="true" className="text-xl leading-none">
+          +
+        </span>
+        Add animal
+      </button>
+
+      {filtersOpen ? (
+        <Modal
+          title="Filters"
+          placement="side"
+          onClose={() => setFiltersOpen(false)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => setFiltersOpen(false)}>
+                Show {animals.length}
+              </Button>
+              {activeFilters.length === 0 ? null : (
+                <Button variant="ghost" onClick={() => setFilters(NO_FILTERS)}>
+                  Clear filters
+                </Button>
+              )}
+            </>
+          }
+        >
+          {/*
+            The rest of what #15 asks for, in the order it gets reached for.
+            They stack rather than replace each other: "bulls in the north pen
+            still under withdrawal" is one question, not three. Class is not
+            here because the chips above are the class filter.
+          */}
           <Select
             label="Pen"
             value={filters.zoneId}
@@ -778,14 +829,6 @@ export function HerdScreen({
             onChange={(event) => setFilters({ ...filters, sex: event.target.value })}
           />
           <Select
-            label="Class"
-            hint="Calves are under a year. A steer is a steer whatever his age."
-            value={filters.cattleClass}
-            placeholder="Any class"
-            options={CLASS_OPTIONS}
-            onChange={(event) => setFilters({ ...filters, cattleClass: event.target.value })}
-          />
-          <Select
             label="Breed"
             hint="Typed on the animal, or worked out from its makeup."
             value={filters.breed}
@@ -806,31 +849,63 @@ export function HerdScreen({
             checked={filters.withdrawnOnly}
             onChange={(event) => setFilters({ ...filters, withdrawnOnly: event.target.checked })}
           />
-        </div>
-      </FilterPanel>
+          <Checkbox
+            label="No pen recorded"
+            checked={filters.unplacedOnly}
+            onChange={(event) => setFilters({ ...filters, unplacedOnly: event.target.checked })}
+          />
+        </Modal>
+      ) : null}
 
       {draft !== undefined ? (
         <Modal
           key={editing?.id ?? "new"}
-          size="wide"
-          title={editing === undefined ? "New animal" : `Editing ${editing.name ?? "animal"}`}
-          description="Name or tag is enough to start. Everything else can be filled in later."
+          placement="side"
+          title={editing === undefined ? "Add an animal" : `Editing ${animalTitle(editing)}`}
+          description="Tag or name is enough to start. Everything else can be filled in later."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Add animal" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                // Delete lives here now that the row has no room for it. The
+                // editor closes first, so the typed confirmation is the only
+                // dialog on screen rather than a second one stacked on this.
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const animal = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(animal);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
-          <div className="flex flex-col gap-density md:grid md:grid-cols-2">
-            <TextInput
-              label="Name"
-              value={draft.name}
-              error={errors["name"]}
-              hint="What you call it. A tag number is enough on its own."
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-            />
+          <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
+            {/* The tag first: it is what is written on the animal, and the
+                thing somebody standing at the chute is reading off her ear. */}
             <TextInput
               label="Tag number"
               numeric
               value={draft.tagNumber}
               error={errors["tagNumber"]}
               onChange={(event) => setDraft({ ...draft, tagNumber: event.target.value })}
+            />
+            <TextInput
+              label="Name"
+              value={draft.name}
+              error={errors["name"]}
+              hint="What you call it. A tag number is enough on its own."
+              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
             />
             <Select
               label="Sex"
@@ -894,48 +969,13 @@ export function HerdScreen({
             <TextArea
               label="Notes"
               rows={3}
-              className="md:col-span-2"
+              className="sm:col-span-2"
               value={draft.notes}
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
           </div>
-
-          <div className="mt-density flex gap-2">
-            <Button variant="primary" onClick={() => void save()}>
-              {editing === undefined ? "Add animal" : "Save changes"}
-            </Button>
-            <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-          </div>
         </Modal>
       ) : null}
-
-      <Card>
-        <DataTable
-          caption="Cattle on this property"
-          columns={columns}
-          rows={animals}
-          rowKey={(animal) => animal.id}
-          empty={
-            <EmptyState
-              title={search === "" ? "No cattle yet" : `Nothing matches "${search}"`}
-              detail={
-                search === ""
-                  ? "Add the herd here. Breeding, health, and feed all hang off these records."
-                  : "Search looks at name, tag number, and notes."
-              }
-              {...(search === ""
-                ? {
-                    action: (
-                      <Button variant="primary" onClick={startCreate}>
-                        Add the first animal
-                      </Button>
-                    ),
-                  }
-                : {})}
-            />
-          }
-        />
-      </Card>
     </div>
   );
 }

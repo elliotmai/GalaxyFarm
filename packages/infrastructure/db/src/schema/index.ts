@@ -687,7 +687,8 @@ export const feedPurchases = pgTable(
     ...baseColumns,
     feedTypeId: text("feed_type_id").notNull(),
     quantity: doublePrecision("quantity").notNull(),
-    unitCost: jsonb("unit_cost").$type<{ cents: number }>().notNull(),
+    // Nullable since 0039: a load can be counted before its bill arrives.
+    unitCost: jsonb("unit_cost").$type<{ cents: number }>(),
     vendorContactId: text("vendor_contact_id"),
     purchasedOn: timestamp("purchased_on", { withTimezone: true }).notNull(),
     notes: text("notes"),
@@ -794,7 +795,8 @@ export const fuelLogs = pgTable(
     ...baseColumns,
     equipmentId: text("equipment_id").notNull(),
     gallons: doublePrecision("gallons").notNull(),
-    cost: jsonb("cost").$type<{ cents: number }>().notNull(),
+    // Nullable since 0038: bulk-tank fuel often has no receipt.
+    cost: jsonb("cost").$type<{ cents: number }>(),
     filledOn: timestamp("filled_on", { withTimezone: true, mode: "date" }).notNull(),
     hours: doublePrecision("hours"),
     miles: doublePrecision("miles"),
@@ -834,7 +836,8 @@ export const supplyPurchases = pgTable(
     ...baseColumns,
     supplyItemId: text("supply_item_id").notNull(),
     quantity: doublePrecision("quantity").notNull(),
-    unitCost: jsonb("unit_cost").$type<{ cents: number }>().notNull(),
+    // Nullable since 0038: a purchase moves stock whether or not it was priced.
+    unitCost: jsonb("unit_cost").$type<{ cents: number }>(),
     vendorContactId: text("vendor_contact_id"),
     purchasedOn: timestamp("purchased_on", { withTimezone: true, mode: "date" }).notNull(),
     notes: text("notes"),
@@ -1025,9 +1028,21 @@ export const crops = pgTable(
   {
     ...baseColumns,
     name: text("name").notNull(),
-    /** Botanical family. The rotation guard runs on this, not on the name. */
-    family: text("family").notNull(),
+    /**
+     * Botanical family. The rotation guard runs on this, not on the name.
+     * Nullable since 0037: NULL means "inferred from the name" (§5.5).
+     */
+    family: text("family"),
+    scientificName: text("scientific_name"),
     notes: text("notes"),
+    /** How it is grown (0040, §5.5): typical figures a new variety starts from. */
+    daysToMaturity: integer("days_to_maturity"),
+    spacingInches: doublePrecision("spacing_inches"),
+    season: text("season"),
+    lifecycle: text("lifecycle"),
+    sun: text("sun"),
+    sowing: text("sowing"),
+    depthInches: doublePrecision("depth_inches"),
   },
   baseIndexes("crops"),
 );
@@ -1058,7 +1073,7 @@ export const seedInventory = pgTable(
   {
     ...baseColumns,
     varietyId: text("variety_id").notNull(),
-    quantity: doublePrecision("quantity").notNull(),
+    quantity: doublePrecision("quantity"),
     unit: text("unit").notNull(),
     packedForYear: integer("packed_for_year"),
     source: text("source"),
@@ -1112,7 +1127,7 @@ export const harvestLogs = pgTable(
     ...baseColumns,
     plantingId: text("planting_id").notNull(),
     harvestedOn: timestamp("harvested_on", { withTimezone: true, mode: "date" }).notNull(),
-    quantity: doublePrecision("quantity").notNull(),
+    quantity: doublePrecision("quantity"),
     unit: text("unit").notNull(),
     notes: text("notes"),
   },
@@ -1134,7 +1149,7 @@ export const preservationLogs = pgTable(
     harvestLogId: text("harvest_log_id"),
     label: text("label").notNull(),
     method: text("method").notNull(),
-    quantity: doublePrecision("quantity").notNull(),
+    quantity: doublePrecision("quantity"),
     unit: text("unit").notNull(),
     preservedOn: timestamp("preserved_on", { withTimezone: true, mode: "date" }).notNull(),
     storageLocation: text("storage_location"),
@@ -1302,6 +1317,7 @@ export const choreTemplates = pgTable(
     recurrence: text("recurrence").notNull(),
     recurrenceDays: integer("recurrence_days").array().notNull().default([]),
     timeOfDay: text("time_of_day"),
+    weather: text("weather"),
     zoneId: text("zone_id"),
     animalId: text("animal_id"),
     active: boolean("active").notNull(),
@@ -1381,7 +1397,8 @@ export const purchaseCandidates = pgTable(
     roadmapItemId: text("roadmap_item_id"),
     title: text("title").notNull(),
     status: text("status").notNull(),
-    askingPrice: jsonb("asking_price").$type<{ cents: number }>().notNull(),
+    // Nullable since 0038: "price on request" is a real listing.
+    askingPrice: jsonb("asking_price").$type<{ cents: number }>(),
     /** Hauling, inspection, repairs — the costs that decide the purchase. */
     additionalCosts: jsonb("additional_costs")
       .$type<{ label: string; amount: { cents: number } }[]>()

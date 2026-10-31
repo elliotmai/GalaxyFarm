@@ -198,7 +198,7 @@ Every animal carries a level plus **safetyNotes** stating *why* ("kicks when cor
 
 **Attachment** — polymorphic file link (registration papers, manuals, receipts, signed forms) → R2 key.
 
-**Task / ChoreTemplate** — recurring templates (daily, weekly, cron-ish) generate dated instances; completable from kiosk; assignable; overdue state feeds notifications.
+**Task / ChoreTemplate** — recurring templates (daily, weekly, cron-ish) generate dated instances; completable from kiosk; assignable; overdue state feeds notifications. A template may also wait for the weather (`freeze_tonight`, `frost_tonight`, `freezing_today`, `rain_coming`, `wind_coming`, `heat_today`; added v1.8): it then generates only on days the forecast shows that, and is kept when no forecast could be read. The two "before" conditions look from the morning to noon the next day — rain likely (≥ 50 %), or gusts ≥ 40 mph / sustained ≥ 25 mph, or an NWS wind, storm or flood alert — and when the weather arrives during the day the chore is due by then. The weather's own jobs — covers the day before a freeze, an ice check per tank on a freezing morning, row cover on a frost night with something planted out — are derived chores on the same day sheet (§6), ticked like any other and keyed by tank and day.
 
 **CalendarEvent** — mostly *projected* from other modules (calving windows, withdrawal ends, maintenance due, rule deadlines, planting windows, drop-offs) plus manual events. The calendar is a read model, so nothing is entered twice.
 
@@ -274,7 +274,11 @@ Hatching/incubation: not built; the module boundary leaves a clean seam if that 
 
 **Bed** — a child of a garden Zone: shape/position from the layout designer, type (`raised_bed | row`), dimensions, soil notes.
 
-**Crop / Variety** — name, **family (for rotation logic)**, daysToMaturity, spacing, source. **SeedInventory** — variety, qty, packedForYear, source, germination notes.
+**Crop / Variety** — name, **family (for rotation logic)**, scientific name, daysToMaturity, spacing, source. **SeedInventory** — variety, qty (optional — a packet nobody counted is still in the box), packedForYear, source, germination notes.
+
+**The family is inferred, not asked for.** A built-in table of common garden crops (`GARDEN_CROPS` in the garden module — Solanaceae: tomato, pepper, potato, eggplant; Brassicaceae: cabbage, kale, broccoli; Cucurbitaceae; Fabaceae; Amaryllidaceae, which folds the older Alliaceae; Apiaceae; Asteraceae; Amaranthaceae; Poaceae; and the rest of an ordinary kitchen garden) maps a crop's name, or failing that its scientific name's genus, to its family. It works offline, and it is what the rotation guard reads whenever a crop stores no family of its own. A family that is stored — typed as an override behind the crop form's "Family · Change" disclosure, or supplied by a plant-search pick for something the table does not know — always wins. A family that merely repeats the table's answer is not stored, so it stays derived (§2). Old family names are normalised (Alliaceae → Amaryllidaceae, Leguminosae → Fabaceae …) so one rotation is never read as two. Family is never required; a crop the table cannot place reads "family unknown — rotation not checked".
+
+**Plant search.** The crop form's name box is also a search, and the variety form has a "Find the plant" box that files the variety under the matching crop (adding the crop if the list has none). Picking a match fills the name, scientific name and family, and how the plant grows: typical days to maturity and spacing, cool or warm season, sun, sowing (direct, transplant or either), annual / biennial / perennial, and planting depth. Those come from a built-in table for every crop the family table knows, and from Growstuff (`/api/plants/growing`, open data, session-checked, cached for a day) for the rest — taken only from a Growstuff record whose scientific name is the one picked, so a fuzzy search never fills borage with rosemary's figures. Every growing fact is optional and editable; a crop saved without them falls back to the table, as its family does. A new variety starts from its crop's days and spacing, filling only blanks, and keeps its own off the packet. The built-in table answers instantly and offline; `/api/plants/search` (session-checked, server-side, answers cached for a day) adds GBIF's species API — accepted plant species of the GBIF backbone, re-ranked so a common name that *is* the query beats one that merely contains it. The browser never calls GBIF directly, and when the route or GBIF is unreachable the form says so in one quiet line and still works by hand.
 
 **Planting** — bed, variety, method (`direct_sow | transplant`), optional indoor start date, plantedDate, expectedHarvestDate (derived), status. **CareLog** — bed/planting, action (`fertilize | water | weed | pest_treatment | amend`), product, notes.
 
@@ -282,7 +286,7 @@ Hatching/incubation: not built; the module boundary leaves a clean seam if that 
 
 **Rotation guard** — each bed keeps its crop-family history; planting the same family in a bed within a configurable window (default 3 years) raises a visible warning in the designer.
 
-**HarvestLog** — planting, date, qty, unit. **PreservationLog** — method (`canned | frozen | dried | fermented`), qty, date, storage location — your pantry inventory.
+**HarvestLog** — planting, date, qty (optional — the date is what says how long a variety kept giving), unit. **PreservationLog** — method (`canned | frozen | dried | fermented`), qty (optional, and may be edited down to zero as jars are eaten — the batch stays on record), date, storage location — your pantry inventory. A picking's editor offers "Put some by", which opens a pantry batch already naming it.
 
 **Planting calendar** — derived from the property's growing zone (dynamic; Fort Worth ≈ 8b today, but it's a property setting): per-crop sow/transplant windows and frost dates projected onto the unified calendar.
 
@@ -403,10 +407,20 @@ Route: `/admin/supplies`. Builds in Phase 2.
                                 session and no data
 
 /admin                          dashboard: today's chores, alerts, calving countdowns, run-outs
+/admin/animals                  every animal on the place, all species, in one list; select
+                                several to log one thing for all of them (§8 v1.7)
+/admin/breeding                 the season's breeding workspace, at a desk: cows to breed, a
+                                sire from the tank or the catalog, the pairing's risks (§8 v1.7)
+/admin/log                      log anything for one animal or several: what, who, details
+                                (§8 v1.7); ?kind=, ?animals= and ?flock= start it part-way
+/admin/more                     everything not daily: reports, calendar, contacts, housesitter,
+                                boarding business, chore templates, settings (§8 v1.7)
 /admin/map                      property map — draw pens/pastures over aerial photo,
-                                drag animal chips between zones, tap for instructions
+                                drag animal chips between zones, tap for instructions; each
+                                zone opens a panel for its boundary and temporary fencing
 /admin/pastures                 care logs (seed/overseed, fertilize, spray, mow), rest status,
-                                seasonal reminders, per-pasture cost history
+                                seasonal reminders, per-pasture cost history; ?zone= opens
+                                that zone's editor (the map's "Edit zone details")
 /admin/calendar                 unified calendar
 /admin/chores                   templates + today
 /admin/reports
@@ -430,17 +444,34 @@ Route: `/admin/supplies`. Builds in Phase 2.
 
 /admin/feed                     inventory, purchases, run-out projections, cost per head
 /admin/supplies                 ranch supply inventory: consumables, show/fitting gear, hardware
-/admin/chickens/flock           flocks & headcount log
+/admin/chickens/flock           Chickens: every flock and bird kept by name, on the species-page
+                                shape (decision 44); add a flock
+/admin/chickens/headcount       the flocks' headcount log and the losses line
+/admin/chickens/flock/[id]      one flock, by name: headcount, eggs this week, coop chores,
+                                one history (headcount · eggs · notes), photos, details
 /admin/chickens/eggs            logs + trends
-/admin/garden/layout            visual designer (beds/rows, rotation warnings)
-/admin/garden/plantings         + care logs
-/admin/garden/seeds
-/admin/garden/harvest           + preservation
+/admin/garden/layout            visual designer (beds/rows, rotation warnings); a bed's row opens
+                                its record under plantings ?tab=beds&bed=
+/admin/garden/plantings         + beds, care logs, season plan; ?tab=beds|care|plan opens a tab,
+                                ?bed=<id> opens that bed's editor
+/admin/garden/seeds             seed box · crops & varieties, with plant search (§5.5) — names
+                                come from the built-in table and GET api/plants/search?q=
+                                (built-in + GBIF, cached, session-checked); how a pick
+                                grows from the table or GET api/plants/growing (Growstuff)
+/admin/garden/harvest           + preservation; ?tab=harvest opens the log
 /admin/equipment                fleet · /admin/equipment/[id] · /admin/equipment/roadmap
 /admin/equipment/candidates     purchase candidates: compare units, true cost, links, decision log
-/admin/pets
-/admin/horses                   what is live and what is coming · /admin/horses/roadmap (active)
-/admin/horses/herd              shell (§5.9) — who is here and what each is like to handle
+/admin/pets/dogs                Dogs, on the species-page shape (decision 44); add a dog
+/admin/pets/dogs/care           Dog care: the dogs' vet visits, medicine and rations (decision 46)
+/admin/pets/cats                Cats, on the species-page shape (decision 44); add a cat
+/admin/pets/cats/care           Cat care: the cats' vet visits, medicine and rations (decision 46)
+/admin/pets/[id]                one dog or cat: what a sitter needs (handling, food, medicine)
+                                first, then shot · medicine · worming · vet · ration · note ·
+                                photo, coming up, one history, photos; slug per lib/animal-slug
+/admin/horses                   Horses, on the species-page shape (decision 44); add a horse
+/admin/horses/roadmap           horse goals and purchases planned (active)
+/admin/horses/[id]              one horse: move · note · photo · edit, coming up, one history,
+                                photos; its slug steps around the section's own views
 /admin/horses/pens              shell — which horse is in which trap
 /admin/horses/feeding           shell — rations, and what a horse costs to keep
 /admin/horses/breeding          shell — covers, foaling dates, what a cross was for
@@ -650,3 +681,15 @@ The point of expressing §4.1 and §4.5 as *executable* checks rather than prose
 **v1.6 additions:**
 
 38. **A pet has no zone** (§5.8). Reported from the field: a dog was dragged into a pen on the property map. The map offered the move because it drew him — a pet has no pen, so his chip sat in the tray of animals not on the map, in among the stock and one gesture from the North Trap. A pen is a fact about grazing, handling and gates, and a dog goes where the family goes, so the placement had nothing true to record. Pets are now absent from every join between an animal and ground: no chip on the map or in its tray, no line on the Pen Board, no head against a pen's capacity, no contribution to a zone's effective safety level, no share of a zone feeding plan. The guide keeps briefing them in the pets' own section, which is where §5.10's reader looks. The filter is on **placements, not animals**, and it is read-side: rows an earlier mis-drag wrote stop counting rather than being deleted, so §5.1's append-only history stays intact and no migration is needed.
+
+**v1.7 additions:**
+
+39. **The admin is light unless a device chooses otherwise** (§8, amends 37). The owners prefer daylight on the admin, on the phone as well as the laptop, so `/admin` now renders `flying-day` and Settings offers Light, Dark or Match device. The choice is kept on the device and never syncs: two people share the farm, and the phone in the barn and the laptop in the house can sensibly differ. A boot script applies a stored choice before first paint, so a device set to dark does not flash white. `/kiosk` and `/sitter` still follow the device under 37.
+40. **Weather work is decided by the forecast, and done from the chore list** (§5.1, §6). A tank cover that is off is not by itself a job: Today used to list the covers every day, and people learned to scroll past them. Covers now appear only the day before a freeze the forecast shows, ice checks only on a freezing day, and garden cover only on a frost night with plantings in the ground — as chores, on Today, the kiosk, the Chores screen and the housesitter's list alike, so they are ticked where the rest of the round is. Forecast days are matched by calendar date, not instant, because a bare forecast date reads as the previous evening west of Greenwich.
+41. **Every page reached by a step has a step back** (§8). The admin layout draws "‹ <previous page>" above any page that was not reached by changing tab. A tab change starts the trail afresh, as in any phone app; moving along a section strip replaces the current step rather than adding one; a page opened cold falls back to the list it sits under, or to More. The Log's Close and Done return to the page it was opened from (`?from=`).
+42. **Pets, horses and flocks have their own pages, like cattle** (§5.8, §5.9, §5.4, §7). The Animals list opens every animal onto its own record page, laid out the same way: who it is, the things people do to it as big buttons, what is coming up, one history, then the details behind one link.
+43. **Photos upload through the app, not straight to the bucket** (§4.2, amends its presigned PUT). A browser PUT to R2 is cross-origin and needs a bucket CORS rule for every origin the app is served from — the farm's domain, each deploy preview, a laptop — and with none in place every photo sat queued on the phone and never arrived. `/api/storage/presign` still names the key, but now hands back `/api/storage/upload`, which checks the same rules (a writer, the caller's own property's prefix, a photograph, the size limit) and forwards the bytes server to server. A photo is compressed to about 300 KB on the device first, so the second hop costs little. Reads stay signed bucket URLs, which an `<img>` loads without CORS. The photo buttons no longer force the camera, so a picture already on the phone can be chosen too.
+44. **Every species has a page of its own, laid out the same way** (§7, §8). Cattle, Horses, Chickens, Dogs and Cats each open on the herd page's shape: the head count, search, Filter & group, the species' classes as chips, a list opening each animal's own page, and Add — the species' existing add form, so there is one way to write each. The species' tools (breeding, feeding, pens, eggs, headcount, vet and medicine) follow in the strip above, as cattle's do. Horses, Chickens, Dogs and Cats are one component (the Animals list with one species in it), so they cannot drift apart. On the Animals list each species chip opens that page rather than filtering in place. Dogs and cats are separate pages; their vet, medicine and feeding stay together on Pet care.
+45. **The Animals tab reopens the species last looked at, and each species page is its own** (§8, amends 44). Getting to a species was awkward: a strip of species tabs that scrolled off a phone's edge. The title of every animal page is now the switcher — "Cattle ▾" opens the five species with their counts and Every animal — and the Animals tab reopens whichever was chosen last on that device (kept in localStorage, never synced). The species strip is gone; the strip under the title is the species' own tools. Each species page leads with its own facts and jobs: cattle with due to calve, calves to wean, withdrawals and Treat/Weigh/Move/Heat; horses with turnout and handling, and Move/Note/Feeding/Pens; chickens with eggs today and this week, birds and losses, and Eggs/Headcount/Feeding/Trends; dogs and cats with shots and medicine overdue or due, rations missing, and Medicine/Feeding/Note/Rations. Rows say what matters for the species — a pet's next shot, a horse to handle with care, a flock's eggs today.
+46. **Pets are moved like any animal, care is per species, and a day count stops at the calving** (§5.1, §5.8, amends 44). Dogs and cats can be moved to a pen or pasture and into a barn — a livestock guardian dog lives with the flock, barn cats live in the barn — so Move takes them and a pet's page says where it is. Dog care and Cat care replace the shared Pet care page, each in its own species' strip (`/admin/pets` redirects to Dog care). How many days along a cow is stops at her calving ("calved at day 281") and shows nothing after a preg check finds her open, rather than counting up from the service for ever.
+47. **A plant pick fills in how it grows** (§5.5). Picking "Tomato" filled the name and family and left everything a gardener plants by blank. Crops now carry typical days to maturity and spacing, season, sun, sowing, lifecycle and depth (migration 0040, all nullable), filled from a built-in table or Growstuff and editable. The variety keeps its own days and spacing — the packet is the authority — and only starts from the crop's.

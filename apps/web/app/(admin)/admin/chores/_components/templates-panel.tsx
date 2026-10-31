@@ -3,11 +3,8 @@
 import { useState } from "react";
 
 import {
-  Badge,
   Button,
-  Card,
   Checkbox,
-  DataTable,
   EmptyState,
   Modal,
   Pill,
@@ -16,9 +13,10 @@ import {
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import {
+  CHORE_WEATHER,
+  CHORE_WEATHER_LABELS,
   choreTemplateSchema,
   displayName,
   occurrencesInWindow,
@@ -28,6 +26,7 @@ import {
   TIMES_OF_DAY,
   type Animal,
   type ChoreTemplate,
+  type ChoreWeather,
   type Recurrence,
   type TimeOfDay,
   type Ulid,
@@ -74,6 +73,8 @@ interface Draft {
   readonly monthDays: string;
   /** `""` means the whole day, the same as the field being absent. */
   readonly timeOfDay: string;
+  /** `""` means any weather — the recurrence alone decides. */
+  readonly weather: string;
   readonly zoneId: string;
   readonly animalId: string;
   readonly active: boolean;
@@ -86,6 +87,7 @@ const BLANK: Draft = {
   weekdays: [],
   monthDays: "",
   timeOfDay: "",
+  weather: "",
   zoneId: "",
   animalId: "",
   active: true,
@@ -133,6 +135,7 @@ export function TemplatesPanel({
       weekdays: template.recurrence === "weekly" ? template.recurrenceDays : [],
       monthDays: template.recurrence === "monthly" ? template.recurrenceDays.join(", ") : "",
       timeOfDay: template.timeOfDay ?? "",
+      weather: template.weather ?? "",
       zoneId: template.zoneId ?? "",
       animalId: template.animalId ?? "",
       active: template.active,
@@ -166,6 +169,8 @@ export function TemplatesPanel({
       // Explicit rather than omitted when blank, so editing a template back
       // to "any time" actually clears the field in the patch that travels.
       timeOfDay: draft.timeOfDay === "" ? undefined : (draft.timeOfDay as TimeOfDay),
+      // The same: editing back to "any weather" has to clear it.
+      weather: draft.weather === "" ? undefined : (draft.weather as ChoreWeather),
       ...(draft.detail.trim() === "" ? {} : { detail: draft.detail.trim() }),
       ...(draft.zoneId === "" ? {} : { zoneId: draft.zoneId as Ulid }),
       ...(draft.animalId === "" ? {} : { animalId: draft.animalId as Ulid }),
@@ -224,94 +229,33 @@ export function TemplatesPanel({
 
   const today = startOfDay(new Date());
 
-  const columns: readonly Column<ChoreTemplate>[] = [
-    {
-      key: "title",
-      header: "Chore",
-      render: (template) => (
-        <span className="flex flex-col gap-0.5">
-          <span className={template.active ? "text-ink" : "text-muted"}>{template.title}</span>
-          {template.detail === undefined ? null : (
-            <span className="text-sm text-muted">{template.detail}</span>
-          )}
-        </span>
-      ),
-    },
-    {
-      key: "recurrence",
-      header: "When",
-      render: (template) => (
-        <span className="flex flex-col gap-1">
-          <span className="flex flex-wrap gap-1">
-            <Badge
-              tone={GENERATING_RECURRENCES.includes(template.recurrence) ? "neutral" : "danger"}
-            >
-              {describeRecurrence(template)}
-            </Badge>
-            {template.timeOfDay === undefined ? null : (
-              <Badge>{TIME_OF_DAY_LABELS[template.timeOfDay]}</Badge>
-            )}
-          </span>
-          <span className="text-sm text-muted">
-            {/* What it means in practice, which is easier to check than the
-                rule that produced it. */}
-            {occurrencesInWindow(template, today, 14).length} times in the next fortnight
-          </span>
-        </span>
-      ),
-    },
-    {
-      key: "where",
-      header: "Where",
-      render: (template) => {
-        const labels = [
-          zones.find((zone) => zone.id === template.zoneId)?.name,
-          (() => {
-            const animal = animals.find((candidate) => candidate.id === template.animalId);
-            return animal === undefined ? undefined : displayName(animal);
-          })(),
-        ].filter((label): label is string => label !== undefined);
+  /** The muted line: when it comes round, where, and what that means in practice. */
+  function lineFor(template: ChoreTemplate): string {
+    const animal = animals.find((candidate) => candidate.id === template.animalId);
+    return [
+      describeRecurrence(template),
+      template.timeOfDay === undefined ? undefined : TIME_OF_DAY_LABELS[template.timeOfDay],
+      zones.find((zone) => zone.id === template.zoneId)?.name,
+      animal === undefined ? undefined : displayName(animal),
+      // What the rule means in practice, which is easier to check than the
+      // rule that produced it. A weather template's count depends on a
+      // forecast nobody has yet, so it says what it waits for instead.
+      template.weather === undefined
+        ? `${occurrencesInWindow(template, today, 14).length} in the next fortnight`
+        : `Only ${CHORE_WEATHER_LABELS[template.weather].toLowerCase()}`,
+    ]
+      .filter((part): part is string => part !== undefined)
+      .join(" · ");
+  }
 
-        return labels.length === 0 ? (
-          <span className="text-muted">Anywhere</span>
-        ) : (
-          <span className="flex flex-wrap gap-1">
-            {labels.map((label) => (
-              <Pill key={label} tone="identity">
-                {label}
-              </Pill>
-            ))}
-          </span>
-        );
-      },
-    },
-    {
-      key: "active",
-      header: "On",
-      render: (template) =>
-        template.active ? <Pill tone="calm">Running</Pill> : <Pill>Switched off</Pill>,
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (template) => (
-        <span className="flex gap-2">
-          <Button
-            variant="ghost"
-            onClick={() => void api.update(template.id, { active: !template.active })}
-          >
-            {template.active ? "Switch off" : "Switch on"}
-          </Button>
-          <Button variant="ghost" onClick={() => startEdit(template)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void remove(template)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
+  /** One chip, by exception: switched off, or a rule that never fires. */
+  function chipFor(template: ChoreTemplate) {
+    if (!template.active) return <Pill>Switched off</Pill>;
+    if (!GENERATING_RECURRENCES.includes(template.recurrence)) {
+      return <Pill tone="danger">Never fires</Pill>;
+    }
+    return null;
+  }
 
   const recurrenceOptions = RECURRENCES.filter(
     (recurrence) => GENERATING_RECURRENCES.includes(recurrence) || recurrence === draft?.recurrence,
@@ -319,23 +263,44 @@ export function TemplatesPanel({
 
   return (
     <div className="flex flex-col gap-density">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="max-w-prose text-sm text-muted">
-          Templates are the reason a chore turns up. Switching one off stops it repeating and keeps
-          every chore it already produced.
-        </p>
+      {/* Templates are the reason a chore turns up; switching one off stops
+          it repeating and keeps every chore it already produced. */}
+      <div className="flex justify-end">
         <Button variant="primary" onClick={startCreate}>
-          Add a template
+          <span aria-hidden="true">+</span> Add template
         </Button>
       </div>
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
-          size="wide"
+          placement="side"
           title={editing === undefined ? "New template" : `Editing ${editing.title}`}
-          description="A job that comes round on its own — feeding, checking water, cleaning a coop."
+          description="A job that comes round on its own."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Add template" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                // Closed first, so the confirmation is the only dialog.
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const template = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(template);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
             <TextInput
@@ -348,7 +313,7 @@ export function TemplatesPanel({
             <TextArea
               label="Detail"
               rows={3}
-              hint="Anything a housesitter would need to know to do it right."
+              hint="What a housesitter would need to do it right."
               value={draft.detail}
               onChange={(event) => setDraft({ ...draft, detail: event.target.value })}
             />
@@ -358,7 +323,7 @@ export function TemplatesPanel({
               options={recurrenceOptions}
               value={draft.recurrence}
               error={errors["recurrence"]}
-              hint="A one-off is a chore rather than a template — add it on the Today tab, on the day it belongs to."
+              hint="A one-off is a chore — add it on the day it belongs to."
               onChange={(event) =>
                 setDraft({ ...draft, recurrence: event.target.value as Recurrence })
               }
@@ -403,7 +368,7 @@ export function TemplatesPanel({
                 label="Which days of the month"
                 value={draft.monthDays}
                 placeholder="1, 15"
-                hint="Days 1 to 31, separated by commas. A month that is short simply skips the day."
+                hint="1 to 31, comma separated. A short month skips the day."
                 error={errors["recurrenceDays"]}
                 onChange={(event) => setDraft({ ...draft, monthDays: event.target.value })}
               />
@@ -413,7 +378,7 @@ export function TemplatesPanel({
               label="Time of day"
               value={draft.timeOfDay}
               error={errors["timeOfDay"]}
-              hint="Named, the chore counts late once that part of the day has passed — the same clock the feeding rounds keep."
+              hint="Named, it counts late once that part of the day has passed."
               options={[
                 { value: "", label: "Any time — due by the end of the day" },
                 ...TIMES_OF_DAY.map((timeOfDay) => ({
@@ -422,6 +387,21 @@ export function TemplatesPanel({
                 })),
               ]}
               onChange={(event) => setDraft({ ...draft, timeOfDay: event.target.value })}
+            />
+
+            <Select
+              label="Only when"
+              value={draft.weather}
+              error={errors["weather"]}
+              hint="Waits for the forecast — covers before a freeze, hay in before rain, tarps down before a wind. A “before” chore is due before the weather arrives."
+              options={[
+                { value: "", label: "Any weather" },
+                ...CHORE_WEATHER.map((weather) => ({
+                  value: weather,
+                  label: CHORE_WEATHER_LABELS[weather],
+                })),
+              ]}
+              onChange={(event) => setDraft({ ...draft, weather: event.target.value })}
             />
 
             <Select
@@ -449,40 +429,61 @@ export function TemplatesPanel({
 
             <Checkbox
               label="Running"
-              hint="Switched off, it stops generating chores and keeps the ones it already made."
+              hint="Off stops new chores and keeps the ones it made."
               checked={draft.active}
               onChange={(event) => setDraft({ ...draft, active: event.target.checked })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Add template" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}
 
-      <Card>
-        <DataTable
-          caption="Chore templates"
-          columns={columns}
-          rows={templates}
-          rowKey={(template) => template.id}
-          empty={
-            <EmptyState
-              title="No templates yet"
-              detail="Feeding, water checks, cleaning out a coop — anything that comes round on its own belongs here, and then it turns up on the day by itself."
-              action={
-                <Button variant="primary" onClick={startCreate}>
-                  Add the first template
-                </Button>
-              }
-            />
+      {templates.length === 0 ? (
+        <EmptyState
+          title="No templates yet"
+          detail="Feeding, water checks, cleaning a coop — anything that comes round on its own."
+          action={
+            <Button variant="primary" onClick={startCreate}>
+              Add the first template
+            </Button>
           }
         />
-      </Card>
+      ) : (
+        <ul
+          aria-label="Chore templates"
+          className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
+        >
+          {templates.map((template) => (
+            <li key={template.id} className="flex items-center bg-panel">
+              {/* The row opens the editor, where delete is. */}
+              <button
+                type="button"
+                onClick={() => startEdit(template)}
+                className="flex min-h-[60px] min-w-0 flex-1 items-center gap-3 py-2 pl-4 pr-2 text-left hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
+              >
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span
+                    className={`truncate font-semibold ${template.active ? "text-ink" : "text-muted"}`}
+                  >
+                    {template.title}
+                  </span>
+                  <span className="truncate text-sm text-muted">{lineFor(template)}</span>
+                </span>
+                {chipFor(template)}
+              </button>
+              {/* Switching is the everyday change — "not while it's raining"
+                  — so it stays one tap from the list, beside the row. */}
+              <Button
+                variant="ghost"
+                className="mr-1 shrink-0"
+                aria-label={`${template.active ? "Switch off" : "Switch on"} ${template.title}`}
+                onClick={() => void api.update(template.id, { active: !template.active })}
+              >
+                {template.active ? "Switch off" : "Switch on"}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -1,22 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import {
   Button,
-  Card,
-  DataTable,
   EmptyState,
   Modal,
-  Section,
   Select,
-  StatRow,
   TextArea,
-  Tile,
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import {
   addCalendarDays,
@@ -36,6 +30,7 @@ import {
   type EggDispositionKind,
 } from "@galaxy-farm/module-poultry";
 
+import { ListRow, RowList } from "@/app/(admin)/admin/horses/_components/list-row";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -111,6 +106,9 @@ export function DispositionsPanel({
   const [editDraft, setEditDraft] = useState<Draft | undefined>();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  /** Whether the log form is open. It is a side panel, so the list stays put. */
+  const [logging, setLogging] = useState(false);
+  const formId = useId();
 
   // Whole days to the end of today: an entry dated today is stored at midday,
   // and a window ending at this instant would leave this morning's out.
@@ -229,90 +227,110 @@ export function DispositionsPanel({
     });
   }
 
-  const columns: readonly Column<EggDisposition>[] = [
-    {
-      key: "when",
-      header: "When",
-      primary: true,
-      render: (entry) => formatDate(entry.disposedOn),
-    },
-    { key: "kind", header: "What happened", render: (entry) => KIND_LABEL[entry.kind] },
-    { key: "quantity", header: "Eggs", numeric: true, render: (entry) => entry.quantity },
-    { key: "who", header: "Who", render: (entry) => contactName(entry.contactId) ?? "—" },
-    {
-      key: "price",
-      header: "Brought",
-      numeric: true,
-      render: (entry) => (entry.price === undefined ? "—" : formatMoney(entry.price)),
-    },
-    { key: "notes", header: "Note", render: (entry) => entry.notes ?? "—" },
-    {
-      key: "actions",
-      header: "",
-      render: (entry) => (
-        <span className="flex gap-2">
-          <Button variant="ghost" onClick={() => startEdit(entry)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void removeEntry(entry)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
-
   const history = [...dispositions].sort(
     (left, right) => right.disposedOn.getTime() - left.disposedOn.getTime(),
   );
 
   if (loading) return <p className="text-muted">Loading dispositions…</p>;
 
+  /**
+   * The thirty days, as one line of facts. What is left in the basket is in
+   * the screen's header rather than here — this is the thirty days, not the
+   * balance, and the two would be read as the same window.
+   */
+  const month30 = [
+    `${byKind.get("kept") ?? 0} kept`,
+    `${byKind.get("given") ?? 0} given`,
+    `${byKind.get("sold") ?? 0} sold`,
+    `${formatMoney(revenue)} brought in`,
+  ].join(" · ");
+
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title="Last 30 days"
-        description="Kept, given and sold, and what the sold ones brought."
-      >
-        <Card>
-          <StatRow>
-            <Tile label="Kept" value={byKind.get("kept") ?? 0} hint="Into the house" />
-            <Tile label="Given" value={byKind.get("given") ?? 0} hint="To whoever was passing" />
-            <Tile label="Sold" value={byKind.get("sold") ?? 0} />
-            {/* What is left is the tile at the top of the screen rather than a
-                fifth stat here — this section is the thirty days, not the
-                balance, and the two would be read as the same window. */}
-            <Tile label="Brought in" value={formatMoney(revenue)} emphasis />
-          </StatRow>
-        </Card>
-      </Section>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted">Last 30 days: {month30}</p>
+        <Button
+          variant="primary"
+          onClick={() => {
+            setErrors({});
+            setLogging(true);
+          }}
+        >
+          <span aria-hidden="true">+</span> Log where some went
+        </Button>
+      </div>
 
-      <Section
-        title="Log where some went"
-        description="Optional, and deliberately small: a date, a count, and one of three things that happened to them."
-      >
-        <form onSubmit={(event) => void record(event)} className="flex flex-col gap-density">
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-5">
-            <TextInput
-              label="When"
-              type="date"
-              required
-              value={draft.disposedOn}
-              error={errors["disposedOn"]}
-              onChange={(event) => setDraft({ ...draft, disposedOn: event.target.value })}
+      {history.length === 0 ? (
+        <EmptyState
+          title="Nothing logged"
+          detail="Optional. Log the ones sold or given away and the basket starts telling the truth."
+        />
+      ) : (
+        <RowList label="Egg dispositions">
+          {history.map((entry) => (
+            <ListRow
+              key={entry.id}
+              lead={entry.quantity}
+              title={KIND_LABEL[entry.kind]}
+              line={[
+                formatDate(entry.disposedOn),
+                contactName(entry.contactId),
+                entry.price === undefined ? undefined : formatMoney(entry.price),
+                entry.notes,
+              ]}
+              label={`Edit ${KIND_LABEL[entry.kind]} ${entry.quantity}, ${formatDate(entry.disposedOn)}`}
+              onOpen={() => startEdit(entry)}
             />
-            <TextInput
-              label="How many"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              step={1}
-              numeric
-              required
-              value={draft.quantity}
-              error={errors["quantity"]}
-              onChange={(event) => setDraft({ ...draft, quantity: event.target.value })}
-            />
+          ))}
+        </RowList>
+      )}
+
+      {/*
+        Optional, and deliberately small: a date, a count, and one of three
+        things that happened to them. It stays open after each entry — a
+        dozen to the neighbour is usually followed by a dozen to somebody else.
+      */}
+      {!logging ? null : (
+        <Modal
+          placement="side"
+          title="Log where some went"
+          onClose={() => setLogging(false)}
+          footer={
+            <>
+              <Button type="submit" form={formId} variant="primary" busy={busy}>
+                Log it
+              </Button>
+              <Button onClick={() => setLogging(false)}>Done</Button>
+            </>
+          }
+        >
+          <form
+            id={formId}
+            onSubmit={(event) => void record(event)}
+            className="flex flex-col gap-density"
+          >
+            <div className="grid grid-cols-2 gap-density">
+              <TextInput
+                label="When"
+                type="date"
+                required
+                value={draft.disposedOn}
+                error={errors["disposedOn"]}
+                onChange={(event) => setDraft({ ...draft, disposedOn: event.target.value })}
+              />
+              <TextInput
+                label="How many"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1}
+                numeric
+                required
+                value={draft.quantity}
+                error={errors["quantity"]}
+                onChange={(event) => setDraft({ ...draft, quantity: event.target.value })}
+              />
+            </div>
             <Select
               label="What happened"
               value={draft.kind}
@@ -356,51 +374,48 @@ export function DispositionsPanel({
               error={errors["price"]}
               onChange={(event) => setDraft({ ...draft, price: event.target.value })}
             />
-          </div>
-
-          <TextArea
-            label="Note"
-            rows={2}
-            value={draft.notes}
-            error={errors["notes"]}
-            onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-          />
-
-          <div>
-            <Button type="submit" variant="primary" busy={busy}>
-              Log it
-            </Button>
-          </div>
-        </form>
-      </Section>
-
-      <Section title="Everything logged">
-        <Card>
-          <DataTable
-            caption="Egg dispositions"
-            columns={columns}
-            rows={history}
-            rowKey={(entry) => entry.id}
-            empty={
-              <EmptyState
-                title="Nothing logged"
-                detail="This is optional — eggs can be collected without ever saying where they went. Log the ones that were sold or given away and the basket starts telling the truth."
-              />
-            }
-          />
-        </Card>
-      </Section>
+            <TextArea
+              label="Note"
+              rows={2}
+              value={draft.notes}
+              error={errors["notes"]}
+              onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
+            />
+          </form>
+        </Modal>
+      )}
 
       {editDraft === undefined || editing === undefined ? null : (
         <Modal
           key={editing.id}
-          size="wide"
+          placement="side"
           title={`Editing ${KIND_LABEL[editing.kind]} ${editing.quantity}`}
-          description="Correct the count, the day, who they went to, or what they brought."
+          description="Correct the count, the day, who, or what they brought."
           onClose={closeEdit}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void saveEdit()}>
+                Save changes
+              </Button>
+              <Button onClick={closeEdit}>Cancel</Button>
+              <Button
+                variant="danger"
+                className="ml-auto"
+                onClick={() => {
+                  // The editor closes first, so the confirmation is the
+                  // only dialog on screen.
+                  const entry = editing;
+                  closeEdit();
+                  void removeEntry(entry);
+                }}
+              >
+                Delete
+              </Button>
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-density">
               <TextInput
                 label="When"
                 type="date"
@@ -419,43 +434,42 @@ export function DispositionsPanel({
                 error={errors["quantity"]}
                 onChange={(event) => setEditDraft({ ...editDraft, quantity: event.target.value })}
               />
-              <Select
-                label="What happened"
-                value={editDraft.kind}
-                options={KIND_OPTIONS}
-                error={errors["kind"]}
-                onChange={(event) =>
-                  setEditDraft({
-                    ...editDraft,
-                    kind: event.target.value as EggDispositionKind,
-                    price: event.target.value === "sold" ? editDraft.price : "",
-                  })
-                }
-              />
-              <Select
-                label="Who"
-                options={[
-                  { value: "", label: "Nobody in particular" },
-                  ...contacts.map((contact) => ({ value: contact.id, label: contact.name })),
-                ]}
-                value={editDraft.contactId}
-                error={errors["contactId"]}
-                onChange={(event) => setEditDraft({ ...editDraft, contactId: event.target.value })}
-              />
-              <TextInput
-                label="What it brought ($)"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min={0}
-                numeric
-                disabled={editDraft.kind !== "sold"}
-                value={editDraft.price}
-                error={errors["price"]}
-                onChange={(event) => setEditDraft({ ...editDraft, price: event.target.value })}
-              />
             </div>
-
+            <Select
+              label="What happened"
+              value={editDraft.kind}
+              options={KIND_OPTIONS}
+              error={errors["kind"]}
+              onChange={(event) =>
+                setEditDraft({
+                  ...editDraft,
+                  kind: event.target.value as EggDispositionKind,
+                  price: event.target.value === "sold" ? editDraft.price : "",
+                })
+              }
+            />
+            <Select
+              label="Who"
+              options={[
+                { value: "", label: "Nobody in particular" },
+                ...contacts.map((contact) => ({ value: contact.id, label: contact.name })),
+              ]}
+              value={editDraft.contactId}
+              error={errors["contactId"]}
+              onChange={(event) => setEditDraft({ ...editDraft, contactId: event.target.value })}
+            />
+            <TextInput
+              label="What it brought ($)"
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min={0}
+              numeric
+              disabled={editDraft.kind !== "sold"}
+              value={editDraft.price}
+              error={errors["price"]}
+              onChange={(event) => setEditDraft({ ...editDraft, price: event.target.value })}
+            />
             <TextArea
               label="Note"
               rows={3}
@@ -463,13 +477,6 @@ export function DispositionsPanel({
               error={errors["notes"]}
               onChange={(event) => setEditDraft({ ...editDraft, notes: event.target.value })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void saveEdit()}>
-                Save changes
-              </Button>
-              <Button onClick={closeEdit}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}

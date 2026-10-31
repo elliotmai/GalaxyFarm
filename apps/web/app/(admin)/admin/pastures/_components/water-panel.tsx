@@ -1,17 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   Button,
-  Callout,
-  CardGrid,
   Checkbox,
   EmptyState,
   Modal,
-  Pill,
-  RecordCard,
-  Section,
   Select,
   TextArea,
   TextInput,
@@ -32,6 +27,17 @@ import {
 } from "@galaxy-farm/core";
 
 import { useMutations } from "@/lib/local/mutations";
+
+import {
+  AddAction,
+  ChipGroup,
+  FilteredLine,
+  LandRow,
+  RowAction,
+  RowList,
+  StatusLine,
+  type RowChip,
+} from "./land-kit";
 
 /**
  * The tanks (spec §5.1, §6).
@@ -120,9 +126,25 @@ export function WaterPanel({
   const [editing, setEditing] = useState<WaterSource | undefined>();
   const [draft, setDraft] = useState<Draft | undefined>();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  /** A save in flight: a second tap on Add tank must not add a second tank. */
+  const [busy, setBusy] = useState(false);
 
-  const servedBy = (source: WaterSource) =>
-    zones.filter((zone) => zone.waterSourceIds.includes(source.id));
+  /**
+   * Which zones drink from each tank, worked out once per change of the zones
+   * rather than by a scan of every zone for every row, chip and status line.
+   */
+  const drinkersByTank = useMemo(() => {
+    const byTank = new Map<Ulid, Zone[]>();
+    for (const zone of zones) {
+      for (const id of zone.waterSourceIds) {
+        const list = byTank.get(id);
+        if (list === undefined) byTank.set(id, [zone]);
+        else list.push(zone);
+      }
+    }
+    return byTank;
+  }, [zones]);
+  const servedBy = (source: WaterSource): readonly Zone[] => drinkersByTank.get(source.id) ?? [];
 
   /** What §6 will raise a chore for tonight, and which of those have no heater. */
   const targets = freezeCheckTargets(
@@ -160,7 +182,7 @@ export function WaterPanel({
   }
 
   async function save() {
-    if (draft === undefined) return;
+    if (draft === undefined || busy) return;
 
     const fields = {
       name: draft.name.trim(),
@@ -168,13 +190,15 @@ export function WaterPanel({
       hasHeater: draft.hasHeater,
       cover: draft.cover,
       active: draft.active,
-      ...(draft.notes.trim() === "" ? {} : { notes: draft.notes.trim() }),
+      // Explicitly undefined when emptied: an edit's patch that never
+      // mentioned the notes would leave the old ones standing.
+      notes: draft.notes.trim() === "" ? undefined : draft.notes.trim(),
     };
 
-    const result =
-      editing === undefined
-        ? await mutations.create(fields)
-        : await mutations.update(editing.id, fields);
+    setBusy(true);
+    const result = await (
+      editing === undefined ? mutations.create(fields) : mutations.update(editing.id, fields)
+    ).finally(() => setBusy(false));
 
     if (!result.ok) {
       // §4.5 clause 2: per field, so nobody has to guess which input the
@@ -272,12 +296,17 @@ export function WaterPanel({
       return;
     }
 
-    // Take it off the zones, so nothing is left pointing at a tombstone.
-    for (const zone of drinkers) {
-      await zoneMutations.update(zone.id, {
-        waterSourceIds: zone.waterSourceIds.filter((id) => id !== source.id),
-      });
-    }
+    // Take it off the zones, so nothing is left pointing at a tombstone. Side
+    // by side rather than one after another: each is its own record and its
+    // own patch, and a tank serving six zones should not cost six round trips
+    // to the device store before the toast can say it is done.
+    await Promise.all(
+      drinkers.map((zone) =>
+        zoneMutations.update(zone.id, {
+          waterSourceIds: zone.waterSourceIds.filter((id) => id !== source.id),
+        }),
+      ),
+    );
 
     show({
       message: `${source.name} deleted`,
@@ -289,136 +318,217 @@ export function WaterPanel({
         onAct: () => {
           void (async () => {
             await mutations.restoreRecord(source.id);
-            for (const zone of drinkers) {
-              await zoneMutations.update(zone.id, { waterSourceIds: zone.waterSourceIds });
-            }
+            await Promise.all(
+              drinkers.map((zone) =>
+                zoneMutations.update(zone.id, { waterSourceIds: zone.waterSourceIds }),
+              ),
+            );
           })();
         },
       },
     });
   }
 
+  const [filter, setFilter] = useState("");
+
+  /** The one line under a tank's name: what it is, its cover, what it serves. */
+  function lineFor(source: WaterSource): string {
+    const drinkers = servedBy(source);
+    return [
+      TYPE_LABEL[source.type],
+      COVER_PILL[source.cover ?? "none"],
+      source.hasHeater ? "heated" : undefined,
+      drinkers.length === 0
+        ? "serves nothing"
+        : `serves ${drinkers.map((zone) => zone.name).join(", ")}`,
+    ]
+      .filter((part) => part !== undefined)
+      .join(" · ");
+  }
+
+  /**
+   * The one chip. Stowed first, because nothing else about a tank in the barn
+   * matters tonight; then a cover that is off, which is the job before a
+   * freeze; then a tank in use with nothing over it, which is what the freeze
+   * alert will name.
+   */
+  function chipFor(source: WaterSource): RowChip | undefined {
+    const cover: TankCover = source.cover ?? "none";
+    if (!source.active) return { tone: "neutral", label: "Stowed" };
+    if (cover === "off") return { tone: "action", label: "Cover off" };
+    if (servedBy(source).length > 0 && cover !== "on") return { tone: "danger", label: "Exposed" };
+    return undefined;
+  }
+
+  const stowedCount = water.filter((source) => !source.active).length;
+  const chips = [
+    { key: "", label: "All", count: water.length },
+    { key: "out", label: "Out", count: water.length - stowedCount },
+    ...(stowedCount === 0 ? [] : [{ key: "stowed", label: "Stowed", count: stowedCount }]),
+    ...(toFit.length === 0 ? [] : [{ key: "cover", label: "Cover off", count: toFit.length }]),
+  ];
+  const coverOffIds = new Set(toFit.map((target) => target.waterSource.id));
+  const shown = water.filter((source) =>
+    filter === "out"
+      ? source.active
+      : filter === "stowed"
+        ? !source.active
+        : filter === "cover"
+          ? coverOffIds.has(source.id)
+          : true,
+  );
+
   if (loading) return <p className="text-muted">Loading tanks…</p>;
 
   return (
-    <div className="flex flex-col gap-density">
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
+      {/*
+        What the freeze asks of the tanks, as two lines rather than two boxes
+        of prose. Covers first: that is the job that has to happen the evening
+        before rather than the morning after. The heaterless line is quiet —
+        it is true every day here, and nothing on this place is going to be
+        heated — but it names where the ice-breaking chores will land.
+      */}
       {toFit.length === 0 ? null : (
-        <Callout
-          tone="action"
-          title={`${toFit.length} cover${toFit.length === 1 ? "" : "s"} to put on before a freeze`}
-        >
-          {toFit.map((target) => target.waterSource.name).join(", ")}.{" "}
-          {toFit.length === 1 ? "It has a cover" : "They have covers"} and{" "}
-          {toFit.length === 1 ? "it is" : "they are"} off. This is the job that has to happen the
-          evening before rather than the morning after — put {toFit.length === 1 ? "it" : "them"} on
-          and mark {toFit.length === 1 ? "it" : "them"} covered here.
-        </Callout>
+        <StatusLine tone="action">
+          <span className="font-semibold">
+            {toFit.length} cover{toFit.length === 1 ? "" : "s"} to put on before a freeze:
+          </span>{" "}
+          {toFit.map((target) => target.waterSource.name).join(", ")}
+        </StatusLine>
       )}
-
       {vulnerable.length === 0 ? null : (
-        <Callout tone="danger" title={`${vulnerable.length} in use with no heater`}>
-          {vulnerable.map((target) => target.waterSource.name).join(", ")} —{" "}
-          {vulnerable.length === 1 ? "this is the tank" : "these are the tanks"} §6 names in the
-          freeze alert, and {vulnerable.length === 1 ? "it is" : "they are"} where the ice-breaking
-          chores land on a hard-freeze morning. A cover slows the ice; it does not stop it, so the
-          morning walk still happens.
-        </Callout>
+        <p className="text-sm text-muted">
+          No heater, in use: {vulnerable.map((target) => target.waterSource.name).join(", ")} — the
+          freeze-morning chores land here.
+        </p>
       )}
 
-      <Section
-        title="Tanks"
-        description="One record per tank, not per zone — tanks are shared, and a chore list that sends someone to the same trough twice stops being read."
-        actions={
-          <Button variant="primary" onClick={startCreate}>
-            Add a tank
-          </Button>
-        }
-      >
-        {water.length === 0 ? (
-          <EmptyState
-            title="No water sources yet"
-            detail="Add the tanks first, then tick them on the zones that drink from them."
-            action={
-              <Button variant="primary" onClick={startCreate}>
-                Add the first tank
-              </Button>
-            }
-          />
-        ) : (
-          <CardGrid columns={3}>
-            {water.map((source) => {
-              const drinkers = servedBy(source);
-              const cover: TankCover = source.cover ?? "none";
-              // What the freeze alert will say about it: in use, serving
-              // something, and with nothing over it.
-              const exposed = source.active && drinkers.length > 0 && cover !== "on";
+      {water.length === 0 ? null : (
+        <div className="flex items-center justify-between gap-density">
+          <div className="min-w-0 flex-1">
+            <ChipGroup label="Filter tanks" chips={chips} value={filter} onChange={setFilter} />
+          </div>
+          <AddAction label="Add tank" onClick={startCreate} />
+        </div>
+      )}
 
-              return (
-                <RecordCard
-                  key={source.id}
-                  tone={!source.active ? "neutral" : exposed ? "danger" : "calm"}
-                  title={source.name}
-                  subtitle={TYPE_LABEL[source.type]}
-                  actions={
-                    <Pill tone={source.active ? "calm" : "neutral"} dot={!source.active}>
-                      {source.active ? "out" : "stowed"}
-                    </Pill>
-                  }
-                  meta={
-                    <>
-                      <Pill
-                        tone={cover === "on" ? "calm" : cover === "off" ? "action" : "neutral"}
-                        dot={cover === "off"}
-                      >
-                        {COVER_PILL[cover]}
-                      </Pill>
-                      {source.hasHeater ? <Pill tone="calm">heated</Pill> : null}
-                      <Pill tone="neutral">
-                        {drinkers.length === 0
-                          ? "serves nothing"
-                          : `serves ${drinkers.map((zone) => zone.name).join(", ")}`}
-                      </Pill>
-                    </>
-                  }
-                >
-                  {source.notes === undefined ? null : (
-                    <p className="text-sm text-muted">{source.notes}</p>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    {cover === "none" ? null : (
-                      <Button variant="ghost" onClick={() => void toggleCover(source)}>
-                        {cover === "on" ? "Take the cover off" : "Put the cover on"}
-                      </Button>
-                    )}
-                    <Button variant="ghost" onClick={() => void toggleActive(source)}>
-                      {source.active ? "Stow it" : "Put it out"}
-                    </Button>
-                    <Button variant="ghost" onClick={() => startEdit(source)}>
-                      Edit
-                    </Button>
-                    <Button variant="ghost" onClick={() => void removeSource(source)}>
-                      Delete
-                    </Button>
-                  </div>
-                </RecordCard>
-              );
-            })}
-          </CardGrid>
-        )}
-      </Section>
+      <FilteredLine
+        shown={shown.length}
+        total={water.length}
+        labels={filter === "" ? [] : [chips.find((chip) => chip.key === filter)?.label ?? ""]}
+        onClear={() => setFilter("")}
+      />
+
+      {water.length === 0 ? (
+        <EmptyState
+          title="No water sources yet"
+          detail="Add the tanks first, then tick them on the zones that drink from them."
+          action={
+            <Button variant="primary" onClick={startCreate}>
+              Add the first tank
+            </Button>
+          }
+        />
+      ) : (
+        /*
+         * One record per tank, not per zone — tanks are shared, and a chore
+         * list that sends someone to the same trough twice stops being read.
+         */
+        <RowList label="Tanks">
+          {shown.map((source) => {
+            const cover: TankCover = source.cover ?? "none";
+            return (
+              <LandRow
+                key={source.id}
+                title={source.name}
+                openLabel={`Edit ${source.name}`}
+                line={lineFor(source)}
+                chip={chipFor(source)}
+                quiet={!source.active}
+                onOpen={() => startEdit(source)}
+                // The cover is the one-tap job, when there is one to move. A
+                // tank with no cover keeps the other one-tap job — out or in.
+                action={
+                  cover === "none" ? (
+                    <RowAction
+                      label={source.active ? `Stow ${source.name}` : `Put ${source.name} out`}
+                      onClick={() => void toggleActive(source)}
+                    >
+                      {source.active ? "Stow" : "Put out"}
+                    </RowAction>
+                  ) : (
+                    <RowAction
+                      label={
+                        cover === "on"
+                          ? `Take the cover off ${source.name}`
+                          : `Put the cover on ${source.name}`
+                      }
+                      onClick={() => void toggleCover(source)}
+                    >
+                      {cover === "on" ? "Uncover" : "Cover"}
+                    </RowAction>
+                  )
+                }
+              />
+            );
+          })}
+        </RowList>
+      )}
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
+          placement="side"
           title={editing === undefined ? "New tank" : `Editing ${editing.name}`}
           description="A trough, a tank, a pond — anywhere the stock drinks."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" busy={busy} onClick={() => void save()}>
+                {editing === undefined ? "Add tank" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                <>
+                  {/* Out or in for a tank with a cover lives here, since the
+                      row's one quick action is the cover. Applied at once,
+                      like the row toggle, and the editor closes behind it. */}
+                  {(editing.cover ?? "none") === "none" ? null : (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        const source = editing;
+                        setDraft(undefined);
+                        setEditing(undefined);
+                        void toggleActive(source);
+                      }}
+                    >
+                      {editing.active ? "Stow it" : "Put it out"}
+                    </Button>
+                  )}
+                  <Button
+                    variant="danger"
+                    className="ml-auto"
+                    onClick={() => {
+                      const source = editing;
+                      setDraft(undefined);
+                      setEditing(undefined);
+                      void removeSource(source);
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
             <TextInput
               label="Name"
               required
-              hint="Name it for what it serves — &ldquo;Pen 1 / 2nd Pen tank&rdquo; beats &ldquo;Tank 2&rdquo; at six in the morning."
+              hint="Name it for what it serves — &ldquo;Pen 1 / 2nd Pen tank&rdquo;, not &ldquo;Tank 2&rdquo;."
               value={draft.name}
               error={errors["name"]}
               onChange={(event) => setDraft({ ...draft, name: event.target.value })}
@@ -435,18 +545,18 @@ export function WaterPanel({
               label="Cover"
               options={COVER_OPTIONS}
               value={draft.cover}
-              hint="A cover that is off before a hard freeze becomes a chore the evening before."
+              hint="A cover that is off becomes a chore the evening before a freeze."
               onChange={(event) => setDraft({ ...draft, cover: event.target.value as TankCover })}
             />
             <Checkbox
               label="Has a heater"
-              hint="Nothing on this place does. Heaterless tanks are the ones the freeze alert calls out by name."
+              hint="Heaterless tanks are the ones the freeze alert names."
               checked={draft.hasHeater}
               onChange={(event) => setDraft({ ...draft, hasHeater: event.target.checked })}
             />
             <Checkbox
               label="Out and in use"
-              hint="Untick a seasonal tank while it is stowed — a tank that is in raises no chore."
+              hint="Untick while it is stowed — a tank that is in raises no chore."
               checked={draft.active}
               onChange={(event) => setDraft({ ...draft, active: event.target.checked })}
             />
@@ -458,17 +568,8 @@ export function WaterPanel({
               onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
             />
 
-            <p className="text-sm text-muted">
-              Which zones drink from this is set on the zone, where the tanks are ticked — a zone
-              can have more than one.
-            </p>
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Add tank" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
+            {/* Said because the obvious place to look for it is here. */}
+            <p className="text-sm text-muted">Which zones drink from it is ticked on each zone.</p>
           </div>
         </Modal>
       )}

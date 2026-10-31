@@ -35,8 +35,11 @@ vi.mock("@/lib/local/mutations", () => ({
   }),
 }));
 
+/** The query string the screens see — `?dam=` is how a cow's own links arrive. */
+const search = vi.hoisted(() => ({ current: "" }));
+
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(search.current),
   usePathname: () => "/admin/cattle/breeding",
   useRouter: () => ({ push: () => {}, replace: () => {} }),
 }));
@@ -128,6 +131,7 @@ function view(ui: React.ReactElement) {
 }
 
 beforeEach(() => {
+  search.current = "";
   vi.useFakeTimers();
   vi.setSystemTime(IN_WINDOW);
   stored.current = {
@@ -184,6 +188,24 @@ describe("The calving log", () => {
 
     const log = screen.getByRole("table", { name: /Calving records/ });
     expect(within(log).getByText("Not linked")).toBeTruthy();
+  });
+});
+
+describe("The calving form", () => {
+  it("opens on her when the link names her", () => {
+    // Two taps from her profile or the watch card: the link carries the cow,
+    // and the form arrives already open with her chosen.
+    search.current = `dam=${ANDROMEDA.id}`;
+    stored.current = { ...stored.current, calvingRecords: [] };
+    view(<CalvingScreen propertyId={PROPERTY} actorId={ACTOR} />);
+
+    const panel = screen.getByRole("dialog", { name: "Record a calving" });
+    expect((within(panel).getByLabelText(/^Dam\b/) as HTMLSelectElement).value).toBe(ANDROMEDA.id);
+  });
+
+  it("stays closed until asked for otherwise", () => {
+    view(<CalvingScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 

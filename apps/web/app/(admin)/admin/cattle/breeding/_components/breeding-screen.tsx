@@ -1,16 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import {
   Badge,
   Button,
-  Callout,
-  Card,
   DataTable,
-  DetailList,
   EmptyState,
+  Modal,
   PageBody,
   PageHeader,
   Pill,
@@ -18,12 +16,14 @@ import {
   SearchSelect,
   Select,
   StatRow,
+  Tabs,
   Tile,
   TextInput,
   useConfirmDelete,
   useToast,
   type Column,
   type SearchOption,
+  toOptions,
 } from "@galaxy-farm/ui";
 import { asDate, displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -34,6 +34,7 @@ import {
   inferAncestorSexes,
   calvingWindow,
   daysBred,
+  daysCarried,
   drawStraw,
   awaitingCalving,
   groupOf,
@@ -86,6 +87,11 @@ import {
  * when to preg check, and how far along she is today. §2's "derive, don't
  * duplicate", which is also what makes correcting a mistyped breeding date fix
  * every downstream date at once instead of leaving four stale copies.
+ *
+ * The log is the screen's one job, so it leads. Recording a service is the
+ * primary action and opens a side panel rather than a form that pushes the
+ * log down; the pairing planner is a second view, a tab away, because it is
+ * consulted before a breeding rather than every time the page is opened.
  */
 
 /**
@@ -109,6 +115,9 @@ function ordinal(place: number): string {
   const suffix = { 1: "st", 2: "nd", 3: "rd" }[place % 10] ?? "th";
   return `${place}${suffix}`;
 }
+
+const LINK =
+  "font-medium text-ink underline decoration-edge underline-offset-4 hover:decoration-action";
 
 export function BreedingScreen({
   propertyId,
@@ -144,9 +153,14 @@ export function BreedingScreen({
   );
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
-  // The service a re-breeding is answering, so the form can say what failed
-  // without assuming anything about what to try next.
+  // Whether the record panel is open, and — when it is answering a service
+  // that came back open — which one, so the form can say what failed without
+  // assuming anything about what to try next.
+  const [recording, setRecording] = useState(false);
   const [rebreedFrom, setRebreedFrom] = useState<BreedingRecord | undefined>();
+  // The service whose preg check is being entered. A panel rather than two
+  // selects unfolding inside a table row, which widened the row it was in.
+  const [checking, setChecking] = useState<BreedingRecord | undefined>();
 
   const now = new Date();
   const byId = useMemo(() => new Map(animals.map((animal) => [animal.id, animal])), [animals]);
@@ -204,6 +218,21 @@ export function BreedingScreen({
       // needs no scan, and neither does a service her re-breeding answered.
       return due !== undefined && due <= now;
     });
+  const nextDue = breedings
+    .filter((record) => record.pregCheck?.result !== "open")
+    .map((record) => projectedDueDate(record))
+    .filter((due) => due >= now)
+    .sort((left, right) => left.getTime() - right.getTime())[0];
+
+  function startRecording(from?: BreedingRecord) {
+    setRebreedFrom(from);
+    setRecording(true);
+  }
+
+  function stopRecording() {
+    setRecording(false);
+    setRebreedFrom(undefined);
+  }
 
   async function remove(record: BreedingRecord) {
     const dam = damOf(record);
@@ -260,50 +289,43 @@ export function BreedingScreen({
       header: "Dam",
       render: (record) => {
         const dam = damOf(record);
-        return dam === undefined ? (
-          <span className="text-muted">Unknown</span>
-        ) : (
-          <Link
-            href={animalHref(dam)}
-            className="font-medium text-ink underline decoration-edge underline-offset-4 hover:decoration-action"
-          >
-            {displayName(dam)}
-          </Link>
-        );
-      },
-    },
-    {
-      key: "attempt",
-      header: "Service",
-      // Which try this was. Blank for a cow who took the first time, because
-      // "1st of 1" on every row of a log is a column of noise.
-      render: (record) => {
         const attempt = attemptOf(record);
-        if (attempt === undefined || attempt.services.length === 1) {
-          return <span className="text-muted">—</span>;
-        }
-        const place = attempt.services.findIndex((service) => service.id === record.id) + 1;
+        // Which try this was, under her name. Absent for a cow who took the
+        // first time, because "1st of 1" on every row of a log is noise.
+        const place =
+          attempt === undefined || attempt.services.length === 1
+            ? undefined
+            : attempt.services.findIndex((service) => service.id === record.id) + 1;
         return (
-          <span className="text-muted">
-            {ordinal(place)} of {attempt.services.length}
+          <span className="flex flex-col">
+            {dam === undefined ? (
+              <span className="text-muted">Unknown</span>
+            ) : (
+              <Link href={animalHref(dam)} className={LINK}>
+                {displayName(dam)}
+              </Link>
+            )}
+            {place === undefined || attempt === undefined ? null : (
+              <span className="text-sm font-normal text-muted">
+                {ordinal(place)} of {attempt.services.length}
+              </span>
+            )}
           </span>
         );
       },
     },
-    { key: "method", header: "Method", render: (record) => record.method },
     {
       key: "sire",
       header: "Sire",
-      // Worth a column of its own: the sire is half the answer to "what is
-      // this calf", and until there was a field for him he lived in a note
-      // nobody could see from here.
+      // The sire is half the answer to "what is this calf", and until there
+      // was a field for him he lived in a note nobody could see from here. The
+      // method rides along in front of him, since it is how he got there.
       render: (record) => {
         const sire = sireDisplay(record, lookup);
-        return sire === undefined ? (
-          <span className="text-muted">—</span>
-        ) : (
-          <span className="flex items-center gap-2">
-            {sire}
+        return (
+          <span className="flex flex-wrap items-center gap-x-2">
+            <span className="text-muted">{record.method}</span>
+            {sire === undefined ? null : <span>{sire}</span>}
             {record.semenInventoryId === undefined ? null : <Pill tone="neutral">straw</Pill>}
           </span>
         );
@@ -314,18 +336,18 @@ export function BreedingScreen({
       key: "due",
       header: "Due",
       render: (record) => (
-        <span className="[font-variant-numeric:tabular-nums]">
-          {formatDate(projectedDueDate(record))}
-        </span>
+        <span className="gf-numeric">{formatDate(projectedDueDate(record))}</span>
       ),
     },
     {
       key: "day",
       header: "Day",
+      numeric: true,
       // The number the calving-watch alert says out loud.
       render: (record) => {
-        const day = daysBred(record, now);
-        return day < 0 ? "—" : <span className="[font-variant-numeric:tabular-nums]">{day}</span>;
+        // Frozen at the calving: what she carried, not days since the service.
+        const day = daysCarried(record, calvings, now);
+        return day === undefined ? "—" : day;
       },
     },
     {
@@ -381,14 +403,11 @@ export function BreedingScreen({
         }
 
         return (
-          <span className="flex flex-wrap items-center gap-2">
+          <span className="flex flex-wrap items-center gap-x-2">
             {calf === undefined ? (
               <span>Calved</span>
             ) : (
-              <Link
-                href={animalHref(calf)}
-                className="font-medium text-ink underline decoration-edge underline-offset-4 hover:decoration-action"
-              >
+              <Link href={animalHref(calf)} className={LINK}>
                 {displayName(calf)}
               </Link>
             )}
@@ -401,21 +420,14 @@ export function BreedingScreen({
       key: "actions",
       header: "",
       render: (record) => (
-        <span className="flex gap-2">
+        <span className="flex flex-wrap gap-1">
           {attemptOf(record)?.standing.id !== record.id ||
           !needsRebreeding(attemptOf(record) as ServiceGroup<CalvingRecord>) ? null : (
-            <Button
-              onClick={() => {
-                setRebreedFrom(record);
-                // On a phone the form is below the log, so a button that only
-                // changed state under the fold would read as doing nothing.
-                document.getElementById("record-a-breeding")?.scrollIntoView({ block: "start" });
-              }}
-            >
-              Re-breed
-            </Button>
+            <Button onClick={() => startRecording(record)}>Re-breed</Button>
           )}
-          <PregCheckButton record={record} api={breedingsApi} />
+          <Button variant="ghost" onClick={() => setChecking(record)}>
+            {record.pregCheck === undefined ? "Preg check" : "Re-check"}
+          </Button>
           <Button variant="ghost" onClick={() => void remove(record)}>
             Delete
           </Button>
@@ -425,119 +437,166 @@ export function BreedingScreen({
   ];
 
   return (
+    // Bottom clearance on a phone, so the floating button and the tab bar
+    // under it never sit on top of the last row of the log.
     <PageBody>
-      <PageHeader
-        eyebrow="Cattle"
-        title="Breeding"
-        subtitle={`Due dates project at ${DEFAULT_GESTATION_DAYS} days (§12 decision 2), and the calving window opens a fortnight before.`}
-      />
-
-      <StatRow>
-        <Tile label="Bred" value={breedings.length} />
-        <Tile
-          label="In the window"
-          value={watched.length}
-          emphasis={watched.length > 0}
-          hint={watched.length > 0 ? "Watch these" : undefined}
-        />
-        <Tile label="Preg checks due" value={openChecks.length} />
-        <Tile
-          label="To re-breed"
-          value={toRebreed.length}
-          emphasis={toRebreed.length > 0}
-          hint={toRebreed.length > 0 ? "Came back open" : undefined}
-        />
-        <Tile
-          label="Next due"
-          value={
-            breedings.length === 0
-              ? "—"
-              : formatDate(
-                  breedings
-                    .filter((record) => record.pregCheck?.result !== "open")
-                    .map((record) => projectedDueDate(record))
-                    .filter((due) => due >= now)
-                    .sort((left, right) => left.getTime() - right.getTime())[0],
-                )
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <PageHeader
+          eyebrow="Cattle"
+          title="Breeding"
+          subtitle={`${breedings.length} bred · ${DEFAULT_GESTATION_DAYS}-day gestation`}
+          actions={
+            // Hidden on a phone by a wrapper, not a class on the button: the
+            // button's own `inline-flex` wins over a `hidden` passed in.
+            <span className="hidden sm:block">
+              <Button variant="primary" onClick={() => startRecording()}>
+                <span aria-hidden="true">+</span> Record a breeding
+              </Button>
+            </span>
           }
         />
-      </StatRow>
 
-      {watched.length === 0 ? null : (
-        <Section
-          title="In the calving window"
-          description="Due date give or take a fortnight. The weather side of the watch is issue #14."
+        <Tabs
+          label="Breeding views"
+          tabs={[
+            { id: "log", label: "Log" },
+            { id: "plan", label: "Try a pairing" },
+          ]}
         >
-          {watched.map((record) => {
-            const window = calvingWindow(record);
-            const dam = damOf(record);
-            return (
-              <Card key={record.id}>
-                <DetailList
-                  columns={3}
-                  items={[
-                    { label: "Dam", value: dam === undefined ? undefined : displayName(dam) },
-                    { label: "Day of gestation", value: daysBred(record, now) },
-                    { label: "Due", value: formatDate(projectedDueDate(record)) },
-                    { label: "Window opened", value: formatDate(window.from) },
-                    { label: "Window closes", value: formatDate(window.to) },
-                    { label: "Service", value: record.method },
-                  ]}
-                />
-              </Card>
-            );
-          })}
-        </Section>
-      )}
+          {(active) =>
+            active === "plan" ? (
+              /*
+                A view of its own rather than a panel above the form. The
+                questions it answers — what the calf will be, what colour, how
+                close these two are, what the pairing could carry — are asked
+                before the straw is pulled, not every time the log is opened.
+              */
+              <PairingPlanner animals={animals} propertyId={propertyId} />
+            ) : (
+              <div className="flex flex-col gap-density">
+                <StatRow>
+                  <Tile
+                    label="In the window"
+                    value={watched.length}
+                    emphasis={watched.length > 0}
+                    hint={watched.length > 0 ? "Watch these" : undefined}
+                  />
+                  <Tile label="Preg checks due" value={openChecks.length} />
+                  <Tile
+                    label="To re-breed"
+                    value={toRebreed.length}
+                    emphasis={toRebreed.length > 0}
+                    hint={toRebreed.length > 0 ? "Came back open" : undefined}
+                  />
+                  <Tile
+                    label="Next due"
+                    value={breedings.length === 0 ? "—" : formatDate(nextDue)}
+                  />
+                </StatRow>
 
-      {/*
-        The planner sits above the form on purpose. The questions it answers —
-        what the calf will be, what colour, how close these two are, and what
-        the pairing could carry — are the ones somebody wishes they had asked
-        *before* the straw was pulled, and a panel underneath the form is a
-        panel nobody scrolls to.
-      */}
-      <PairingPlanner animals={animals} propertyId={propertyId} />
+                {watched.length === 0 ? null : (
+                  <Section title="In the calving window" description="Due date ± a fortnight.">
+                    <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
+                      {watched.map((record) => {
+                        const window = calvingWindow(record);
+                        const dam = damOf(record);
+                        return (
+                          <li key={record.id} className="flex flex-col gap-0.5 px-density py-3">
+                            {dam === undefined ? (
+                              <span className="font-semibold text-muted">Unknown</span>
+                            ) : (
+                              <Link href={animalHref(dam)} className={`${LINK} font-semibold`}>
+                                {displayName(dam)}
+                              </Link>
+                            )}
+                            <span className="text-sm text-muted">
+                              Day {daysBred(record, now)} · due{" "}
+                              {formatDate(projectedDueDate(record))} · window{" "}
+                              {formatDate(window.from)} – {formatDate(window.to)} · {record.method}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </Section>
+                )}
 
-      <div id="record-a-breeding">
-        <Section title="Record a breeding">
-          <AddBreeding
-            dams={dams}
-            sexes={sexes}
-            lookup={lookup}
-            api={breedingsApi}
-            strawsApi={strawsApi}
-            profiles={profiles}
-            rebreedFrom={rebreedFrom}
-            onDone={() => setRebreedFrom(undefined)}
-          />
-        </Section>
+                <Section title="Every breeding">
+                  {loading ? (
+                    <p className="text-muted">Looking…</p>
+                  ) : (
+                    <DataTable
+                      caption="Breeding records"
+                      columns={columns}
+                      // Grouped, not merely sorted: the services of one attempt
+                      // sit together, earliest first, under the most recent
+                      // attempt. A log sorted by date alone scatters a cow's
+                      // three tries across eleven months of other people's rows.
+                      rows={attempts.flatMap((attempt) => attempt.services)}
+                      rowKey={(record) => record.id}
+                      empty={
+                        <EmptyState
+                          title="Nothing bred yet"
+                          detail="The due date, calving window and preg-check reminder all follow from a service."
+                          action={
+                            <Button variant="primary" onClick={() => startRecording()}>
+                              Record the first breeding
+                            </Button>
+                          }
+                        />
+                      }
+                    />
+                  )}
+                </Section>
+              </div>
+            )
+          }
+        </Tabs>
+
+        {/*
+          On a phone the button floats bottom-right, where a thumb already is,
+          and clear of the tab bar. On anything wider it is in the header.
+        */}
+        <button
+          type="button"
+          onClick={() => startRecording()}
+          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
+        >
+          <span aria-hidden="true" className="text-xl leading-none">
+            +
+          </span>
+          Record a breeding
+        </button>
       </div>
 
-      <Section title="Every breeding">
-        {loading ? (
-          <p className="text-muted">Looking…</p>
-        ) : (
-          <Card>
-            <DataTable
-              caption="Breeding records"
-              columns={columns}
-              // Grouped, not merely sorted: the services of one attempt sit
-              // together, earliest first, under the most recent attempt. A log
-              // sorted by date alone scatters a cow's three tries across
-              // eleven months of other people's rows.
-              rows={attempts.flatMap((attempt) => attempt.services)}
-              rowKey={(record) => record.id}
-              empty={
-                <EmptyState
-                  title="Nothing bred yet"
-                  detail="Record a service above and the due date, the calving window and the preg-check reminder all follow from it."
-                />
-              }
-            />
-          </Card>
-        )}
-      </Section>
+      {recording ? (
+        <AddBreeding
+          // A fresh form per service answered, so a re-breed opened straight
+          // after another starts from her and nothing left over.
+          key={rebreedFrom?.id ?? "new"}
+          dams={dams}
+          sexes={sexes}
+          lookup={lookup}
+          api={breedingsApi}
+          strawsApi={strawsApi}
+          profiles={profiles}
+          rebreedFrom={rebreedFrom}
+          onAnswerNothing={() => setRebreedFrom(undefined)}
+          onDone={stopRecording}
+        />
+      ) : null}
+
+      {checking === undefined ? null : (
+        <PregCheckPanel
+          record={checking}
+          damName={(() => {
+            const dam = damOf(checking);
+            return dam === undefined ? "this cow" : displayName(dam);
+          })()}
+          api={breedingsApi}
+          onDone={() => setChecking(undefined)}
+        />
+      )}
     </PageBody>
   );
 }
@@ -560,6 +619,13 @@ function sireOptions(
 
 type Api = ReturnType<typeof useMutations<BreedingRecord>>;
 
+/**
+ * Recording a service, in a side panel (a bottom sheet on a phone).
+ *
+ * The panel unmounts on close, so every opening starts clean — the old inline
+ * form kept the last cow selected between services, which is how a second
+ * breeding gets recorded against the first cow.
+ */
 function AddBreeding({
   dams,
   sexes,
@@ -568,6 +634,7 @@ function AddBreeding({
   strawsApi,
   profiles,
   rebreedFrom,
+  onAnswerNothing,
   onDone,
 }: {
   readonly dams: readonly Animal[];
@@ -580,9 +647,12 @@ function AddBreeding({
   readonly profiles: readonly CattleProfile[];
   /** The service that came back open, when this form is answering one. */
   readonly rebreedFrom?: BreedingRecord | undefined;
+  /** Keeps the panel open but stops it answering the open service. */
+  readonly onAnswerNothing: () => void;
   readonly onDone: () => void;
 }) {
   const { show } = useToast();
+  const formId = useId();
   const [damId, setDamId] = useState("");
   const [method, setMethod] = useState<BreedingMethod>("AI");
   const [sire, setSire] = useState("");
@@ -651,14 +721,12 @@ function AddBreeding({
     if (sireCoat === undefined) {
       blocked.push(
         animalId === undefined && externalId === undefined
-          ? `${named} is not on file — a bull named by hand has no pedigree to work from.`
-          : `Nothing is recorded about ${named}'s colour, and nothing in his pedigree settles it.`,
+          ? `${named} is not on file, so there is no pedigree to work from.`
+          : `Nothing settles ${named}'s colour yet.`,
       );
     }
     if (damCoat === undefined) {
-      blocked.push(
-        "Nothing is recorded about the cow's colour, and nothing in her pedigree settles it.",
-      );
+      blocked.push("Nothing settles the cow's colour yet.");
     }
     if (sireCoat === undefined || damCoat === undefined) return { blocked };
 
@@ -763,8 +831,6 @@ function AddBreeding({
 
       const tank = chosenStraw === undefined ? "" : await drawFromTank(chosenStraw);
 
-      setSire("");
-      setNotes("");
       onDone();
       show({ message: `Bred. Due ${formatDate(projectedDueDate(result.value))}${tank}` });
     } finally {
@@ -773,36 +839,58 @@ function AddBreeding({
   }
 
   const previousSire = rebreedFrom === undefined ? undefined : sireDisplay(rebreedFrom, lookup);
+  const caveats =
+    calfColour === undefined
+      ? []
+      : [...calfColour.blocked, ...(calfColour.prediction?.missing ?? [])];
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-      {rebreedFrom === undefined ? null : (
-        <Callout tone="action" title="Breeding her again">
-          <p>
-            Her {formatDate(rebreedFrom.date)} service ({rebreedFrom.method}
-            {previousSire === undefined ? "" : ` to ${previousSire}`}) came back open. Pick the bull
-            and the method for this one — they do not have to be the same.
-          </p>
-          <span className="mt-2 flex flex-wrap gap-2">
-            {previousSire === undefined ? null : (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setMethod(rebreedFrom.method);
-                  setSire(sireValueOf(rebreedFrom));
-                }}
-              >
-                Same bull and method
+    <Modal
+      title={rebreedFrom === undefined ? "Record a breeding" : "Breeding her again"}
+      placement="side"
+      onClose={onDone}
+      footer={
+        <>
+          {/* Outside the form in the markup, tied to it by `form`, so the
+              footer stays pinned while the fields scroll. */}
+          <Button type="submit" form={formId} variant="primary" busy={busy}>
+            Record breeding
+          </Button>
+          <Button onClick={onDone}>Cancel</Button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        onSubmit={(event) => void submit(event)}
+        className="flex flex-col gap-density"
+      >
+        {rebreedFrom === undefined ? null : (
+          <div className="flex flex-col gap-2 rounded-density bg-raised p-density text-sm">
+            <p className="text-ink">
+              Her {formatDate(rebreedFrom.date)} service ({rebreedFrom.method}
+              {previousSire === undefined ? "" : ` to ${previousSire}`}) came back open. Bull and
+              method can differ this time.
+            </p>
+            <span className="flex flex-wrap gap-2">
+              {previousSire === undefined ? null : (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setMethod(rebreedFrom.method);
+                    setSire(sireValueOf(rebreedFrom));
+                  }}
+                >
+                  Same bull and method
+                </Button>
+              )}
+              <Button variant="ghost" onClick={onAnswerNothing}>
+                Not answering that service
               </Button>
-            )}
-            <Button variant="ghost" onClick={onDone}>
-              Not answering that service
-            </Button>
-          </span>
-        </Callout>
-      )}
+            </span>
+          </div>
+        )}
 
-      <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
         <SearchSelect
           label="Dam"
           value={damId}
@@ -819,16 +907,16 @@ function AddBreeding({
           label="Method"
           value={method}
           onChange={(event) => setMethod(event.target.value as BreedingMethod)}
-          options={BREEDING_METHODS.map((value) => ({ value, label: value }))}
+          options={toOptions(BREEDING_METHODS)}
         />
         <SearchSelect
           label={method === "natural" ? "Bull" : method === "ET" ? "Sire of the embryo" : "Sire"}
           hint={
             method === "natural"
-              ? "Bulls here and on the papers. A leased or neighbour's bull can be typed in."
+              ? "A leased or neighbour's bull can be typed in."
               : method === "ET"
-                ? "The bull on the embryo's papers. Picked, typed, or left out."
-                : "A straw from the tank, a bull on file, or a name typed in — semen you never held and a cow bred at somebody else's place both count."
+                ? "Off the embryo's papers. Can be left out."
+                : "A straw, a bull on file, or a name typed in."
           }
           value={sire}
           placeholder={
@@ -844,81 +932,75 @@ function AddBreeding({
           {...(method === "ET" ? {} : { required: true })}
           clearLabel={method === "ET" ? "Not recorded" : undefined}
         />
-        <TextInput
-          label="Date bred"
-          type="date"
-          value={date}
-          onChange={(event) => setDate(event.target.value)}
-          required
-        />
-        <TextInput
-          label="Gestation days"
-          hint={`Blank uses the ${DEFAULT_GESTATION_DAYS}-day default.`}
-          type="number"
-          value={gestation}
-          onChange={(event) => setGestation(event.target.value)}
-        />
+        {/* What the straw does to the tank, said before it happens. */}
+        {chosenStraw === undefined ? null : (
+          <p className="-mt-2 text-sm text-muted">
+            {chosenStraw.strawsOnHand === 0
+              ? `${chosenStraw.sireName} shows none on hand — the tank count stays put.`
+              : `Draws one straw; ${chosenStraw.strawsOnHand - 1} would be left.`}
+          </p>
+        )}
+        <div className="grid grid-cols-2 gap-density">
+          <TextInput
+            label="Date bred"
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+            required
+          />
+          <TextInput
+            label="Gestation days"
+            hint={`Blank = ${DEFAULT_GESTATION_DAYS}`}
+            type="number"
+            value={gestation}
+            onChange={(event) => setGestation(event.target.value)}
+          />
+        </div>
+        {preview === undefined ? null : (
+          <p className="-mt-2 text-sm text-muted">
+            Due <span className="font-medium text-ink">{formatDate(preview.due)}</span> · window
+            opens {formatDate(preview.opens)}
+          </p>
+        )}
         <TextInput
           label="Notes"
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
           {...(error === undefined ? {} : { error })}
         />
-      </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" busy={busy}>
-          Record breeding
-        </Button>
-        {preview === undefined ? null : (
-          <p className="text-sm text-muted">
-            Due <span className="font-medium text-ink">{formatDate(preview.due)}</span> · window
-            opens {formatDate(preview.opens)}
-          </p>
+        {calfColour === undefined ? null : (
+          <div className="flex flex-col gap-2 border-t border-rule pt-density">
+            <p className="text-sm font-semibold text-ink">What colour the calf can be</p>
+            {calfColour.prediction === undefined ? null : (
+              <ul className="flex flex-wrap gap-2">
+                {calfColour.prediction.outcomes.map((outcome) => (
+                  <li key={outcome.name}>
+                    <Pill tone={outcome.chance === 1 ? "identity" : "neutral"}>
+                      {outcome.name} · {Math.round(outcome.chance * 100)}%
+                    </Pill>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/*
+              Half an answer said to be half an answer, and no answer said to
+              be no answer. A confident-looking list covering one locus is
+              worse than one admitting the other is open, and a blank space is
+              worse than either.
+            */}
+            {caveats.length === 0 ? null : (
+              <ul className="flex flex-col gap-1 text-sm text-muted">
+                {caveats.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
-        {chosenStraw === undefined ? null : (
-          <p className="text-sm text-muted">
-            {chosenStraw.strawsOnHand === 0
-              ? `${chosenStraw.sireName} shows none on hand — the breeding saves and the tank count stays put.`
-              : `Draws one straw of ${chosenStraw.sireName}; ${chosenStraw.strawsOnHand - 1} would be left.`}
-          </p>
-        )}
-      </div>
-
-      {calfColour === undefined ? null : (
-        <Callout
-          tone={calfColour.prediction === undefined ? "neutral" : "identity"}
-          title="What colour the calf can be"
-        >
-          {calfColour.prediction === undefined ? null : (
-            <ul className="flex flex-wrap gap-2">
-              {calfColour.prediction.outcomes.map((outcome) => (
-                <li key={outcome.name}>
-                  <Pill tone={outcome.chance === 1 ? "identity" : "neutral"}>
-                    {outcome.name} · {Math.round(outcome.chance * 100)}%
-                  </Pill>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {/*
-            Half an answer said to be half an answer, and no answer said to be
-            no answer. A confident-looking list covering one locus is worse
-            than one admitting the other is open, and a blank space is worse
-            than either.
-          */}
-          {[...calfColour.blocked, ...(calfColour.prediction?.missing ?? [])].length ===
-          0 ? null : (
-            <ul className="mt-2 flex flex-col gap-1 text-sm">
-              {[...calfColour.blocked, ...(calfColour.prediction?.missing ?? [])].map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          )}
-        </Callout>
-      )}
-    </form>
+      </form>
+    </Modal>
   );
 }
 
@@ -929,9 +1011,18 @@ function AddBreeding({
  * calve, and leaving her on the dashboard for a month teaches people to ignore
  * the card.
  */
-function PregCheckButton({ record, api }: { readonly record: BreedingRecord; readonly api: Api }) {
+function PregCheckPanel({
+  record,
+  damName,
+  api,
+  onDone,
+}: {
+  readonly record: BreedingRecord;
+  readonly damName: string;
+  readonly api: Api;
+  readonly onDone: () => void;
+}) {
   const { show } = useToast();
-  const [openForm, setOpenForm] = useState(false);
   const [result, setResult] = useState<PregCheckResult>("bred");
   const [method, setMethod] = useState<PregCheckMethod>("ultrasound");
 
@@ -939,36 +1030,37 @@ function PregCheckButton({ record, api }: { readonly record: BreedingRecord; rea
     await api.update(record.id, {
       pregCheck: { date: new Date(), result, method },
     } as Partial<BreedingRecord>);
-    setOpenForm(false);
+    onDone();
     show({ message: result === "open" ? "Recorded open" : "Recorded bred" });
   }
 
-  if (!openForm) {
-    return (
-      <Button variant="ghost" onClick={() => setOpenForm(true)}>
-        {record.pregCheck === undefined ? "Preg check" : "Re-check"}
-      </Button>
-    );
-  }
-
   return (
-    <span className="flex flex-wrap items-end gap-2">
+    <Modal
+      title={`${record.pregCheck === undefined ? "Preg check" : "Re-check"} · ${damName}`}
+      description={`Bred ${formatDate(record.date)}. Recorded as today.`}
+      placement="side"
+      onClose={onDone}
+      footer={
+        <>
+          <Button variant="primary" onClick={() => void save()}>
+            Save
+          </Button>
+          <Button onClick={onDone}>Cancel</Button>
+        </>
+      }
+    >
       <Select
         label="Result"
         value={result}
         onChange={(event) => setResult(event.target.value as PregCheckResult)}
-        options={PREG_CHECK_RESULTS.map((value) => ({ value, label: value }))}
+        options={toOptions(PREG_CHECK_RESULTS)}
       />
       <Select
         label="Method"
         value={method}
         onChange={(event) => setMethod(event.target.value as PregCheckMethod)}
-        options={PREG_CHECK_METHODS.map((value) => ({ value, label: value }))}
+        options={toOptions(PREG_CHECK_METHODS)}
       />
-      <Button onClick={() => void save()}>Save</Button>
-      <Button variant="ghost" onClick={() => setOpenForm(false)}>
-        Cancel
-      </Button>
-    </span>
+    </Modal>
   );
 }

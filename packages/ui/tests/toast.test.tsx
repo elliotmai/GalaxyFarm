@@ -104,6 +104,19 @@ describe("ToastProvider", () => {
     expect(screen.getByText("Animal deleted")).toBeInTheDocument();
   });
 
+  it("starts the clock again once the pointer leaves", async () => {
+    // Held for good, a toast brushed past once sat over whatever was beneath
+    // it — on a phone, the confirmation sheet's Delete button.
+    const timers = await raise({ message: "Saved" });
+
+    await userEvent.hover(screen.getByText("Saved"));
+    await userEvent.unhover(screen.getByText("Saved"));
+
+    expect(timers.pending()).toHaveLength(1);
+    timers.advance(DEFAULT_TOAST_MS);
+    expect(screen.queryByText("Saved")).not.toBeInTheDocument();
+  });
+
   it("runs the action and closes when Undo is pressed", async () => {
     const onAct = vi.fn();
     await raise({ message: "Animal deleted", action: { label: "Undo", onAct } });

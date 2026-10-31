@@ -4,12 +4,8 @@ import { useState } from "react";
 
 import {
   Button,
-  CardGrid,
   EmptyState,
   Modal,
-  Pill,
-  RecordCard,
-  Section,
   Select,
   TextArea,
   TextInput,
@@ -25,8 +21,21 @@ import {
   type Variety,
 } from "@galaxy-farm/module-garden";
 
-import { SEED_UNIT_OPTIONS, quantityLabel } from "@/app/(admin)/admin/garden/_components/labels";
-import { varietyLabel } from "@/lib/garden";
+import {
+  SEED_UNIT_OPTIONS,
+  optionalNumber,
+  optionalText,
+  quantityLabel,
+} from "@/app/(admin)/admin/garden/_components/labels";
+import {
+  AddAction,
+  ChipGroup,
+  FilteredLine,
+  LandRow,
+  RowList,
+  StatusLine,
+} from "@/app/(admin)/admin/pastures/_components/land-kit";
+import { byId, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -92,11 +101,7 @@ export function SeedBoxPanel({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const now = new Date();
-  const nameOf = (varietyId: Ulid) =>
-    varietyLabel(
-      varieties.find((variety) => variety.id === varietyId),
-      crops,
-    );
+  const nameOf = (varietyId: Ulid) => varietyLabel(byId(varieties).get(varietyId), crops);
 
   const varietyOptions = [...varieties]
     .map((variety) => ({ value: variety.id, label: varietyLabel(variety, crops) }))
@@ -112,7 +117,7 @@ export function SeedBoxPanel({
     setEditing(entry);
     setDraft({
       varietyId: entry.varietyId,
-      quantity: String(entry.quantity),
+      quantity: entry.quantity === undefined ? "" : String(entry.quantity),
       unit: entry.unit,
       packedForYear: entry.packedForYear === undefined ? "" : String(entry.packedForYear),
       source: entry.source ?? "",
@@ -134,10 +139,11 @@ export function SeedBoxPanel({
     if (draft === undefined) return;
     setErrors({});
 
-    const text = (value: string) => (value.trim() === "" ? undefined : value.trim());
+    const text = optionalText;
     const fields = {
       varietyId: draft.varietyId as Ulid,
-      quantity: draft.quantity.trim() === "" ? Number.NaN : Number(draft.quantity),
+      // Optional: a packet whose count nobody knows is still in the box.
+      quantity: optionalNumber(draft.quantity),
       unit: draft.unit,
       // Explicitly undefined rather than left out: on an edit, a field the
       // patch never mentions keeps its old value, so a year somebody cleared
@@ -176,7 +182,7 @@ export function SeedBoxPanel({
 
     const confirmed = await confirmDelete({
       tier: "standard",
-      recordName: `${quantityLabel(entry.quantity, entry.unit)} of ${label}`,
+      recordName: `${quantityLabel(entry.quantity, entry.unit, "Some")} of ${label}`,
       entity: "seed entry",
       dependents: [],
       consequence: "Nothing else points at it — a planting names the variety, not the packet.",
@@ -199,108 +205,156 @@ export function SeedBoxPanel({
     });
   }
 
+  const [filter, setFilter] = useState("");
+
   if (loading) return <p className="text-muted">Loading the seed box…</p>;
 
-  const sorted = [...seed].sort((left, right) =>
-    nameOf(left.varietyId).localeCompare(nameOf(right.varietyId)),
+  // Named once each, not twice per comparison.
+  const sorted = seed
+    .map((entry) => ({ entry, name: nameOf(entry.varietyId) }))
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map(({ entry }) => entry);
+  const staleCount = seed.filter((entry) => isStaleSeed(entry, now)).length;
+  const emptyCount = seed.filter((entry) => entry.quantity === 0).length;
+  const chips = [
+    { key: "", label: "All", count: seed.length },
+    ...(staleCount === 0 ? [] : [{ key: "stale", label: "Worth testing", count: staleCount }]),
+    ...(emptyCount === 0 ? [] : [{ key: "empty", label: "Used up", count: emptyCount }]),
+  ];
+  const shown = sorted.filter((entry) =>
+    filter === "stale" ? isStaleSeed(entry, now) : filter === "empty" ? entry.quantity === 0 : true,
   );
 
-  return (
-    <div className="flex flex-col gap-density">
-      <Section
-        title="Seed box"
-        description="One entry per packet or lot. Anything more than two seasons past its packed-for year is flagged — not hidden, because old seed is usually fine and it is worth a germination test rather than a re-order."
-        actions={
-          <Button variant="primary" onClick={startCreate} disabled={varieties.length === 0}>
-            Add seed
-          </Button>
-        }
-      >
-        {varieties.length === 0 ? (
-          <EmptyState
-            title="No varieties yet"
-            detail="Seed is seed of something. Add the crop and the variety first, then the packet."
-            action={
-              <Button variant="primary" onClick={onNeedsCatalog}>
-                Go to the catalogue
-              </Button>
-            }
-          />
-        ) : seed.length === 0 ? (
-          <EmptyState
-            title="The box is empty"
-            detail="Add what you have on hand. The packed-for year is what makes the staleness warning work, so it is worth typing."
-            action={
-              <Button variant="primary" onClick={startCreate}>
-                Add the first packet
-              </Button>
-            }
-          />
-        ) : (
-          <CardGrid columns={3}>
-            {sorted.map((entry) => {
-              const stale = isStaleSeed(entry, now);
+  /** The one line: how much, how old, where from. */
+  function lineFor(entry: SeedInventory): string {
+    return [
+      quantityLabel(entry.quantity, entry.unit, "amount not counted"),
+      entry.packedForYear === undefined ? "no year on it" : `packed for ${entry.packedForYear}`,
+      entry.source,
+      entry.germinationNotes,
+    ]
+      .filter((part) => part !== undefined && part !== "")
+      .join(" · ");
+  }
 
-              return (
-                <RecordCard
-                  key={entry.id}
-                  tone={stale ? "danger" : entry.quantity === 0 ? "neutral" : "calm"}
-                  title={nameOf(entry.varietyId)}
-                  subtitle={entry.source}
-                  actions={
-                    stale ? (
-                      <Pill tone="danger" dot>
-                        test it first
-                      </Pill>
-                    ) : null
-                  }
-                  meta={
-                    <>
-                      <Pill tone={entry.quantity === 0 ? "neutral" : "identity"}>
-                        {quantityLabel(entry.quantity, entry.unit)}
-                      </Pill>
-                      {entry.packedForYear === undefined ? (
-                        <Pill tone="neutral">no year on it</Pill>
-                      ) : (
-                        <Pill tone="neutral">packed for {entry.packedForYear}</Pill>
-                      )}
-                    </>
-                  }
-                >
-                  {stale ? (
-                    <p className="text-sm text-muted">
-                      Two seasons past {entry.packedForYear}. Germination falls off well before seed
-                      is dead — run ten on a damp paper towel before you commit a bed to it.
-                    </p>
-                  ) : null}
-                  {entry.germinationNotes === undefined ? null : (
-                    <p className="text-sm text-muted">{entry.germinationNotes}</p>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="ghost" onClick={() => startEdit(entry)}>
-                      Edit
-                    </Button>
-                    <Button variant="ghost" onClick={() => void remove(entry)}>
-                      Delete
-                    </Button>
-                  </div>
-                </RecordCard>
-              );
-            })}
-          </CardGrid>
-        )}
-      </Section>
+  return (
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
+      {varieties.length === 0 ? (
+        <EmptyState
+          title="No varieties yet"
+          detail="Seed is seed of something. Add the crop and the variety first, then the packet."
+          action={
+            <Button variant="primary" onClick={onNeedsCatalog}>
+              Go to the catalogue
+            </Button>
+          }
+        />
+      ) : seed.length === 0 ? (
+        <EmptyState
+          title="The box is empty"
+          detail="Add what you have on hand. The packed-for year is what makes the staleness warning work."
+          action={
+            <Button variant="primary" onClick={startCreate}>
+              Add the first packet
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          {/*
+            Old seed is flagged, never hidden: it is usually fine, and a box
+            that hid it would have people re-buying what they already have. So
+            the warning is one line and a chip, and the seed stays in the list.
+          */}
+          {staleCount === 0 || filter === "stale" ? null : (
+            <StatusLine tone="danger">
+              {staleCount} worth a germination test — two seasons past the packed-for year.{" "}
+              <button
+                type="button"
+                onClick={() => setFilter("stale")}
+                className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
+              >
+                Show them
+              </button>
+            </StatusLine>
+          )}
+
+          <div className="flex items-center justify-between gap-density">
+            <div className="min-w-0 flex-1">
+              <ChipGroup label="Filter seed" chips={chips} value={filter} onChange={setFilter} />
+            </div>
+            <AddAction label="Add seed" onClick={startCreate} />
+          </div>
+
+          <FilteredLine
+            shown={shown.length}
+            total={seed.length}
+            labels={filter === "" ? [] : [chips.find((chip) => chip.key === filter)?.label ?? ""]}
+            onClear={() => setFilter("")}
+          />
+
+          <RowList label="Seed box">
+            {shown.map((entry) => (
+              <LandRow
+                key={entry.id}
+                title={nameOf(entry.varietyId)}
+                openLabel={`Edit ${nameOf(entry.varietyId)}`}
+                line={lineFor(entry)}
+                chip={
+                  isStaleSeed(entry, now)
+                    ? { tone: "danger", label: "Test first" }
+                    : entry.quantity === 0
+                      ? { tone: "neutral", label: "Used up" }
+                      : undefined
+                }
+                quiet={entry.quantity === 0}
+                onOpen={() => startEdit(entry)}
+              />
+            ))}
+          </RowList>
+        </>
+      )}
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
-          size="wide"
+          placement="side"
           title={editing === undefined ? "Add seed" : `Editing ${nameOf(editing.varietyId)}`}
-          description="A packet, a jar, or whatever the lot came in. Quantity and unit are yours to choose — packets for what you bought, grams for what you saved."
+          description="Packets for what you bought, grams for what you saved."
           onClose={() => setDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void save()}>
+                {editing === undefined ? "Add seed" : "Save changes"}
+              </Button>
+              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+              {editing === undefined ? null : (
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const entry = editing;
+                    setDraft(undefined);
+                    setEditing(undefined);
+                    void remove(entry);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+            {/* The why behind the row's chip, where somebody deciding what to
+                do about it is looking. */}
+            {editing === undefined || !isStaleSeed(editing, now) ? null : (
+              <StatusLine tone="danger">
+                Two seasons past {editing.packedForYear}. Run ten on a damp paper towel before you
+                commit a bed to it.
+              </StatusLine>
+            )}
+            <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <Select
                 label="Variety"
                 required
@@ -312,7 +366,7 @@ export function SeedBoxPanel({
               />
               <TextInput
                 label="Source"
-                hint="&ldquo;Baker Creek&rdquo;, &ldquo;saved 2025&rdquo;, &ldquo;from Judy&rdquo;."
+                placeholder="Baker Creek, saved 2025"
                 value={draft.source}
                 error={errors["source"]}
                 onChange={(event) => setDraft({ ...draft, source: event.target.value })}
@@ -324,7 +378,7 @@ export function SeedBoxPanel({
                 min={0}
                 step="any"
                 numeric
-                required
+                hint="Optional — leave it blank if you have not counted."
                 value={draft.quantity}
                 error={errors["quantity"]}
                 onChange={(event) => setDraft({ ...draft, quantity: event.target.value })}
@@ -346,7 +400,7 @@ export function SeedBoxPanel({
                 max={2100}
                 step={1}
                 numeric
-                hint="The year printed on the packet. Without it nothing can tell you the seed is getting old."
+                hint="The year on the packet — it is what flags old seed."
                 value={draft.packedForYear}
                 error={errors["packedForYear"]}
                 onChange={(event) => setDraft({ ...draft, packedForYear: event.target.value })}
@@ -356,18 +410,11 @@ export function SeedBoxPanel({
             <TextArea
               label="Germination notes"
               rows={3}
-              hint="What last year's test gave, how it was stored, whether it needs stratifying."
+              placeholder="Last test, how it was stored, stratifying"
               value={draft.germinationNotes}
               error={errors["germinationNotes"]}
               onChange={(event) => setDraft({ ...draft, germinationNotes: event.target.value })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Add seed" : "Save changes"}
-              </Button>
-              <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}

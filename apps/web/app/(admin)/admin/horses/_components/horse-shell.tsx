@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Callout, PageBody, PageHeader, Section } from "@galaxy-farm/ui";
+import { EmptyState, PageBody, PageHeader } from "@galaxy-farm/ui";
 
 /**
  * A horses screen that does not exist yet (spec §5.9).
@@ -13,15 +13,15 @@ import { Callout, PageBody, PageHeader, Section } from "@galaxy-farm/ui";
  *
  * Deliberately not `PagePlaceholder`. A screen that is waiting on a horse is
  * not the same as one waiting on a phase, and this one can say what it will
- * hold and where the live work is in the meantime.
+ * hold and where the live work is in the meantime — as one empty state with
+ * the two live screens as its actions, rather than a callout and a section
+ * explaining the spec.
  */
 export function HorseShell({
   title,
-  route,
   holds,
 }: {
   readonly title: string;
-  readonly route: string;
   /** One line: what will live here once there are horses. */
   readonly holds: string;
 }) {
@@ -29,39 +29,26 @@ export function HorseShell({
     <PageBody>
       <PageHeader eyebrow="Horses" title={title} subtitle={holds} />
 
-      <Callout tone="neutral" title="No horses here yet">
-        This screen is a shell on purpose. Spec §5.9 keeps the horses module a skeleton until there
-        is a horse to put in it — the route exists now so navigation and permissions are real, and
-        so the build is filling in a prepared module rather than designing one.
-      </Callout>
-
-      <Section
-        title="What is live now"
-        description="Horses are the purchase furthest out and the one most worth researching slowly, so the shopping surface runs years ahead of the module."
-      >
-        <ul className="flex flex-col gap-2">
-          <li>
-            <Link href="/admin/horses/roadmap" className="text-action underline underline-offset-4">
-              The roadmap
-            </Link>{" "}
-            <span className="text-muted">
-              — what the horses are for, what has to be true first, and the budget for it.
-            </span>
-          </li>
-          <li>
+      <EmptyState
+        title="No horses here yet"
+        detail="This fills in when the first horse arrives. The shopping is live now."
+        action={
+          <div className="flex flex-wrap justify-center gap-2">
+            <Link
+              href="/admin/horses/roadmap"
+              className="inline-flex min-h-target items-center rounded-density border border-rule px-4 font-semibold text-action hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+            >
+              Roadmap
+            </Link>
             <Link
               href="/admin/horses/candidates"
-              className="text-action underline underline-offset-4"
+              className="inline-flex min-h-target items-center rounded-density border border-rule px-4 font-semibold text-action hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
             >
               Candidates
-            </Link>{" "}
-            <span className="text-muted">
-              — the horses under consideration, compared on what one would cost to get here.
-            </span>
-          </li>
-        </ul>
-        <code className="text-sm text-muted">{route}</code>
-      </Section>
+            </Link>
+          </div>
+        }
+      />
     </PageBody>
   );
 }

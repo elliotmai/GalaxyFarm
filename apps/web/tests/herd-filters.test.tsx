@@ -128,19 +128,62 @@ describe("the breed filter", () => {
   it("narrows the herd to one breed rather than throwing", async () => {
     view();
 
-    // The rows, by their name links — a name also appears on the quick-move
-    // controls, which are not what is being narrowed here. `getAll` because
-    // the table draws a row and a card, one for each viewport.
-    expect(screen.getAllByRole("link", { name: "Andromeda" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: "Cassiopeia" }).length).toBeGreaterThan(0);
+    // The rows, by their links. The whole row is the link, so its name is the
+    // tag, the name and the muted line together — matched on the name alone.
+    expect(screen.getByRole("link", { name: /Andromeda/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Cassiopeia/ })).toBeInTheDocument();
 
-    // The panel is folded away until it is wanted, and its controls are
-    // unmounted rather than hidden while it is.
-    await userEvent.click(screen.getByRole("button", { name: /Narrow the herd/ }));
+    // The filters are behind one button until they are wanted, and their
+    // controls are unmounted rather than hidden while they are.
+    expect(screen.queryByLabelText("Breed")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     await userEvent.selectOptions(screen.getByLabelText("Breed"), "Maine-Anjou");
 
-    expect(screen.getAllByRole("link", { name: "Andromeda" }).length).toBeGreaterThan(0);
-    expect(screen.queryAllByRole("link", { name: "Cassiopeia" })).toEqual([]);
+    expect(screen.getByRole("link", { name: /Andromeda/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Cassiopeia/ })).toBeNull();
     expect(screen.getByText(/Showing 1 of 2/)).toBeInTheDocument();
+  });
+
+  it("keeps saying what is on once the filters are closed", async () => {
+    view();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Filters/ }));
+    await userEvent.selectOptions(screen.getByLabelText("Breed"), "Maine-Anjou");
+    await userEvent.click(screen.getByRole("button", { name: "Show 1" }));
+
+    // Folded away, but never silent: a narrowed list that does not say so
+    // reads as a smaller herd.
+    expect(screen.queryByLabelText("Breed")).toBeNull();
+    expect(screen.getByText(/Breed: Maine-Anjou/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filters (1)" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(screen.getByRole("link", { name: /Cassiopeia/ })).toBeInTheDocument();
+  });
+});
+
+describe("the herd list", () => {
+  it("counts the head and opens the editor in a dialog", async () => {
+    view();
+
+    expect(screen.getByRole("heading", { level: 1, name: /^Cattle/ })).toBeInTheDocument();
+    expect(screen.getByText("2 head")).toBeInTheDocument();
+
+    // Two add buttons are drawn — the header one for a laptop, the floating
+    // one for a phone — and CSS decides which shows. Either opens the same.
+    await userEvent.click(screen.getAllByRole("button", { name: /Add animal/ })[0]!);
+    expect(screen.getByRole("dialog", { name: "Add an animal" })).toBeInTheDocument();
+  });
+
+  it("toggles a class from the chip row and back", async () => {
+    view();
+
+    const heifers = screen.getByRole("button", { name: /^Heifers/ });
+    await userEvent.click(heifers);
+    expect(heifers).toHaveAttribute("aria-pressed", "true");
+
+    // Pressing the one already on goes back to the whole herd.
+    await userEvent.click(heifers);
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
   });
 });

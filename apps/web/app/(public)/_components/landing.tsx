@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Logomark } from "@galaxy-farm/ui";
+import { SiteHeader } from "@/app/(public)/_components/public-shell";
 
 /**
  * The front door (spec §7, §8).
@@ -68,23 +68,10 @@ export function Landing({
 }) {
   return (
     <div className="flex min-h-[100dvh] flex-col">
-      <header className="border-b border-edge">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-density py-4">
-          <span className="flex min-w-0 items-center gap-2">
-            <Logomark size="small" decorative />
-            <span className="truncate text-ink">{farmName}</span>
-          </span>
-          <Link
-            href="/book"
-            className="min-h-target rounded-density bg-action px-4 py-2 text-density font-medium text-action-ink"
-          >
-            Enquire
-          </Link>
-        </div>
-      </header>
+      <SiteHeader farmName={farmName} />
 
       <main className="flex flex-1 flex-col">
-        <section className="mx-auto flex w-full max-w-5xl flex-col gap-density px-density py-12 sm:py-16">
+        <section className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-12 sm:px-6 sm:py-20">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted">
             Wise County, Texas
           </p>
@@ -100,43 +87,52 @@ export function Landing({
           <div className="flex flex-wrap gap-3 pt-2">
             <Link
               href="/book"
-              className="min-h-target rounded-density bg-action px-5 py-2.5 text-density font-medium text-action-ink"
+              className="inline-flex min-h-target items-center rounded-density bg-action px-5 text-density font-semibold text-action-ink"
             >
               Ask about boarding
             </Link>
+            {/* To sign-in rather than to /account: the farm's owner and a
+                calf's owner both press this, and sign-in sends each to their
+                own surface. Pointing at /account landed the farm's owner on a
+                customer page that does not exist yet. */}
             <Link
-              href="/account"
-              className="min-h-target rounded-density border border-edge px-5 py-2.5 text-density font-medium text-ink hover:border-action"
+              href="/login"
+              className="inline-flex min-h-target items-center rounded-density border border-edge bg-panel px-5 text-density font-semibold text-ink hover:bg-raised"
             >
               Owner sign in
             </Link>
           </div>
         </section>
 
-        <section className="border-y border-edge bg-panel">
-          <div className="mx-auto grid w-full max-w-5xl gap-density px-density py-12 md:grid-cols-3">
+        <section className="mx-auto w-full max-w-5xl px-4 pb-12 sm:px-6">
+          <ul className="grid gap-4 md:grid-cols-3">
             {OFFERINGS.map((offering) => (
-              <div key={offering.title} className="flex flex-col gap-2">
-                <h2 className="text-ink">{offering.title}</h2>
+              <li
+                key={offering.title}
+                className="flex flex-col gap-2 rounded-density border border-rule bg-panel p-5"
+              >
+                <h2 className="text-xl text-ink">{offering.title}</h2>
                 <p className="text-muted">{offering.detail}</p>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </section>
 
-        <section className="mx-auto flex w-full max-w-5xl flex-col gap-density px-density py-12">
+        <section className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 pb-12 sm:px-6">
           <h2 className="text-ink">How it works</h2>
-          <ol className="grid gap-density md:grid-cols-3">
+          <ol className="grid gap-5 md:grid-cols-3">
             {HOW_IT_WORKS.map((entry) => (
-              <li key={entry.step} className="flex flex-col gap-2">
+              <li key={entry.step} className="flex gap-3">
                 <span
                   aria-hidden
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-edge font-heading text-lg font-semibold text-action"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-action font-heading text-lg font-semibold text-action-ink"
                 >
                   {entry.step}
                 </span>
-                <h3 className="text-ink">{entry.title}</h3>
-                <p className="text-muted">{entry.detail}</p>
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-ink">{entry.title}</h3>
+                  <p className="text-muted">{entry.detail}</p>
+                </div>
               </li>
             ))}
           </ol>
@@ -150,8 +146,8 @@ export function Landing({
           fault. Here the slack is inside the section, so its background runs
           down to the footer however tall the window is.
         */}
-        <section className="flex flex-1 flex-col border-t border-edge bg-panel">
-          <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-density py-12">
+        <section className="flex flex-1 flex-col border-t border-rule bg-panel">
+          <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 py-12 sm:px-6">
             <h2 className="text-ink">Everything written down</h2>
             <p className="max-w-2xl text-muted">
               Every feeding, weight, treatment and working day is recorded as it happens — from a
@@ -162,11 +158,14 @@ export function Landing({
         </section>
       </main>
 
-      <footer className="border-t border-edge">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-density py-6 text-sm text-muted">
+      <footer className="border-t border-rule bg-panel">
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-4 text-sm text-muted sm:px-6">
           <span>
             {farmName} · Rhome, Texas ·{" "}
-            <Link href="/book" className="underline underline-offset-2 hover:text-ink">
+            <Link
+              href="/book"
+              className="inline-flex min-h-target items-center underline underline-offset-2 hover:text-ink"
+            >
               Get in touch
             </Link>
           </span>
@@ -177,7 +176,10 @@ export function Landing({
             (§4.3), so concealing the link would buy nothing and cost the
             person who actually needs it a typed URL every morning.
           */}
-          <Link href="/admin" className="underline underline-offset-2 hover:text-ink">
+          <Link
+            href="/admin"
+            className="inline-flex min-h-target items-center underline underline-offset-2 hover:text-ink"
+          >
             Farm login
           </Link>
         </div>

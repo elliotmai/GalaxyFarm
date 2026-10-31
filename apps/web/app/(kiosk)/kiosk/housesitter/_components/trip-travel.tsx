@@ -109,7 +109,7 @@ export function TripTravel({ trip }: { readonly trip: Trip }) {
       {legs.map((leg, index) => (
         <article
           key={`${leg.departAt}-${leg.from}-${leg.to}-${index}`}
-          className="flex flex-col gap-1 border border-edge bg-panel p-density"
+          className="flex flex-col gap-1 rounded-density border border-rule bg-panel px-5 py-4"
         >
           <header className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="text-sm font-medium text-ink">

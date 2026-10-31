@@ -12,7 +12,6 @@ export default async function AdminHorsesFeedingPage() {
   return (
     <HorseShell
       title={"Feeding"}
-      route={"/admin/horses/feeding"}
       holds={"Rations in the units they are fed in, and what a horse costs to keep."}
     />
   );

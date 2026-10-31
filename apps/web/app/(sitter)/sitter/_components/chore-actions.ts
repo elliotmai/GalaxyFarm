@@ -32,6 +32,11 @@ export interface SetChoreDoneInput {
   readonly taskId?: string | undefined;
   /** The template behind an occurrence nobody has touched yet. */
   readonly templateId?: string | undefined;
+  /**
+   * A derived chore's own id — the weather's covers and ice checks have no
+   * row or template behind them. Re-derived and checked in `tickChore`.
+   */
+  readonly sourceKey?: string | undefined;
   /** The day being ticked, as `yyyy-mm-dd`. */
   readonly day: string;
   readonly done: boolean;
@@ -56,7 +61,15 @@ export async function setChoreDone(input: SetChoreDoneInput): Promise<ChoreActio
 
   const taskId = asUlid(input.taskId);
   const templateId = asUlid(input.templateId);
-  if (taskId === undefined && templateId === undefined) {
+  // Length-checked only: the key is an opaque derived id whose real
+  // validation is `tickChore` rebuilding the occurrence.
+  const sourceKey =
+    typeof input.sourceKey === "string" &&
+    input.sourceKey.length > 0 &&
+    input.sourceKey.length <= 200
+      ? input.sourceKey
+      : undefined;
+  if (taskId === undefined && templateId === undefined && sourceKey === undefined) {
     return { ok: false, error: "That chore is not on the list any more." };
   }
 
@@ -74,6 +87,7 @@ export async function setChoreDone(input: SetChoreDoneInput): Promise<ChoreActio
     actorId: actor.id,
     ...(taskId === undefined ? {} : { taskId }),
     ...(templateId === undefined ? {} : { templateId }),
+    ...(sourceKey === undefined ? {} : { sourceKey }),
     date,
     at: now,
     done: input.done,

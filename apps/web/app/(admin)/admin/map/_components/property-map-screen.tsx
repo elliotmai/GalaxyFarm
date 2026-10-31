@@ -1,22 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
 import {
   Button,
-  Callout,
   Card,
-  DataTable,
   EmptyState,
   Modal,
   PageBody,
   PageHeader,
-  Pill,
   Section,
   SpatialEditor,
   propertyPalette,
+  useConfirmDelete,
   useToast,
-  type Column,
   type SpatialDraft,
   type SpatialReassignment,
   type SpatialView,
@@ -29,14 +27,34 @@ import {
   standingDividers,
   zoneAssignmentSchema,
   zoneSchema,
+  type Divider,
   type Property,
   type Ulid,
+  type WaterSource,
   type Zone,
   type ZoneAssignment,
   type Animal,
 } from "@galaxy-farm/core";
 
+import {
+  BLANK_FENCE,
+  draftFromFence,
+  fenceErrors,
+  fenceFromDraft,
+  withFence,
+  withFenceToggled,
+  withoutFence,
+  type FenceDraft,
+} from "@/app/(admin)/admin/map/_components/fences";
 import { GoogleSatelliteLayer } from "@/app/(admin)/admin/map/_components/google-satellite-layer";
+import { FenceEditor, ZoneMapPanel } from "@/app/(admin)/admin/map/_components/zone-map-panel";
+import {
+  ChipGroup,
+  LandRow,
+  RowAction,
+  RowList,
+  StatusLine,
+} from "@/app/(admin)/admin/pastures/_components/land-kit";
 import { mapsApiKey, mapsNotConfigured } from "@/lib/google-maps";
 import { animalChips, zoneShapes } from "@/lib/map-shapes";
 import { offlineImagery, offlineImageryGap } from "@/lib/offline-imagery";
@@ -73,6 +91,7 @@ export function PropertyMapScreen({
   const { records: animals } = useRecords<Animal>("animals", query);
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
   const { records: properties } = useRecords<Property>("properties", query);
+  const { records: water } = useRecords<WaterSource>("waterSources", query);
 
   // Off-site zones have no ground here to draw, and prompting somebody to
   // trace a boundary for a collection facility two counties away is noise.
@@ -88,9 +107,27 @@ export function PropertyMapScreen({
     actorId,
   );
 
+  const confirmDelete = useConfirmDelete();
+
   const [draft, setDraft] = useState<SpatialDraft | undefined>();
   const [saving, setSaving] = useState(false);
+  /** Why the aerial tiles failed — about the background only, never a save. */
   const [error, setError] = useState<string | undefined>();
+  /** The zone whose map panel is open. */
+  const [openZoneId, setOpenZoneId] = useState<Ulid | undefined>();
+  /**
+   * A fence being added or edited. It outlives the panel while its line is on
+   * the map being drawn, and the form comes back with the line filled in.
+   */
+  const [fence, setFence] = useState<
+    | {
+        readonly zoneId: Ulid;
+        readonly editing: Divider | undefined;
+        readonly draft: FenceDraft;
+        readonly errors: Readonly<Record<string, string>>;
+      }
+    | undefined
+  >();
   /** A move into resting ground, waiting to be confirmed. */
   const [challenge, setChallenge] = useState<{ animal: Animal; zone: Zone } | undefined>();
 
@@ -161,9 +198,11 @@ export function PropertyMapScreen({
         indoorZoneIds,
       );
 
-      for (const entry of closed) {
-        await placements.update(entry.id, { periodTo: entry.periodTo });
-      }
+      // Side by side: each close is its own record, and an animal holding a
+      // stall and a pasture has two to close before the new one may open.
+      await Promise.all(
+        closed.map((entry) => placements.update(entry.id, { periodTo: entry.periodTo })),
+      );
 
       if (opened === undefined) {
         // Already there. Saying so is the honest answer to the gesture that
@@ -202,7 +241,7 @@ export function PropertyMapScreen({
   );
 
   const saveBoundary = useCallback(async () => {
-    if (draft === undefined || draft.boundary.length < 3) return;
+    if (draft === undefined || draft.boundary.length < 3 || draft.open === true) return;
     setSaving(true);
 
     try {
@@ -214,139 +253,337 @@ export function PropertyMapScreen({
         show({ tone: "success", message: `Boundary saved — ${draft.boundary.length} corners.` });
         setDraft(undefined);
       } else {
-        setError("That boundary would not save.");
+        // A toast, not `error`: that one is about the aerial tiles, and
+        // setting it switched the background off over a failed save.
+        show({ tone: "danger", message: "That boundary would not save." });
       }
     } finally {
       setSaving(false);
     }
   }, [draft, show, zoneApi]);
 
-  const columns = useMemo<Column<Zone>[]>(
-    () => [
-      { key: "name", header: "Zone", primary: true, render: (zone) => describeZoneExtent(zone) },
-      { key: "type", header: "Kind", render: (zone) => zone.type.replace(/_/g, " ") },
-      {
-        key: "drawn",
-        header: "On the map",
-        render: (zone) =>
-          zone.boundary === undefined || zone.boundary.length < 3 ? (
-            <Pill tone="neutral">Not drawn</Pill>
-          ) : (
-            <Pill tone="calm">{zone.boundary.length} corners</Pill>
-          ),
+  /** Trace a zone's boundary — from its corners when it has some. */
+  const startTrace = (zone: Zone) => {
+    setOpenZoneId(undefined);
+    setFence(undefined);
+    setDraft({ shapeId: zone.id, boundary: zone.boundary ?? [] });
+  };
+
+  /**
+   * Take a zone's boundary off the map.
+   *
+   * Confirmed, because the corners took a walk round the fence line to put
+   * there, and offered with an undo for the same reason.
+   */
+  const removeBoundary = async (zone: Zone) => {
+    const previous = zone.boundary;
+    if (previous === undefined) return;
+    setOpenZoneId(undefined);
+    const confirmed = await confirmDelete({
+      tier: "standard",
+      recordName: `${zone.name} boundary`,
+      entity: "boundary",
+      dependents: [],
+      consequence: "The zone stays; it is no longer drawn, and its animals list beside the map.",
+      action: "Remove",
+    });
+    if (!confirmed) {
+      setOpenZoneId(zone.id);
+      return;
+    }
+    const outcome = await zoneApi.update(zone.id, { boundary: undefined });
+    if (!outcome.ok) {
+      show({ tone: "danger", message: "That boundary would not come off." });
+      return;
+    }
+    show({
+      message: `${zone.name} is no longer drawn`,
+      action: {
+        label: "Undo",
+        onAct: () => void zoneApi.update(zone.id, { boundary: previous }),
       },
-      {
-        key: "fencing",
-        header: "Temporary fencing",
-        render: (zone) => {
-          const standing = standingDividers(zone);
-          if ((zone.dividers ?? []).length === 0) return "—";
-          return standing.length === 0 ? (
-            <Pill tone="neutral">Down</Pill>
-          ) : (
-            <Pill tone="action">{standing.length} up</Pill>
-          );
-        },
-      },
-      {
-        key: "trace",
-        header: "",
-        render: (zone) =>
-          draft?.shapeId === zone.id ? (
-            <Button variant="ghost" onClick={() => setDraft(undefined)}>
-              Cancel
-            </Button>
-          ) : (
-            <Button
-              variant="secondary"
-              onClick={() =>
-                // Adjusting starts from the corners that are already there;
-                // drawing starts empty. Redrawing a traced pen from scratch is
-                // "Start over" once the corners are on screen, where somebody
-                // can see what they are about to throw away.
-                setDraft({ shapeId: zone.id, boundary: zone.boundary ?? [] })
-              }
-            >
-              {zone.boundary === undefined ? "Draw" : "Adjust"}
-            </Button>
-          ),
-      },
-    ],
-    [draft],
-  );
+    });
+  };
+
+  /** Start a new fence: its line first, on the map, then the form. */
+  const startFence = (zone: Zone) => {
+    setOpenZoneId(undefined);
+    setFence({ zoneId: zone.id, editing: undefined, draft: BLANK_FENCE, errors: {} });
+    setDraft({ shapeId: zone.id, boundary: [], open: true, label: "the new fence" });
+  };
+
+  const openFence = (zone: Zone, divider: Divider) => {
+    setOpenZoneId(undefined);
+    setFence({ zoneId: zone.id, editing: divider, draft: draftFromFence(divider), errors: {} });
+  };
+
+  /** Back to the zone's panel — where a fence was opened from. */
+  const closeFence = () => {
+    const zoneId = fence?.zoneId;
+    setFence(undefined);
+    setDraft(undefined);
+    setOpenZoneId(zoneId);
+  };
+
+  /** The line is drawn; back to the form with it. */
+  const finishFenceLine = () => {
+    if (fence === undefined || draft === undefined) return;
+    setFence({
+      ...fence,
+      draft: { ...fence.draft, line: draft.boundary },
+      errors: Object.fromEntries(
+        Object.entries(fence.errors).filter(([field]) => field !== "line"),
+      ),
+    });
+    setDraft(undefined);
+  };
+
+  /** Drawing cancelled: a redraw goes back to its form, a new fence is dropped. */
+  const cancelDraft = () => {
+    if (draft?.open === true && fence !== undefined) {
+      if (fence.editing !== undefined || fence.draft.line.length >= 2) {
+        setDraft(undefined);
+        return;
+      }
+      closeFence();
+      return;
+    }
+    setDraft(undefined);
+  };
+
+  const saveFence = async () => {
+    if (fence === undefined || saving) return;
+    const zone = zones.find((candidate) => candidate.id === fence.zoneId);
+    if (zone === undefined) return;
+
+    if (fence.draft.line.length < 2) {
+      setFence({
+        ...fence,
+        errors: { line: "Draw the line on the map first — two points at least." },
+      });
+      return;
+    }
+
+    const divider = fenceFromDraft(fence.editing?.id ?? encodeUlid(Date.now()), fence.draft);
+    const next = withFence(zone, divider);
+    setSaving(true);
+    const outcome = await zoneApi
+      .update(zone.id, { dividers: next })
+      .finally(() => setSaving(false));
+    if (!outcome.ok) {
+      setFence({
+        ...fence,
+        errors: fenceErrors(
+          outcome.error,
+          next.findIndex((candidate) => candidate.id === divider.id),
+        ),
+      });
+      return;
+    }
+    show({
+      tone: "success",
+      message: fence.editing === undefined ? `${divider.name} added` : `${divider.name} saved`,
+    });
+    closeFence();
+  };
+
+  /** Up or down, in one tap — the thing that changes, more than the fence. */
+  const toggleFence = async (zone: Zone, divider: Divider) => {
+    const outcome = await zoneApi.update(zone.id, {
+      dividers: withFenceToggled(zone, divider.id),
+    });
+    show(
+      outcome.ok
+        ? { message: divider.up ? `${divider.name} is down` : `${divider.name} is up` }
+        : { tone: "danger", message: "Could not change that" },
+    );
+  };
+
+  const removeFence = async (zone: Zone, divider: Divider) => {
+    setFence(undefined);
+    const confirmed = await confirmDelete({
+      tier: "standard",
+      recordName: divider.name,
+      entity: "temporary fence",
+      dependents: [],
+      action: "Delete",
+    });
+    if (!confirmed) {
+      setFence({ zoneId: zone.id, editing: divider, draft: draftFromFence(divider), errors: {} });
+      return;
+    }
+    const previous = zone.dividers ?? [];
+    const outcome = await zoneApi.update(zone.id, { dividers: withoutFence(zone, divider.id) });
+    if (!outcome.ok) {
+      show({ tone: "danger", message: "Could not delete that fence" });
+      return;
+    }
+    setOpenZoneId(zone.id);
+    show({
+      message: `${divider.name} deleted`,
+      action: { label: "Undo", onAct: () => void zoneApi.update(zone.id, { dividers: previous }) },
+    });
+  };
+
+  /**
+   * Start tracing a zone, or stop.
+   *
+   * Adjusting starts from the corners that are already there; drawing starts
+   * empty. Redrawing a traced pen from scratch is "Start over" once the
+   * corners are on screen, where somebody can see what they are about to
+   * throw away.
+   */
+  const traceAction = (zone: Zone) =>
+    draft?.shapeId === zone.id ? (
+      <RowAction label={`Stop tracing ${zone.name}`} onClick={() => setDraft(undefined)}>
+        Cancel
+      </RowAction>
+    ) : (
+      <RowAction
+        label={`${zone.boundary === undefined ? "Draw" : "Adjust"} ${zone.name}`}
+        onClick={() => startTrace(zone)}
+      >
+        {zone.boundary === undefined ? "Draw" : "Adjust"}
+      </RowAction>
+    );
+
+  const isDrawn = (zone: Zone) => (zone.boundary?.length ?? 0) >= 3;
+
+  /** The one line under a zone: what it is, how it is drawn, its fencing. */
+  function lineFor(zone: Zone): string {
+    const standing = standingDividers(zone);
+    return [
+      capitalise(zone.type.replace(/_/g, " ")),
+      isDrawn(zone) ? `${zone.boundary?.length ?? 0} corners` : undefined,
+      (zone.dividers ?? []).length === 0
+        ? undefined
+        : standing.length === 0
+          ? "temporary fencing down"
+          : `${standing.length} temporary fence${standing.length === 1 ? "" : "s"} up`,
+    ]
+      .filter((part) => part !== undefined)
+      .join(" · ");
+  }
+
+  const [onlyUndrawn, setOnlyUndrawn] = useState(false);
 
   const noKey = mapsApiKey() === undefined;
   const gap = property === undefined ? undefined : offlineImageryGap(property);
-  const drawnCount = zones.filter((zone) => (zone.boundary?.length ?? 0) >= 3).length;
+  const drawnCount = zones.filter(isDrawn).length;
+  /** Nothing drawn and no farm location: the canvas has no ground to tap. */
+  const unplaced =
+    drawnCount === 0 && (property?.latitude === undefined || property.longitude === undefined);
+  const openZone = zones.find((zone) => zone.id === openZoneId);
+  const fenceZone =
+    fence === undefined ? undefined : zones.find((zone) => zone.id === fence.zoneId);
 
   return (
     <PageBody>
       <PageHeader
-        eyebrow="Today"
+        eyebrow="Farm"
         title="Property map"
-        subtitle="Pens traced over aerial imagery, with everything standing in them. Boundaries are stored as real coordinates, so the same shapes render on a barn screen with no signal."
-        meta={
-          <Pill tone="neutral">
-            {drawnCount} of {zones.length} drawn
-          </Pill>
-        }
+        subtitle={`${drawnCount} of ${zones.length} zones drawn`}
       />
 
-      {noKey ? (
-        <Callout tone="neutral" title="The aerial view is not connected">
-          {mapsNotConfigured()}
-        </Callout>
-      ) : null}
-
-      {error === undefined ? null : (
-        <Callout tone="danger" title="The aerial view could not be shown">
-          {error} The pens are still drawn and still editable — they are stored as coordinates, not
-          as a picture.
-        </Callout>
-      )}
-
-      {imagery === undefined && gap !== undefined ? (
-        <Callout tone="neutral" title="No offline background yet">
-          {gap} Google&rsquo;s tiles cannot stand in for it: their terms do not permit storing them,
-          which is the whole reason for keeping our own.
-        </Callout>
+      {/*
+        What is wrong with the background, one line each rather than a stack
+        of boxes above the map. The pens are drawn either way — they are
+        stored as coordinates, not as a picture — so none of this stops work,
+        and the long setup text waits behind its own toggle.
+      */}
+      {noKey || unplaced || error !== undefined || (imagery === undefined && gap !== undefined) ? (
+        <div className="flex flex-col gap-1">
+          {/*
+            Nothing drawn and nowhere to centre on is a map with no ground to
+            tap — Draw would open an empty grey box and every tap in it would
+            be ignored. Said first, with the way out, because nothing else on
+            this screen works until it is done.
+          */}
+          {!unplaced ? null : (
+            <StatusLine tone="action">
+              The map needs to know where the farm is before the first boundary can be drawn.{" "}
+              <Link
+                href="/admin/settings"
+                className="font-semibold text-action underline-offset-2 hover:underline"
+              >
+                Set the location in Settings
+              </Link>
+            </StatusLine>
+          )}
+          {error === undefined ? null : (
+            <StatusLine tone="danger">
+              The aerial view could not be shown: {error} The pens are still drawn and editable.
+            </StatusLine>
+          )}
+          {noKey ? (
+            <details className="text-sm text-muted">
+              <summary className="inline-flex min-h-target cursor-pointer flex-wrap items-center gap-x-1">
+                The aerial view is not connected.{" "}
+                <span className="font-semibold text-action">How to connect it</span>
+              </summary>
+              <p className="max-w-prose pb-2">{mapsNotConfigured()}</p>
+            </details>
+          ) : null}
+          {imagery === undefined && gap !== undefined ? (
+            <details className="text-sm text-muted">
+              <summary className="inline-flex min-h-target cursor-pointer flex-wrap items-center gap-x-1">
+                No offline background yet. <span className="font-semibold text-action">Why</span>
+              </summary>
+              <p className="max-w-prose pb-2">
+                {gap} Google&rsquo;s tiles cannot stand in for it: their terms do not permit storing
+                them, which is the whole reason for keeping our own.
+              </p>
+            </details>
+          ) : null}
+        </div>
       ) : null}
 
       <Section
         title="Aerial view"
         description={
           draft === undefined
-            ? "Tap a pen or an animal for its instructions. Drag an animal to move it."
-            : "Click each corner. Drag a corner to move it."
+            ? "Drag an animal to move it; tap one for its instructions"
+            : draft.open === true
+              ? "Tap each point along the fence; drag a point to move it"
+              : "Tap each corner; drag a corner to move it"
         }
         actions={
           draft === undefined ? undefined : (
             <span className="flex flex-wrap gap-2">
               <Button
                 variant="ghost"
-                onClick={() =>
-                  setDraft({ shapeId: draft.shapeId, boundary: draft.boundary.slice(0, -1) })
-                }
+                onClick={() => setDraft({ ...draft, boundary: draft.boundary.slice(0, -1) })}
                 disabled={draft.boundary.length === 0 || saving}
               >
-                Undo corner
+                {draft.open === true ? "Undo point" : "Undo corner"}
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => setDraft({ shapeId: draft.shapeId, boundary: [] })}
+                onClick={() => setDraft({ ...draft, boundary: [] })}
                 disabled={draft.boundary.length === 0 || saving}
               >
                 Start over
               </Button>
-              <Button variant="ghost" onClick={() => setDraft(undefined)} disabled={saving}>
+              <Button variant="ghost" onClick={cancelDraft} disabled={saving}>
                 Cancel
               </Button>
-              <Button
-                onClick={() => void saveBoundary()}
-                disabled={draft.boundary.length < 3 || saving}
-              >
-                {saving ? "Saving…" : "Save boundary"}
-              </Button>
+              {draft.open === true ? (
+                <Button
+                  variant="primary"
+                  onClick={finishFenceLine}
+                  disabled={draft.boundary.length < 2}
+                >
+                  Use this line
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  onClick={() => void saveBoundary()}
+                  disabled={draft.boundary.length < 3 || saving}
+                >
+                  {saving ? "Saving…" : "Save boundary"}
+                </Button>
+              )}
             </span>
           )
         }
@@ -369,21 +606,102 @@ export function PropertyMapScreen({
         </Card>
       </Section>
 
-      <Section title="Zones" description="Everything on the place, and whether it is on the map.">
+      <Section title="Zones">
         {zones.length === 0 ? (
           <EmptyState
             title="No zones yet"
-            detail="Add the pens and pastures under Settings → Zones, then come back and draw them."
+            detail="Add the pens and pastures under Pastures and water, then come back and draw them."
+            action={
+              <Link
+                href="/admin/pastures"
+                className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
+              >
+                Go to Pastures and water
+              </Link>
+            }
           />
         ) : (
-          <DataTable
-            caption="Zones and their boundaries"
-            columns={columns}
-            rows={zones}
-            rowKey={(zone) => zone.id}
-          />
+          <>
+            {drawnCount === zones.length ? null : (
+              <ChipGroup
+                label="Filter zones"
+                chips={[
+                  { key: "", label: "All", count: zones.length },
+                  { key: "undrawn", label: "Not drawn", count: zones.length - drawnCount },
+                ]}
+                value={onlyUndrawn ? "undrawn" : ""}
+                onChange={(key) => setOnlyUndrawn(key === "undrawn")}
+              />
+            )}
+            <RowList label="Zones and their boundaries">
+              {zones
+                .filter((zone) => !onlyUndrawn || !isDrawn(zone))
+                .map((zone) => {
+                  const standing = standingDividers(zone);
+                  return (
+                    <LandRow
+                      key={zone.id}
+                      title={describeZoneExtent(zone)}
+                      line={lineFor(zone)}
+                      // Not drawn is the one thing to fix; fencing up is the
+                      // one thing worth noticing on ground that is drawn.
+                      chip={
+                        !isDrawn(zone)
+                          ? { tone: "neutral", label: "Not drawn" }
+                          : standing.length > 0
+                            ? { tone: "action", label: `${standing.length} up` }
+                            : undefined
+                      }
+                      openLabel={`Open ${zone.name} on the map`}
+                      onOpen={() => setOpenZoneId(zone.id)}
+                      action={traceAction(zone)}
+                    />
+                  );
+                })}
+            </RowList>
+          </>
         )}
       </Section>
+
+      {openZone === undefined ? null : (
+        <ZoneMapPanel
+          key={openZone.id}
+          zone={openZone}
+          water={water}
+          onClose={() => setOpenZoneId(undefined)}
+          onTrace={() => startTrace(openZone)}
+          onRemoveBoundary={() => void removeBoundary(openZone)}
+          onAddFence={() => startFence(openZone)}
+          onOpenFence={(divider) => openFence(openZone, divider)}
+          onToggleFence={(divider) => void toggleFence(openZone, divider)}
+        />
+      )}
+
+      {fence === undefined || fenceZone === undefined || draft !== undefined ? null : (
+        <FenceEditor
+          key={fence.editing?.id ?? "new"}
+          zone={fenceZone}
+          draft={fence.draft}
+          editing={fence.editing}
+          water={water}
+          errors={fence.errors}
+          busy={saving}
+          onChange={(next) => setFence({ ...fence, draft: next })}
+          onRedraw={() =>
+            setDraft({
+              shapeId: fenceZone.id,
+              boundary: fence.draft.line,
+              open: true,
+              label: fence.draft.name.trim() === "" ? "the fence" : fence.draft.name.trim(),
+            })
+          }
+          onSave={() => void saveFence()}
+          onCancel={closeFence}
+          onDelete={() => {
+            if (fence.editing !== undefined) void removeFence(fenceZone, fence.editing);
+          }}
+        />
+      )}
 
       {challenge === undefined ? null : (
         <Modal
@@ -412,4 +730,8 @@ export function PropertyMapScreen({
       )}
     </PageBody>
   );
+}
+
+function capitalise(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

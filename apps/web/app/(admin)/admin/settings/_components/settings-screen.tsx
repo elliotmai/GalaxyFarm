@@ -1,8 +1,11 @@
 "use client";
 
-import { Callout, PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
+import Link from "next/link";
+
+import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import type { NotificationSetting, Ulid } from "@galaxy-farm/core";
 
+import { AppearanceSetting } from "@/app/(admin)/admin/settings/_components/appearance-setting";
 import { BrandingScreen } from "@/app/(admin)/admin/settings/_components/branding-screen";
 import { DevicesScreen } from "@/app/(admin)/admin/settings/_components/devices-screen";
 import { NotificationsScreen } from "@/app/(admin)/admin/settings/_components/notifications-screen";
@@ -20,11 +23,13 @@ import type { PushDevice } from "@/lib/push-store";
  *
  * §7 gives this one route a long list — branding, users and roles, property
  * and zones, feed types, breeds, notification preferences, kiosk devices,
- * integrations — so it grows tabs rather than routes. Five of them exist so
- * far.
+ * integrations — so it grows tabs rather than routes. Five, and no more: the
+ * farm's name and the property's facts are one tab, Farm, because they are
+ * one question ("what is this place") and a sixth tab is a strip that scrolls
+ * on a phone.
  *
- * The People and Branding tabs are absent rather than disabled for anyone
- * without the capability. That is presentation, not permission: §4.3 puts the
+ * The People tab, and the farm-name form inside Farm, are absent rather than
+ * disabled for anyone without the capability. That is presentation, not permission: §4.3 puts the
  * actual check in the application layer, and both ask again on the server —
  * People in its server actions, Branding in the sync push handler, which
  * refuses a `brandingConfigs` patch from anybody without `branding.manage`
@@ -78,12 +83,11 @@ export function SettingsScreen({
   readonly notificationsUnavailable?: string | undefined;
 }) {
   const tabs = [
-    ...(mayManageBranding ? [{ id: "branding", label: "Branding" }] : []),
-    // Not owner-gated, unlike Branding. Renaming the farm renames it to
-    // everyone the farm deals with; the property's own name, address and
-    // timezone are the operational facts a member works from — and the watch
-    // thresholds beside them have always been open to a member.
-    { id: "property", label: "Property" },
+    // Not owner-gated, unlike the farm name inside it. Renaming the farm
+    // renames it to everyone the farm deals with; the property's own name,
+    // address and timezone are the operational facts a member works from —
+    // and the watch thresholds beside them have always been open to a member.
+    { id: "farm", label: "Farm" },
     ...(mayManagePeople
       ? [
           {
@@ -117,18 +121,33 @@ export function SettingsScreen({
   return (
     <PageBody>
       <PageHeader
-        eyebrow="Settings"
         title="Settings"
-        subtitle="How the farm is set up, and who can get at it."
+        actions={
+          // Deleted records used to be a link at the foot of the Calving
+          // watch tab, which is the last place anybody looks for them.
+          <Link
+            href="/admin/settings/trash"
+            className="inline-flex min-h-target items-center text-sm font-semibold text-action underline-offset-2 hover:underline"
+          >
+            Trash
+          </Link>
+        }
       />
+
+      {/* Above the tabs because it is the one setting every person changes
+          for themselves, and it should not hide behind a farm-level tab. */}
+      <AppearanceSetting />
 
       <Tabs tabs={tabs} label="Settings">
         {(active) => (
           <div className="pt-density">
-            {active === "branding" && mayManageBranding ? (
-              <BrandingScreen propertyId={propertyId} actorId={actorId} />
-            ) : active === "property" ? (
-              <PropertyScreen propertyId={propertyId} actorId={actorId} />
+            {active === "farm" ? (
+              <div className="flex flex-col gap-density">
+                {mayManageBranding ? (
+                  <BrandingScreen propertyId={propertyId} actorId={actorId} />
+                ) : null}
+                <PropertyScreen propertyId={propertyId} actorId={actorId} />
+              </div>
             ) : active === "people" && mayManagePeople ? (
               <PeopleScreen
                 people={people}
@@ -154,9 +173,7 @@ export function SettingsScreen({
                   {...(pushUnavailable === undefined ? {} : { pushUnavailable })}
                 />
               ) : (
-                <Callout title="Notification settings are unavailable">
-                  {notificationsUnavailable}
-                </Callout>
+                <p className="text-sm text-danger">{notificationsUnavailable}</p>
               )
             ) : (
               <WatchSettingsScreen propertyId={propertyId} actorId={actorId} />

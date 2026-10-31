@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
-import { Callout, PageBody, PageHeader, Tabs, Tile } from "@galaxy-farm/ui";
+import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import {
   emergencyContacts,
   type Animal,
@@ -33,7 +34,7 @@ import type { WanderConnection } from "@/lib/wander-store";
 /**
  * The housesitter guide (spec §5.10, §7).
  *
- * Three tabs, and the middle one is the product: what is stored is a title, an
+ * Four tabs, and the first one is the product: what is stored is a title, an
  * intro, a list of which auto-sections to include, and the sections somebody
  * wrote by hand. Everything else — the pens with their effective safety levels,
  * the merged instructions, the routine, the numbers to ring — is composed from
@@ -112,47 +113,33 @@ export function HousesitterScreen({
 
   return (
     <PageBody>
+      {/* The counts that used to be four tiles, as the header's one line of
+          facts: none of them is a number anybody acts on by itself. */}
       <PageHeader
         title="Housesitter guide"
-        subtitle="Written once, composed live. The pens, the routine and the numbers come from the farm's own records every time it is opened."
+        subtitle={[
+          `${live.length} ${live.length === 1 ? "guide" : "guides"}`,
+          `${pens.length} ${pens.length === 1 ? "pen" : "pens"} on it`,
+          ...(mayManagePeople ? [`${open.length} with access`] : []),
+        ].join(" · ")}
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile
-          label="Guides"
-          value={guides.length}
-          tone="identity"
-          hint={
-            guides.length === live.length ? undefined : `${guides.length - live.length} retired`
-          }
-        />
-        <Tile
-          label="Pens on it"
-          value={pens.length}
-          tone="neutral"
-          hint="Live, with somebody in them"
-        />
-        <Tile
-          label="Emergency numbers"
-          value={emergency.length}
-          tone={emergency.length === 0 ? "danger" : "calm"}
-          emphasis={emergency.length === 0}
-          hint={emergency.length === 0 ? "Nobody tagged" : "From Contacts"}
-        />
-        <Tile
-          label="Sitters with access"
-          value={open.length}
-          tone={open.length > 0 ? "action" : "neutral"}
-          hint={mayManagePeople ? "Windows still open" : "Owner-only"}
-        />
-      </div>
-
+      {/*
+        The one gap worth saying, as one line. The guide takes its emergency
+        numbers from anybody tagged Emergency in Contacts, and until somebody
+        is, that section prints empty — the one a helper looks for when they
+        most need it.
+      */}
       {emergency.length > 0 ? null : (
-        <Callout tone="danger" title="No emergency numbers on the guide">
-          The guide takes them from Contacts, from anybody tagged <em>Emergency</em>. Until somebody
-          is, that section prints empty — and it is the one section a helper will be looking for
-          when they most need it.
-        </Callout>
+        <p className="text-sm text-danger">
+          No emergency numbers on the guide.{" "}
+          <Link
+            href="/admin/contacts"
+            className="inline-flex min-h-target items-center font-semibold underline underline-offset-2"
+          >
+            Tag one in Contacts
+          </Link>
+        </p>
       )}
 
       <Tabs

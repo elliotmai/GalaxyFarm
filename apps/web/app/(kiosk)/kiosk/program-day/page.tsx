@@ -1,3 +1,5 @@
+import { KioskBackLink } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
+
 import { PagePlaceholder } from "../../../_components/page-placeholder";
 
 export const metadata = { title: "Program Day Sheet" };
@@ -12,7 +14,12 @@ export const metadata = { title: "Program Day Sheet" };
  * business module that is supposed to define it.
  */
 export default function KioskProgramDayPage() {
+  // The way back still matters on a board with nothing on it: a screen that
+  // lands here has no other route to the picker.
   return (
-    <PagePlaceholder title={"Program Day Sheet"} route={"/kiosk/program-day"} phase={"Phase 5"} />
+    <div className="flex flex-col gap-density">
+      <KioskBackLink />
+      <PagePlaceholder title={"Program Day Sheet"} route={"/kiosk/program-day"} phase={"Phase 5"} />
+    </div>
   );
 }

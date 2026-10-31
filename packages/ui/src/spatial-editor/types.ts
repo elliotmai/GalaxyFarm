@@ -148,6 +148,13 @@ export interface SpatialImagery {
 export interface SpatialDraft {
   readonly shapeId: string;
   readonly boundary: readonly GeoPoint[];
+  /**
+   * A line that does not close — a cross-fence run across a pasture — rather
+   * than a boundary. Drawn open and unfilled, and two points are enough.
+   */
+  readonly open?: boolean | undefined;
+  /** What is being drawn, for the inspector: "the West fence". Defaults to the shape. */
+  readonly label?: string | undefined;
 }
 
 /** A chip moved from one shape to another. */

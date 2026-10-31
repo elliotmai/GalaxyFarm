@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Button, Callout, Card, Section, TextInput, useToast } from "@galaxy-farm/ui";
+import { Button, Card, Section, TextInput, useToast } from "@galaxy-farm/ui";
 import {
   brandingConfigSchema,
   FALLBACK_FARM_NAME,
@@ -112,17 +112,13 @@ export function BrandingScreen({
   return (
     <Section
       title="Farm name"
-      description="Used in the page title, the navigation, emails, PDFs, the kiosk boards and the customer portal. Changing it here changes it everywhere."
+      description="On the navigation, emails, PDFs, kiosk boards and the customer portal."
     >
       <Card>
         <form onSubmit={(event) => void save(event)} className="flex flex-col gap-density">
           <TextInput
             label="Farm name"
-            hint={
-              config === undefined
-                ? `Not set yet, so the app is using ${stored}.`
-                : "What this place is called."
-            }
+            hint={config === undefined ? `Not set yet, so the app is using ${stored}.` : undefined}
             value={value}
             maxLength={80}
             onChange={(event) => {
@@ -134,8 +130,10 @@ export function BrandingScreen({
           />
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Named, not a bare "Save": it shares a tab with the property's
+                own forms, and a column of identical buttons says nothing. */}
             <Button type="submit" busy={busy} disabled={!dirty}>
-              Save
+              Save farm name
             </Button>
             {!dirty ? null : (
               <Button
@@ -159,13 +157,13 @@ export function BrandingScreen({
             signing in are rendered on the server, which has no device to read
             from. They follow on the next deploy that sets the variable.
           */}
-          <Callout tone="action" title="Where this reaches, and where it does not yet">
-            Inside the app it takes effect straight away — here, and on the kiosk and the phones as
-            they sync. What it does not yet change is anything drawn before you sign in: the browser
-            tab title, the front door, the login screen, an invitation. Those are built on the
-            server, which has no device to read from, and still say{" "}
-            <strong>{process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME}</strong>.
-          </Callout>
+          <p className="text-sm text-muted">
+            Changes the app at once. Pages before sign-in still say{" "}
+            <strong className="text-ink">
+              {process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME}
+            </strong>{" "}
+            until the next deploy.
+          </p>
         </form>
       </Card>
     </Section>

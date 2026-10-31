@@ -7,7 +7,6 @@ import {
   EmptyState,
   Modal,
   Pill,
-  RecordCard,
   Section,
   Select,
   TextArea,
@@ -33,10 +32,13 @@ import { useMutations } from "@/lib/local/mutations";
 /**
  * One day's chores, with the tick that finishes them (spec §6).
  *
- * The tick is the whole screen. It is a button the width of the card rather
- * than a checkbox, because the hand doing the ticking is in a glove and the
- * screen is often a kiosk on a post — and because a row that is only tappable
- * on a 16px square is a row people stop ticking.
+ * The tick is the whole screen. Each chore is one row — a large round tick
+ * the full height of the row on the left, the title and one line of facts,
+ * and at most one chip — rather than a card with a button the width of it.
+ * The tick stays big because the hand doing the ticking is in a glove and the
+ * screen is often a kiosk on a post, and a row that is only tappable on a
+ * 16px square is a row people stop ticking. The rest of the row opens the
+ * chore, where editing and deleting now live.
  *
  * Ticking a chore that came from a template is what *writes* it: the sheet is
  * derived until somebody finishes something, and then the finished thing
@@ -214,87 +216,123 @@ export function DaySheet({
   const open = entries.filter((entry) => entry.completedAt === undefined);
   const done = entries.filter((entry) => entry.completedAt !== undefined);
 
-  const card = (entry: ChoreEntry) => {
+  /** The one chip a row may carry: the most urgent thing true of it. */
+  function chipFor(entry: ChoreEntry) {
+    if (entry.completedAt !== undefined) {
+      return <Pill tone="calm">Done {timeLabel(entry.completedAt)}</Pill>;
+    }
+    if (entry.carriedOver) {
+      return (
+        <Pill tone="danger" dot>
+          Owed from {dateLabel(entry.dueAt)}
+        </Pill>
+      );
+    }
+    if (entry.overdue) return <Pill tone="danger">Overdue</Pill>;
+    return null;
+  }
+
+  /** The muted line: when, where, who, and whether it repeats. */
+  function lineFor(entry: ChoreEntry): string {
+    return [
+      // A due time worth saying is one finer than "the end of the day" — a
+      // feeding round, or a template that names a part of the day. The 23rd
+      // hour is the end-of-day deadline every chore has anyway.
+      entry.carriedOver || entry.dueAt.getHours() === 23
+        ? undefined
+        : `By ${timeLabel(entry.dueAt)}`,
+      zoneName(entry.zoneId),
+      animalName(entry.animalId),
+      entry.templateId === undefined ? "One-off" : "Repeating",
+      entry.detail,
+    ]
+      .filter((part): part is string => part !== undefined && part !== "")
+      .join(" · ");
+  }
+
+  const row = (entry: ChoreEntry) => {
     const finished = entry.completedAt !== undefined;
-    const where = [zoneName(entry.zoneId), animalName(entry.animalId)].filter(
-      (label): label is string => label !== undefined,
-    );
 
     return (
-      <RecordCard
-        key={entry.id}
-        tone={finished ? "calm" : entry.overdue ? "danger" : "neutral"}
-        title={
-          <span className={finished ? "text-muted line-through" : undefined}>{entry.title}</span>
-        }
-        subtitle={entry.detail}
-        meta={
-          <>
-            {entry.carriedOver ? (
-              <Pill tone="danger" dot>
-                Owed from {dateLabel(entry.dueAt)}
-              </Pill>
-            ) : null}
-            {entry.overdue && !entry.carriedOver ? <Pill tone="danger">Overdue</Pill> : null}
-            {/*
-              A due time worth saying is one finer than "the end of the day" —
-              a feeding round, or a template that names a part of the day. The
-              23rd hour is the end-of-day deadline every chore has anyway.
-            */}
-            {entry.carriedOver || entry.dueAt.getHours() === 23 ? null : (
-              <Pill>By {timeLabel(entry.dueAt)}</Pill>
-            )}
-            {entry.templateId === undefined ? <Pill>One-off</Pill> : <Pill>Repeating</Pill>}
-            {entry.taskId === undefined ? <Pill tone="neutral">Not started</Pill> : null}
-            {where.map((label) => (
-              <Pill key={label} tone="identity">
-                {label}
-              </Pill>
-            ))}
-            {finished ? <Pill tone="calm">Done {timeLabel(entry.completedAt as Date)}</Pill> : null}
-          </>
-        }
-        actions={
-          <>
-            <Button variant="ghost" onClick={() => startEdit(entry)}>
-              {entry.taskId === undefined ? "Details" : "Edit"}
-            </Button>
-            {entry.taskId === undefined ? null : (
-              <Button variant="ghost" onClick={() => void remove(entry)}>
-                Delete
-              </Button>
-            )}
-          </>
-        }
-      >
+      <li key={entry.id} className="flex items-stretch bg-panel">
         {/*
-          The target is the card's whole width and three lines tall. Gloves,
-          a kiosk on a post, and rain: a 16px checkbox is not a thing anybody
-          hits on the third try either.
+          The tick: the row's full height and a wide column of its own.
+          Gloves, a kiosk on a post, and rain — a 16px checkbox is not a thing
+          anybody hits on the third try either.
         */}
-        <Button
-          variant={finished ? "secondary" : "primary"}
-          block
-          className="justify-center py-3 text-base"
-          disabled={busy === entry.id}
+        <button
+          type="button"
           aria-pressed={finished}
+          aria-label={finished ? `Undo ${entry.title}` : `Mark ${entry.title} done`}
+          disabled={busy === entry.id}
           onClick={() => void toggle(entry)}
+          className="flex w-16 shrink-0 items-center justify-center hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action disabled:opacity-60"
         >
-          {finished ? "Undo" : "Mark done"}
-        </Button>
-      </RecordCard>
+          <span
+            aria-hidden="true"
+            className={[
+              "flex h-9 w-9 items-center justify-center rounded-full border-2",
+              finished
+                ? "border-calm bg-calm text-panel"
+                : entry.overdue
+                  ? "border-danger text-danger"
+                  : "border-edge text-transparent",
+            ].join(" ")}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5 12l5 5L20 7" />
+            </svg>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => startEdit(entry)}
+          className="flex min-h-[66px] min-w-0 flex-1 items-center gap-3 py-2 pr-4 text-left text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
+        >
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className={`truncate font-semibold ${finished ? "text-muted line-through" : ""}`}>
+              {entry.title}
+            </span>
+            <span className="truncate text-sm text-muted">{lineFor(entry)}</span>
+          </span>
+          {chipFor(entry)}
+        </button>
+      </li>
     );
   };
 
+  const list = (items: readonly ChoreEntry[], label: string) => (
+    <ul
+      aria-label={label}
+      className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
+    >
+      {items.map(row)}
+    </ul>
+  );
+
   return (
-    <div className="flex flex-col gap-density">
+    // Bottom clearance on a phone, for the floating add button.
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
       <Section
-        title={`${dayName} — still to do`}
+        title="Still to do"
         description="Ticked off, a chore keeps the time and the name of whoever finished it."
         actions={
-          <Button variant="primary" onClick={startCreate}>
-            Add a chore
-          </Button>
+          // Hidden on a phone by a wrapper: the button's own `inline-flex`
+          // wins over a `hidden` passed in. The floating one stands in.
+          <span className="hidden sm:block">
+            <Button variant="primary" onClick={startCreate}>
+              <span aria-hidden="true">+</span> Add chore
+            </Button>
+          </span>
         }
       >
         {open.length === 0 ? (
@@ -302,92 +340,122 @@ export function DaySheet({
             title={entries.length === 0 ? "Nothing on the list" : "All done"}
             detail={
               entries.length === 0
-                ? "No template fires on this day and nobody wrote anything down. Add a chore, or set up a template that repeats."
-                : "Everything asked for on this day is finished."
+                ? "No template fires on this day and nobody wrote anything down."
+                : undefined
             }
-            action={
-              <Button variant="primary" onClick={startCreate}>
-                Add a chore
-              </Button>
-            }
+            {...(entries.length === 0
+              ? {
+                  action: (
+                    <Button variant="primary" onClick={startCreate}>
+                      Add a chore
+                    </Button>
+                  ),
+                }
+              : {})}
           />
         ) : (
-          <div className="flex flex-col gap-density">{open.map(card)}</div>
+          list(open, `${dayName} — still to do`)
         )}
       </Section>
 
       {done.length === 0 ? null : (
-        <Section title="Done" description={`${done.length} finished on this day.`}>
-          <div className="flex flex-col gap-density">{done.map(card)}</div>
+        <Section title="Done" description={`${done.length} finished`}>
+          {list(done, `${dayName} — done`)}
         </Section>
       )}
+
+      <button
+        type="button"
+        onClick={startCreate}
+        className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
+      >
+        <span aria-hidden="true" className="text-xl leading-none">
+          +
+        </span>
+        Add chore
+      </button>
 
       {draft === undefined ? null : (
         <Modal
           key={editing?.id ?? "new"}
+          placement="side"
           title={editing === undefined ? "New chore" : editing.title}
           description={
             readOnly
-              ? "This one comes from a template. Editing it here would change one day and leave every other day saying the old thing — so change the template instead, or tick it and edit the record it leaves."
-              : "A one-off job for this day. Anything that repeats belongs in a template."
+              ? "From a template — change the template, or tick it and edit the record it leaves."
+              : editing === undefined
+                ? "A one-off for this day. Anything that repeats belongs in a template."
+                : undefined
           }
           onClose={() => setDraft(undefined)}
-        >
-          <div className="flex flex-col gap-density">
-            <TextInput
-              label="What needs doing"
-              required
-              value={draft.title}
-              error={errors["title"]}
-              disabled={readOnly}
-              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-            />
-            <TextArea
-              label="Detail"
-              rows={3}
-              hint="Anything a housesitter would need to know to do it right."
-              value={draft.detail}
-              disabled={readOnly}
-              onChange={(event) => setDraft({ ...draft, detail: event.target.value })}
-            />
-            <Select
-              label="Zone"
-              value={draft.zoneId}
-              disabled={readOnly}
-              options={[
-                { value: "", label: "Anywhere on the place" },
-                ...zones
-                  .filter((zone) => zone.active)
-                  .map((zone) => ({ value: zone.id, label: zone.name })),
-              ]}
-              onChange={(event) => setDraft({ ...draft, zoneId: event.target.value })}
-            />
-            <Select
-              label="Animal"
-              value={draft.animalId}
-              disabled={readOnly}
-              options={[
-                { value: "", label: "Not about one animal" },
-                ...animals
-                  .filter((animal) => animal.status === "active")
-                  .map((animal) => ({ value: animal.id, label: displayName(animal) })),
-              ]}
-              onChange={(event) => setDraft({ ...draft, animalId: event.target.value })}
-            />
-
-            <div className="flex gap-2">
-              {readOnly ? (
-                <Button onClick={() => setDraft(undefined)}>Close</Button>
-              ) : (
-                <>
-                  <Button variant="primary" onClick={() => void save()}>
-                    {editing === undefined ? "Add chore" : "Save changes"}
+          footer={
+            readOnly ? (
+              <Button onClick={() => setDraft(undefined)}>Close</Button>
+            ) : (
+              <>
+                <Button variant="primary" onClick={() => void save()}>
+                  {editing === undefined ? "Add chore" : "Save changes"}
+                </Button>
+                <Button onClick={() => setDraft(undefined)}>Cancel</Button>
+                {editing?.taskId === undefined ? null : (
+                  // Closed first, so the confirmation is the only dialog.
+                  <Button
+                    variant="danger"
+                    className="ml-auto"
+                    onClick={() => {
+                      const entry = editing;
+                      setDraft(undefined);
+                      setEditing(undefined);
+                      void remove(entry);
+                    }}
+                  >
+                    Delete
                   </Button>
-                  <Button onClick={() => setDraft(undefined)}>Cancel</Button>
-                </>
-              )}
-            </div>
-          </div>
+                )}
+              </>
+            )
+          }
+        >
+          <TextInput
+            label="What needs doing"
+            required
+            value={draft.title}
+            error={errors["title"]}
+            disabled={readOnly}
+            onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+          />
+          <TextArea
+            label="Detail"
+            rows={3}
+            hint="What a housesitter would need to do it right."
+            value={draft.detail}
+            disabled={readOnly}
+            onChange={(event) => setDraft({ ...draft, detail: event.target.value })}
+          />
+          <Select
+            label="Zone"
+            value={draft.zoneId}
+            disabled={readOnly}
+            options={[
+              { value: "", label: "Anywhere on the place" },
+              ...zones
+                .filter((zone) => zone.active)
+                .map((zone) => ({ value: zone.id, label: zone.name })),
+            ]}
+            onChange={(event) => setDraft({ ...draft, zoneId: event.target.value })}
+          />
+          <Select
+            label="Animal"
+            value={draft.animalId}
+            disabled={readOnly}
+            options={[
+              { value: "", label: "Not about one animal" },
+              ...animals
+                .filter((animal) => animal.status === "active")
+                .map((animal) => ({ value: animal.id, label: displayName(animal) })),
+            ]}
+            onChange={(event) => setDraft({ ...draft, animalId: event.target.value })}
+          />
         </Modal>
       )}
     </div>

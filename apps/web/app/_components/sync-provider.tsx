@@ -181,6 +181,8 @@ export function SyncProvider({
   const [pending, setPending] = useState(0);
   const [stuck, setStuck] = useState(0);
   const running = useRef(false);
+  /** A sync was asked for while one was running; go round once more. */
+  const again = useRef(false);
   /** Server refusals in a row, for the heartbeat's backoff. */
   const refusals = useRef(0);
 
@@ -196,38 +198,55 @@ export function SyncProvider({
     if (store === undefined) return;
     // One sync at a time. Two overlapping runs would drain the same outbox
     // entries twice and push each of them to the server twice.
-    if (running.current) return;
+    //
+    // But a write that arrives while a run is in flight is remembered, and the
+    // run goes round once more for it. Without that, anything queued after the
+    // push had read the outbox — the tail of a machine deleted with its
+    // ledgers, the second of two quick saves — sat "pending" until the next
+    // heartbeat, a minute later, which reads as a save that will not finish.
+    if (running.current) {
+      again.current = true;
+      return;
+    }
 
     running.current = true;
     setSyncing(true);
     try {
-      const outcome = pushEnabled
-        ? await store.engine.sync()
-        : { pushed: 0, rejected: 0, audit: [], ...(await store.engine.pull()) };
+      let settled = true;
+      do {
+        again.current = false;
+        const outcome = pushEnabled
+          ? await store.engine.sync()
+          : { pushed: 0, rejected: 0, audit: [], ...(await store.engine.pull()) };
 
-      // Photos go after the records, and only where pushing is allowed at all.
-      // A kiosk's outbox is empty by design (§4.4) and `/api/storage/presign`
-      // refuses it, so draining there would light the badge up as broken over
-      // a queue that is always empty.
-      const photos =
-        pushEnabled && uploads !== undefined
-          ? await uploads.drain()
-          : { uploaded: 0, refused: 0, offline: false, problem: undefined };
+        // Photos go after the records, and only where pushing is allowed at all.
+        // A kiosk's outbox is empty by design (§4.4) and `/api/storage/presign`
+        // refuses it, so draining there would light the badge up as broken over
+        // a queue that is always empty.
+        const photos =
+          pushEnabled && uploads !== undefined
+            ? await uploads.drain()
+            : { uploaded: 0, refused: 0, offline: false, problem: undefined };
 
-      setOffline(outcome.offline || photos.offline);
-      setProblem(outcome.problem ?? photos.problem);
-      // Only a refusal counts. Offline is not the server's fault, and coming
-      // back into signal fires a sync of its own.
-      if (outcome.problem !== undefined) refusals.current += 1;
-      else if (!outcome.offline) refusals.current = 0;
-      if (!outcome.offline && outcome.problem === undefined) {
-        setLastSyncedAt(new Date());
-        saveCursors(store.engine.cursorState());
-      }
-      setPending((await store.engine.pendingCount()) + ((await uploads?.pendingCount()) ?? 0));
-      setStuck((await store.engine.stuckCount()) + ((await uploads?.stuckCount()) ?? 0));
+        setOffline(outcome.offline || photos.offline);
+        setProblem(outcome.problem ?? photos.problem);
+        // Only a refusal counts. Offline is not the server's fault, and coming
+        // back into signal fires a sync of its own.
+        if (outcome.problem !== undefined) refusals.current += 1;
+        else if (!outcome.offline) refusals.current = 0;
+        if (!outcome.offline && outcome.problem === undefined) {
+          setLastSyncedAt(new Date());
+          saveCursors(store.engine.cursorState());
+        }
+        setPending((await store.engine.pendingCount()) + ((await uploads?.pendingCount()) ?? 0));
+        setStuck((await store.engine.stuckCount()) + ((await uploads?.stuckCount()) ?? 0));
+        // Offline or refused: going round again now would only fail again.
+        // The heartbeat's backoff owns the retry from here.
+        settled = !outcome.offline && outcome.problem === undefined;
+      } while (again.current && settled);
     } finally {
       running.current = false;
+      again.current = false;
       setSyncing(false);
     }
   }, [store, pushEnabled, uploads]);

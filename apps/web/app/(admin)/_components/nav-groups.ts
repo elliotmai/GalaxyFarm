@@ -38,88 +38,145 @@ export interface NavDestination extends NavItem {
   readonly glyph: string;
   /** The in-page tab strip for this destination. */
   readonly sections: readonly NavItem[];
+  /** The landing page draws no strip; see `NAV`. */
+  readonly quietLanding?: boolean;
+  /**
+   * The sections are switched from the page title rather than a strip — the
+   * species switcher on every animal page (decision 45). Their own tools
+   * still draw their strip below.
+   */
+  readonly titleSwitches?: boolean;
 }
 
 /**
- * The five.
+ * The four places, plus Log (spec §7, §8 v1.7).
  *
- * `href` is where the destination lands when clicked: the first section, or the
- * one somebody actually wants. Animals lands on cattle because that is the herd
- * this farm runs; the other species are a tab away.
+ * Shaped by how the farm is actually run: two people doing everything, half
+ * on a phone and half at a desk, with chores and feeding the only weekly job
+ * and most of that ticked on the barn kiosks. So the phone opens on Today; an
+ * animal is one tap away under Animals, every species in one list; the land,
+ * the feed and the kit are Farm; and everything seasonal or set-up-once is
+ * under More. Logging is not a place — it is the button between them, see
+ * `LOG_HREF`.
+ *
+ * `href` is where the destination lands. `quietLanding` means the landing page
+ * draws no section strip of its own: Animals has species chips on the page,
+ * and a strip above them saying the same five words was the clutter this
+ * restructure exists to remove.
  */
 export const NAV: readonly NavDestination[] = [
   {
     href: "/admin",
     label: "Today",
     glyph: "◈",
-    sections: [
-      { href: "/admin", label: "Dashboard" },
-      { href: "/admin/chores", label: "Chores" },
-      { href: "/admin/calendar", label: "Calendar" },
-      { href: "/admin/map", label: "Property map" },
-    ],
+    sections: [{ href: "/admin", label: "Today" }],
   },
   {
-    href: "/admin/cattle",
+    href: "/admin/animals",
     label: "Animals",
     glyph: "✦",
+    quietLanding: true,
+    titleSwitches: true,
     sections: [
+      { href: "/admin/animals", label: "All" },
       { href: "/admin/cattle", label: "Cattle", owns: ["/admin/cattle/"] },
-      { href: "/admin/chickens/flock", label: "Flock" },
       { href: "/admin/horses", label: "Horses", owns: ["/admin/horses/"] },
-      { href: "/admin/pets", label: "Pets" },
+      // `owns`: a flock's own page (`/admin/chickens/flock/<name>`) sits in
+      // Chickens, and as a record page draws no strips (see `SectionStrip`).
+      { href: "/admin/chickens/flock", label: "Chickens", owns: ["/admin/chickens/flock/"] },
+      // Dogs owns the pets' own pages (`/admin/pets/<name>`), cats included:
+      // they share one address space, and a record page draws no strip, so
+      // which of the two lights is the only difference it makes.
+      { href: "/admin/pets/dogs", label: "Dogs", owns: ["/admin/pets/"] },
+      { href: "/admin/pets/cats", label: "Cats" },
     ],
   },
   {
-    href: "/admin/pastures",
-    label: "Land",
+    href: "/admin/feed",
+    label: "Farm",
     glyph: "▢",
     sections: [
+      { href: "/admin/feed", label: "Feed" },
       { href: "/admin/pastures", label: "Pastures and water" },
-      { href: "/admin/garden/layout", label: "Garden layout" },
-      { href: "/admin/garden/plantings", label: "Plantings" },
-      { href: "/admin/garden/seeds", label: "Seeds" },
-      { href: "/admin/garden/harvest", label: "Harvest" },
-    ],
-  },
-  {
-    href: "/admin/equipment",
-    label: "Kit",
-    glyph: "⚙",
-    sections: [
-      { href: "/admin/equipment", label: "Equipment", owns: ["/admin/equipment/"] },
-      { href: "/admin/feed", label: "Feed inventory" },
+      { href: "/admin/map", label: "Map" },
       { href: "/admin/supplies", label: "Supplies" },
+      { href: "/admin/equipment", label: "Equipment", owns: ["/admin/equipment/"] },
+      { href: "/admin/garden/plantings", label: "Garden" },
     ],
   },
   {
-    href: "/admin/business/bookings",
-    label: "Business",
-    glyph: "◇",
-    sections: [
-      { href: "/admin/business/bookings", label: "Bookings" },
-      { href: "/admin/business/clients", label: "Clients" },
-      { href: "/admin/business/program", label: "Program roster" },
-      { href: "/admin/business/schedule", label: "Day schedule" },
-      { href: "/admin/business/forms", label: "Forms" },
-      { href: "/admin/business/invoices", label: "Invoices" },
+    href: "/admin/more",
+    label: "More",
+    glyph: "⋯",
+    sections: [{ href: "/admin/more", label: "More" }],
+  },
+];
+
+/** The button between the places: log anything, for one animal or several. */
+export const LOG_HREF = "/admin/log";
+
+/**
+ * What More holds, in the groups the More page draws.
+ *
+ * Seasonal work done at a desk, the people the farm deals with, and the
+ * things set up once. All of it reached deliberately, none of it daily —
+ * which is the difference between these and the four above.
+ */
+export interface MoreGroup {
+  readonly label: string;
+  readonly items: readonly (NavItem & { readonly hint: string })[];
+}
+
+export const MORE: readonly MoreGroup[] = [
+  {
+    label: "Seasonal · best at a desk",
+    items: [
+      {
+        href: "/admin/breeding",
+        label: "Breeding",
+        hint: "Pairings, catalog, ancestors and the semen tank",
+      },
+      { href: "/admin/reports", label: "Reports", hint: "Costs, sales and the year in numbers" },
+      { href: "/admin/calendar", label: "Calendar", hint: "Every dated thing on the place" },
+    ],
+  },
+  {
+    label: "People",
+    items: [
+      { href: "/admin/contacts", label: "Contacts", hint: "Vet, AI tech, feed store, hauler" },
+      {
+        href: "/admin/housesitter",
+        label: "Housesitter",
+        hint: "The guide, trips and the sitter link",
+      },
+      { href: "/admin/business/bookings", label: "Bookings", hint: "Show-calf boarding requests" },
+      { href: "/admin/business/clients", label: "Clients", hint: "Boarding customers" },
+      { href: "/admin/business/program", label: "Program roster", hint: "Who is in the program" },
+      { href: "/admin/business/schedule", label: "Day schedule", hint: "The boarding day" },
+      { href: "/admin/business/forms", label: "Forms", hint: "Agreements and releases" },
+      { href: "/admin/business/invoices", label: "Invoices", hint: "What customers owe" },
+    ],
+  },
+  {
+    label: "Set-up",
+    items: [
+      {
+        href: "/admin/chores",
+        label: "Chores and feeding",
+        hint: "What appears on Today and the kiosk",
+      },
+      {
+        href: "/admin/settings",
+        label: "Settings",
+        hint: "Farm, people, kiosks, appearance",
+        owns: ["/admin/settings/"],
+      },
     ],
   },
 ];
 
-/**
- * Beneath the rule, quieter.
- *
- * Reached deliberately and rarely, which is the difference between these and
- * the five above. Putting Trash and Reports at the same weight as the herd was
- * a large part of what made the sidebar a wall.
- */
-export const UTILITY: readonly NavItem[] = [
-  { href: "/admin/contacts", label: "Contacts" },
-  { href: "/admin/reports", label: "Reports" },
-  { href: "/admin/housesitter", label: "Housesitter" },
-  { href: "/admin/settings", label: "Settings", owns: ["/admin/settings/"] },
-];
+/** Every More item, flat — what used to be the utility rail, and the business pages. */
+export const UTILITY: readonly NavItem[] = MORE.flatMap((group) => group.items);
 
 /**
  * The second strip, for destinations whose sections have views of their own.
@@ -144,9 +201,9 @@ export const SUB_SECTIONS: Readonly<Record<string, readonly NavItem[]>> = {
     { href: "/admin/cattle/candidates", label: "Candidates" },
     { href: "/admin/cattle/risks", label: "Worth a look" },
   ],
+  // Each species' page leads its own strip, and its tools follow (decision 44).
   "/admin/horses": [
     { href: "/admin/horses", label: "Horses" },
-    { href: "/admin/horses/herd", label: "Herd" },
     { href: "/admin/horses/pens", label: "Pens" },
     { href: "/admin/horses/feeding", label: "Feeding" },
     { href: "/admin/horses/breeding", label: "Breeding" },
@@ -158,9 +215,26 @@ export const SUB_SECTIONS: Readonly<Record<string, readonly NavItem[]>> = {
     { href: "/admin/equipment/roadmap", label: "Roadmap" },
     { href: "/admin/equipment/candidates", label: "Candidates" },
   ],
+  "/admin/garden/plantings": [
+    { href: "/admin/garden/plantings", label: "Plantings" },
+    { href: "/admin/garden/layout", label: "Layout" },
+    { href: "/admin/garden/seeds", label: "Seeds" },
+    { href: "/admin/garden/harvest", label: "Harvest" },
+  ],
   "/admin/chickens/flock": [
-    { href: "/admin/chickens/flock", label: "Flocks" },
+    { href: "/admin/chickens/flock", label: "Chickens" },
     { href: "/admin/chickens/eggs", label: "Eggs" },
+    { href: "/admin/chickens/headcount", label: "Headcount" },
+  ],
+  // Each species' own care — vet visits, medicine, rations — so the Cats
+  // strip never shows the dogs beside it (decision 46).
+  "/admin/pets/dogs": [
+    { href: "/admin/pets/dogs", label: "Dogs" },
+    { href: "/admin/pets/dogs/care", label: "Dog care" },
+  ],
+  "/admin/pets/cats": [
+    { href: "/admin/pets/cats", label: "Cats" },
+    { href: "/admin/pets/cats/care", label: "Cat care" },
   ],
   "/admin/settings": [
     { href: "/admin/settings", label: "Settings" },
@@ -173,6 +247,7 @@ export function allNavRoutes(): readonly string[] {
   return [
     ...NAV.flatMap((destination) => destination.sections.map((section) => section.href)),
     ...UTILITY.map((item) => item.href),
+    LOG_HREF,
     ...Object.values(SUB_SECTIONS).flatMap((items) => items.map((item) => item.href)),
   ];
 }
@@ -206,13 +281,21 @@ export function isWithin(item: NavItem, pathname: string): boolean {
 
 /** Which of the five holds this route, so the rail can mark it. */
 export function destinationFor(pathname: string): NavDestination | undefined {
-  return NAV.find((destination) =>
+  const found = NAV.find((destination) =>
     destination.sections.some(
       (section) =>
         isWithin(section, pathname) ||
         (SUB_SECTIONS[section.href] ?? []).some((sub) => isWithin(sub, pathname)),
     ),
   );
+  if (found !== undefined) return found;
+
+  // Anything listed on the More page lights More, so a page reached from it
+  // never leaves the nav with nothing marked.
+  const fromMore =
+    UTILITY.some((item) => isWithin(item, pathname)) ||
+    UTILITY.some((item) => (SUB_SECTIONS[item.href] ?? []).some((sub) => isWithin(sub, pathname)));
+  return fromMore ? NAV.find((destination) => destination.href === "/admin/more") : undefined;
 }
 
 /** The section within that destination, which owns the second strip. */
@@ -226,3 +309,56 @@ export function sectionFor(pathname: string): NavItem | undefined {
       (SUB_SECTIONS[section.href] ?? []).some((sub) => isWithin(sub, pathname)),
   );
 }
+
+/** A handful of a section's views that belong together, under one name. */
+export interface ViewGroup {
+  readonly label: string;
+  readonly views: readonly NavItem[];
+}
+
+const cattleView = (href: string): NavItem => {
+  const found = (SUB_SECTIONS["/admin/cattle"] ?? []).find((view) => view.href === href);
+  if (found === undefined) throw new Error(`${href} is not a cattle view`);
+  return found;
+};
+
+/**
+ * Thirteen views of one herd, as four questions (spec §8 v0.9).
+ *
+ * A strip of thirteen tabs scrolls, which kept the sidebar short, but the eye
+ * still has to read all thirteen to find one. Grouped, the first strip is four
+ * words — what the herd is, what it is making, how it is, what it is worth —
+ * and the second holds only the views of the one chosen.
+ *
+ * Every view here is one of `SUB_SECTIONS`, so reachability is unchanged and
+ * the test that guards it still reads the flat list. A view in no group would
+ * be reachable by URL and by search but missing from the strip, which
+ * `nav-reachability.test.ts` checks for.
+ */
+export const VIEW_GROUPS: Readonly<Record<string, readonly ViewGroup[]>> = {
+  "/admin/cattle": [
+    {
+      label: "Herd",
+      views: ["/admin/cattle", "/admin/cattle/weights", "/admin/cattle/feed"].map(cattleView),
+    },
+    {
+      label: "Breeding",
+      views: [
+        "/admin/cattle/breeding",
+        "/admin/cattle/calving",
+        "/admin/cattle/supplies",
+        "/admin/cattle/ancestors",
+        "/admin/cattle/catalog",
+        "/admin/cattle/candidates",
+      ].map(cattleView),
+    },
+    {
+      label: "Health",
+      views: ["/admin/cattle/health", "/admin/cattle/risks"].map(cattleView),
+    },
+    {
+      label: "Sales",
+      views: ["/admin/cattle/sales", "/admin/cattle/roadmap"].map(cattleView),
+    },
+  ],
+};

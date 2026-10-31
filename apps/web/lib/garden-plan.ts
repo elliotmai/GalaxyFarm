@@ -17,7 +17,7 @@ import {
   type Variety,
 } from "@galaxy-farm/module-garden";
 
-import { familyHistory, familyOf, varietyLabel } from "@/lib/garden";
+import { byId, familyHistory, familyOf, varietyLabel } from "@/lib/garden";
 
 /**
  * The garden, flattened into the shapes the spatial editor draws (spec §2).
@@ -246,14 +246,19 @@ export function bedShapes(
   // Once for the whole plan rather than once per bed: the history is the same
   // list every time, and `rotationWarning` filters it by bed itself.
   const history = familyHistory(plantings, varieties, crops);
+  // Likewise what is growing, grouped once: a filter of every planting per
+  // bed is a scan of the whole history for each rectangle on the plan.
+  const growingIn = new Map<Ulid, number>();
+  for (const planting of plantings) {
+    if (!LIVE_STATUSES.includes(planting.status)) continue;
+    growingIn.set(planting.bedId, (growingIn.get(planting.bedId) ?? 0) + 1);
+  }
 
   return [...beds]
     .sort((left, right) => left.name.localeCompare(right.name))
     .map((bed) => {
       const boundary = bedBoundary(bed, origin);
-      const growing = plantings.filter(
-        (planting) => planting.bedId === bed.id && LIVE_STATUSES.includes(planting.status),
-      );
+      const growing = growingIn.get(bed.id) ?? 0;
 
       const size =
         bed.lengthFt === undefined || bed.widthFt === undefined
@@ -268,7 +273,7 @@ export function bedShapes(
         ...(family === undefined
           ? {}
           : { rank: rotationRank(rotationWarning(bed.id, family, history, at)) }),
-        resting: bed.active && growing.length === 0,
+        resting: bed.active && growing === 0,
         inactive: !bed.active,
         // Attributed, because the editor now takes instructions as lines with
         // a source rather than one blob of text (§5.1). A bed has exactly one
@@ -303,7 +308,7 @@ export function plantingChips(
   return plantings
     .filter((planting) => LIVE_STATUSES.includes(planting.status))
     .map((planting) => {
-      const variety = varieties.find((entry) => entry.id === planting.varietyId);
+      const variety = byId(varieties).get(planting.varietyId);
       const family = familyOf(planting.varietyId, varieties, crops);
       const accent = familyAccent(family);
 

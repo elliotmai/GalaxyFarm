@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import {
   Button,
-  Card,
   Checkbox,
   EmptyState,
   Modal,
@@ -37,6 +36,11 @@ import { useMutations } from "@/lib/local/mutations";
  * there is deliberately no way to type it in here. A guide holding its own
  * copy of the pen list would be wrong the first time an animal moved, and
  * nobody would find out until it was being relied on.
+ *
+ * Rows rather than cards: the guide is one line with an edit button, each
+ * written section is its heading and the start of its body, and the forms —
+ * with their deletes — open in a side panel, so nothing here reflows while
+ * somebody writes.
  */
 
 const KIND_LABELS: Readonly<Record<GuideSectionKind, string>> = {
@@ -48,19 +52,6 @@ const KIND_LABELS: Readonly<Record<GuideSectionKind, string>> = {
   equipment_quirks: "Equipment quirks",
   pets: "The dogs and cats",
   custom: "Sections you write",
-};
-
-const KIND_HINTS: Readonly<Record<GuideSectionKind, string>> = {
-  pens: "Each pen leads with its effective safety level — the higher of the pen's own and its worst occupant.",
-  cattle_feeding:
-    "Every live plan that is not one of the pets' bowls, said as a ration: who eats it, how much, and how often. Separate from the pens, because a plan can cover the whole place or follow one cow between them.",
-  chores:
-    "The standing rule, not one day's list. Ticking a day off happens on the sitter's own screen.",
-  emergency_contacts: "Everybody tagged Emergency in Contacts.",
-  vet: "Everybody tagged Vet in Contacts.",
-  equipment_quirks: "Equipment does not sync to devices yet, so there is nothing to compose.",
-  pets: "Handling, feeding and any medicine they are on, from the Pets screen.",
-  custom: "Always included. The sections below.",
 };
 
 /** Composed from live records; the two below are not chosen here. */
@@ -297,15 +288,15 @@ export function GuideBuilder({
 
     return (
       <Modal
+        placement="side"
         title={editingGuide === undefined ? "Start a guide" : `Editing ${editingGuide.title}`}
-        description="The title and the opening paragraph. What goes under them is chosen next."
         onClose={() => {
           setGuideDraft(undefined);
           setEditingGuide(undefined);
           setErrors({});
         }}
         footer={
-          <div className="flex gap-2">
+          <div className="flex w-full flex-wrap gap-2">
             <Button variant="primary" busy={busy} onClick={() => void saveGuide()}>
               {editingGuide === undefined ? "Start it" : "Save changes"}
             </Button>
@@ -317,6 +308,21 @@ export function GuideBuilder({
             >
               Cancel
             </Button>
+            {editingGuide === undefined ? null : (
+              // Closed first, so the typed confirmation is the only dialog.
+              <Button
+                variant="danger"
+                className="ml-auto"
+                onClick={() => {
+                  const guide = editingGuide;
+                  setGuideDraft(undefined);
+                  setEditingGuide(undefined);
+                  void removeGuide(guide);
+                }}
+              >
+                Delete
+              </Button>
+            )}
           </div>
         }
       >
@@ -331,7 +337,7 @@ export function GuideBuilder({
           <TextArea
             label="Opening"
             rows={4}
-            hint="Where the key is, what time you are back, who else has been told. The one part nobody else can derive."
+            hint="Where the key is, when you are back, who else knows."
             value={guideDraft.intro}
             error={errors["intro"]}
             onChange={(event) => setGuideDraft({ ...guideDraft, intro: event.target.value })}
@@ -354,8 +360,12 @@ export function GuideBuilder({
       <>
         <EmptyState
           title="No guide yet"
-          detail="A guide is a title, an intro, and a choice of what to compose. Everything else it says, the app already knows."
-          action={<Button onClick={() => startGuide()}>Start one</Button>}
+          detail="A title and an opening. The pens, routine and numbers come from the farm's records."
+          action={
+            <Button variant="primary" onClick={() => startGuide()}>
+              Start one
+            </Button>
+          }
         />
         {guideModal()}
       </>
@@ -364,68 +374,64 @@ export function GuideBuilder({
 
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title="The guide"
-        description="More than one is allowed — a weekend and a fortnight ask for different things."
-        actions={
-          <div className="flex flex-wrap items-end gap-2">
-            {guides.length < 2 ? null : (
-              <Select
-                label="Guide"
-                hideLabel
-                value={chosen.id}
-                options={guides.map((guide) => ({
-                  value: guide.id,
-                  label: guide.active ? guide.title : `${guide.title} (retired)`,
-                }))}
-                onChange={(event) => onChoose(event.target.value as Ulid)}
-              />
-            )}
-            <Button onClick={() => startGuide()}>New guide</Button>
+      {/*
+        The guide itself, as one row: its title, its opening, and the way to
+        edit both. More than one is allowed — a weekend and a fortnight ask for
+        different things — so the picker appears once there are two.
+      */}
+      <div className="flex flex-wrap items-end gap-2">
+        {guides.length < 2 ? null : (
+          <div className="min-w-0 flex-1">
+            <Select
+              label="Guide"
+              hideLabel
+              value={chosen.id}
+              options={guides.map((guide) => ({
+                value: guide.id,
+                label: guide.active ? guide.title : `${guide.title} (retired)`,
+              }))}
+              onChange={(event) => onChoose(event.target.value as Ulid)}
+            />
           </div>
-        }
-      >
-        <Card
-          title={chosen.title}
-          actions={
-            <span className="flex gap-1">
-              <Button variant="ghost" onClick={() => startGuide(chosen)}>
-                Edit
-              </Button>
-              <Button variant="ghost" onClick={() => void removeGuide(chosen)}>
-                Delete
-              </Button>
-            </span>
-          }
+        )}
+        <Button onClick={() => startGuide()}>New guide</Button>
+      </div>
+
+      <div className="flex overflow-hidden rounded-density border border-rule bg-panel">
+        <button
+          type="button"
+          onClick={() => startGuide(chosen)}
+          className="flex min-h-[60px] min-w-0 flex-1 items-center gap-3 py-2 pl-4 pr-3 text-left text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
         >
-          {chosen.active ? null : (
-            <p className="mb-density">
-              <Pill tone="neutral">retired</Pill>
-            </p>
-          )}
-          <p className="text-density text-ink">
-            {chosen.intro ?? "No opening paragraph yet — the one part nobody else can derive."}
-          </p>
-        </Card>
-      </Section>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate font-semibold">{chosen.title}</span>
+            <span className="line-clamp-2 text-sm text-muted">
+              {chosen.intro ?? "No opening yet — where the key is, when you are back."}
+            </span>
+          </span>
+          {chosen.active ? null : <Pill tone="neutral">Retired</Pill>}
+          <EditGlyph />
+        </button>
+      </div>
 
       <Section
         title="What to compose"
-        description="Each of these is built from the farm's own records when the guide is opened. Nothing here is typed in, and nothing here can go stale."
+        description="Built from the farm's own records each time the guide is opened, so nothing here goes stale. Pens lead with their effective safety level — the higher of the pen's own and its worst occupant."
       >
-        <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-x-density sm:grid-cols-2">
           {AUTO_KINDS.map((kind) => {
             const count = counts[kind] ?? 0;
-            const nothing = count === 0;
 
             return (
               <Checkbox
                 key={kind}
                 label={KIND_LABELS[kind]}
                 hint={
-                  nothing
-                    ? `${KIND_HINTS[kind]} Nothing to show right now, so it would print empty.`
-                    : `${KIND_HINTS[kind]} ${count} to show.`
+                  kind === "equipment_quirks"
+                    ? "Not available yet"
+                    : count === 0
+                      ? "Nothing to show — prints empty"
+                      : `${count} to show`
                 }
                 checked={chosen.includes.includes(kind)}
                 disabled={kind === "equipment_quirks"}
@@ -438,36 +444,30 @@ export function GuideBuilder({
 
       <Section
         title="Sections you write"
-        description="The things the app cannot know. The alarm code, which neighbour has the spare key, what the dog is allowed off the table."
+        description="What the app cannot know: the alarm code, who has the spare key."
         actions={<Button onClick={() => startSection()}>Add a section</Button>}
       >
         {sections.length === 0 ? (
           <EmptyState
             title="Nothing written yet"
-            detail="Everything else on the guide is derived. This is where the rest goes."
             action={<Button onClick={() => startSection()}>Write one</Button>}
           />
         ) : (
-          <ul className="flex flex-col gap-density">
+          <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
             {sections.map((section) => (
-              <li key={section.id}>
-                <Card
-                  title={section.title}
-                  actions={
-                    <span className="flex gap-1">
-                      <Button variant="ghost" onClick={() => startSection(section)}>
-                        Edit
-                      </Button>
-                      <Button variant="ghost" onClick={() => void removeSection(section)}>
-                        Delete
-                      </Button>
-                    </span>
-                  }
+              <li key={section.id} className="flex items-center">
+                {/* The whole row edits: the panel it opens is where delete is. */}
+                <button
+                  type="button"
+                  onClick={() => startSection(section)}
+                  className="flex min-h-[60px] min-w-0 flex-1 items-center gap-3 py-2 pl-4 pr-3 text-left text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
                 >
-                  <p className="whitespace-pre-wrap text-density text-muted">
-                    {section.bodyMarkdown}
-                  </p>
-                </Card>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate font-semibold">{section.title}</span>
+                    <span className="truncate text-sm text-muted">{section.bodyMarkdown}</span>
+                  </span>
+                  <EditGlyph />
+                </button>
               </li>
             ))}
           </ul>
@@ -478,7 +478,7 @@ export function GuideBuilder({
 
       {sectionDraft === undefined ? null : (
         <Modal
-          size="wide"
+          placement="side"
           title={
             editingSection === undefined
               ? "A section of your own"
@@ -491,7 +491,7 @@ export function GuideBuilder({
             setErrors({});
           }}
           footer={
-            <div className="flex gap-2">
+            <div className="flex w-full flex-wrap gap-2">
               <Button variant="primary" busy={busy} onClick={() => void saveSection()}>
                 Save section
               </Button>
@@ -503,6 +503,20 @@ export function GuideBuilder({
               >
                 Cancel
               </Button>
+              {editingSection === undefined ? null : (
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const section = editingSection;
+                    setSectionDraft(undefined);
+                    setEditingSection(undefined);
+                    void removeSection(section);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
             </div>
           }
         >
@@ -543,5 +557,26 @@ export function GuideBuilder({
         </Modal>
       )}
     </div>
+  );
+}
+
+/** The pencil at the end of a row that opens its editor. Decoration only. */
+function EditGlyph() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="shrink-0 text-muted"
+    >
+      <path d="M4 20h4L19 9l-4-4L4 16z" />
+      <path d="M13.5 6.5l4 4" />
+    </svg>
   );
 }

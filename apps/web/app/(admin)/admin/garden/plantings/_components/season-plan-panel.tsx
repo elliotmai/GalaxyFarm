@@ -5,20 +5,15 @@ import { useState } from "react";
 import {
   Button,
   Callout,
-  CardGrid,
   Checkbox,
-  DataTable,
   EmptyState,
   Modal,
-  Pill,
-  RecordCard,
   Section,
   Select,
   TextArea,
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import type { CrudError, Ulid } from "@galaxy-farm/core";
 import {
@@ -42,8 +37,16 @@ import {
   dateFromInput,
   dateInputValue,
   formatDate,
+  optionalNumber,
+  optionalText,
 } from "@/app/(admin)/admin/garden/_components/labels";
-import { varietyLabel } from "@/lib/garden";
+import {
+  AddAction,
+  LandRow,
+  RowAction,
+  RowList,
+} from "@/app/(admin)/admin/pastures/_components/land-kit";
+import { byId, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -137,13 +140,29 @@ export function SeasonPlanPanel({
 
   const now = new Date();
   const openBeds = beds.filter((bed) => bed.active);
-  const nameOf = (varietyId: Ulid) =>
-    varietyLabel(
-      varieties.find((variety) => variety.id === varietyId),
-      crops,
-    );
+  const nameOf = (varietyId: Ulid) => varietyLabel(byId(varieties).get(varietyId), crops);
   const bedName = (id: Ulid | undefined) =>
-    id === undefined ? undefined : beds.find((bed) => bed.id === id)?.name;
+    id === undefined ? undefined : byId(beds).get(id)?.name;
+
+  /** Each plan's lines, gathered once and in window order. */
+  const linesOf = new Map<Ulid, PlannedPlanting[]>();
+  for (const entry of planned) {
+    const list = linesOf.get(entry.seasonPlanId) ?? [];
+    list.push(entry);
+    linesOf.set(entry.seasonPlanId, list);
+  }
+  for (const list of linesOf.values()) {
+    list.sort((left, right) => left.windowFrom.getTime() - right.windowFrom.getTime());
+  }
+
+  /** The beds a line can name: those in use, plus the one it already names. */
+  const bedOptions = (current: string, blank: string) => [
+    ...(blank === "" ? [] : [{ value: "", label: blank }]),
+    ...openBeds.map((bed) => ({ value: bed.id, label: bed.name })),
+    ...(current === "" || openBeds.some((bed) => bed.id === current)
+      ? []
+      : [{ value: current, label: `${bedName(current as Ulid) ?? "A bed"} (switched off)` }]),
+  ];
 
   const windows = plantingWindows(planned, now, leadDays);
 
@@ -162,7 +181,7 @@ export function SeasonPlanPanel({
     const fields = {
       name: planDraft.name.trim(),
       year: planDraft.year.trim() === "" ? Number.NaN : Number(planDraft.year.trim()),
-      notes: planDraft.notes.trim() === "" ? undefined : planDraft.notes.trim(),
+      notes: optionalText(planDraft.notes),
       active: planDraft.active,
     };
 
@@ -195,9 +214,9 @@ export function SeasonPlanPanel({
       bedId: entryDraft.bedId === "" ? undefined : (entryDraft.bedId as Ulid),
       windowFrom: from ?? new Date(Number.NaN),
       windowTo: to ?? new Date(Number.NaN),
-      quantity: entryDraft.quantity.trim() === "" ? undefined : Number(entryDraft.quantity.trim()),
+      quantity: optionalNumber(entryDraft.quantity),
       planStatus: editingEntry?.planStatus ?? ("open" as const),
-      notes: entryDraft.notes.trim() === "" ? undefined : entryDraft.notes.trim(),
+      notes: optionalText(entryDraft.notes),
     };
 
     const result =
@@ -299,7 +318,7 @@ export function SeasonPlanPanel({
    * longer exists without losing anything about what is growing.
    */
   async function removePlan(plan: SeasonPlan) {
-    const entries = planned.filter((entry) => entry.seasonPlanId === plan.id);
+    const entries = linesOf.get(plan.id) ?? [];
     const realised = entries.filter((entry) => entry.planStatus === "realised").length;
 
     const confirmed = await confirmDelete({
@@ -325,7 +344,10 @@ export function SeasonPlanPanel({
       return;
     }
 
-    for (const entry of entries) await entryApi.remove(entry.id, `Plan ${plan.name} deleted`);
+    // Together: each line is a local write, and none waits on another.
+    await Promise.all(
+      entries.map((entry) => entryApi.remove(entry.id, `Plan ${plan.name} deleted`)),
+    );
 
     show({
       message: `${plan.name} deleted`,
@@ -334,7 +356,7 @@ export function SeasonPlanPanel({
         onAct: () => {
           void (async () => {
             await planApi.restoreRecord(plan.id);
-            for (const entry of entries) await entryApi.restoreRecord(entry.id);
+            await Promise.all(entries.map((entry) => entryApi.restoreRecord(entry.id)));
           })();
         },
       },
@@ -368,184 +390,133 @@ export function SeasonPlanPanel({
     });
   }
 
+  function startCreatePlan() {
+    setEditingPlan(undefined);
+    setPlanDraft({
+      name: `${new Date().getFullYear()} garden`,
+      year: String(new Date().getFullYear()),
+      notes: "",
+      active: true,
+    });
+    setErrors({});
+  }
+
+  function startEditPlan(plan: SeasonPlan) {
+    setEditingPlan(plan);
+    setPlanDraft({
+      name: plan.name,
+      year: String(plan.year),
+      notes: plan.notes ?? "",
+      active: plan.active,
+    });
+    setErrors({});
+  }
+
+  function startCreateEntry(plan: SeasonPlan) {
+    setEditingEntry(undefined);
+    setEntryDraft({
+      seasonPlanId: plan.id,
+      varietyId: "",
+      method: "direct_sow",
+      bedId: "",
+      windowFrom: dateInputValue(new Date()),
+      windowTo: "",
+      quantity: "",
+      notes: "",
+    });
+    setErrors({});
+  }
+
+  function startEditEntry(row: PlannedPlanting) {
+    setEditingEntry(row);
+    setEntryDraft({
+      seasonPlanId: row.seasonPlanId,
+      varietyId: row.varietyId,
+      method: row.method,
+      bedId: row.bedId ?? "",
+      windowFrom: dateInputValue(row.windowFrom),
+      windowTo: dateInputValue(row.windowTo),
+      quantity: row.quantity === undefined ? "" : String(row.quantity),
+      notes: row.notes ?? "",
+    });
+    setErrors({});
+  }
+
+  function startConvert(entry: PlannedPlanting) {
+    setConverting(entry);
+    setConvertBed(entry.bedId ?? openBeds[0]?.id ?? "");
+  }
+
+  function closeEntry() {
+    setEntryDraft(undefined);
+    setEditingEntry(undefined);
+  }
+
   if (loading) return <p className="text-muted">Loading the season plan…</p>;
 
-  const entryColumns: readonly Column<PlannedPlanting>[] = [
-    {
-      key: "variety",
-      header: "What",
-      primary: true,
-      render: (row) => nameOf(row.varietyId),
-    },
-    {
-      key: "method",
-      header: "How",
-      render: (row) => <Pill tone="action">{METHOD_LABEL[row.method]}</Pill>,
-    },
-    {
-      key: "window",
-      header: "Window",
-      render: (row) => `${formatDate(row.windowFrom)} – ${formatDate(row.windowTo)}`,
-    },
-    {
-      key: "bed",
-      header: "Bed",
-      render: (row) => bedName(row.bedId) ?? <span className="text-muted">not decided</span>,
-    },
-    {
-      key: "status",
-      header: "",
-      render: (row) =>
-        row.planStatus === "realised" ? (
-          <Pill tone="calm">planted</Pill>
-        ) : row.planStatus === "abandoned" ? (
-          <Pill tone="neutral" dot>
-            not planted
-          </Pill>
-        ) : (
-          <Pill tone="identity">open</Pill>
-        ),
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (row) => (
-        <span className="flex flex-wrap gap-2">
-          {row.planStatus !== "open" ? null : (
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setConverting(row);
-                setConvertBed(row.bedId ?? openBeds[0]?.id ?? "");
-              }}
-            >
-              Plant it
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setEditingEntry(row);
-              setEntryDraft({
-                seasonPlanId: row.seasonPlanId,
-                varietyId: row.varietyId,
-                method: row.method,
-                bedId: row.bedId ?? "",
-                windowFrom: dateInputValue(row.windowFrom),
-                windowTo: dateInputValue(row.windowTo),
-                quantity: row.quantity === undefined ? "" : String(row.quantity),
-                notes: row.notes ?? "",
-              });
-              setErrors({});
-            }}
-          >
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void removeEntry(row)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
+  const plantIt = (entry: PlannedPlanting) => (
+    <RowAction
+      label={`Plant ${METHOD_LABEL[entry.method]} ${nameOf(entry.varietyId)}`}
+      onClick={() => startConvert(entry)}
+    >
+      Plant it
+    </RowAction>
+  );
 
   return (
-    <div className="flex flex-col gap-density">
+    <div className="flex flex-col gap-density pb-20 sm:pb-0">
+      {/*
+        What the plan says is due inside the lead time. These are the only
+        things the garden emails about — the seed catalogue stays quiet — so
+        they lead, as rows with the one tap that closes them.
+      */}
       {windows.length === 0 ? null : (
-        <Section
-          title="Windows opening"
-          description={`What the plan says is due inside ${leadDays} days. These are the only things the garden emails about — the seed catalogue stays quiet.`}
-        >
-          <CardGrid columns={3}>
+        <Section title="Windows opening">
+          <RowList label="Planting windows opening">
             {windows.map((window) => {
               const entry = window.planned;
               return (
-                <RecordCard
+                <LandRow
                   key={entry.id}
-                  tone={window.closingSoon ? "danger" : window.open ? "action" : "identity"}
                   title={`${METHOD_LABEL[entry.method]} ${nameOf(entry.varietyId)}`}
-                  subtitle={
+                  openLabel={`Edit ${METHOD_LABEL[entry.method]} ${nameOf(entry.varietyId)}`}
+                  line={[
                     window.open
-                      ? `Open now, through ${formatDate(entry.windowTo)}`
-                      : `Opens ${formatDate(window.opensOn)}`
+                      ? `open through ${formatDate(entry.windowTo)}`
+                      : `opens ${formatDate(window.opensOn)}`,
+                    bedName(entry.bedId) ?? "no bed picked",
+                    entry.quantity === undefined ? undefined : `${entry.quantity} planned`,
+                  ]
+                    .filter((part) => part !== undefined)
+                    .join(" · ")}
+                  chip={
+                    window.closingSoon
+                      ? { tone: "danger", label: "Closing" }
+                      : window.open
+                        ? { tone: "action", label: "Open" }
+                        : undefined
                   }
-                  meta={
-                    <>
-                      {bedName(entry.bedId) === undefined ? (
-                        <Pill tone="neutral">no bed picked</Pill>
-                      ) : (
-                        <Pill tone="neutral">{bedName(entry.bedId)}</Pill>
-                      )}
-                      {window.closingSoon ? <Pill tone="danger">closing</Pill> : null}
-                      {entry.quantity === undefined ? null : (
-                        <Pill tone="neutral">{entry.quantity} planned</Pill>
-                      )}
-                    </>
-                  }
-                >
-                  {entry.notes === undefined ? null : (
-                    <p className="text-sm text-muted">{entry.notes}</p>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="primary"
-                      onClick={() => {
-                        setConverting(entry);
-                        setConvertBed(entry.bedId ?? openBeds[0]?.id ?? "");
-                      }}
-                    >
-                      Plant it
-                    </Button>
-                    <Button variant="ghost" onClick={() => void abandon(entry)}>
-                      Not this year
-                    </Button>
-                  </div>
-                </RecordCard>
+                  onOpen={() => startEditEntry(entry)}
+                  action={plantIt(entry)}
+                />
               );
             })}
-          </CardGrid>
+          </RowList>
         </Section>
       )}
 
       <Section
         title="Season plans"
-        description="One per season. What goes in, how, and the fortnight it wants to go in during."
         actions={
-          <Button
-            variant="primary"
-            onClick={() => {
-              setEditingPlan(undefined);
-              setPlanDraft({
-                name: `${new Date().getFullYear()} garden`,
-                year: String(new Date().getFullYear()),
-                notes: "",
-                active: true,
-              });
-              setErrors({});
-            }}
-          >
-            Add a plan
-          </Button>
+          plans.length === 0 ? undefined : <AddAction label="Add plan" onClick={startCreatePlan} />
         }
       >
         {plans.length === 0 ? (
           <EmptyState
             title="No season plan yet"
-            detail="A plan is what turns the seed box into a set of dates. It is also the only thing the garden will email you about."
+            detail="A plan turns the seed box into a set of dates. It is also the only thing the garden emails about."
             action={
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setEditingPlan(undefined);
-                  setPlanDraft({
-                    name: `${new Date().getFullYear()} garden`,
-                    year: String(new Date().getFullYear()),
-                    notes: "",
-                    active: true,
-                  });
-                  setErrors({});
-                }}
-              >
+              <Button variant="primary" onClick={startCreatePlan}>
                 Start one
               </Button>
             }
@@ -555,70 +526,73 @@ export function SeasonPlanPanel({
             {[...plans]
               .sort((left, right) => right.year - left.year || left.name.localeCompare(right.name))
               .map((plan) => {
-                const entries = planned.filter((entry) => entry.seasonPlanId === plan.id);
+                const entries = linesOf.get(plan.id) ?? [];
                 const open = entries.filter((entry) => entry.planStatus === "open").length;
 
                 return (
-                  <Section
-                    key={plan.id}
-                    title={`${plan.name} · ${plan.year}`}
-                    description={plan.notes}
-                    actions={
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Pill tone={plan.active ? "calm" : "neutral"} dot={!plan.active}>
+                  <section key={plan.id} aria-label={plan.name} className="flex flex-col gap-2">
+                    <div className="flex min-h-target flex-wrap items-center justify-between gap-x-2">
+                      <h3 className="flex min-w-0 items-baseline gap-2 text-sm font-semibold text-ink">
+                        <span className="truncate">
+                          {plan.name} · {plan.year}
+                        </span>
+                        <span className="shrink-0 font-normal text-muted">
                           {plan.active ? `${open} still to plant` : "switched off"}
-                        </Pill>
-                        <Button
-                          variant="primary"
-                          disabled={varieties.length === 0}
+                        </span>
+                      </h3>
+                      <span className="flex items-center">
+                        <RowAction
+                          label={`Add to ${plan.name}`}
                           onClick={() => {
-                            setEditingEntry(undefined);
-                            setEntryDraft({
-                              seasonPlanId: plan.id,
-                              varietyId: "",
-                              method: "direct_sow",
-                              bedId: "",
-                              windowFrom: dateInputValue(new Date()),
-                              windowTo: "",
-                              quantity: "",
-                              notes: "",
-                            });
-                            setErrors({});
+                            if (varieties.length > 0) startCreateEntry(plan);
+                            else
+                              show({
+                                message: "Add a variety under Garden → Seeds first.",
+                                tone: "warning",
+                              });
                           }}
                         >
-                          Add to this plan
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingPlan(plan);
-                            setPlanDraft({
-                              name: plan.name,
-                              year: String(plan.year),
-                              notes: plan.notes ?? "",
-                              active: plan.active,
-                            });
-                            setErrors({});
-                          }}
-                        >
+                          + Add
+                        </RowAction>
+                        <RowAction label={`Edit ${plan.name}`} onClick={() => startEditPlan(plan)}>
                           Edit
-                        </Button>
-                        <Button variant="ghost" onClick={() => void removePlan(plan)}>
-                          Delete
-                        </Button>
-                      </div>
-                    }
-                  >
-                    <DataTable
-                      rows={[...entries].sort(
-                        (left, right) => left.windowFrom.getTime() - right.windowFrom.getTime(),
-                      )}
-                      columns={entryColumns}
-                      rowKey={(row) => row.id}
-                      caption={`${plan.name} — planned plantings`}
-                      empty="Nothing planned under this yet."
-                    />
-                  </Section>
+                        </RowAction>
+                      </span>
+                    </div>
+                    {plan.notes === undefined ? null : (
+                      <p className="text-sm text-muted">{plan.notes}</p>
+                    )}
+                    {entries.length === 0 ? (
+                      <p className="text-sm text-muted">Nothing planned under this yet.</p>
+                    ) : (
+                      <RowList label={`${plan.name} — planned plantings`}>
+                        {entries.map((row) => (
+                          <LandRow
+                            key={row.id}
+                            title={`${METHOD_LABEL[row.method]} ${nameOf(row.varietyId)}`}
+                            openLabel={`Edit ${METHOD_LABEL[row.method]} ${nameOf(row.varietyId)}`}
+                            line={[
+                              `${formatDate(row.windowFrom)} – ${formatDate(row.windowTo)}`,
+                              bedName(row.bedId) ?? "bed not decided",
+                              row.quantity === undefined ? undefined : `${row.quantity} planned`,
+                            ]
+                              .filter((part) => part !== undefined)
+                              .join(" · ")}
+                            chip={
+                              row.planStatus === "realised"
+                                ? { tone: "calm", label: "Planted" }
+                                : row.planStatus === "abandoned"
+                                  ? { tone: "neutral", label: "Not planted" }
+                                  : undefined
+                            }
+                            quiet={row.planStatus !== "open"}
+                            onOpen={() => startEditEntry(row)}
+                            action={row.planStatus === "open" ? plantIt(row) : undefined}
+                          />
+                        ))}
+                      </RowList>
+                    )}
+                  </section>
                 );
               })}
           </div>
@@ -628,8 +602,20 @@ export function SeasonPlanPanel({
       {converting === undefined ? null : (
         <Modal
           title={`Plant ${nameOf(converting.varietyId)}`}
-          description="The plan's variety, method and quantity come across, and the plan keeps the record of having been made."
+          description="Variety, method and quantity come across from the plan."
           onClose={() => setConverting(undefined)}
+          footer={
+            <>
+              <Button
+                variant="primary"
+                disabled={convertBed === ""}
+                onClick={() => void convert(converting, convertBed as Ulid)}
+              >
+                Record it as planted
+              </Button>
+              <Button onClick={() => setConverting(undefined)}>Cancel</Button>
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
             {openBeds.length === 0 ? (
@@ -642,7 +628,7 @@ export function SeasonPlanPanel({
                 required
                 hint={
                   converting.bedId === undefined
-                    ? "The plan did not name one, which is the usual case in January."
+                    ? "The plan did not name one."
                     : "The plan's bed, unless it has changed."
                 }
                 options={openBeds.map((bed) => ({ value: bed.id, label: bed.name }))}
@@ -650,17 +636,6 @@ export function SeasonPlanPanel({
                 onChange={(event) => setConvertBed(event.target.value)}
               />
             )}
-
-            <div className="flex gap-2">
-              <Button
-                variant="primary"
-                disabled={convertBed === ""}
-                onClick={() => void convert(converting, convertBed as Ulid)}
-              >
-                Record it as planted
-              </Button>
-              <Button onClick={() => setConverting(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}
@@ -668,16 +643,38 @@ export function SeasonPlanPanel({
       {planDraft === undefined ? null : (
         <Modal
           key={editingPlan?.id ?? "new-plan"}
+          placement="side"
           title={editingPlan === undefined ? "New season plan" : `Editing ${editingPlan.name}`}
-          description="A season's worth of intentions, kept alongside what actually happened."
           onClose={() => setPlanDraft(undefined)}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void savePlan()}>
+                {editingPlan === undefined ? "Add plan" : "Save changes"}
+              </Button>
+              <Button onClick={() => setPlanDraft(undefined)}>Cancel</Button>
+              {editingPlan === undefined ? null : (
+                <Button
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    const plan = editingPlan;
+                    setPlanDraft(undefined);
+                    setEditingPlan(undefined);
+                    void removePlan(plan);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+            <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <TextInput
                 label="Name"
                 required
-                hint="&ldquo;2026 garden&rdquo;, &ldquo;fall brassicas&rdquo;."
+                placeholder="Fall brassicas"
                 value={planDraft.name}
                 error={errors["name"]}
                 onChange={(event) => setPlanDraft({ ...planDraft, name: event.target.value })}
@@ -698,7 +695,7 @@ export function SeasonPlanPanel({
             </div>
             <Checkbox
               label="Still current"
-              hint="Untick last year's. It keeps every line and stops being the one you are working from."
+              hint="Untick last year's. It keeps every line."
               checked={planDraft.active}
               onChange={(event) => setPlanDraft({ ...planDraft, active: event.target.checked })}
             />
@@ -709,12 +706,6 @@ export function SeasonPlanPanel({
               error={errors["notes"]}
               onChange={(event) => setPlanDraft({ ...planDraft, notes: event.target.value })}
             />
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void savePlan()}>
-                {editingPlan === undefined ? "Add plan" : "Save changes"}
-              </Button>
-              <Button onClick={() => setPlanDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}
@@ -722,13 +713,50 @@ export function SeasonPlanPanel({
       {entryDraft === undefined ? null : (
         <Modal
           key={editingEntry?.id ?? "new-entry"}
-          size="wide"
+          placement="side"
           title={editingEntry === undefined ? "Add to the plan" : "Editing a plan entry"}
-          description="The window is a fortnight, not a date — that is what a planting window is, and it is what the notification speaks from."
-          onClose={() => setEntryDraft(undefined)}
+          description="A window is a fortnight, not a date — the notification speaks from it."
+          onClose={closeEntry}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void saveEntry()}>
+                {editingEntry === undefined ? "Add to plan" : "Save changes"}
+              </Button>
+              <Button onClick={closeEntry}>Cancel</Button>
+              {editingEntry === undefined ? null : (
+                <>
+                  {/* Giving up on an open line lives here, beside delete: it
+                      closes the line out without pretending it happened. */}
+                  {editingEntry.planStatus !== "open" ? null : (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        const entry = editingEntry;
+                        closeEntry();
+                        void abandon(entry);
+                      }}
+                    >
+                      Not this year
+                    </Button>
+                  )}
+                  <Button
+                    variant="danger"
+                    className="ml-auto"
+                    onClick={() => {
+                      const entry = editingEntry;
+                      closeEntry();
+                      void removeEntry(entry);
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </>
+              )}
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
+            <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <Select
                 label="Variety"
                 required
@@ -776,11 +804,8 @@ export function SeasonPlanPanel({
               />
               <Select
                 label="Bed"
-                hint="Optional. Leave it open if you have not decided — it can be chosen when you plant."
-                options={[
-                  { value: "", label: "Not decided" },
-                  ...openBeds.map((bed) => ({ value: bed.id, label: bed.name })),
-                ]}
+                hint="Optional — it can be chosen when you plant."
+                options={bedOptions(entryDraft.bedId, "Not decided")}
                 value={entryDraft.bedId}
                 error={errors["bedId"]}
                 onChange={(event) => setEntryDraft({ ...entryDraft, bedId: event.target.value })}
@@ -801,18 +826,10 @@ export function SeasonPlanPanel({
             <TextArea
               label="Notes"
               rows={3}
-              hint="Why this one, what it is following, what it is for."
               value={entryDraft.notes}
               error={errors["notes"]}
               onChange={(event) => setEntryDraft({ ...entryDraft, notes: event.target.value })}
             />
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void saveEntry()}>
-                {editingEntry === undefined ? "Add to plan" : "Save changes"}
-              </Button>
-              <Button onClick={() => setEntryDraft(undefined)}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}

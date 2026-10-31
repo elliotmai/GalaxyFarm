@@ -1,21 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import {
   Button,
-  Card,
-  DataTable,
   EmptyState,
   Modal,
-  Pill,
-  Section,
   Select,
   TextArea,
   TextInput,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import { endOfDay, type CrudError, type Ulid } from "@galaxy-farm/core";
 import {
@@ -32,6 +27,12 @@ import {
   REASON_LABEL,
   REASON_OPTIONS,
 } from "@/app/(admin)/admin/chickens/flock/_components/reasons";
+import {
+  ChipRow,
+  FilteredLine,
+  ListRow,
+  RowList,
+} from "@/app/(admin)/admin/horses/_components/list-row";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -46,6 +47,11 @@ import { useMutations } from "@/lib/local/mutations";
  * Which way each reason moves the count is the domain's business, not this
  * screen's: `ADJUSTMENT_DIRECTION` decides, so a new reason cannot arrive with
  * the sign wired up differently here than in the count everything else reads.
+ *
+ * Two parts: `RecordChange`, the form a new entry is written in — a side
+ * panel, opened from the header or from a flock's row, so it never pushes the
+ * list down — and `HeadcountPanel`, the history as rows, each opening its own
+ * editor.
  */
 
 function formatDate(value: Date): string {
@@ -75,21 +81,45 @@ function blank(flockId: string): Draft {
   };
 }
 
-export function HeadcountPanel({
+function fields(source: Draft) {
+  return {
+    flockId: source.flockId as Ulid,
+    reason: source.reason,
+    quantity: source.quantity.trim() === "" ? Number.NaN : Number(source.quantity),
+    // Midday, so a date typed here is the same day in every timezone the
+    // farm's devices might be set to.
+    occurredOn: new Date(`${source.occurredOn}T12:00:00`),
+    notes: source.notes.trim() === "" ? undefined : source.notes.trim(),
+  };
+}
+
+function errorsFrom(error: CrudError): Record<string, string> {
+  return error.kind === "validation"
+    ? Object.fromEntries(error.issues.map((issue) => [String(issue.path[0]), issue.message]))
+    : { quantity: "Could not save. Check the fields and try again." };
+}
+
+/**
+ * Record a change — every bird in or out goes through here.
+ *
+ * It stays open after an entry is written: a bad night is several entries in
+ * a row, and closing on each one is a panel reopened four times.
+ */
+export function RecordChange({
   flocks,
   adjustments,
-  loading,
   propertyId,
   actorId,
   focusedFlockId,
+  onClose,
 }: {
   readonly flocks: readonly Flock[];
   readonly adjustments: readonly FlockAdjustment[];
-  readonly loading: boolean;
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
-  /** The flock whose card sent us here, if that is how we arrived. */
-  readonly focusedFlockId?: Ulid;
+  /** The flock whose row opened this, if that is how we arrived. */
+  readonly focusedFlockId?: Ulid | undefined;
+  readonly onClose: () => void;
 }) {
   const mutations = useMutations<FlockAdjustment>(
     "flockAdjustments",
@@ -98,18 +128,13 @@ export function HeadcountPanel({
     propertyId,
     actorId,
   );
-  const confirmDelete = useConfirmDelete();
   const { show } = useToast();
 
   const live = flocks.filter((flock) => flock.active);
   const [draft, setDraft] = useState<Draft>(() => blank(focusedFlockId ?? live[0]?.id ?? ""));
-  const [editing, setEditing] = useState<FlockAdjustment | undefined>();
-  const [editDraft, setEditDraft] = useState<Draft | undefined>();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const [filter, setFilter] = useState<string>(focusedFlockId ?? "all");
-
-  const flockName = (id: Ulid) => flocks.find((flock) => flock.id === id)?.name ?? "Unknown flock";
+  const formId = useId();
 
   /**
    * Which flock the form is actually on.
@@ -130,31 +155,6 @@ export function HeadcountPanel({
   const countNow =
     chosenFlock === undefined ? undefined : headCountOn(chosenFlock, adjustments, now);
 
-  const shown = filter === "all" ? adjustments : adjustments.filter((e) => e.flockId === filter);
-  const history = [...shown].sort(
-    (left, right) => right.occurredOn.getTime() - left.occurredOn.getTime(),
-  );
-
-  function fields(source: Draft) {
-    return {
-      flockId: source.flockId as Ulid,
-      reason: source.reason,
-      quantity: source.quantity.trim() === "" ? Number.NaN : Number(source.quantity),
-      // Midday, so a date typed here is the same day in every timezone the
-      // farm's devices might be set to.
-      occurredOn: new Date(`${source.occurredOn}T12:00:00`),
-      notes: source.notes.trim() === "" ? undefined : source.notes.trim(),
-    };
-  }
-
-  function reportErrors(error: CrudError) {
-    setErrors(
-      error.kind === "validation"
-        ? Object.fromEntries(error.issues.map((issue) => [String(issue.path[0]), issue.message]))
-        : { quantity: "Could not save. Check the fields and try again." },
-    );
-  }
-
   async function record(event: React.FormEvent) {
     event.preventDefault();
     setErrors({});
@@ -168,7 +168,7 @@ export function HeadcountPanel({
     try {
       const result = await mutations.create(fields({ ...draft, flockId: chosen }) as never);
       if (!result.ok) {
-        reportErrors(result.error);
+        setErrors(errorsFrom(result.error));
         return;
       }
 
@@ -196,6 +196,133 @@ export function HeadcountPanel({
     }
   }
 
+  return (
+    <Modal
+      placement="side"
+      title="Record a change"
+      description={
+        countNow === undefined
+          ? undefined
+          : `${chosenFlock?.name} has ${countNow} bird${countNow === 1 ? "" : "s"} today`
+      }
+      onClose={onClose}
+      footer={
+        live.length === 0 ? (
+          <Button onClick={onClose}>Close</Button>
+        ) : (
+          <>
+            {/* A submit tied to the form by id, so Enter in a field still
+                records, as it did when this was a form on the page. */}
+            <Button type="submit" form={formId} variant="primary" busy={busy}>
+              Record it
+            </Button>
+            <Button onClick={onClose}>Done</Button>
+          </>
+        )
+      }
+    >
+      {live.length === 0 ? (
+        <EmptyState
+          title="No flocks to log against"
+          detail="Add a flock first. A headcount entry belongs to one."
+        />
+      ) : (
+        <form
+          id={formId}
+          onSubmit={(event) => void record(event)}
+          className="flex flex-col gap-density"
+        >
+          <Select
+            label="Flock"
+            value={chosen}
+            error={errors["flockId"]}
+            options={live.map((flock) => ({ value: flock.id, label: flock.name }))}
+            onChange={(event) => setDraft({ ...draft, flockId: event.target.value })}
+          />
+          <Select
+            label="What happened"
+            value={draft.reason}
+            hint={REASON_HINT[draft.reason]}
+            options={REASON_OPTIONS}
+            error={errors["reason"]}
+            onChange={(event) =>
+              setDraft({ ...draft, reason: event.target.value as AdjustmentReason })
+            }
+          />
+          <div className="grid grid-cols-2 gap-density">
+            <TextInput
+              label="How many"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              numeric
+              required
+              value={draft.quantity}
+              error={errors["quantity"]}
+              onChange={(event) => setDraft({ ...draft, quantity: event.target.value })}
+            />
+            <TextInput
+              label="When"
+              type="date"
+              required
+              value={draft.occurredOn}
+              error={errors["occurredOn"]}
+              onChange={(event) => setDraft({ ...draft, occurredOn: event.target.value })}
+            />
+          </div>
+          <TextArea
+            label="Note"
+            rows={2}
+            hint="What got in, which bird, where the hole was."
+            value={draft.notes}
+            error={errors["notes"]}
+            onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
+          />
+        </form>
+      )}
+    </Modal>
+  );
+}
+
+export function HeadcountPanel({
+  flocks,
+  adjustments,
+  loading,
+  propertyId,
+  actorId,
+  focusedFlockId,
+}: {
+  readonly flocks: readonly Flock[];
+  readonly adjustments: readonly FlockAdjustment[];
+  readonly loading: boolean;
+  readonly propertyId: Ulid;
+  readonly actorId: Ulid;
+  /** The flock to show the history of first, if one was picked. */
+  readonly focusedFlockId?: Ulid;
+}) {
+  const mutations = useMutations<FlockAdjustment>(
+    "flockAdjustments",
+    "flockAdjustments",
+    flockAdjustmentSchema,
+    propertyId,
+    actorId,
+  );
+  const confirmDelete = useConfirmDelete();
+  const { show } = useToast();
+
+  const [editing, setEditing] = useState<FlockAdjustment | undefined>();
+  const [editDraft, setEditDraft] = useState<Draft | undefined>();
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [filter, setFilter] = useState<string>(focusedFlockId ?? "all");
+
+  const flockName = (id: Ulid) => flocks.find((flock) => flock.id === id)?.name ?? "Unknown flock";
+
+  const shown = filter === "all" ? adjustments : adjustments.filter((e) => e.flockId === filter);
+  const history = [...shown].sort(
+    (left, right) => right.occurredOn.getTime() - left.occurredOn.getTime(),
+  );
+
   function startEdit(entry: FlockAdjustment) {
     setEditing(entry);
     setEditDraft({
@@ -219,7 +346,7 @@ export function HeadcountPanel({
 
     const result = await mutations.update(editing.id, fields(editDraft));
     if (!result.ok) {
-      reportErrors(result.error);
+      setErrors(errorsFrom(result.error));
       return;
     }
 
@@ -251,180 +378,112 @@ export function HeadcountPanel({
     });
   }
 
-  const columns: readonly Column<FlockAdjustment>[] = [
-    {
-      key: "flock",
-      header: "Flock",
-      primary: true,
-      render: (entry) => flockName(entry.flockId),
-    },
-    { key: "when", header: "When", render: (entry) => formatDate(entry.occurredOn) },
-    {
-      key: "change",
-      header: "Change",
-      numeric: true,
-      render: (entry) => (
-        <Pill tone={ADJUSTMENT_DIRECTION[entry.reason] > 0 ? "calm" : "danger"}>
-          {signed(entry)}
-        </Pill>
-      ),
-    },
-    {
-      key: "reason",
-      header: "Reason",
-      render: (entry) => REASON_LABEL[entry.reason],
-    },
-    { key: "notes", header: "Note", render: (entry) => entry.notes ?? "—" },
-    {
-      key: "actions",
-      header: "",
-      render: (entry) => (
-        <span className="flex gap-2">
-          <Button variant="ghost" onClick={() => startEdit(entry)}>
-            Edit
-          </Button>
-          <Button variant="ghost" onClick={() => void removeEntry(entry)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
-  ];
-
   if (loading) return <p className="text-muted">Loading the headcount log…</p>;
 
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title="Record a change"
-        description="Every bird in or out goes through here. The count on the flock follows from it and is never typed."
-      >
-        {live.length === 0 ? (
-          <EmptyState
-            title="No flocks to log against"
-            detail="Add a flock first. A headcount entry belongs to one, and there is nothing yet for it to move."
-          />
-        ) : (
-          <form onSubmit={(event) => void record(event)} className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-4">
-              <Select
-                label="Flock"
-                value={chosen}
-                error={errors["flockId"]}
-                options={live.map((flock) => ({ value: flock.id, label: flock.name }))}
-                onChange={(event) => setDraft({ ...draft, flockId: event.target.value })}
-              />
-              <Select
-                label="What happened"
-                value={draft.reason}
-                hint={REASON_HINT[draft.reason]}
-                options={REASON_OPTIONS}
-                error={errors["reason"]}
-                onChange={(event) =>
-                  setDraft({ ...draft, reason: event.target.value as AdjustmentReason })
-                }
-              />
-              <TextInput
-                label="How many"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                step={1}
-                numeric
-                required
-                value={draft.quantity}
-                error={errors["quantity"]}
-                onChange={(event) => setDraft({ ...draft, quantity: event.target.value })}
-              />
-              <TextInput
-                label="When"
-                type="date"
-                required
-                value={draft.occurredOn}
-                error={errors["occurredOn"]}
-                onChange={(event) => setDraft({ ...draft, occurredOn: event.target.value })}
-              />
-            </div>
-            <TextArea
-              label="Note"
-              rows={2}
-              hint="What got in, which bird, where the hole was. This is the half a bare number cannot hold."
-              value={draft.notes}
-              error={errors["notes"]}
-              onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-            />
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit" variant="primary" busy={busy}>
-                Record it
-              </Button>
-              {countNow === undefined ? null : (
-                <span className="text-sm text-muted">
-                  {chosenFlock?.name} has {countNow} bird{countNow === 1 ? "" : "s"} today.
-                </span>
-              )}
-            </div>
-          </form>
-        )}
-      </Section>
+      {/*
+        The flocks as chips: there are a handful, and "what happened to the
+        bantams" is one press. The whole history is the default, and the only
+        way to correct a count is to correct the entry that caused it.
+      */}
+      {flocks.length < 2 ? null : (
+        <ChipRow
+          label="Filter by flock"
+          value={filter}
+          onChange={setFilter}
+          chips={[
+            { key: "all", label: "Every flock" },
+            ...flocks.map((flock) => ({ key: flock.id as string, label: flock.name })),
+          ]}
+        />
+      )}
 
-      <Section
-        title="Every change"
-        description="The whole history, and the only way to correct one is to correct the entry that caused it."
-        actions={
-          <Select
-            label="Flock"
-            hideLabel
-            value={filter}
-            options={[
-              { value: "all", label: "Every flock" },
-              ...flocks.map((flock) => ({ value: flock.id, label: flock.name })),
-            ]}
-            onChange={(event) => setFilter(event.target.value)}
-          />
-        }
-      >
-        <Card>
-          <DataTable
-            caption="Headcount log"
-            columns={columns}
-            rows={history}
-            rowKey={(entry) => entry.id}
-            empty={
-              <EmptyState
-                title="Nothing logged yet"
-                detail="Birds bought, hatched, lost, culled and sold all land here, and the count on each flock follows."
-              />
-            }
-          />
-        </Card>
-      </Section>
+      {filter === "all" ? null : (
+        <FilteredLine
+          shown={history.length}
+          total={adjustments.length}
+          what={flockName(filter as Ulid)}
+          onClear={() => setFilter("all")}
+        />
+      )}
+
+      {history.length === 0 ? (
+        <EmptyState
+          title="Nothing logged yet"
+          detail="Birds bought, hatched, lost, culled and sold all land here."
+        />
+      ) : (
+        <RowList label="Headcount log">
+          {history.map((entry) => (
+            <ListRow
+              key={entry.id}
+              // The sign is the point of the row, so it leads, in the colour
+              // that says which way the count went.
+              title={
+                <>
+                  <span
+                    className={ADJUSTMENT_DIRECTION[entry.reason] > 0 ? "text-calm" : "text-danger"}
+                  >
+                    {signed(entry)}
+                  </span>{" "}
+                  {REASON_LABEL[entry.reason]}
+                </>
+              }
+              line={[flockName(entry.flockId), formatDate(entry.occurredOn), entry.notes]}
+              onOpen={() => startEdit(entry)}
+            />
+          ))}
+        </RowList>
+      )}
 
       {editDraft === undefined || editing === undefined ? null : (
         <Modal
           key={editing.id}
-          size="wide"
+          placement="side"
           title={`Editing ${REASON_LABEL[editing.reason]} ${editing.quantity}`}
           description="Correct what happened, to which flock, and when."
           onClose={closeEdit}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => void saveEdit()}>
+                Save changes
+              </Button>
+              <Button onClick={closeEdit}>Cancel</Button>
+              {/* The editor closes first, so the confirmation is the only
+                  dialog on screen. */}
+              <Button
+                variant="danger"
+                className="ml-auto"
+                onClick={() => {
+                  const entry = editing;
+                  closeEdit();
+                  void removeEntry(entry);
+                }}
+              >
+                Delete
+              </Button>
+            </>
+          }
         >
           <div className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
-              <Select
-                label="Flock"
-                value={editDraft.flockId}
-                error={errors["flockId"]}
-                options={flocks.map((flock) => ({ value: flock.id, label: flock.name }))}
-                onChange={(event) => setEditDraft({ ...editDraft, flockId: event.target.value })}
-              />
-              <Select
-                label="What happened"
-                value={editDraft.reason}
-                options={REASON_OPTIONS}
-                error={errors["reason"]}
-                onChange={(event) =>
-                  setEditDraft({ ...editDraft, reason: event.target.value as AdjustmentReason })
-                }
-              />
+            <Select
+              label="Flock"
+              value={editDraft.flockId}
+              error={errors["flockId"]}
+              options={flocks.map((flock) => ({ value: flock.id, label: flock.name }))}
+              onChange={(event) => setEditDraft({ ...editDraft, flockId: event.target.value })}
+            />
+            <Select
+              label="What happened"
+              value={editDraft.reason}
+              options={REASON_OPTIONS}
+              error={errors["reason"]}
+              onChange={(event) =>
+                setEditDraft({ ...editDraft, reason: event.target.value as AdjustmentReason })
+              }
+            />
+            <div className="grid grid-cols-2 gap-density">
               <TextInput
                 label="How many"
                 type="number"
@@ -451,12 +510,6 @@ export function HeadcountPanel({
               error={errors["notes"]}
               onChange={(event) => setEditDraft({ ...editDraft, notes: event.target.value })}
             />
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => void saveEdit()}>
-                Save changes
-              </Button>
-              <Button onClick={closeEdit}>Cancel</Button>
-            </div>
           </div>
         </Modal>
       )}

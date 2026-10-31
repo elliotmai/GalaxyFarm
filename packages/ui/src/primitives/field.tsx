@@ -290,3 +290,24 @@ export function Checkbox({ label, hint, error, className, ...rest }: CheckboxPro
     </div>
   );
 }
+
+/**
+ * A select's options from a list of stored values, labelled for people.
+ *
+ * The domain spells its choices the way the database stores them —
+ * `subcutaneous`, `off_site`, `stillborn` — and a select that showed those as
+ * they are read like a form nobody had finished. Lowercase words get a capital
+ * and spaces; anything already cased (`AI`, `ET`, a breed's name) is left
+ * exactly as written, because its casing is part of what it says.
+ */
+export function toOptions<T extends string>(
+  values: readonly T[],
+): { readonly value: T; readonly label: string }[] {
+  return values.map((value) => ({ value, label: optionLabel(value) }));
+}
+
+export function optionLabel(value: string): string {
+  if (value !== value.toLowerCase()) return value;
+  const spaced = value.replace(/_/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}

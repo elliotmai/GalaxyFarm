@@ -5,17 +5,14 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import {
-  Badge,
   Button,
   Callout,
-  Card,
-  DataTable,
   EmptyState,
   Modal,
+  Pill,
   Section,
   TextInput,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import { INVITATION_DAYS, type AccountState, type Ulid, type User } from "@galaxy-farm/core";
 
@@ -35,6 +32,9 @@ import {
  * away rather than a detour into settings — but it is the same server actions
  * and the same refusals underneath, so the rule cannot be routed around by
  * coming in through this door.
+ *
+ * One row per sitter — name, the dates, one chip — and the dates are changed
+ * in a side panel the row opens, so nothing reflows under a half-typed date.
  *
  * Nothing here reads from the device. `users` is the one entity §4.3 keeps off
  * them entirely.
@@ -75,6 +75,19 @@ const formatDate = (value: Date | undefined): string =>
   value === undefined
     ? "—"
     : value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+/**
+ * The row's one chip. The account's state while it is not usable yet — an
+ * invitation outstanding or lapsed is the thing to act on — and the visit's
+ * window once it is, because that is the only thing anybody asks after.
+ */
+function chipFor(row: SitterRow, now: Date): { readonly label: string; readonly tone: Tone } {
+  if (row.state !== "active")
+    return { label: STATE_LABELS[row.state], tone: STATE_TONES[row.state] };
+  return windowState(row.user, now);
+}
+
+type Tone = "calm" | "action" | "danger" | "neutral";
 
 /** Open now, opening later, or already closed — the only thing anybody asks. */
 function windowState(
@@ -177,67 +190,18 @@ export function SitterAccess({
     return (
       <EmptyState
         title="Owner-only"
-        detail="Accounts are managed by an owner (§4.3). The guide itself is on the tabs beside this one, and everybody with an admin sign-in can read it."
+        detail="Only an owner manages sitter accounts. The guide is on the other tabs."
       />
     );
   }
 
-  const columns: readonly Column<SitterRow>[] = [
-    {
-      key: "name",
-      header: "Who",
-      render: (row) => (
-        <span className="flex flex-col">
-          <span className="text-ink">{row.user.name}</span>
-          <span className="text-sm text-muted">{row.user.email}</span>
-        </span>
-      ),
-    },
-    {
-      key: "state",
-      header: "Account",
-      render: (row) => <Badge tone={STATE_TONES[row.state]}>{STATE_LABELS[row.state]}</Badge>,
-    },
-    {
-      key: "window",
-      header: "Visit",
-      render: (row) => {
-        const state = windowState(row.user, now);
-        return (
-          <span className="flex flex-col">
-            <Badge tone={state.tone}>{state.label}</Badge>
-            <span className="text-sm text-muted">
-              {formatDate(row.user.accessFrom)} → {formatDate(row.user.accessTo)}
-            </span>
-          </span>
-        );
-      },
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (row) => (
-        <span className="flex gap-2">
-          <Button variant="ghost" onClick={() => startEdit(row.user)}>
-            Change dates
-          </Button>
-          {row.state === "active" ? null : (
-            <Button variant="ghost" busy={pending} onClick={() => resend(row.user)}>
-              New link
-            </Button>
-          )}
-        </span>
-      ),
-    },
-  ];
+  /** The state of the one being edited, for the panel's "New link". */
+  const editingState =
+    editing === undefined ? undefined : sitters.find((row) => row.user.id === editing.id)?.state;
 
   return (
     <div className="flex flex-col gap-density">
-      {unavailable === undefined ? null : (
-        <Callout tone="danger" title="The sitter list is not here">
-          {unavailable}
-        </Callout>
-      )}
+      {unavailable === undefined ? null : <p className="text-sm text-danger">{unavailable}</p>}
 
       {link === undefined ? null : (
         <Callout
@@ -256,58 +220,77 @@ export function SitterAccess({
         >
           <p className="break-all font-mono text-sm">{link}</p>
           <p className="mt-2 text-sm">
-            Shown once — only its hash is kept, so the only way to see it again is to issue a new
-            one. It lapses in {INVITATION_DAYS} days.
+            Shown once, and it lapses in {INVITATION_DAYS} days. Lost it? Issue a new one.
           </p>
         </Callout>
       )}
 
       <Section
         title="Sitters"
-        description="Time-boxed by rule. Outside their window they have no access at all — not a reduced one."
+        description="Outside their window they have no access at all."
         actions={
           <Button variant="primary" onClick={startAdd}>
-            Add a sitter
+            <span aria-hidden="true">+</span> Add sitter
           </Button>
         }
       >
         {sitters.length === 0 ? (
           <EmptyState
             title="Nobody has a sitter account"
-            detail="Adding one sends a link they use to set their own password. They see the guide and today's chores, and nothing else."
+            detail="They get a link to set a password, and see the guide and today's chores."
             action={<Button onClick={startAdd}>Add one</Button>}
           />
         ) : (
-          <Card>
-            <DataTable
-              caption="Housesitter accounts"
-              columns={columns}
-              rows={[...sitters]}
-              rowKey={(row) => row.user.id}
-            />
-          </Card>
+          <ul
+            aria-label="Housesitter accounts"
+            className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel"
+          >
+            {sitters.map((row) => {
+              const chip = chipFor(row, now);
+              return (
+                <li key={row.user.id}>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(row.user)}
+                    aria-label={`Change ${row.user.name}'s dates`}
+                    className="flex min-h-[60px] w-full min-w-0 items-center gap-3 py-2 pl-4 pr-3 text-left text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate font-semibold">{row.user.name}</span>
+                      <span className="truncate text-sm text-muted">
+                        {formatDate(row.user.accessFrom)} → {formatDate(row.user.accessTo)} ·{" "}
+                        {row.user.email}
+                      </span>
+                    </span>
+                    <Pill tone={chip.tone}>{chip.label}</Pill>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         )}
 
         <p className="mt-density text-sm text-muted">
-          Switching an account off, deleting it, or changing somebody&rsquo;s role happens in{" "}
+          Switch off, delete or change role in{" "}
           <Link className="text-action underline" href="/admin/settings">
             Settings
           </Link>
-          , alongside everybody else&rsquo;s.
+          .
         </p>
       </Section>
 
       {draft === undefined ? null : (
         <Modal
+          placement="side"
           title={editing === undefined ? "Add a sitter" : `${editing.name}'s visit`}
-          description="A start and an end. §4.3 refuses to save a sitter without both — access that never lapses is not a visit."
+          description="A start and an end — both are required."
           onClose={() => {
             setDraft(undefined);
             setEditing(undefined);
             setErrors({});
           }}
           footer={
-            <div className="flex gap-2">
+            <div className="flex w-full flex-wrap gap-2">
               <Button variant="primary" busy={pending} onClick={submit}>
                 {editing === undefined ? "Send an invitation" : "Save dates"}
               </Button>
@@ -319,6 +302,20 @@ export function SitterAccess({
               >
                 Cancel
               </Button>
+              {/* Here rather than on the row: it is needed once per lapsed
+                  invitation, and a second button per row is a second target. */}
+              {editing === undefined ||
+              editingState === undefined ||
+              editingState === "active" ? null : (
+                <Button
+                  variant="ghost"
+                  className="ml-auto"
+                  busy={pending}
+                  onClick={() => resend(editing)}
+                >
+                  New link
+                </Button>
+              )}
             </div>
           }
         >
@@ -340,8 +337,8 @@ export function SitterAccess({
               disabled={editing !== undefined}
               hint={
                 editing === undefined
-                  ? "Where the invitation goes. They choose their own password."
-                  : "An address cannot be changed here — issue a new invitation instead."
+                  ? undefined
+                  : "Cannot be changed — issue a new invitation instead."
               }
               value={draft.email}
               error={errors["email"]}
@@ -366,9 +363,7 @@ export function SitterAccess({
               />
             </div>
             {editing?.id === actorId ? (
-              <p className="text-sm text-muted">
-                This is your own account. You cannot change your own role, so only the dates move.
-              </p>
+              <p className="text-sm text-muted">Your own account — only the dates move.</p>
             ) : null}
           </div>
         </Modal>

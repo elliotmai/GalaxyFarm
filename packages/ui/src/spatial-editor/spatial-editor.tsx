@@ -414,7 +414,7 @@ export function SpatialEditor({
       } else if (active.kind === "vertex" && draft !== undefined) {
         const next = [...draft.boundary];
         next[active.vertexIndex as number] = groundAt(at, viewport);
-        onDraftChange?.({ shapeId: draft.shapeId, boundary: next });
+        onDraftChange?.({ ...draft, boundary: next });
       } else if (active.kind === "chip" && active.moved) {
         setDragging({ chipId: active.chipId as string, at });
       }
@@ -451,7 +451,7 @@ export function SpatialEditor({
         // corner; otherwise it is somebody dismissing whatever was selected.
         if (draft !== undefined) {
           onDraftChange?.({
-            shapeId: draft.shapeId,
+            ...draft,
             boundary: [...draft.boundary, groundAt(at, viewport)],
           });
         } else if (!overShape(unproject(at, viewport))) {

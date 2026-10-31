@@ -1,6 +1,6 @@
 "use client";
 
-import { PageBody, PageHeader, Tabs, Tile } from "@galaxy-farm/ui";
+import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import { addCalendarDays, endOfDay, startOfDay, type Contact, type Ulid } from "@galaxy-farm/core";
 import {
   eggsOnHand,
@@ -26,7 +26,7 @@ import { useRecords } from "@/lib/local/use-records";
  * the first tab — a total and a date, both already filled in, and a breakdown
  * only for whoever wants one.
  *
- * Every number above the tabs is derived from the two logs. Nothing here is a
+ * Every number in the header is derived from the two logs. Nothing here is a
  * stored total, so correcting a miscounted Tuesday corrects the week, the lay
  * rate, and the basket at the same time.
  */
@@ -34,12 +34,25 @@ import { useRecords } from "@/lib/local/use-records";
 /** Seven days including today, which is what "last 7 days" means out loud. */
 const WEEK_DAYS = 6;
 
+const TABS = [
+  { id: "collect", label: "Collect" },
+  { id: "log", label: "Log" },
+  { id: "trends", label: "Trends" },
+  { id: "gone", label: "Where they went" },
+] as const;
+
 export function EggsScreen({
   propertyId,
   actorId,
+  initialTab,
+  initialFlockId,
 }: {
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
+  /** The tab to open on (`?tab=`), when it names one. */
+  readonly initialTab?: string;
+  /** The flock the trends open on (`?flock=`), from that flock's page. */
+  readonly initialFlockId?: string;
 }) {
   const query = { propertyId };
   const { records: logs, loading } = useRecords<EggLog>("eggLogs", query);
@@ -57,7 +70,7 @@ export function EggsScreen({
    * A collection carries a *date*, and a date-only value is stored at midday so
    * it reads as the same day whichever timezone a device is set to. Asked as of
    * the instant, the basket brought in at half past six this morning is stamped
-   * six hours in the future and none of these tiles would show it — which is
+   * six hours in the future and none of these numbers would show it — which is
    * exactly when somebody is standing there having just logged it.
    */
   const now = endOfDay(new Date());
@@ -77,51 +90,38 @@ export function EggsScreen({
 
   return (
     <PageBody>
+      {/*
+        The four numbers the tiles used to carry, as facts beside the title.
+        Each is derived, so correcting a row corrects all of them at once.
+      */}
       <PageHeader
-        eyebrow="Flock"
+        eyebrow="Chickens"
         title="Eggs"
-        subtitle="What came in this morning, what the week looks like, and where they went."
+        subtitle={[
+          `${collectedToday} today`,
+          `${collectedWeek} in 7 days`,
+          rate === undefined ? undefined : `${rate.toFixed(2)} per bird a day`,
+          `${basket} in the basket`,
+        ]
+          .filter((part) => part !== undefined)
+          .join(" · ")}
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile
-          label="Today"
-          value={collectedToday}
-          tone="identity"
-          emphasis
-          hint={collectedToday === 0 ? "Nothing logged yet today" : "Collected today"}
-        />
-        <Tile label="Last 7 days" value={collectedWeek} tone="action" />
-        <Tile
-          label="Per bird per day"
-          value={rate === undefined ? "—" : rate.toFixed(2)}
-          tone={rate === undefined ? "neutral" : rate < 0.4 ? "danger" : "calm"}
-          hint={
-            birds === 0
-              ? "No birds counted — add a flock and its headcount"
-              : `Over 7 days, across ${birds} bird${birds === 1 ? "" : "s"}`
-          }
-        />
-        <Tile
-          label="In the basket"
-          value={basket}
-          tone={basket < 0 ? "danger" : "neutral"}
-          hint={
-            basket < 0
-              ? "More has gone out than was logged coming in"
-              : "Collected, less what has left"
-          }
-        />
-      </div>
+      {/* Said only when it is wrong. */}
+      {basket < 0 ? (
+        <p className="text-sm text-danger">More eggs have gone out than were logged coming in.</p>
+      ) : rate !== undefined && rate < 0.4 ? (
+        <p className="text-sm text-danger">Lay rate is low this week.</p>
+      ) : birds === 0 && logs.length > 0 ? (
+        <p className="text-sm text-muted">No birds counted, so there is no rate per bird.</p>
+      ) : null}
 
       <Tabs
         label="Eggs"
-        tabs={[
-          { id: "collect", label: "Collect" },
-          { id: "log", label: "Log" },
-          { id: "trends", label: "Trends" },
-          { id: "gone", label: "Where they went" },
-        ]}
+        tabs={TABS}
+        {...(initialTab !== undefined && TABS.some((tab) => tab.id === initialTab)
+          ? { defaultTab: initialTab }
+          : {})}
       >
         {(active) =>
           active === "collect" ? (
@@ -135,7 +135,12 @@ export function EggsScreen({
               actorId={actorId}
             />
           ) : active === "trends" ? (
-            <TrendsPanel logs={logs} flocks={flocks} adjustments={adjustments} />
+            <TrendsPanel
+              logs={logs}
+              flocks={flocks}
+              adjustments={adjustments}
+              {...(initialFlockId === undefined ? {} : { initialFlockId })}
+            />
           ) : (
             <DispositionsPanel
               dispositions={dispositions}

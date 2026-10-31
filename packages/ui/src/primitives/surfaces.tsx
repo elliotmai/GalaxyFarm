@@ -51,12 +51,16 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   readonly children: ReactNode;
 }
 
+// Filled with a tint of the tone rather than outlined. An outline is the
+// border a control wears, so a row of outlined badges read as a row of buttons
+// nobody could press — and six small outlines in one row is most of what
+// "chip soup" meant.
 const TONES: Record<BadgeTone, string> = {
-  neutral: "border-edge text-muted",
-  action: "border-action text-action",
-  calm: "border-calm text-calm",
-  danger: "border-danger text-danger",
-  identity: "border-identity text-identity",
+  neutral: "bg-raised text-muted",
+  action: "bg-action/10 text-action",
+  calm: "bg-calm/15 text-calm",
+  danger: "bg-danger/10 text-danger",
+  identity: "bg-identity/10 text-identity",
 };
 
 /**
@@ -70,7 +74,7 @@ export function Badge({ tone = "neutral", children, className, ...rest }: BadgeP
   return (
     <span
       className={[
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-sm",
+        "inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-sm font-medium",
         TONES[tone],
         className ?? "",
       ]
@@ -135,30 +139,31 @@ export function DataTable<T>({
         Built from the same `columns`, so a screen cannot add a column to one
         layout and forget the other.
       */}
-      <ul className="flex flex-col gap-3 sm:hidden">
+      {/*
+        One panel with hairlines between the rows, not a card per row: a stack
+        of separate boxes is a page of outlines before it is a list. The pairs
+        flow on one or two lines under the name rather than one per line, so a
+        row is a name and a sentence of facts — the shape a phone list reads in.
+      */}
+      <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel sm:hidden">
         {rows.map((row) => (
-          <li
-            key={rowKey(row)}
-            className="flex flex-col gap-2 rounded-density border border-rule bg-raised p-density"
-          >
+          <li key={rowKey(row)} className="flex flex-col gap-1 px-density py-3">
             {identity === undefined ? null : (
-              <div className="text-density font-medium text-ink">{identity.render(row)}</div>
+              <div className="text-density font-semibold text-ink">{identity.render(row)}</div>
             )}
-            <dl className="flex flex-col gap-1.5">
+            <dl className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
               {others.map((column) =>
                 // An empty header is the actions column. A label of "" above a
                 // row of buttons is noise, so it gets the full width instead.
                 column.header === "" ? (
-                  <dd key={column.key} className="flex flex-wrap gap-2 pt-1">
+                  <dd key={column.key} className="flex w-full flex-wrap gap-2 pt-1">
                     {column.render(row)}
                   </dd>
                 ) : (
-                  <div key={column.key} className="flex items-baseline justify-between gap-3">
-                    <dt className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted">
-                      {column.header}
-                    </dt>
+                  <div key={column.key} className="flex min-w-0 items-baseline gap-1">
+                    <dt className="shrink-0 text-muted">{column.header}</dt>
                     <dd
-                      className={`min-w-0 break-words text-right text-density text-ink ${
+                      className={`min-w-0 break-words text-ink ${
                         column.numeric === true ? "gf-numeric" : ""
                       }`}
                     >
@@ -184,12 +189,12 @@ export function DataTable<T>({
           {/* Named for screen readers; a page of unlabelled tables is a maze. */}
           <caption className="sr-only">{caption}</caption>
           <thead>
-            <tr className="border-b border-rule text-left text-muted">
+            <tr className="border-b border-rule text-left text-xs uppercase tracking-wide text-muted">
               {columns.map((column) => (
                 <th
                   key={column.key}
                   scope="col"
-                  className={["py-2 pr-3 font-medium", column.numeric ? "text-right" : ""]
+                  className={["py-2.5 pr-3 font-semibold", column.numeric ? "text-right" : ""]
                     .filter(Boolean)
                     .join(" ")}
                 >
@@ -200,11 +205,14 @@ export function DataTable<T>({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={rowKey(row)} className="border-b border-rule/70 last:border-0">
+              <tr
+                key={rowKey(row)}
+                className="border-b border-rule/70 last:border-0 hover:bg-canvas"
+              >
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={["py-2 pr-3", column.numeric ? "gf-numeric text-right" : ""]
+                    className={["py-3 pr-3", column.numeric ? "gf-numeric text-right" : ""]
                       .filter(Boolean)
                       .join(" ")}
                   >

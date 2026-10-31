@@ -386,6 +386,21 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     phase: "Phase 3",
     status: "built",
   },
+  "The family is inferred, not asked for": {
+    section: "5.5",
+    kind: "derivation",
+    declares: ["GARDEN_CROPS", "inferFamily", "cropFamily", "normaliseFamily"],
+    phase: "Phase 3",
+    status: "built",
+  },
+  "Plant search": {
+    section: "5.5",
+    kind: "derivation",
+    declares: ["searchGardenCrops"],
+    phase: "Phase 3",
+    status: "built",
+    note: "The GBIF half is apps/web/lib/plant-search.ts behind /api/plants/search; the built-in half is the garden module's table. How a pick grows: the garden module's growing table (growingFor, cropGrowing), else apps/web/lib/plant-growing.ts (Growstuff) behind /api/plants/growing.",
+  },
   Planting: {
     section: "5.5",
     kind: "entity",

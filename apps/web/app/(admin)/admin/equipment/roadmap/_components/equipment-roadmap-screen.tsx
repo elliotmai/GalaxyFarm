@@ -1,48 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-import {
-  Button,
-  CardGrid,
-  Checkbox,
-  EmptyState,
-  PageBody,
-  PageHeader,
-  Pill,
-  RecordCard,
-  Section,
-  Select,
-  TextInput,
-  Tile,
-  useConfirmDelete,
-  useToast,
-  Modal,
-} from "@galaxy-farm/ui";
+import { Button, EmptyState, PageBody, Pill, useConfirmDelete, useToast } from "@galaxy-farm/ui";
 import {
   byPriority,
   compareToBudget,
   formatMoney,
-  fromDollars,
   isActive,
+  isPriced,
   isRoadmapOpen,
-  PRIORITIES,
-  ROADMAP_ITEM_TYPES,
-  ROADMAP_STATUSES,
   roadmapItemSchema,
   totalAcquisitionCost,
   type Money,
   type Priority,
   type PurchaseCandidate,
   type RoadmapItem,
-  type RoadmapItemType,
   type RoadmapStatus,
   type Ulid,
 } from "@galaxy-farm/core";
 
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
+
+import { AddFab, ChipRow, KitHeader, KitList, KitRow } from "../../_components/kit-controls";
+import { RoadmapForm } from "./roadmap-form";
+
+/**
+ * One formatter, built once. `toLocaleDateString` with options builds a new
+ * `Intl.DateTimeFormat` on every call — about a tenth of a millisecond each,
+ * which on a list of a few hundred rows, dated twice a row, was most of the
+ * time a save spent re-rendering the list behind its panel.
+ */
+const DAY = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
 
 /**
  * What the place still needs (spec §5.6, §7's `/admin/equipment/roadmap`).
@@ -55,41 +46,18 @@ import { useRecords } from "@/lib/local/use-records";
  *
  * That comparison is the point. A wishlist with a budget and no candidates is
  * a wish; a budget with three real trucks under it is a decision that can be
- * made.
+ * made — which is why it is the muted line on every row, and "over budget" is
+ * the one thing a row will put in a chip besides a need.
  */
 
 function formatDate(value: Date | undefined): string {
-  return value === undefined
-    ? "—"
-    : value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return value === undefined ? "—" : DAY.format(value);
 }
 
 const PRIORITY_TONE: Record<Priority, "danger" | "action" | "neutral"> = {
   need: "danger",
   want: "action",
   someday: "neutral",
-};
-
-interface Draft {
-  readonly type: RoadmapItemType;
-  readonly title: string;
-  readonly detail: string;
-  readonly priority: Priority;
-  readonly budgetEstimate: string;
-  readonly targetDate: string;
-  readonly targetSeason: string;
-  readonly status: RoadmapStatus;
-}
-
-const BLANK: Draft = {
-  type: "wishlist",
-  title: "",
-  detail: "",
-  priority: "want",
-  budgetEstimate: "",
-  targetDate: "",
-  targetSeason: "",
-  status: "open",
 };
 
 export function EquipmentRoadmapScreen({
@@ -113,94 +81,32 @@ export function EquipmentRoadmapScreen({
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
 
-  const [editing, setEditing] = useState<RoadmapItem | undefined>();
-  // The editor is a side dialog now, so it needs an open state of its own —
-  // `editing` alone cannot express \"adding a new one\".
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [draft, setDraft] = useState<Draft>(BLANK);
-  const [error, setError] = useState<string | undefined>();
-  const [busy, setBusy] = useState(false);
-  const [showClosed, setShowClosed] = useState(false);
+  /**
+   * The open panel: adding a line, or editing one. The draft lives in the
+   * panel, so typing in it re-renders the panel and not the roadmap behind it.
+   */
+  const [panel, setPanel] = useState<
+    { readonly kind: "add" } | { readonly kind: "edit"; readonly item: RoadmapItem } | undefined
+  >();
+  /** A priority, "closed", or "" for everything still open. */
+  const [view, setView] = useState("");
 
   // One aggregate serves cattle, horses and equipment (§5.1). This screen owns
   // the equipment slice of it and nothing else.
-  const items = allItems.filter((item) => item.domain === "equipment");
-  const candidates = allCandidates.filter((entry) => entry.domain === "equipment");
+  const items = useMemo(() => allItems.filter((item) => item.domain === "equipment"), [allItems]);
+  const candidates = useMemo(
+    () => allCandidates.filter((entry) => entry.domain === "equipment"),
+    [allCandidates],
+  );
 
   const open = items.filter(isRoadmapOpen);
-  const visible = (showClosed ? items : open).slice().sort(byPriority);
 
   const budgeted: Money = {
     cents: open.reduce((total, item) => total + (item.budgetEstimate?.cents ?? 0), 0),
   };
 
-  function openEditor(): void {
-    setEditorOpen(true);
-  }
-
-  function reset() {
-    setEditorOpen(false);
-    setEditing(undefined);
-    setDraft(BLANK);
-    setError(undefined);
-  }
-
-  function startEdit(item: RoadmapItem) {
-    setEditorOpen(true);
-    setEditing(item);
-    setDraft({
-      type: item.type,
-      title: item.title,
-      detail: item.detail ?? "",
-      priority: item.priority,
-      budgetEstimate:
-        item.budgetEstimate === undefined ? "" : (item.budgetEstimate.cents / 100).toFixed(2),
-      targetDate: item.targetDate === undefined ? "" : item.targetDate.toISOString().slice(0, 10),
-      targetSeason: item.targetSeason ?? "",
-      status: item.status,
-    });
-    setError(undefined);
-  }
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(undefined);
-    setBusy(true);
-
-    try {
-      const payload = {
-        domain: "equipment" as const,
-        type: draft.type,
-        title: draft.title.trim(),
-        detail: draft.detail.trim() === "" ? undefined : draft.detail.trim(),
-        priority: draft.priority,
-        budgetEstimate:
-          draft.budgetEstimate === "" ? undefined : fromDollars(Number(draft.budgetEstimate)),
-        targetDate: draft.targetDate === "" ? undefined : new Date(`${draft.targetDate}T12:00:00`),
-        targetSeason: draft.targetSeason.trim() === "" ? undefined : draft.targetSeason.trim(),
-        status: draft.status,
-      };
-
-      const result =
-        editing === undefined
-          ? await api.create(payload as never)
-          : await api.update(editing.id, payload as Partial<RoadmapItem>);
-
-      if (!result.ok) {
-        setError(
-          result.error.kind === "validation"
-            ? (result.error.issues[0]?.message ?? "That is not valid")
-            : "Could not save that",
-        );
-        return;
-      }
-
-      show({ message: editing === undefined ? "Added to the roadmap" : "Roadmap item updated" });
-      reset();
-    } finally {
-      setBusy(false);
-    }
-  }
+  const openEditor = () => setPanel({ kind: "add" });
+  const close = () => setPanel(undefined);
 
   async function setStatus(item: RoadmapItem, status: RoadmapStatus) {
     await api.update(item.id, { status } as Partial<RoadmapItem>);
@@ -244,7 +150,6 @@ export function EquipmentRoadmapScreen({
     });
     if (!confirmed) return;
 
-    if (editing?.id === item.id) reset();
     await api.remove(item.id, "Removed from the equipment roadmap");
     show({
       message: `${item.title} deleted`,
@@ -253,241 +158,208 @@ export function EquipmentRoadmapScreen({
     });
   }
 
+  const closed = items.filter((item) => !isRoadmapOpen(item));
+  const count = (priority: Priority) => open.filter((item) => item.priority === priority).length;
+
+  /**
+   * The priority chips replace the tiles and the "show achieved" box: the
+   * counts are the filter, and "Closed" is the way to the things that are
+   * done or dropped, kept one press away rather than mixed into the list.
+   */
+  const chips = [
+    { key: "", label: "Open", count: open.length },
+    { key: "need", label: "Needs", count: count("need") },
+    { key: "want", label: "Wants", count: count("want") },
+    { key: "someday", label: "Somedays", count: count("someday") },
+    ...(closed.length === 0 && view !== "closed"
+      ? []
+      : [{ key: "closed", label: "Achieved or dropped", count: closed.length }]),
+  ];
+
+  const visible = (
+    view === "closed" ? closed : view === "" ? open : open.filter((item) => item.priority === view)
+  )
+    .slice()
+    .sort(byPriority);
+
+  /**
+   * What the candidates under each line add up to, against its budget.
+   *
+   * Grouped once per change to the candidates, not filtered per row: the row,
+   * its chip and its Compare link each asked, so every render walked every
+   * candidate three times for every line on the roadmap.
+   *
+   * Unpriced candidates are counted as looked at but never as the cheapest —
+   * "no price yet" is not $0, and a budget beaten by a blank is not beaten.
+   */
+  const shoppingByItem = useMemo(() => {
+    const live = new Map<Ulid, PurchaseCandidate[]>();
+    for (const entry of candidates) {
+      if (entry.roadmapItemId === undefined || !isActive(entry)) continue;
+      const held = live.get(entry.roadmapItemId);
+      if (held === undefined) live.set(entry.roadmapItemId, [entry]);
+      else held.push(entry);
+    }
+    return live;
+  }, [candidates]);
+
+  function shopping(item: RoadmapItem) {
+    const live = shoppingByItem.get(item.id) ?? [];
+    const cheapest = live
+      .filter(isPriced)
+      .map((entry) => ({ entry, total: totalAcquisitionCost(entry) }))
+      .sort((left, right) => left.total.cents - right.total.cents)[0];
+    const against =
+      item.budgetEstimate === undefined || cheapest === undefined
+        ? undefined
+        : compareToBudget(cheapest.entry, item.budgetEstimate);
+    return { live, cheapest, against };
+  }
+
+  /** The one muted line: budget, when, and what has been found against it. */
+  function lineFor(item: RoadmapItem): string {
+    const { live, cheapest, against } = shopping(item);
+    return [
+      item.priority === "need" ? undefined : item.priority,
+      item.type === "wishlist" ? undefined : item.type.replace(/_/g, " "),
+      item.budgetEstimate === undefined ? undefined : `${formatMoney(item.budgetEstimate)} budget`,
+      item.targetDate === undefined ? undefined : `by ${formatDate(item.targetDate)}`,
+      item.targetSeason,
+      live.length === 0
+        ? undefined
+        : cheapest === undefined
+          ? `${live.length} looked at, no price yet`
+          : `${live.length} looked at, cheapest ${formatMoney(cheapest.total)}` +
+            (against === undefined
+              ? ""
+              : against.overBudget
+                ? ` (${formatMoney({ cents: against.difference.cents })} over)`
+                : ` (${formatMoney({ cents: -against.difference.cents })} under)`),
+    ]
+      .filter((part): part is string => part !== undefined && part !== "")
+      .join(" · ");
+  }
+
+  /** One chip: closed lines say how they closed; a need says so; an over-budget find says so. */
+  function chipFor(item: RoadmapItem) {
+    if (!isRoadmapOpen(item)) return <Pill>{item.status.replace(/_/g, " ")}</Pill>;
+    if (shopping(item).against?.overBudget === true) return <Pill tone="danger">Over budget</Pill>;
+    if (item.priority === "need") return <Pill tone={PRIORITY_TONE.need}>Need</Pill>;
+    return null;
+  }
+
+  const facts = [
+    count("need") > 0 ? `${count("need")} need${count("need") === 1 ? "" : "s"}` : undefined,
+    `${open.length} open`,
+    budgeted.cents > 0 ? `${formatMoney(budgeted)} budgeted` : undefined,
+  ]
+    .filter((part): part is string => part !== undefined)
+    .join(" · ");
+
   return (
     <PageBody>
-      <PageHeader
-        eyebrow="Kit"
-        title="Equipment roadmap"
-        subtitle="What the place still needs, in the order it is actually shopped for. Candidates hang off these lines, so a want accumulates the real machines you looked at."
-      />
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile
-          label="Needs"
-          value={open.filter((item) => item.priority === "need").length}
-          tone="danger"
-          emphasis={open.some((item) => item.priority === "need")}
+      {/* Bottom clearance on a phone for the floating add button. */}
+      <div className="flex flex-col gap-density pb-20 sm:pb-0">
+        <KitHeader
+          eyebrow="Farm"
+          title="Equipment roadmap"
+          facts={loading ? undefined : facts}
+          action={
+            <Button variant="primary" onClick={openEditor}>
+              <span aria-hidden="true">+</span> Add to roadmap
+            </Button>
+          }
         />
-        <Tile
-          label="Wants"
-          value={open.filter((item) => item.priority === "want").length}
-          tone="action"
-        />
-        <Tile label="Somedays" value={open.filter((item) => item.priority === "someday").length} />
-        <Tile label="Budgeted" value={formatMoney(budgeted)} hint="Across everything still open" />
-      </div>
 
-      {editorOpen || editing !== undefined ? (
-        <Modal placement="side" title={"Edit"} onClose={reset}>
-          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-density">
-            <div className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
-              <TextInput
-                label="What"
-                hint="&ldquo;Three-quarter-ton truck&rdquo;, &ldquo;Compact tractor with a loader&rdquo;"
-                value={draft.title}
-                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-                required
-              />
-              <Select
-                label="Kind"
-                value={draft.type}
-                onChange={(event) =>
-                  setDraft({ ...draft, type: event.target.value as RoadmapItemType })
-                }
-                options={ROADMAP_ITEM_TYPES.map((value) => ({
-                  value,
-                  label: value.replace(/_/g, " "),
-                }))}
-              />
-              <Select
-                label="Priority"
-                value={draft.priority}
-                onChange={(event) =>
-                  setDraft({ ...draft, priority: event.target.value as Priority })
-                }
-                options={PRIORITIES.map((value) => ({ value, label: value }))}
-              />
-              <TextInput
-                label="Budget ($)"
-                hint="What a candidate's all-in cost gets measured against."
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                numeric
-                value={draft.budgetEstimate}
-                onChange={(event) => setDraft({ ...draft, budgetEstimate: event.target.value })}
-              />
-              <TextInput
-                label="Target date"
-                type="date"
-                value={draft.targetDate}
-                onChange={(event) => setDraft({ ...draft, targetDate: event.target.value })}
-              />
-              <TextInput
-                label="…or season"
-                hint="&ldquo;Before hay season&rdquo; is how this is usually said."
-                value={draft.targetSeason}
-                onChange={(event) => setDraft({ ...draft, targetSeason: event.target.value })}
-              />
-              <TextInput
-                label="Why"
-                value={draft.detail}
-                onChange={(event) => setDraft({ ...draft, detail: event.target.value })}
-              />
-              <Select
-                label="Status"
-                value={draft.status}
-                onChange={(event) =>
-                  setDraft({ ...draft, status: event.target.value as RoadmapStatus })
-                }
-                options={ROADMAP_STATUSES.map((value) => ({
-                  value,
-                  label: value.replace(/_/g, " "),
-                }))}
-              />
-            </div>
+        {items.length === 0 ? null : (
+          <ChipRow label="Filter by priority" chips={chips} value={view} onChange={setView} />
+        )}
 
-            {error === undefined ? null : (
-              <p role="alert" className="text-sm text-danger">
-                {error}
-              </p>
-            )}
-
-            <div className="flex flex-wrap gap-2">
-              <Button type="submit" busy={busy}>
-                {editing === undefined ? "Add to roadmap" : "Save item"}
-              </Button>
-              {editing === undefined ? null : (
-                <Button variant="ghost" onClick={reset}>
-                  Cancel
-                </Button>
-              )}
-            </div>
-          </form>
-        </Modal>
-      ) : null}
-
-      <Section
-        title="The list"
-        description="Needs first, then wants, then somedays — the order you actually shop in."
-        actions={
-          <span className="flex flex-wrap items-center gap-3">
-            <Button onClick={openEditor}>Add to the roadmap</Button>
-            <Checkbox
-              label="Show achieved and dropped"
-              checked={showClosed}
-              onChange={(event) => setShowClosed(event.target.checked)}
-            />
-          </span>
-        }
-      >
         {loading ? (
           <p className="text-muted">Looking…</p>
         ) : visible.length === 0 ? (
           <EmptyState
-            title={items.length === 0 ? "Nothing on the roadmap" : "Nothing open"}
+            title={
+              items.length === 0
+                ? "Nothing on the roadmap"
+                : view === "closed"
+                  ? "Nothing achieved or dropped yet"
+                  : "Nothing open here"
+            }
             detail={
               items.length === 0
-                ? "The truck, the tractor, the ATV — writing them down with a budget is what lets a candidate be judged against something rather than against a feeling."
-                : "Everything here has been achieved or dropped. Tick the box to see it."
+                ? "The truck, the tractor, the ATV — with a budget, a candidate is judged against something rather than a feeling."
+                : undefined
             }
+            {...(items.length === 0
+              ? {
+                  action: (
+                    <Button variant="primary" onClick={openEditor}>
+                      Add the first line
+                    </Button>
+                  ),
+                }
+              : view !== ""
+                ? { action: <Button onClick={() => setView("")}>Show everything open</Button> }
+                : {})}
           />
         ) : (
-          <CardGrid columns={2}>
+          <KitList label="The equipment roadmap">
             {visible.map((item) => {
-              const attached = candidates.filter((entry) => entry.roadmapItemId === item.id);
-              const live = attached.filter(isActive);
-              const cheapest = live
-                .map((entry) => ({ entry, total: totalAcquisitionCost(entry) }))
-                .sort((left, right) => left.total.cents - right.total.cents)[0];
-              const against =
-                item.budgetEstimate === undefined || cheapest === undefined
-                  ? undefined
-                  : compareToBudget(cheapest.entry, item.budgetEstimate);
-
+              const { live } = shopping(item);
               return (
-                <RecordCard
+                <KitRow
                   key={item.id}
-                  tone={
-                    !isRoadmapOpen(item)
-                      ? "neutral"
-                      : item.priority === "need"
-                        ? "danger"
-                        : item.priority === "want"
-                          ? "action"
-                          : "identity"
-                  }
                   title={item.title}
-                  subtitle={item.detail}
-                  actions={<Pill tone={PRIORITY_TONE[item.priority]}>{item.priority}</Pill>}
-                  meta={
-                    <>
-                      <Pill tone="identity">{item.type.replace(/_/g, " ")}</Pill>
-                      <Pill>{item.status.replace(/_/g, " ")}</Pill>
-                      {item.budgetEstimate === undefined ? null : (
-                        <Pill>{formatMoney(item.budgetEstimate)} budget</Pill>
-                      )}
-                      {item.targetDate === undefined ? null : (
-                        <Pill tone="action">by {formatDate(item.targetDate)}</Pill>
-                      )}
-                      {item.targetSeason === undefined ? null : (
-                        <Pill tone="action">{item.targetSeason}</Pill>
-                      )}
-                    </>
-                  }
-                >
-                  {live.length === 0 ? (
-                    <p className="text-sm text-muted">
-                      Nothing under consideration against this yet.
-                    </p>
-                  ) : (
-                    <p className="text-sm text-ink">
-                      {live.length} under consideration · cheapest all in{" "}
-                      <span className="font-semibold">
-                        {formatMoney(cheapest?.total ?? { cents: 0 })}
-                      </span>
-                      {against === undefined ? null : (
-                        <span className={against.overBudget ? " text-danger" : " text-muted"}>
-                          {against.overBudget
-                            ? ` · ${formatMoney({ cents: against.difference.cents })} over budget`
-                            : ` · ${formatMoney({ cents: -against.difference.cents })} under`}
-                        </span>
-                      )}
-                    </p>
-                  )}
-
-                  <div className="flex flex-wrap items-end gap-2">
+                  line={lineFor(item)}
+                  chip={chipFor(item)}
+                  onOpen={() => setPanel({ kind: "edit", item })}
+                  openLabel={`Edit ${item.title}`}
+                  trailing={
                     <Link
                       href={`/admin/equipment/candidates?item=${item.id}`}
-                      className="inline-flex min-h-target items-center rounded-density border border-edge px-density text-sm font-medium text-ink hover:border-action"
+                      className="inline-flex min-h-target items-center whitespace-nowrap rounded-density px-2 text-sm font-semibold text-action hover:bg-raised"
                     >
                       {live.length === 0 ? "Find one" : `Compare ${live.length}`}
                     </Link>
-                    <Select
-                      label={`Status for ${item.title}`}
-                      hideLabel
-                      value={item.status}
-                      onChange={(event) =>
-                        void setStatus(item, event.target.value as RoadmapStatus)
-                      }
-                      options={ROADMAP_STATUSES.map((value) => ({
-                        value,
-                        label: value.replace(/_/g, " "),
-                      }))}
-                    />
-                    <Button variant="ghost" onClick={() => startEdit(item)}>
-                      Edit
-                    </Button>
-                    <Button variant="ghost" onClick={() => void remove(item)}>
-                      Delete
-                    </Button>
-                  </div>
-                </RecordCard>
+                  }
+                />
               );
             })}
-          </CardGrid>
+          </KitList>
         )}
-      </Section>
+
+        <AddFab label="Add to roadmap" onClick={openEditor} />
+      </div>
+
+      {panel === undefined ? null : (
+        <RoadmapForm
+          key={panel.kind === "edit" ? panel.item.id : "new"}
+          editing={panel.kind === "edit" ? panel.item : undefined}
+          propertyId={propertyId}
+          actorId={actorId}
+          onClose={close}
+          // The panel closes first, so the confirmation is the only dialog on
+          // screen rather than a second one stacked on this.
+          onDelete={
+            panel.kind === "edit"
+              ? () => {
+                  close();
+                  void remove(panel.item);
+                }
+              : undefined
+          }
+          onFinish={
+            panel.kind === "edit" && isRoadmapOpen(panel.item)
+              ? (status) => {
+                  const item = panel.item;
+                  close();
+                  void setStatus(item, status);
+                }
+              : undefined
+          }
+        />
+      )}
     </PageBody>
   );
 }

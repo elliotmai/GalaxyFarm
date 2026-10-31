@@ -82,6 +82,13 @@ describe("which calves are on the list at all", () => {
     expect(all([calf({ bornDaysAgo: 200, species: "horse" })])).toEqual([]);
   });
 
+  it("treats anything past a year old as weaned, written down or not", () => {
+    // A cow entered on the first day has no weaning date; she is not a calf.
+    expect(all([calf({ bornDaysAgo: 2000 })])).toEqual([]);
+    // A calf months past its deadline is still raised, loudly.
+    expect(all([calf({ bornDaysAgo: 300 })])).toHaveLength(1);
+  });
+
   it("keeps calves nowhere near ready, because they set the batch's date", () => {
     // The whole reason this is not filtered by lead time: the calves that are
     // not yet due are exactly the ones deciding when the batch is.

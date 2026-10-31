@@ -114,10 +114,9 @@ export function BreakdownEditor({
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted">
-          No breakdown — the total stands on its own, which is all the trends report needs. Add rows
-          only when it is worth knowing which hens are laying.
-        </p>
+        // The total stands on its own, which is all the trends need; rows are
+        // only for whoever wants to know which hens are laying.
+        <p className="text-sm text-muted">Optional. The total stands on its own.</p>
       ) : (
         <ul className="flex flex-wrap items-center gap-2" aria-label="The breakdown so far">
           {rows.map((row, index) => (
@@ -130,7 +129,7 @@ export function BreakdownEditor({
                   type="button"
                   aria-label={`Take out ${COLOUR_LABEL[row.colour].toLowerCase()} ${SIZE_LABEL[row.size]}`}
                   onClick={() => onChange(rows.filter((_, at) => at !== index))}
-                  className="rounded-full px-1 text-muted hover:text-danger"
+                  className="-my-1 inline-flex min-h-8 min-w-8 items-center justify-center rounded-full text-muted hover:text-danger"
                 >
                   ×
                 </button>

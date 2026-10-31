@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Card, EmptyState, Meter, Pill, Section, Select, StatRow, Tile } from "@galaxy-farm/ui";
+import { EmptyState, Meter, StatRow, Tile } from "@galaxy-farm/ui";
 import { addCalendarDays, endOfDay, startOfDay } from "@galaxy-farm/core";
 import {
   breakdownTotals,
@@ -14,6 +14,8 @@ import {
   type Flock,
   type FlockAdjustment,
 } from "@galaxy-farm/module-poultry";
+
+import { ChipRow } from "@/app/(admin)/admin/horses/_components/list-row";
 
 /**
  * Egg production trends (spec §6, §7 — "logs + trends").
@@ -61,13 +63,16 @@ export function TrendsPanel({
   logs,
   flocks,
   adjustments,
+  initialFlockId,
 }: {
   readonly logs: readonly EggLog[];
   readonly flocks: readonly Flock[];
   readonly adjustments: readonly FlockAdjustment[];
+  /** The flock to open on — a flock's page links here with its own id. */
+  readonly initialFlockId?: string;
 }) {
   const [period, setPeriod] = useState<Period>("day");
-  const [flockId, setFlockId] = useState("all");
+  const [flockId, setFlockId] = useState(initialFlockId ?? "all");
 
   const chosen = flocks.find((flock) => flock.id === flockId);
   const shown = flockId === "all" ? logs : logs.filter((log) => log.flockId === flockId);
@@ -94,174 +99,156 @@ export function TrendsPanel({
     .filter((log) => log.collectedOn >= month.from && log.collectedOn <= month.to)
     .reduce((sum, log) => sum + log.total, 0);
 
+  const flockChips = [
+    { key: "all", label: "Every flock" },
+    ...flocks.map((flock) => ({ key: flock.id as string, label: flock.name })),
+  ];
+
   return (
     <div className="flex flex-col gap-density">
-      <Section
-        title="Production"
-        description="Straight off the collections — nothing here is stored, so correcting a row corrects the trend."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Select
-              label="Flock"
-              hideLabel
-              value={flockId}
-              options={[
-                { value: "all", label: "Every flock" },
-                ...flocks.map((flock) => ({ value: flock.id, label: flock.name })),
-              ]}
-              onChange={(event) => setFlockId(event.target.value)}
-            />
-            <Select
-              label="Period"
-              hideLabel
-              value={period}
-              options={PERIODS.map((entry) => ({ value: entry.value, label: entry.label }))}
-              onChange={(event) => setPeriod(event.target.value as Period)}
-            />
-          </div>
-        }
-      >
-        {totals.length === 0 ? (
-          <EmptyState
-            title="Nothing to plot yet"
-            detail="Log a few collections and the trend draws itself. One morning is a number; a fortnight is a trend."
-          />
-        ) : (
-          <Card>
-            <StatRow>
-              <Tile
-                label="Last 30 days"
-                value={monthly}
-                hint={`${collected} logged in total`}
-                emphasis
-              />
-              <Tile
-                label="Per bird per day"
-                value={rate === undefined ? "—" : rate.toFixed(2)}
-                hint={
-                  birds === 0
-                    ? "No birds counted for this flock"
-                    : `${birds} bird${birds === 1 ? "" : "s"}, over 30 days`
-                }
-              />
-              <Tile
-                label="Best in this view"
-                value={peak}
-                hint={
-                  period === "day" ? "In one day" : period === "week" ? "In a week" : "In a month"
-                }
-              />
-            </StatRow>
-
-            <ul className="mt-density flex flex-col gap-2">
-              {totals.map(([key, count]) => (
-                <li key={key}>
-                  <Meter
-                    // Against the tallest bucket rather than a fixed ceiling:
-                    // eighteen hens and eighty hens are different farms, and
-                    // both want the shape of their own fortnight.
-                    value={peak === 0 ? 0 : count / peak}
-                    tone={count === peak ? "calm" : "action"}
-                    label={label(key, period)}
-                    detail={count}
-                  />
-                </li>
-              ))}
-            </ul>
-          </Card>
+      {/*
+        Straight off the collections — nothing here is stored, so correcting a
+        row corrects the trend. The period and the flock as chips: both are a
+        handful of choices, and each is one press.
+      */}
+      <div className="flex flex-col gap-1">
+        <ChipRow
+          label="Period"
+          chips={PERIODS.map((entry) => ({ key: entry.value, label: entry.label }))}
+          value={period}
+          onChange={setPeriod}
+        />
+        {flocks.length < 2 ? null : (
+          <ChipRow label="Flock" chips={flockChips} value={flockId} onChange={setFlockId} />
         )}
-      </Section>
+      </div>
 
-      <Section
-        title="Colour and size"
-        description="From the collections that carried a breakdown. §5.4 keeps it optional, so this is a sample of the basket rather than all of it."
-      >
+      {totals.length === 0 ? (
+        <EmptyState
+          title="Nothing to plot yet"
+          detail="Log a few collections and the trend draws itself."
+        />
+      ) : (
+        <>
+          <StatRow>
+            <Tile
+              label="Last 30 days"
+              value={monthly}
+              hint={`${collected} logged in total`}
+              emphasis
+            />
+            <Tile
+              label="Per bird per day"
+              value={rate === undefined ? "—" : rate.toFixed(2)}
+              hint={
+                birds === 0
+                  ? "No birds counted"
+                  : `${birds} bird${birds === 1 ? "" : "s"}, over 30 days`
+              }
+            />
+            <Tile
+              label="Best in this view"
+              value={peak}
+              hint={
+                period === "day" ? "In one day" : period === "week" ? "In a week" : "In a month"
+              }
+            />
+          </StatRow>
+
+          <ul
+            aria-label="Production"
+            className="flex flex-col gap-2 rounded-density border border-rule bg-panel p-density"
+          >
+            {totals.map(([key, count]) => (
+              <li key={key}>
+                <Meter
+                  // Against the tallest bucket rather than a fixed ceiling:
+                  // eighteen hens and eighty hens are different farms, and
+                  // both want the shape of their own fortnight.
+                  value={peak === 0 ? 0 : count / peak}
+                  tone={count === peak ? "calm" : "action"}
+                  label={label(key, period)}
+                  detail={count}
+                />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {/*
+        From the collections that carried a breakdown, and the line says how
+        many — §5.4 keeps it optional, so this is a sample, not the basket.
+      */}
+      <section aria-labelledby="eggs-breakdown" className="flex flex-col gap-2.5">
+        <h2
+          id="eggs-breakdown"
+          className="text-xs font-semibold uppercase tracking-wide text-muted"
+        >
+          Colour and size
+        </h2>
         {withBreakdown.length === 0 ? (
-          <EmptyState
-            title="No breakdowns logged"
-            detail="Add colour and size rows to a collection when it is worth knowing which hens are laying. The totals stand without them."
-          />
+          <p className="text-sm text-muted">No breakdowns logged yet.</p>
         ) : (
-          <Card>
-            <p className="text-sm text-muted">
-              {inBreakdown} of {collected} eggs broken down, across {withBreakdown.length}{" "}
-              collection{withBreakdown.length === 1 ? "" : "s"}.
+          <div className="flex flex-col gap-1 rounded-density border border-rule bg-panel p-density text-sm">
+            <p className="text-muted">
+              {inBreakdown} of {collected} eggs, across {withBreakdown.length} collection
+              {withBreakdown.length === 1 ? "" : "s"}
             </p>
-
-            <div className="mt-density grid grid-cols-1 gap-density sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
-                  By colour
-                </h3>
-                <ul className="flex flex-wrap gap-2">
-                  {[...byColour]
-                    .sort(([, left], [, right]) => right - left)
-                    .map(([colour, count]) => (
-                      <li key={colour}>
-                        <Pill tone="identity">
-                          {count} {colour}
-                        </Pill>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
-                  By size
-                </h3>
-                <ul className="flex flex-wrap gap-2">
-                  {[...bySize]
-                    .sort(([, left], [, right]) => right - left)
-                    .map(([size, count]) => (
-                      <li key={size}>
-                        <Pill tone="action">
-                          {count} {size.replace(/_/g, " ")}
-                        </Pill>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            </div>
-          </Card>
+            <p className="text-ink">
+              {[...byColour]
+                .sort(([, left], [, right]) => right - left)
+                .map(([colour, count]) => `${count} ${colour}`)
+                .join(" · ")}
+            </p>
+            <p className="text-ink">
+              {[...bySize]
+                .sort(([, left], [, right]) => right - left)
+                .map(([size, count]) => `${count} ${size.replace(/_/g, " ")}`)
+                .join(" · ")}
+            </p>
+          </div>
         )}
-      </Section>
+      </section>
 
+      {/* Who is actually laying, and how many are in there. */}
       {flocks.length < 2 ? null : (
-        <Section title="Per flock" description="Who is actually laying, and how many are in there.">
-          <Card>
-            <ul className="flex flex-col gap-2">
-              {flocks.map((flock) => {
-                const theirs = logs.filter((log) => log.flockId === flock.id);
-                const count = headCountOn(flock, adjustments, now);
-                const theirRate = layRate(theirs, count, month);
+        <section aria-labelledby="eggs-per-flock" className="flex flex-col gap-2.5">
+          <h2
+            id="eggs-per-flock"
+            className="text-xs font-semibold uppercase tracking-wide text-muted"
+          >
+            Per flock
+          </h2>
+          <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
+            {flocks.map((flock) => {
+              const theirs = logs.filter((log) => log.flockId === flock.id);
+              const count = headCountOn(flock, adjustments, now);
+              const theirRate = layRate(theirs, count, month);
+              const inMonth = theirs
+                .filter((log) => log.collectedOn >= month.from)
+                .reduce((sum, log) => sum + log.total, 0);
 
-                return (
-                  <li
-                    key={flock.id}
-                    className="flex flex-wrap items-baseline justify-between gap-2 border-b border-edge pb-2 last:border-b-0"
-                  >
-                    <span className="text-ink">{flock.name}</span>
-                    <span className="flex flex-wrap items-center gap-2 text-sm text-muted">
-                      <Pill tone="neutral">
-                        {count} bird{count === 1 ? "" : "s"}
-                      </Pill>
-                      <Pill tone="identity">
-                        {theirs
-                          .filter((log) => log.collectedOn >= month.from)
-                          .reduce((sum, log) => sum + log.total, 0)}{" "}
-                        in 30 days
-                      </Pill>
-                      <Pill tone={theirRate === undefined ? "neutral" : "action"}>
-                        {theirRate === undefined ? "no rate" : `${theirRate.toFixed(2)}/bird/day`}
-                      </Pill>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </Card>
-        </Section>
+              return (
+                <li
+                  key={flock.id}
+                  className="flex min-h-[64px] flex-col justify-center gap-0.5 px-4 py-2"
+                >
+                  <span className="truncate font-semibold text-ink">{flock.name}</span>
+                  <span className="truncate text-sm text-muted">
+                    {[
+                      `${count} bird${count === 1 ? "" : "s"}`,
+                      `${inMonth} in 30 days`,
+                      theirRate === undefined
+                        ? "no rate"
+                        : `${theirRate.toFixed(2)} per bird a day`,
+                    ].join(" · ")}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
     </div>
   );
