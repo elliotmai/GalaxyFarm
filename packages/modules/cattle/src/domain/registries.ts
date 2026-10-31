@@ -61,6 +61,8 @@ export interface Registry {
   readonly name: string;
   /** The initials this app used before breeds named the registries. */
   readonly legacyCode: string;
+  /** The short name this app uses for the association: `MAINE`, `CHI`, `SHORT`, `SIMM`, `ANGUS`. */
+  readonly shortName: string;
   /**
    * The prefix a *foreign* page puts in front of one of its numbers.
    *
@@ -95,6 +97,7 @@ export const REGISTRIES: readonly Registry[] = [
     code: "Maine-Anjou",
     name: "American Maine-Anjou Association",
     legacyCode: "AMAA",
+    shortName: "MAINE",
     prefix: "MA",
     urlFor: (registration) => digitalBeef("maine-anjou.digitalbeef.com", registration),
     readable: true,
@@ -103,6 +106,7 @@ export const REGISTRIES: readonly Registry[] = [
     code: "Chianina",
     name: "American Chianina Association",
     legacyCode: "ACA",
+    shortName: "CHI",
     prefix: "CA",
     urlFor: (registration) => digitalBeef("chianina.digitalbeef.com", registration),
     readable: true,
@@ -111,6 +115,7 @@ export const REGISTRIES: readonly Registry[] = [
     code: "Shorthorn",
     name: "American Shorthorn Association",
     legacyCode: "ASA",
+    shortName: "SHORT",
     prefix: "SH",
     urlFor: (registration) => digitalBeef("shorthorn.digitalbeef.com", registration),
     readable: true,
@@ -119,12 +124,24 @@ export const REGISTRIES: readonly Registry[] = [
     code: "Angus",
     name: "American Angus Association",
     legacyCode: "AAA",
+    shortName: "ANGUS",
     prefix: "AN",
     urlFor: (registration) =>
       `https://www.angus.org/find-an-animal?aid=${encodeURIComponent(registration)}`,
     // Not Digital Beef — a different application with a different page, read
     // by `parseAngusPage` against a real saved page from the site.
     readable: true,
+  },
+  {
+    code: "Simmental",
+    name: "American Simmental Association",
+    // No old code to keep: Simmental was never filed here before, and `ASA`
+    // already means Shorthorn, so the short name is the only handle it has.
+    legacyCode: "SIMM",
+    shortName: "SIMM",
+    // The herdbook's lookup address is not known to this app, so there is no
+    // link to build and no page to read.
+    readable: false,
   },
 ];
 
@@ -140,6 +157,7 @@ const BY_ALIAS = new Map<string, Registry>(
   REGISTRIES.flatMap((registry) => [
     [registry.code.toLowerCase(), registry] as const,
     [registry.legacyCode.toLowerCase(), registry] as const,
+    [registry.shortName.toLowerCase(), registry] as const,
   ]),
 );
 
