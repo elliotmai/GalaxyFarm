@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { baseRecordSchema, ulidSchema, type BaseRecord, type Ulid } from "@galaxy-farm/core";
 
+import { LIFECYCLES, SEASONS, SOWING_METHODS, SUN_NEEDS, type GrowingFacts } from "./growing.js";
+
 /**
  * Beds, crops and seed (spec §5.5).
  *
@@ -46,7 +48,13 @@ export function bedAreaSqFt(bed: Pick<Bed, "lengthFt" | "widthFt">): number | un
   return bed.lengthFt * bed.widthFt;
 }
 
-export interface Crop extends BaseRecord {
+/**
+ * A crop also carries how it is grown (`GrowingFacts`): typical days to
+ * maturity and spacing, cool or warm season, sun, sowing, lifecycle and depth.
+ * Filled in from the plant search and editable; a new variety starts from the
+ * crop's days and spacing, then keeps its own off the packet.
+ */
+export interface Crop extends BaseRecord, GrowingFacts {
   readonly name: string;
   /**
    * Botanical family, which is the field the rotation guard runs on.
@@ -71,6 +79,13 @@ export const cropSchema = baseRecordSchema.extend({
   family: z.string().max(80).optional(),
   scientificName: z.string().max(160).optional(),
   notes: z.string().max(2000).optional(),
+  daysToMaturity: z.number().int().positive().max(1000).optional(),
+  spacingInches: z.number().positive().max(240).optional(),
+  season: z.enum(SEASONS).optional(),
+  lifecycle: z.enum(LIFECYCLES).optional(),
+  sun: z.enum(SUN_NEEDS).optional(),
+  sowing: z.enum(SOWING_METHODS).optional(),
+  depthInches: z.number().positive().max(24).optional(),
 }) as unknown as z.ZodType<Crop>;
 
 export interface Variety extends BaseRecord {

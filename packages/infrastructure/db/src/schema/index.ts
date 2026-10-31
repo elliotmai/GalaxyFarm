@@ -1035,6 +1035,14 @@ export const crops = pgTable(
     family: text("family"),
     scientificName: text("scientific_name"),
     notes: text("notes"),
+    /** How it is grown (0040, §5.5): typical figures a new variety starts from. */
+    daysToMaturity: integer("days_to_maturity"),
+    spacingInches: doublePrecision("spacing_inches"),
+    season: text("season"),
+    lifecycle: text("lifecycle"),
+    sun: text("sun"),
+    sowing: text("sowing"),
+    depthInches: doublePrecision("depth_inches"),
   },
   baseIndexes("crops"),
 );

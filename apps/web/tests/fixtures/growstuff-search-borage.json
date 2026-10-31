@@ -1,0 +1,87 @@
+[
+  {
+    "id": 28,
+    "name": "borage",
+    "slug": "borage"
+  },
+  {
+    "id": 180,
+    "name": "rosemary",
+    "slug": "rosemary"
+  },
+  {
+    "id": 187,
+    "name": "sage",
+    "slug": "sage"
+  },
+  {
+    "id": 16,
+    "name": "asparagus",
+    "slug": "asparagus"
+  },
+  {
+    "id": 247,
+    "name": "pot marigold",
+    "slug": "pot-marigold"
+  },
+  {
+    "id": 108,
+    "name": "lemon balm",
+    "slug": "lemon-balm"
+  },
+  {
+    "id": 89,
+    "name": "ginger",
+    "slug": "ginger"
+  },
+  {
+    "id": 299,
+    "name": "watercress",
+    "slug": "watercress"
+  },
+  {
+    "id": 59,
+    "name": "comfrey",
+    "slug": "comfrey"
+  },
+  {
+    "id": 97,
+    "name": "jasmine",
+    "slug": "jasmine"
+  },
+  {
+    "id": 127,
+    "name": "marshmallow",
+    "slug": "marshmallow"
+  },
+  {
+    "id": 220,
+    "name": "valerian",
+    "slug": "valerian"
+  },
+  {
+    "id": 118,
+    "name": "lovage",
+    "slug": "lovage"
+  },
+  {
+    "id": 70,
+    "name": "dandelion",
+    "slug": "dandelion"
+  },
+  {
+    "id": 885,
+    "name": "english marigold",
+    "slug": "english-marigold"
+  },
+  {
+    "id": 469,
+    "name": "hyssop",
+    "slug": "hyssop"
+  },
+  {
+    "id": 564,
+    "name": "lesser galangal",
+    "slug": "lesser-galangal"
+  }
+]

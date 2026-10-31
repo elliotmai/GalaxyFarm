@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-import { searchGardenCrops } from "@galaxy-farm/module-garden";
+import {
+  GROWING,
+  isEmptyGrowing,
+  searchGardenCrops,
+  type GrowingFacts,
+} from "@galaxy-farm/module-garden";
 
 /**
  * Matches for whatever is typed into a plant name (spec §5.5).
@@ -12,6 +17,10 @@ import { searchGardenCrops } from "@galaxy-farm/module-garden";
  * · Solanaceae*, and the name, the scientific name and the family are filled
  * in. Ignoring the list and typing a name by hand is always fine — the family
  * is inferred from the name anyway.
+ *
+ * A pick also brings how the plant is grown — days, spacing, season, sun,
+ * sowing, lifecycle, depth (`growingForPick`): straight from the table for a
+ * crop it knows, from `/api/plants/growing` (Growstuff) for one it does not.
  *
  * The built-in garden table answers on the first keystroke and offline. The
  * server's answer (`/api/plants/search`, which adds GBIF for everything the
@@ -24,6 +33,26 @@ export interface PlantPick {
   readonly scientificName: string;
   readonly family?: string | undefined;
   readonly source: "built-in" | "gbif";
+  readonly growing?: GrowingFacts | undefined;
+}
+
+/**
+ * How a picked plant is grown: what the pick carries, else the server's
+ * answer. Never rejects — no answer is `undefined` and the form keeps what
+ * was typed.
+ */
+export async function growingForPick(pick: PlantPick): Promise<GrowingFacts | undefined> {
+  if (!isEmptyGrowing(pick.growing)) return pick.growing;
+  try {
+    const params = new URLSearchParams({ name: pick.commonName, scientific: pick.scientificName });
+    const response = await fetch(`/api/plants/growing?${params.toString()}`);
+    if (!response.ok) return undefined;
+    const body = (await response.json()) as { growing?: GrowingFacts };
+    return isEmptyGrowing(body.growing) ? undefined : body.growing;
+  } catch (error) {
+    console.warn("Growing facts unavailable", error);
+    return undefined;
+  }
 }
 
 /** Long enough to stop asking GBIF about every two-letter prefix. */
@@ -36,6 +65,7 @@ function localMatches(query: string): PlantPick[] {
     scientificName: crop.scientificName,
     family: crop.family,
     source: "built-in" as const,
+    growing: GROWING.get(crop.name),
   }));
 }
 

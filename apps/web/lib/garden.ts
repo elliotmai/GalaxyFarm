@@ -4,6 +4,11 @@ import {
   inferFamily,
   normaliseFamily,
   type Crop,
+  type GrowingFacts,
+  type Lifecycle,
+  type Season,
+  type SowingMethod,
+  type SunNeed,
   type PreservationLog,
   type Planting,
   type PreservationMethod,
@@ -199,7 +204,8 @@ export function cropFields(draft: {
   readonly scientificName: string;
   readonly family: string;
   readonly notes?: string;
-}): Pick<Crop, "name" | "family" | "scientificName" | "notes"> {
+  readonly growing?: GrowingDraft;
+}): Pick<Crop, "name" | "family" | "scientificName" | "notes" | keyof GrowingFacts> {
   const name = draft.name.trim();
   const scientificName = text(draft.scientificName);
   const typed = normaliseFamily(draft.family);
@@ -209,5 +215,78 @@ export function cropFields(draft: {
     scientificName,
     family: typed === undefined || typed === inferred ? undefined : typed,
     notes: text(draft.notes ?? ""),
+    ...growingFields(draft.growing ?? BLANK_GROWING),
+  };
+}
+
+/**
+ * How a crop is grown, as a form holds it: numbers as typed, choices as ""
+ * for "not recorded". Filled from a plant pick, editable field by field.
+ */
+export interface GrowingDraft {
+  readonly daysToMaturity: string;
+  readonly spacingInches: string;
+  readonly season: Season | "";
+  readonly lifecycle: Lifecycle | "";
+  readonly sun: SunNeed | "";
+  readonly sowing: SowingMethod | "";
+  readonly depthInches: string;
+}
+
+export const BLANK_GROWING: GrowingDraft = {
+  daysToMaturity: "",
+  spacingInches: "",
+  season: "",
+  lifecycle: "",
+  sun: "",
+  sowing: "",
+  depthInches: "",
+};
+
+/** A crop's (or a pick's) facts, ready for the form. */
+export function growingDraft(facts: GrowingFacts | undefined): GrowingDraft {
+  const number = (value: number | undefined) => (value === undefined ? "" : String(value));
+  return {
+    daysToMaturity: number(facts?.daysToMaturity),
+    spacingInches: number(facts?.spacingInches),
+    season: facts?.season ?? "",
+    lifecycle: facts?.lifecycle ?? "",
+    sun: facts?.sun ?? "",
+    sowing: facts?.sowing ?? "",
+    depthInches: number(facts?.depthInches),
+  };
+}
+
+/**
+ * The form's facts as fields to save. A blank is `undefined` — on an edit,
+ * that clears what was there, which is what emptying a box means.
+ */
+export function growingFields(draft: GrowingDraft): GrowingFacts {
+  const number = (value: string) => (value.trim() === "" ? undefined : Number(value.trim()));
+  return {
+    daysToMaturity: number(draft.daysToMaturity),
+    spacingInches: number(draft.spacingInches),
+    season: draft.season === "" ? undefined : draft.season,
+    lifecycle: draft.lifecycle === "" ? undefined : draft.lifecycle,
+    sun: draft.sun === "" ? undefined : draft.sun,
+    sowing: draft.sowing === "" ? undefined : draft.sowing,
+    depthInches: number(draft.depthInches),
+  };
+}
+
+/**
+ * Days and spacing for a new variety: what is already typed, else the
+ * crop's typical figures. Only blanks are filled — a number off the packet
+ * always beats a typical one.
+ */
+export function varietyDefaults(
+  current: { readonly daysToMaturity: string; readonly spacingInches: string },
+  facts: GrowingFacts | undefined,
+): { daysToMaturity: string; spacingInches: string } {
+  const fill = (typed: string, typical: number | undefined) =>
+    typed.trim() !== "" || typical === undefined ? typed : String(typical);
+  return {
+    daysToMaturity: fill(current.daysToMaturity, facts?.daysToMaturity),
+    spacingInches: fill(current.spacingInches, facts?.spacingInches),
   };
 }

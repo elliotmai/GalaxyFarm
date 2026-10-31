@@ -15,7 +15,10 @@ import {
 import type { CrudError, Ulid } from "@galaxy-farm/core";
 import {
   cropFamily,
+  cropGrowing,
   cropSchema,
+  growingLine,
+  isEmptyGrowing,
   inferFamily,
   normaliseFamily,
   seedInventorySchema,
@@ -32,7 +35,9 @@ import {
   optionalText,
   quantityLabel,
 } from "@/app/(admin)/admin/garden/_components/labels";
+import { GrowingFields } from "@/app/(admin)/admin/garden/seeds/_components/growing-fields";
 import {
+  growingForPick,
   PlantSuggestions,
   type PlantPick,
 } from "@/app/(admin)/admin/garden/seeds/_components/plant-suggestions";
@@ -45,7 +50,14 @@ import {
   RowList,
   StatusLine,
 } from "@/app/(admin)/admin/pastures/_components/land-kit";
-import { byId, cropFields } from "@/lib/garden";
+import {
+  BLANK_GROWING,
+  byId,
+  cropFields,
+  growingDraft,
+  varietyDefaults,
+  type GrowingDraft,
+} from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -64,6 +76,11 @@ import { useMutations } from "@/lib/local/mutations";
  * not know — the family GBIF gives. The family can still be set by hand,
  * behind a disclosure, for the gardener who knows better than the table.
  *
+ * **A pick also fills how it grows** — typical days to maturity and spacing,
+ * season, sun, sowing, lifecycle and depth — from the built-in table, or from
+ * Growstuff for a plant the table does not know. A new variety starts from
+ * its crop's days and spacing.
+ *
  * **Deleting a variety is `restrict` (§4.5).** A planting or a plan that names
  * it is a record about ground and a record about a season, and neither
  * survives losing what was in it. Seed *does* go with the variety, because a
@@ -76,6 +93,7 @@ interface CropDraft {
   /** "" is "infer it from the name"; anything else is an override. */
   readonly family: string;
   readonly notes: string;
+  readonly growing: GrowingDraft;
 }
 
 interface VarietyDraft {
@@ -87,7 +105,22 @@ interface VarietyDraft {
   readonly notes: string;
 }
 
-const BLANK_CROP: CropDraft = { name: "", scientificName: "", family: "", notes: "" };
+const BLANK_CROP: CropDraft = {
+  name: "",
+  scientificName: "",
+  family: "",
+  notes: "",
+  growing: BLANK_GROWING,
+};
+
+/** Where a pick's growing facts came from, for the line above them. */
+function growingStatus(pick: PlantPick, found: boolean): string {
+  if (!found)
+    return `Nothing known about growing ${pick.commonName} — fill in what the packet says.`;
+  return pick.source === "built-in"
+    ? `Filled in for ${pick.commonName} from the built-in list. Change anything.`
+    : `Filled in for ${pick.commonName} from Growstuff, where it had figures. Change anything.`;
+}
 
 const BLANK_VARIETY: VarietyDraft = {
   cropId: "",
@@ -185,6 +218,8 @@ function Crops({
   const [errors, setErrors] = useState<Record<string, string>>({});
   /** True while the name is being typed; a pick or an opened record stops it. */
   const [searching, setSearching] = useState(false);
+  /** The line above "How it grows": where its figures came from. */
+  const [growingNote, setGrowingNote] = useState<string | undefined>();
 
   // Grouped once, so each crop row is a lookup rather than a scan.
   const varietiesByCrop = useMemo(() => {
@@ -203,6 +238,7 @@ function Crops({
     setDraft(BLANK_CROP);
     setErrors({});
     setSearching(false);
+    setGrowingNote(undefined);
   }
 
   function startEdit(crop: Crop) {
@@ -212,11 +248,22 @@ function Crops({
       scientificName: crop.scientificName ?? "",
       family: crop.family ?? "",
       notes: crop.notes ?? "",
+      growing: growingDraft(cropGrowing(crop)),
     });
     setErrors({});
     setSearching(false);
+    setGrowingNote(
+      isEmptyGrowing(crop) && !isEmptyGrowing(cropGrowing(crop))
+        ? `Filled in for ${crop.name} from the built-in list. Saving keeps it.`
+        : undefined,
+    );
   }
 
+  /**
+   * A pick is a new plant: its name, scientific name, family, and how it
+   * grows all replace what was there. The growing facts land at once for a
+   * plant the table knows, and after a lookup for one it does not.
+   */
   function pick(match: PlantPick) {
     if (draft === undefined) return;
     setDraft({
@@ -224,8 +271,26 @@ function Crops({
       name: match.commonName,
       scientificName: match.scientificName,
       family: match.family ?? "",
+      growing: growingDraft(match.growing),
     });
     setSearching(false);
+    if (match.growing !== undefined) {
+      setGrowingNote(growingStatus(match, true));
+      return;
+    }
+    setGrowingNote(`Looking up how ${match.commonName} grows…`);
+    void growingForPick(match).then((facts) => {
+      setDraft((current) =>
+        // Only if the form still holds this plant and nobody has typed a figure.
+        current === undefined ||
+        current.scientificName !== match.scientificName ||
+        facts === undefined ||
+        Object.values(current.growing).some((value) => value !== "")
+          ? current
+          : { ...current, growing: growingDraft(facts) },
+      );
+      setGrowingNote(growingStatus(match, facts !== undefined));
+    });
   }
 
   async function save() {
@@ -317,6 +382,7 @@ function Crops({
                   openLabel={`Edit ${crop.name}`}
                   line={[
                     familyLine(crop),
+                    growingLine(cropGrowing(crop)),
                     `${count} variet${count === 1 ? "y" : "ies"}`,
                     crop.notes,
                   ]
@@ -334,7 +400,7 @@ function Crops({
           key={editing?.id ?? "new-crop"}
           placement="side"
           title={editing === undefined ? "New crop" : `Editing ${editing.name}`}
-          description="Type a name or pick a match — the family is worked out for you."
+          description="Type a name or pick a match — the family and how it grows are filled in."
           onClose={() => setDraft(undefined)}
           footer={
             <>
@@ -423,6 +489,13 @@ function Crops({
                 </datalist>
               </div>
             </details>
+
+            <GrowingFields
+              value={draft.growing}
+              onChange={(growing) => setDraft({ ...draft, growing })}
+              errors={errors}
+              status={growingNote}
+            />
 
             <TextArea
               label="Notes"
@@ -544,13 +617,42 @@ function Varieties({
       );
 
     setPlantQuery("");
-    if (existing !== undefined) {
+    if (existing !== undefined && !isEmptyGrowing(cropGrowing(existing))) {
       setNewCrop(undefined);
-      setDraft({ ...draft, cropId: existing.id });
-    } else {
-      setNewCrop(match);
-      setDraft({ ...draft, cropId: NEW_CROP });
+      setDraft({ ...draft, cropId: existing.id, ...varietyDefaults(draft, cropGrowing(existing)) });
+      return;
     }
+
+    // A new crop, or one recorded before it knew how it grows: the pick's
+    // facts (looked up if it brought none) fill the variety's blanks, and a
+    // new crop is saved with them.
+    setNewCrop(existing === undefined ? match : undefined);
+    const cropId = existing?.id ?? NEW_CROP;
+    setDraft({ ...draft, cropId, ...varietyDefaults(draft, match.growing) });
+    if (match.growing !== undefined) return;
+    void growingForPick(match).then((facts) => {
+      if (facts === undefined) return;
+      if (existing === undefined) {
+        setNewCrop((current) =>
+          current?.scientificName === match.scientificName
+            ? { ...current, growing: facts }
+            : current,
+        );
+      }
+      setDraft((current) =>
+        current === undefined || current.cropId !== cropId
+          ? current
+          : { ...current, ...varietyDefaults(current, facts) },
+      );
+    });
+  }
+
+  /** Choosing a crop by hand starts the variety from its typical figures. */
+  function chooseCrop(cropId: string) {
+    if (draft === undefined) return;
+    const crop = cropId === NEW_CROP ? undefined : byId(crops).get(cropId as Ulid);
+    const facts = cropId === NEW_CROP ? newCrop?.growing : cropGrowing(crop);
+    setDraft({ ...draft, cropId, ...varietyDefaults(draft, facts) });
   }
 
   async function save() {
@@ -564,6 +666,7 @@ function Varieties({
           name: newCrop.commonName,
           scientificName: newCrop.scientificName,
           family: newCrop.family ?? "",
+          growing: growingDraft(newCrop.growing),
         }) as never,
       );
       if (!created.ok) {
@@ -811,7 +914,7 @@ function Varieties({
                 label="Find the plant"
                 placeholder="Tomato, okra, basil…"
                 autoComplete="off"
-                hint="Picks the crop below, or adds it."
+                hint="Picks the crop below, or adds it, and fills in days and spacing."
                 value={plantQuery}
                 onChange={(event) => setPlantQuery(event.target.value)}
               />
@@ -825,7 +928,7 @@ function Varieties({
                 options={cropOptions}
                 value={draft.cropId}
                 error={errors["cropId"]}
-                onChange={(event) => setDraft({ ...draft, cropId: event.target.value })}
+                onChange={(event) => chooseCrop(event.target.value)}
               />
               <TextInput
                 label="Name"

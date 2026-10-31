@@ -10,5 +10,6 @@
 export * from "./domain/beds.js";
 export * from "./domain/calendar.js";
 export * from "./domain/families.js";
+export * from "./domain/growing.js";
 export * from "./domain/planting.js";
 export * from "./domain/season-plan.js";

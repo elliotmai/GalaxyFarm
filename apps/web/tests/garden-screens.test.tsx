@@ -313,11 +313,25 @@ describe("crops — the family is inferred", () => {
 
     expect(dialog.getByLabelText(/^Name/)).toHaveValue("Squash");
     expect(dialog.getByLabelText(/Scientific name/)).toHaveValue("Cucurbita pepo");
+    // How it grows comes with the pick, from the built-in list.
+    expect(dialog.getByLabelText(/Days to maturity/)).toHaveValue(60);
+    expect(dialog.getByLabelText(/Spacing/)).toHaveValue(36);
+    expect(dialog.getByLabelText(/^Season/)).toHaveValue("warm");
+    expect(dialog.getByLabelText(/^Sowing/)).toHaveValue("direct");
+    await user.clear(dialog.getByLabelText(/Spacing/));
+    await user.type(dialog.getByLabelText(/Spacing/), "48");
     await user.click(dialog.getByRole("button", { name: "Add crop" }));
     expect(writes.created[0]).toMatchObject({
       store: "crops",
       name: "Squash",
       scientificName: "Cucurbita pepo",
+      daysToMaturity: 60,
+      spacingInches: 48,
+      season: "warm",
+      lifecycle: "annual",
+      sun: "full",
+      sowing: "direct",
+      depthInches: 1,
     });
   });
 
@@ -347,6 +361,8 @@ describe("crops — the family is inferred", () => {
     await user.type(dialog.getByLabelText(/Find the plant/), "okra");
     await user.click(dialog.getByRole("button", { name: /^Okra/ }));
     expect(dialog.getByLabelText(/^Crop/)).toHaveDisplayValue(/Okra — new crop \(Malvaceae\)/);
+    expect(dialog.getByLabelText(/Days to maturity/)).toHaveValue(60);
+    expect(dialog.getByLabelText(/Spacing/)).toHaveValue(12);
     await user.type(dialog.getByLabelText(/^Name/), "Clemson Spineless");
     await user.click(dialog.getByRole("button", { name: "Add variety" }));
 
@@ -354,10 +370,14 @@ describe("crops — the family is inferred", () => {
     expect(writes.created[0]).toMatchObject({
       name: "Okra",
       scientificName: "Abelmoschus esculentus",
+      season: "warm",
+      daysToMaturity: 60,
     });
     expect(writes.created[1]).toMatchObject({
       name: "Clemson Spineless",
       cropId: "01ARZ3NDEKTSV4RRFFQ69G5GZZ",
+      daysToMaturity: 60,
+      spacingInches: 12,
     });
   });
 
@@ -371,5 +391,8 @@ describe("crops — the family is inferred", () => {
     await user.type(dialog.getByLabelText(/Find the plant/), "tomato");
     await user.click(dialog.getAllByRole("button", { name: /^Tomato/ })[0] as HTMLElement);
     expect(dialog.getByLabelText(/^Crop/)).toHaveValue(TOMATO.id);
+    // Typical figures fill the blanks; a number off the packet is kept.
+    expect(dialog.getByLabelText(/Days to maturity/)).toHaveValue(75);
+    expect(dialog.getByLabelText(/Spacing/)).toHaveValue(24);
   });
 });

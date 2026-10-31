@@ -1,4 +1,9 @@
-import { normaliseFamily, searchGardenCrops } from "@galaxy-farm/module-garden";
+import {
+  GROWING,
+  normaliseFamily,
+  searchGardenCrops,
+  type GrowingFacts,
+} from "@galaxy-farm/module-garden";
 
 /**
  * Plant search for the crop and variety forms (spec §5.5).
@@ -31,6 +36,12 @@ export interface PlantMatch {
   readonly source: "built-in" | "gbif";
   /** GBIF's species key, for a match that came from there. */
   readonly key?: number;
+  /**
+   * How it is grown, for a built-in match. A GBIF match has none here: the
+   * form asks `/api/plants/growing` for the one that is picked, rather than
+   * this route asking Growstuff about all ten.
+   */
+  readonly growing?: GrowingFacts;
 }
 
 export interface PlantSearchAnswer {
@@ -130,12 +141,16 @@ export function parseGbif(body: unknown, query: string): PlantMatch[] {
 
 /** The table's answers, in the same shape. */
 export function builtInMatches(query: string): PlantMatch[] {
-  return searchGardenCrops(query).map((crop) => ({
-    commonName: crop.name,
-    scientificName: crop.scientificName,
-    family: crop.family,
-    source: "built-in" as const,
-  }));
+  return searchGardenCrops(query).map((crop) => {
+    const growing = GROWING.get(crop.name);
+    return {
+      commonName: crop.name,
+      scientificName: crop.scientificName,
+      family: crop.family,
+      source: "built-in" as const,
+      ...(growing === undefined ? {} : { growing }),
+    };
+  });
 }
 
 /**
