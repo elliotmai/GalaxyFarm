@@ -1,8 +1,10 @@
 import type { Viewport } from "next";
+import Link from "next/link";
 
 import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
 import { ConfirmProvider, ToastProvider, Wordmark } from "@galaxy-farm/ui";
 
+import { KioskNav } from "@/app/(kiosk)/kiosk/_components/kiosk-nav";
 import { PwaShell } from "@/app/_components/pwa-shell";
 import { SyncProvider } from "@/app/_components/sync-provider";
 import { currentActor } from "@/lib/auth";
@@ -95,7 +97,10 @@ function KioskMasthead() {
   return (
     <header className="gf-kiosk-masthead">
       <div className="gf-kiosk-masthead__inner">
-        <Wordmark farmName={farmName} size="small" />
+        <Link href="/kiosk" className="gf-kiosk-masthead__home" aria-label="Kiosk home">
+          <Wordmark farmName={farmName} size="small" />
+        </Link>
+        <KioskNav />
       </div>
     </header>
   );

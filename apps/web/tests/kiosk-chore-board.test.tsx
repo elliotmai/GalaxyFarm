@@ -154,21 +154,25 @@ describe("Today's Chores on a kiosk", () => {
   it("counts the day in one line instead of spending a row on a meter", () => {
     view();
 
+    expect(screen.getByText("2 to go")).toBeInTheDocument();
     expect(screen.getByText(/1 of 3 done/)).toBeInTheDocument();
     expect(screen.getByText(/1 late/)).toBeInTheDocument();
   });
 
-  it("sinks a finished chore to the bottom of its own part of the day", () => {
+  it("folds finished chores away until somebody asks for them", async () => {
     view();
 
-    const morning = section("Morning")
-      .getAllByRole("button")
-      .map((button) => button.textContent ?? "");
+    // What is left is what is on screen; the ticked one is a count, not a row.
+    expect(screen.queryByRole("button", { name: /Scratch grain/ })).not.toBeInTheDocument();
+    expect(section("Morning").getByText("1 finished")).toBeInTheDocument();
 
-    expect(morning[0]).toMatch(/Break ice/);
-    expect(morning[1]).toMatch(/Scratch grain/);
+    await userEvent.click(section("Morning").getByRole("button", { name: /1 finished/ }));
+
+    expect(screen.getByRole("button", { name: /Scratch grain/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
-
   it("moves the row on the tap rather than after the round trip", async () => {
     view();
 

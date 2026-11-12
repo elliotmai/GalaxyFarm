@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 
-import { Card, PageBody, PageHeader, Select, useToast } from "@galaxy-farm/ui";
+import { PageBody, PageHeader, Select, useToast } from "@galaxy-farm/ui";
 import { dayKey, type Ulid } from "@galaxy-farm/core";
 import type { EggBreakdown, EggLog, Flock } from "@galaxy-farm/module-poultry";
 
@@ -74,11 +73,7 @@ export function EggsBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
 
   return (
     <PageBody>
-      <PageHeader
-        eyebrow={<Link href="/kiosk">← Kiosk</Link>}
-        title="Egg Quick-Entry"
-        subtitle="Tap +1 for every egg as you collect it."
-      />
+      <PageHeader title="Egg Quick-Entry" subtitle="Tap +1 for every egg as you collect it." />
 
       {flocksLoading || store === undefined ? (
         <p className="text-muted">Loading…</p>
@@ -94,15 +89,12 @@ export function EggsBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
               onChange={(event) => setFlockId(event.target.value as Ulid)}
             />
           ) : null}
-
-          <Card className="items-center text-center">
-            <span className="text-sm uppercase tracking-wide text-muted">Today</span>
-            <p className="text-5xl text-ink">{logsLoading ? "…" : todayTotal}</p>
-            <span className="text-muted">
-              {todayTotal === 1 ? "egg collected" : "eggs collected"}
-            </span>
-          </Card>
-
+          <div className="gf-kiosk-egg-count" aria-live="polite">
+            <p className="gf-kiosk-egg-count__n">{logsLoading ? "…" : todayTotal}</p>
+            <p className="text-muted">
+              {todayTotal === 1 ? "egg collected today" : "eggs collected today"}
+            </p>
+          </div>
           <div className="grid grid-cols-1 gap-density sm:grid-cols-3">
             {PRESETS.map((preset) => (
               <button
@@ -110,15 +102,15 @@ export function EggsBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
                 type="button"
                 disabled={pending}
                 onClick={() => tap(preset)}
-                className="min-h-target rounded-density border border-edge bg-panel p-density text-center hover:border-action disabled:opacity-60"
+                className="gf-kiosk-egg-button"
               >
-                <span className="block text-3xl text-action">
+                <span className="gf-kiosk-egg-button__plus">
                   {pending && busyLabel === preset.label ? "…" : "+1"}
                 </span>
-                <span className="text-density text-muted">{preset.label}</span>
+                <span>{preset.label}</span>
               </button>
             ))}
-          </div>
+          </div>{" "}
         </div>
       )}
     </PageBody>

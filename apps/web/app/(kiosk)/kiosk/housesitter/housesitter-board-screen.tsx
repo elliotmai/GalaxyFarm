@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
 
 import { PageBody, PageHeader } from "@galaxy-farm/ui";
@@ -78,7 +77,6 @@ export function HousesitterBoardScreen({ propertyId }: { readonly propertyId: Ul
   return (
     <PageBody>
       <PageHeader
-        eyebrow={<Link href="/kiosk">← Kiosk</Link>}
         title="Housesitter Mode"
         subtitle="Everything a helper needs, read live from the farm's own records."
       />

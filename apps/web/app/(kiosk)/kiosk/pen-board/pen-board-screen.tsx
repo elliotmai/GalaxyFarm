@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 
 import { Button, Card, Modal, PageBody, PageHeader, SafetyBadge, useToast } from "@galaxy-farm/ui";
@@ -84,11 +83,7 @@ export function PenBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
 
   return (
     <PageBody>
-      <PageHeader
-        eyebrow={<Link href="/kiosk">← Kiosk</Link>}
-        title="Pen Board"
-        subtitle="Tap an animal, then tap where it is going."
-      />
+      <PageHeader title="Pen Board" subtitle="Tap an animal, then tap where it is going." />
 
       {zonesLoading || store === undefined ? (
         <p className="text-muted">Loading…</p>

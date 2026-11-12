@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 
@@ -15,29 +15,42 @@ import {
   useToast,
 } from "@galaxy-farm/ui";
 
+import { choreProgress, dayKey, type Ulid } from "@galaxy-farm/core";
+import type { EggLog } from "@galaxy-farm/module-poultry";
+
 import { checkKioskPin, unpairThisDevice } from "@/app/(kiosk)/kiosk/_actions";
+import { useTodayChores } from "@/app/(kiosk)/kiosk/_components/use-today-chores";
+import { useRecords } from "@/lib/local/use-records";
 import { KIOSK_BOARDS, type KioskBoardSlug } from "@/lib/kiosk-boards";
 
 /**
  * The board picker (spec §4.4).
  *
- * What a screen shows when it is not locked to one board — six large tiles,
- * nothing to read past arm's length, in the same order the spec names them.
+ * What a screen shows when it is not locked to one board — six large tiles in
+ * the spec's order, each carrying the one fact worth knowing before opening it.
  */
 export function KioskHome({
   deviceName,
   pinSet,
+  propertyId,
 }: {
   /** Set only for a paired barn screen — absent for an owner or member browsing `/kiosk` as themselves. */
   readonly deviceName?: string;
   readonly pinSet: boolean;
+  readonly propertyId: Ulid;
 }) {
+  const status = useBoardStatus(propertyId);
+  const today = useMemo(() => new Date(), []);
+
   return (
     <PageBody>
       <PageHeader
-        eyebrow={deviceName ?? "Kiosk"}
-        title="Pick a board"
-        subtitle="Tap a board to open it."
+        title={today.toLocaleDateString(undefined, {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+        })}
+        subtitle={deviceName === undefined ? "Pick a board." : `${deviceName} — pick a board.`}
       />
 
       <div className="gf-kiosk-board-picker grid grid-cols-2 gap-density md:grid-cols-3">
@@ -45,22 +58,36 @@ export function KioskHome({
             loading boundary — see `next.config.ts`. Six tiles on a screen that
             is powered on and then left alone, and the barn is the place most
             likely to be out of signal by the time one of them is pressed. */}
-        {KIOSK_BOARDS.map((board) => (
-          <Link
-            key={board.slug}
-            href={board.route}
-            prefetch
-            className="gf-kiosk-board-link block"
-            data-board={board.slug}
-          >
-            <Card className="gf-kiosk-board-tile">
-              <span className="gf-kiosk-board-glyph" aria-hidden="true">
-                <BoardGlyph slug={board.slug} />
-              </span>
-              <h2>{board.label}</h2>
-            </Card>
-          </Link>
-        ))}
+        {KIOSK_BOARDS.map((board) => {
+          const line = status[board.slug];
+
+          return (
+            <Link
+              key={board.slug}
+              href={board.route}
+              prefetch
+              className="gf-kiosk-board-link block"
+              data-board={board.slug}
+            >
+              <Card className="gf-kiosk-board-tile">
+                <span className="gf-kiosk-board-glyph" aria-hidden="true">
+                  <BoardGlyph slug={board.slug} />
+                </span>
+                <span className="flex min-w-0 flex-col gap-1">
+                  <h2>{board.label}</h2>
+                  {line === undefined ? null : (
+                    <span
+                      className="gf-kiosk-board-status"
+                      data-tone={line.urgent ? "danger" : undefined}
+                    >
+                      {line.text}
+                    </span>
+                  )}
+                </span>
+              </Card>
+            </Link>
+          );
+        })}
       </div>
 
       {deviceName === undefined ? null : (
@@ -72,6 +99,48 @@ export function KioskHome({
   );
 }
 
+interface BoardStatus {
+  readonly text: string;
+  readonly urgent: boolean;
+}
+
+/**
+ * One live line per board that has something to say, from this device's own
+ * store — so the picker answers "is there anything to do?" before a tap.
+ */
+function useBoardStatus(propertyId: Ulid): Partial<Record<KioskBoardSlug, BoardStatus>> {
+  const { entries, loading } = useTodayChores(propertyId);
+  const query = useMemo(() => ({ propertyId }), [propertyId]);
+  const { records: eggLogs, loading: eggsLoading } = useRecords<EggLog>("eggLogs", query);
+
+  return useMemo(() => {
+    const status: Partial<Record<KioskBoardSlug, BoardStatus>> = {};
+
+    if (!loading && entries.length > 0) {
+      const progress = choreProgress(entries);
+      status.chores =
+        progress.open === 0
+          ? { text: "All done today", urgent: false }
+          : {
+              text:
+                progress.overdue > 0
+                  ? `${progress.open} to do · ${progress.overdue} late`
+                  : `${progress.open} to do`,
+              urgent: progress.overdue > 0,
+            };
+    }
+
+    if (!eggsLoading) {
+      const key = dayKey(new Date());
+      const total = eggLogs
+        .filter((log) => dayKey(log.collectedOn) === key)
+        .reduce((sum, log) => sum + log.total, 0);
+      status.eggs = { text: `${total} ${total === 1 ? "egg" : "eggs"} today`, urgent: false };
+    }
+
+    return status;
+  }, [entries, loading, eggLogs, eggsLoading]);
+}
 const BOARD_GLYPHS: Readonly<Record<KioskBoardSlug, ReactNode>> = {
   "pen-board": <path d="M4 8h24M7 8v17m9-17v17m9-17v17M4 25h24M4 15h24" />,
   calendar: (

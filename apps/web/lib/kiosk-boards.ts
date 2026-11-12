@@ -15,16 +15,23 @@ export type KioskBoardSlug =
 export interface KioskBoard {
   readonly slug: KioskBoardSlug;
   readonly label: string;
+  /** What fits on one line of the board switcher. */
+  readonly short: string;
   readonly route: string;
 }
 
 export const KIOSK_BOARDS: readonly KioskBoard[] = [
-  { slug: "pen-board", label: "Pen Board", route: "/kiosk/pen-board" },
-  { slug: "calendar", label: "Calendar", route: "/kiosk/calendar" },
-  { slug: "chores", label: "Today's Chores", route: "/kiosk/chores" },
-  { slug: "eggs", label: "Egg Quick-Entry", route: "/kiosk/eggs" },
-  { slug: "program-day", label: "Program Day Sheet", route: "/kiosk/program-day" },
-  { slug: "housesitter", label: "Housesitter Mode", route: "/kiosk/housesitter" },
+  { slug: "pen-board", label: "Pen Board", short: "Pens", route: "/kiosk/pen-board" },
+  { slug: "calendar", label: "Calendar", short: "Calendar", route: "/kiosk/calendar" },
+  { slug: "chores", label: "Today's Chores", short: "Chores", route: "/kiosk/chores" },
+  { slug: "eggs", label: "Egg Quick-Entry", short: "Eggs", route: "/kiosk/eggs" },
+  {
+    slug: "program-day",
+    label: "Program Day Sheet",
+    short: "Program",
+    route: "/kiosk/program-day",
+  },
+  { slug: "housesitter", label: "Housesitter Mode", short: "Sitter", route: "/kiosk/housesitter" },
 ] as const;
 
 export function kioskBoardFor(slug: string | undefined): KioskBoard | undefined {

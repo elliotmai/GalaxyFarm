@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
 
-import { Card, PageBody, PageHeader } from "@galaxy-farm/ui";
+import { PageBody, PageHeader } from "@galaxy-farm/ui";
 import {
+  addCalendarDays,
+  dayKey,
   groupByDay,
   projectEvents,
   startOfDay,
@@ -34,6 +35,7 @@ import type { FeedConsumption, FeedPurchase, FeedType } from "@galaxy-farm/modul
 
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { projectedCalendarEntries } from "@/lib/calendar";
+import { dayLabel } from "@/lib/chores";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -76,52 +78,63 @@ export function CalendarBoardScreen({ propertyId }: { readonly propertyId: Ulid 
   );
   const byDay = useMemo(() => groupByDay(entries), [entries]);
 
+  const todayKey = dayKey(from);
+  // Every day of the window gets a row, so a quiet Wednesday reads as quiet
+  // rather than as a day the board forgot.
+  const days = useMemo(
+    () => Array.from({ length: WINDOW_DAYS }, (_, index) => addCalendarDays(from, index)),
+    [from],
+  );
+
   return (
     <PageBody>
-      <PageHeader
-        eyebrow={<Link href="/kiosk">← Kiosk</Link>}
-        title="Calendar"
-        subtitle={`The next ${WINDOW_DAYS} days.`}
-      />
+      <PageHeader title="Calendar" subtitle={`The next ${WINDOW_DAYS} days.`} />
 
       {loading ? (
         <p className="text-muted">Loading…</p>
-      ) : byDay.size === 0 ? (
-        <p className="text-muted">Nothing on the calendar in the next {WINDOW_DAYS} days.</p>
       ) : (
-        <div className="flex flex-col gap-density">
-          {[...byDay.entries()].map(([day, dayEntries]) => (
-            <Card key={day} className="flex flex-col gap-2">
-              <h2>
-                {new Date(`${day}T12:00:00`).toLocaleDateString(undefined, {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </h2>
-              <ul className="flex flex-col gap-1">
-                {dayEntries.map((entry) => (
-                  <li key={entry.id} className="text-density text-ink">
-                    {entry.allDay ? null : (
-                      <span className="mr-2 text-muted">
-                        {entry.at.toLocaleTimeString(undefined, {
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    )}
-                    {entry.title}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ))}
-        </div>
+        <ol className="gf-kiosk-days">
+          {days.map((date) => {
+            const key = dayKey(date);
+            const dayEntries = byDay.get(key) ?? [];
+            const isToday = key === todayKey;
+            if (dayEntries.length === 0 && !isToday) return null;
+
+            return (
+              <li key={key} className="gf-kiosk-day" data-today={isToday ? "" : undefined}>
+                <h2 className="gf-kiosk-day__date">
+                  <span className="gf-kiosk-day__name">{dayLabel(date, from)}</span>
+                  <span className="gf-kiosk-day__sub">
+                    {date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  </span>
+                </h2>
+                {dayEntries.length === 0 ? (
+                  <p className="text-muted">Nothing scheduled.</p>
+                ) : (
+                  <ul className="gf-kiosk-day__list">
+                    {dayEntries.map((entry) => (
+                      <li key={entry.id}>
+                        <span className="gf-kiosk-day__time">
+                          {entry.allDay
+                            ? "All day"
+                            : entry.at.toLocaleTimeString(undefined, {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                        </span>
+                        <span className="text-ink">{entry.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ol>
       )}
     </PageBody>
   );
 }
-
 /**
  * Both halves of the calendar, from this device's own store.
  *
