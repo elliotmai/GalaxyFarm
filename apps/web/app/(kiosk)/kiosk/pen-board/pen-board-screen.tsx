@@ -93,7 +93,7 @@ export function PenBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
       {zonesLoading || store === undefined ? (
         <p className="text-muted">Loading…</p>
       ) : (
-        <div className="grid grid-cols-1 gap-density md:grid-cols-2 lg:grid-cols-3">
+        <div className="gf-kiosk-zone-grid grid grid-cols-1 gap-density md:grid-cols-2 lg:grid-cols-3">
           {activeZones.map((zone) => {
             const occupants = occupantsFor(zone);
             const level = effectiveSafetyLevel(
@@ -105,7 +105,7 @@ export function PenBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
             );
 
             return (
-              <Card key={zone.id} className="flex flex-col gap-2">
+              <Card key={zone.id} className="gf-kiosk-zone flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
                   <h2>{zone.name}</h2>
                   <SafetyBadge

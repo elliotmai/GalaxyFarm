@@ -108,6 +108,27 @@ test.describe("kiosk surface", () => {
       "data-theme",
       "flying-auto",
     );
+    await expect(page.locator(".gf-kiosk-masthead")).toBeVisible();
+    await expect(page.locator(".gf-kiosk-board-link")).toHaveCount(6);
+
+    const penBoard = page.getByRole("link", { name: "Pen Board" });
+    await expect(penBoard).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+      .toBe(true);
+
+    await page.keyboard.press("Tab");
+    await expect(penBoard).toBeFocused();
+    expect(await penBoard.evaluate((element) => getComputedStyle(element).outlineWidth)).not.toBe(
+      "0px",
+    );
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+      .toBe(true);
   });
 
   for (const board of KIOSK_BOARDS) {

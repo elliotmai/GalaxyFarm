@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 
 import {
@@ -15,7 +16,7 @@ import {
 } from "@galaxy-farm/ui";
 
 import { checkKioskPin, unpairThisDevice } from "@/app/(kiosk)/kiosk/_actions";
-import { KIOSK_BOARDS } from "@/lib/kiosk-boards";
+import { KIOSK_BOARDS, type KioskBoardSlug } from "@/lib/kiosk-boards";
 
 /**
  * The board picker (spec §4.4).
@@ -36,17 +37,26 @@ export function KioskHome({
       <PageHeader
         eyebrow={deviceName ?? "Kiosk"}
         title="Pick a board"
-        subtitle="Tap one. Any screen can be locked to a single board from Settings → Kiosk devices."
+        subtitle="Tap a board to open it."
       />
 
-      <div className="grid grid-cols-2 gap-density md:grid-cols-3">
+      <div className="gf-kiosk-board-picker grid grid-cols-2 gap-density md:grid-cols-3">
         {/* `prefetch` fetches each board whole rather than as far as its
             loading boundary — see `next.config.ts`. Six tiles on a screen that
             is powered on and then left alone, and the barn is the place most
             likely to be out of signal by the time one of them is pressed. */}
         {KIOSK_BOARDS.map((board) => (
-          <Link key={board.slug} href={board.route} prefetch className="block">
-            <Card className="flex min-h-[8rem] items-center justify-center text-center">
+          <Link
+            key={board.slug}
+            href={board.route}
+            prefetch
+            className="gf-kiosk-board-link block"
+            data-board={board.slug}
+          >
+            <Card className="gf-kiosk-board-tile">
+              <span className="gf-kiosk-board-glyph" aria-hidden="true">
+                <BoardGlyph slug={board.slug} />
+              </span>
               <h2>{board.label}</h2>
             </Card>
           </Link>
@@ -59,6 +69,40 @@ export function KioskHome({
         </div>
       )}
     </PageBody>
+  );
+}
+
+const BOARD_GLYPHS: Readonly<Record<KioskBoardSlug, ReactNode>> = {
+  "pen-board": <path d="M4 8h24M7 8v17m9-17v17m9-17v17M4 25h24M4 15h24" />,
+  calendar: (
+    <>
+      <path d="M7 4v5m18-5v5M5 8h22v20H5zM5 14h22" />
+      <path d="M11 19h3m5 0h3m-11 5h3m5 0h3" />
+    </>
+  ),
+  chores: (
+    <>
+      <path d="M12 7h15M12 16h15M12 25h15" />
+      <path d="m4 7 2 2 4-4m-6 11 2 2 4-4m-6 11 2 2 4-4" />
+    </>
+  ),
+  eggs: <path d="M16 3c-6 0-10 9-10 16a10 10 0 0 0 20 0c0-7-4-16-10-16Z" />,
+  "program-day": (
+    <>
+      <path d="M6 5v22m10-22v22m10-22v22M3 10h6m4 6h6m4 6h6" />
+      <circle cx="6" cy="10" r="2" />
+      <circle cx="16" cy="16" r="2" />
+      <circle cx="26" cy="22" r="2" />
+    </>
+  ),
+  housesitter: <path d="m3 14 13-10 13 10M7 12v16h18V12M13 28v-9h6v9" />,
+};
+
+function BoardGlyph({ slug }: { readonly slug: KioskBoardSlug }) {
+  return (
+    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      {BOARD_GLYPHS[slug]}
+    </svg>
   );
 }
 

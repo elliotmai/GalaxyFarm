@@ -9,8 +9,11 @@
  * screen already locked to it.
  */
 
+export type KioskBoardSlug =
+  "pen-board" | "calendar" | "chores" | "eggs" | "program-day" | "housesitter";
+
 export interface KioskBoard {
-  readonly slug: string;
+  readonly slug: KioskBoardSlug;
   readonly label: string;
   readonly route: string;
 }

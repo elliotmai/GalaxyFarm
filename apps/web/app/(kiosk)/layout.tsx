@@ -1,10 +1,15 @@
 import type { Viewport } from "next";
 
-import { ConfirmProvider, ToastProvider } from "@galaxy-farm/ui";
+import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
+import { ConfirmProvider, ToastProvider, Wordmark } from "@galaxy-farm/ui";
 
 import { PwaShell } from "@/app/_components/pwa-shell";
 import { SyncProvider } from "@/app/_components/sync-provider";
 import { currentActor } from "@/lib/auth";
+
+import "./kiosk.css";
+
+const farmName = process.env.NEXT_PUBLIC_FARM_NAME ?? FALLBACK_FARM_NAME;
 
 /**
  * The browser chrome, matched to the surface (spec §8 v0.9).
@@ -45,15 +50,26 @@ export default async function KioskLayout({ children }: { children: React.ReactN
   // middleware already gates.
   if (actor === undefined) {
     return (
-      <div data-surface="kiosk" data-theme="flying-auto" data-density="kiosk">
-        <main className="p-density">{children}</main>
+      <div
+        className="gf-kiosk-frame"
+        data-surface="kiosk"
+        data-theme="flying-auto"
+        data-density="kiosk"
+      >
+        <main className="gf-kiosk-main p-density">{children}</main>
         <PwaShell unattended />
       </div>
     );
   }
 
   return (
-    <div data-surface="kiosk" data-theme="flying-auto" data-density="kiosk">
+    <div
+      className="gf-kiosk-frame"
+      data-surface="kiosk"
+      data-theme="flying-auto"
+      data-density="kiosk"
+    >
+      <KioskMasthead />
       {/* Off for a kiosk device (spec §4.3): its outbox is always empty —
           writes go through the server actions in `kiosk/_actions.ts` rather
           than `useMutations` — and `/api/sync/push` refuses anything that is
@@ -62,7 +78,7 @@ export default async function KioskLayout({ children }: { children: React.ReactN
       <SyncProvider pushEnabled={actor.role === "owner" || actor.role === "member"} quietOvernight>
         <ToastProvider>
           <ConfirmProvider>
-            <main className="p-density">{children}</main>
+            <main className="gf-kiosk-main p-density">{children}</main>
           </ConfirmProvider>
         </ToastProvider>
       </SyncProvider>
@@ -72,5 +88,15 @@ export default async function KioskLayout({ children }: { children: React.ReactN
           wall and needs the same treatment. */}
       <PwaShell unattended />
     </div>
+  );
+}
+
+function KioskMasthead() {
+  return (
+    <header className="gf-kiosk-masthead">
+      <div className="gf-kiosk-masthead__inner">
+        <Wordmark farmName={farmName} size="small" />
+      </div>
+    </header>
   );
 }
