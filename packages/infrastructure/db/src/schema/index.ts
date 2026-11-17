@@ -1534,6 +1534,38 @@ export const wanderConnections = pgTable("wander_connections", {
 });
 
 /**
+ * Bearer tokens for connected apps — another of the household's apps reading
+ * this farm's board server-to-server (spec §4.3 "Connected apps").
+ *
+ * **Deliberately outside `allTables`**, with `kiosk_pins` and
+ * `wander_connections`: it holds a credential's hash, and sync copies rows to
+ * every device on the property. `apps/web/lib/api-token-store.ts` is its only
+ * reader and writer, and nothing it returns carries `tokenHash`.
+ *
+ * Scoped to one property by `propertyId` — the API takes the property from
+ * the token row and never from the request. A §4.5 system-owned row: minted
+ * by the owner (the token is shown once), revoked by the owner, never edited
+ * and never deleted, so the revoked row stays as the record of what wrote
+ * under its id in the sync audit.
+ */
+export const apiTokens = pgTable(
+  "api_tokens",
+  {
+    id: text("id").primaryKey(),
+    propertyId: text("property_id").notNull(),
+    /** Which app holds it — "Fridge Board". */
+    label: text("label").notNull(),
+    /** SHA-256 of the token, base64url. The token itself is never stored. */
+    tokenHash: text("token_hash").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+    createdBy: text("created_by").notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true, mode: "date" }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
+  },
+  (table) => [index("api_tokens_property_idx").on(table.propertyId)],
+);
+
+/**
  * One browser on one device, subscribed to push (spec §6).
  *
  * A subscription is a capability URL plus the two keys that decrypt what is

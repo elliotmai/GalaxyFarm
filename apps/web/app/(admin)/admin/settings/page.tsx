@@ -4,6 +4,7 @@ import { can, type NotificationSetting } from "@galaxy-farm/core";
 
 import { SettingsScreen } from "@/app/(admin)/admin/settings/_components/settings-screen";
 import type { PersonRow } from "@/app/(admin)/admin/settings/_components/people-screen";
+import { listApiTokens, type ApiToken } from "@/lib/api-token-store";
 import { currentActor } from "@/lib/auth";
 import { withDeadline } from "@/lib/deadline";
 import { listDeletedDevices, listDevices, type KioskDevice } from "@/lib/device-store";
@@ -48,6 +49,7 @@ export default async function AdminSettingsPage() {
   // actually refuses a branding write from anybody else (§4.3).
   const mayManageBranding = can(actor, "branding.manage", now);
   const mayManageDevices = can(actor, "devices.manage", now);
+  const mayManageApps = can(actor, "integrations.manage", now);
 
   let people: readonly PersonRow[] = [];
   let deleted: readonly PersonRow[] = [];
@@ -90,6 +92,19 @@ export default async function AdminSettingsPage() {
     }
   }
 
+  let apiTokens: readonly ApiToken[] = [];
+  let appsUnavailable: string | undefined;
+
+  if (mayManageApps) {
+    try {
+      apiTokens = await withDeadline(listApiTokens(actor.propertyId), "the connected apps list");
+    } catch (error) {
+      console.error("[settings:apps]", error);
+      appsUnavailable =
+        "Could not reach the database, so the list of connected apps is not here. Everything else on this page is read from this device and is unaffected.";
+    }
+  }
+
   /**
    * The push half of the notification settings.
    *
@@ -127,12 +142,15 @@ export default async function AdminSettingsPage() {
       devices={devices}
       deletedDevices={deletedDevices}
       pinSet={pinSet}
+      mayManageApps={mayManageApps}
+      apiTokens={apiTokens}
       pushDevices={pushDevices}
       notificationSettings={notificationSettings}
       {...(push.ok ? { vapidPublicKey: push.publicKey } : { pushUnavailable: push.reason })}
       {...(unavailable === undefined ? {} : { unavailable })}
       {...(devicesUnavailable === undefined ? {} : { devicesUnavailable })}
       {...(notificationsUnavailable === undefined ? {} : { notificationsUnavailable })}
+      {...(appsUnavailable === undefined ? {} : { appsUnavailable })}
     />
   );
 }

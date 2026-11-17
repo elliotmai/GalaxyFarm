@@ -9,7 +9,7 @@ import {
   type WatchSettings,
   type WeatherAlert,
 } from "@galaxy-farm/core";
-import { allTables } from "@galaxy-farm/infra-db";
+import { allTables, type Database } from "@galaxy-farm/infra-db";
 import { combinedWeather, nwsProvider, openMeteoProvider } from "@galaxy-farm/infra-weather";
 
 import { database } from "@/lib/credential-store";
@@ -58,8 +58,11 @@ function provider() {
   return combinedWeather(openMeteoProvider(), nwsProvider());
 }
 
-export async function propertyFor(propertyId: Ulid): Promise<Property | undefined> {
-  const rows = await database()
+export async function propertyFor(
+  propertyId: Ulid,
+  db: Database = database(),
+): Promise<Property | undefined> {
+  const rows = await db
     .select()
     .from(allTables.properties)
     .where(eq(allTables.properties.id, propertyId))

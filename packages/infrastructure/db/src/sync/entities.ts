@@ -62,12 +62,18 @@ export const BOOKKEEPING_TABLES: readonly string[] = ["syncAudit", "syncFieldMet
  * travel history readable from an unlocked feed room. The trip it pulls is a
  * `trips` row and syncs normally; the credential that fetched it never leaves
  * the server.
+ *
+ * `api_tokens` joined it with connected apps (§4.3): the SHA-256 of a bearer
+ * token another app holds. A hash rather than the token, but still nothing a
+ * barn screen has any business holding — and the app it belongs to reads
+ * through the server, never through sync.
  */
 export const UNTRACKED_TABLES: readonly string[] = [
   "kiosk_pins",
   "push_subscriptions",
   "notification_settings",
   "wander_connections",
+  "api_tokens",
 ];
 
 export const SYNCED_ENTITIES: readonly string[] = Object.keys(allTables).filter(
