@@ -355,6 +355,10 @@ describe("the housesitter guide", () => {
           contact("01ARZ3NDEKTSV4RRFFQ69G5FC3", { name: "Farrier", tags: ["vet"] }),
           contact("01ARZ3NDEKTSV4RRFFQ69G5FC4", { name: "Hay buyer", tags: ["buyer"] }),
         ],
+        templates: [],
+        plans: [],
+        feeds: [feed],
+        health: [],
         ...fields,
       },
       NOW,
@@ -386,14 +390,209 @@ describe("the housesitter guide", () => {
         assignments,
         animals,
         contacts: [contact("01ARZ3NDEKTSV4RRFFQ69G5FC3", { name: "Farrier", tags: ["vet"] })],
+        templates: [template(MORNING_TEMPLATE, { title: "Check water" })],
+        plans: [morningFeed],
+        feeds: [feed],
+        health: [],
       },
       NOW,
     );
     expect(contactsOnly).toEqual({
       contacts: [{ name: "Farrier", role: "Vet", phone: "" }],
       notes: [],
+      intro: null,
+      doNotHandle: [],
+      care: [],
     });
-    expect(sitter({ guide: undefined })).toEqual({ contacts: [], notes: [] });
+    expect(sitter({ guide: undefined })).toEqual({
+      contacts: [],
+      notes: [],
+      intro: null,
+      doNotHandle: [],
+      care: [],
+    });
+  });
+});
+
+describe("the guide's care sections", () => {
+  const DOG = "01ARZ3NDEKTSV4RRFFQ69G5FA2" as Ulid;
+  const BULL = "01ARZ3NDEKTSV4RRFFQ69G5FA1" as Ulid;
+  const full = {
+    ...base("01ARZ3NDEKTSV4RRFFQ69G5FG1"),
+    title: "While we are away",
+    intro: "Thanks for **minding** the place.",
+    includes: ["pens", "pets", "cattle_feeding", "chores", "emergency_contacts", "vet"],
+    active: true,
+  } as CareGuide;
+  const animal = (id: Ulid, fields: Record<string, unknown>) =>
+    ({
+      ...base(id),
+      sex: "male",
+      status: "active",
+      ownership: "own",
+      safetyLevel: 1,
+      photoKeys: [],
+      ...fields,
+    }) as unknown as Animal;
+  const animals = [
+    animal(BULL, {
+      name: "Bruno",
+      species: "cattle",
+      safetyLevel: 5,
+      safetyNotes: "Charges the gate",
+    }),
+    animal(DOG, {
+      name: "Rex",
+      species: "dog",
+      safetyLevel: 2,
+      customInstructions: "Sleeps **inside**.",
+    }),
+  ];
+  const dogFood = {
+    ...base("01ARZ3NDEKTSV4RRFFQ69G5FQ2"),
+    name: "Rex's bowl",
+    target: "animal",
+    targetId: DOG,
+    alsoFeeds: [],
+    portion: "per_head",
+    active: true,
+    lines: [
+      {
+        feedTypeId: HAY,
+        amount: { amount: 2, unit: "cup" },
+        frequency: "once_daily",
+        timeOfDay: "evening",
+      },
+    ],
+  } as unknown as FeedingPlan;
+
+  const result = boardSitter(
+    {
+      guide: full,
+      sections: [
+        {
+          ...base("01ARZ3NDEKTSV4RRFFQ69G5FH1"),
+          careGuideId: full.id,
+          title: "Wifi",
+          bodyMarkdown: "## Network\nThe password is on [the fridge](https://example.com).",
+          order: 0,
+        } as GuideSection,
+      ],
+      zones: [
+        zone(NORTH, { baselineSafetyLevel: 2, customInstructions: "Water trough by the gate" }),
+      ],
+      assignments: [
+        {
+          ...base("01ARZ3NDEKTSV4RRFFQ69G5FS1"),
+          animalId: BULL,
+          zoneId: NORTH,
+          periodFrom: MADE,
+          slot: "primary",
+        } as ZoneAssignment,
+      ],
+      animals,
+      contacts: [],
+      templates: [
+        template(MORNING_TEMPLATE, { title: "Check water", timeOfDay: "evening", zoneId: NORTH }),
+      ],
+      plans: [morningFeed, dogFood],
+      feeds: [feed],
+      health: [],
+    },
+    NOW,
+  );
+
+  it("lays out the animals tab and the written sections in the kiosk's order", () => {
+    expect(result.intro).toBe("Thanks for minding the place.");
+    expect(result.doNotHandle).toEqual(["Bruno — Charges the gate"]);
+    expect(result.care).toEqual([
+      {
+        title: "In the pens",
+        items: [
+          {
+            name: "North Trap",
+            detail: "Bruno — Charges the gate · Water trough by the gate (this pen)",
+            safety: 5,
+            safetyLabel: "Do not handle",
+          },
+        ],
+      },
+      {
+        title: "Pets",
+        items: [
+          {
+            name: "Rex",
+            detail: "dog · Sleeps inside. · 2 cups of Coastal hay, once a day, evening",
+            safety: 2,
+            safetyLabel: "Safe with basic caution",
+          },
+        ],
+      },
+      {
+        // The dog's bowl is under Pets, not here — the kiosk's own filter.
+        title: "The rations",
+        items: [
+          {
+            name: "North Trap — 1 head · North ration",
+            detail: "40 lbs of Coastal hay, once a day, morning",
+            safety: null,
+            safetyLabel: null,
+          },
+        ],
+      },
+      {
+        title: "The routine",
+        items: [
+          {
+            name: "Check water",
+            detail: "Every day · North Trap",
+            safety: null,
+            safetyLabel: null,
+          },
+        ],
+      },
+      {
+        title: "Wifi",
+        items: [
+          {
+            name: "",
+            detail: "Network · The password is on the fridge.",
+            safety: null,
+            safetyLabel: null,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("keeps the first cut's notes exactly as they were", () => {
+    expect(result.notes).toEqual([
+      { safety: true, text: "Do not handle alone: Bruno — Charges the gate" },
+      { safety: true, text: "North Trap: level 5, Do not handle" },
+      { safety: false, text: "Thanks for minding the place." },
+      { safety: false, text: "Wifi: Network\nThe password is on the fridge." },
+    ]);
+  });
+
+  it("leaves out every section the guide does not include, and empty ones", () => {
+    const pensOnly = boardSitter(
+      {
+        guide: { ...full, includes: ["pens"] },
+        sections: [],
+        zones: [zone(NORTH)],
+        assignments: [],
+        animals,
+        contacts: [],
+        templates: [template(MORNING_TEMPLATE, { title: "Check water" })],
+        plans: [morningFeed, dogFood],
+        feeds: [feed],
+        health: [],
+      },
+      NOW,
+    );
+    // An empty pen with nothing written on it is not in the guide at all.
+    expect(pensOnly.care).toEqual([]);
+    expect(pensOnly.doNotHandle).toEqual([]);
   });
 });
 

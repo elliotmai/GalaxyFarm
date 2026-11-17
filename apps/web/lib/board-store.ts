@@ -63,7 +63,7 @@ export async function boardSnapshot(
     property: boardProperty(property, process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME),
     date: sheet.date,
     chores: boardChores(sheet.entries),
-    sitter: boardSitter(view, now),
+    sitter: boardSitter({ ...view, health: view.petHealth }, now),
   };
 }
 

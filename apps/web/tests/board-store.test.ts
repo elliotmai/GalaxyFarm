@@ -161,7 +161,13 @@ describe("the board", () => {
         done: false,
       },
     ]);
-    expect(board.sitter).toEqual({ contacts: [], notes: [] });
+    expect(board.sitter).toEqual({
+      contacts: [],
+      notes: [],
+      intro: null,
+      doNotHandle: [],
+      care: [],
+    });
 
     const { apiToken: elsewhere } = await mint(OTHER);
     expect((await boardSnapshot(elsewhere, NOW, db)).chores).toEqual([]);

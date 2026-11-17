@@ -19,12 +19,21 @@ import {
   type CareGuide,
   type GuideSection,
 } from "@galaxy-farm/module-housesitting";
+import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
+import { petBriefings, petsOnFarm } from "@galaxy-farm/module-pets";
 
 import { guideIncludes } from "@/lib/care-guide-selection";
 import { groupChoresForBoard } from "@/lib/chores";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
-import { guideEmergencyContacts, guideVets, guideZonesFrom } from "@/lib/guide-composition";
+import {
+  guideChores,
+  guideEmergencyContacts,
+  guideFeedingPlans,
+  guideVets,
+  guideZonesFrom,
+} from "@/lib/guide-composition";
+import { currentMedicinesFor, feedingLinesFor } from "@/lib/pet-care";
 
 /**
  * The board API's answer, worked out from the farm's records (spec §4.3
@@ -77,9 +86,28 @@ export interface BoardNote {
   readonly text: string;
 }
 
+export interface BoardCareItem {
+  readonly name: string;
+  /** One plain-text line, its facts joined with " · ". */
+  readonly detail: string;
+  /** The level the kiosk badges this row with, when it badges it. */
+  readonly safety: number | null;
+  readonly safetyLabel: string | null;
+}
+
+export interface BoardCareSection {
+  readonly title: string;
+  readonly items: readonly BoardCareItem[];
+}
+
 export interface BoardSitter {
   readonly contacts: readonly BoardContact[];
+  /** The original flat list, kept for callers written against v1's first cut. */
   readonly notes: readonly BoardNote[];
+  readonly intro: string | null;
+  readonly doNotHandle: readonly string[];
+  /** "The animals" tab's sections, then the "Notes" tab's written sections. */
+  readonly care: readonly BoardCareSection[];
 }
 
 export interface BoardResponse {
@@ -331,17 +359,52 @@ export interface SitterSources {
   readonly assignments: readonly ZoneAssignment[];
   readonly animals: readonly Animal[];
   readonly contacts: readonly Contact[];
+  readonly templates: readonly ChoreTemplate[];
+  readonly plans: readonly FeedingPlan[];
+  readonly feeds: readonly FeedType[];
+  /** Health records — only the pets' are read, for what they are on now. */
+  readonly health: readonly HealthRecord[];
 }
+
+const EMPTY_SITTER: BoardSitter = {
+  contacts: [],
+  notes: [],
+  intro: null,
+  doNotHandle: [],
+  care: [],
+};
+
+/** Facts as one line: blanks dropped, each fact's own newlines folded in. */
+export function oneLine(parts: readonly (string | undefined)[]): string {
+  return parts
+    .flatMap((part) => (part === undefined ? [] : plainText(part).split("\n")))
+    .map((part) => part.trim())
+    .filter((part) => part !== "")
+    .join(" · ");
+}
+
+const item = (
+  name: string,
+  parts: readonly (string | undefined)[],
+  safety?: { readonly level: number; readonly label: string },
+): BoardCareItem => ({
+  name,
+  detail: oneLine(parts),
+  safety: safety?.level ?? null,
+  safetyLabel: safety?.label ?? null,
+});
 
 /**
  * The housesitter guide, as the kiosk's Housesitter Mode composes it
- * (`housesitter-guide.tsx`): its "Who to ring" tab, and its notes — the
- * do-not-handle list and the pens' effective safety levels leading, then the
- * intro and the hand-written sections.
+ * (`housesitter-guide.tsx`), section for section and gated on the same
+ * `includes`: "Who to ring", the do-not-handle callout, "The animals" (pens,
+ * pets, rations, routine) and "Notes" (intro, written sections).
+ *
+ * `notes` is the first cut's flat list and is kept exactly as it was.
  */
 export function boardSitter(sources: SitterSources, now: Date): BoardSitter {
   const { guide } = sources;
-  if (guide === undefined) return { contacts: [], notes: [] };
+  if (guide === undefined) return EMPTY_SITTER;
 
   const emergency = guideIncludes(guide, "emergency_contacts")
     ? guideEmergencyContacts(sources.contacts)
@@ -402,6 +465,88 @@ export function boardSitter(sources: SitterSources, now: Date): BoardSitter {
     })),
   ];
 
+  // "The animals" tab, in the kiosk's order: pens and pets, then the
+  // rations, then the standing routine.
+  const pens = composed.pens.map((pen) =>
+    item(
+      pen.zoneName,
+      [
+        pen.animals.length === 0
+          ? "Empty at the moment"
+          : pen.animals
+              .map((animal) =>
+                animal.safetyNotes === undefined
+                  ? animal.name
+                  : `${animal.name} — ${animal.safetyNotes}`,
+              )
+              .join(", "),
+        ...pen.instructions.map(
+          (instruction) =>
+            `${instruction.text} (${instruction.source === "zone" ? "this pen" : instruction.sourceName})`,
+        ),
+      ],
+      { level: pen.effectiveLevel, label: pen.effectiveLabel },
+    ),
+  );
+
+  const pets = guideIncludes(guide, "pets")
+    ? petBriefings(
+        petsOnFarm(sources.animals).map((pet) => ({
+          pet,
+          feeding: feedingLinesFor(pet.id, sources.plans, sources.feeds, sources.animals).map(
+            (text) => ({ text }),
+          ),
+          medicines: currentMedicinesFor(pet.id, sources.health, now),
+        })),
+      ).map((pet) =>
+        item(
+          pet.name,
+          [
+            pet.species,
+            pet.safetyNotes,
+            pet.instructions,
+            ...(pet.feeding.length === 0
+              ? ["No ration written down — ask before feeding."]
+              : pet.feeding),
+            pet.medicines.length === 0 ? undefined : `On now: ${pet.medicines.join("; ")}`,
+          ],
+          { level: pet.safetyLevel, label: pet.safetyLabel },
+        ),
+      )
+    : [];
+
+  const feeding = guideIncludes(guide, "cattle_feeding")
+    ? guideFeedingPlans(
+        sources.plans,
+        sources.feeds,
+        sources.animals,
+        sources.zones,
+        sources.assignments,
+        now,
+      ).map((plan) => item(`${plan.who} · ${plan.name}`, [plan.portion, ...plan.lines, plan.notes]))
+    : [];
+
+  const routine = guideIncludes(guide, "chores")
+    ? guideChores(sources.templates, sources.zones).map((chore) =>
+        item(chore.title, [chore.when, chore.zoneName, chore.detail]),
+      )
+    : [];
+
+  const care: BoardCareSection[] = [
+    { title: "In the pens", items: pens },
+    { title: "Pets", items: pets },
+    { title: "The rations", items: feeding },
+    { title: "The routine", items: routine },
+    // The "Notes" tab's hand-written sections, after the intro it leads with.
+    ...composed.custom.map((section) => ({
+      title: section.title,
+      items: [item("", [section.bodyMarkdown])],
+    })),
+  ].filter((section) => section.items.length > 0);
+
+  const intro =
+    composed.intro === undefined || composed.intro.trim() === "" ? null : plainText(composed.intro);
+
   return {
     contacts: [...contacts.values()].map((person) => ({
       name: person.name,
@@ -409,6 +554,9 @@ export function boardSitter(sources: SitterSources, now: Date): BoardSitter {
       phone: person.phone,
     })),
     notes,
+    intro,
+    doNotHandle: doNotHandleList(composed),
+    care,
   };
 }
 

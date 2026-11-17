@@ -284,7 +284,7 @@ Copy `.env.example` to `.env.local` and fill it in. It covers `DATABASE_URL` (Ne
 
 Another app — the kitchen's Fridge Board — reads the farm server-to-server with a bearer token (spec §4.3 "Connected apps"):
 
-- `GET /api/board/v1` — the property's name, coordinates and timezone, today's date there, today's chores exactly as the kiosk's Today's Chores board shows them (`slot`: `owed | morning | midday | evening | night`), and the housesitter guide's contacts and notes.
+- `GET /api/board/v1` — the property's name, coordinates and timezone, today's date there, today's chores exactly as the kiosk's Today's Chores board shows them (`slot`: `owed | morning | midday | evening | night`), and the housesitter guide as Housesitter Mode shows it: `contacts` and the flat `notes` list, plus `intro`, `doNotHandle`, and `care` — the "The animals" tab's sections (pens with their effective safety level, pets, rations, routine) and then the written guide sections, each as `{ title, items: [{ name, detail, safety, safetyLabel }] }` with `detail` one plain-text line. Sections follow the guide's own includes; empty ones are left out.
 - `POST /api/board/v1/chores/{id}` with `{ "done": true | false }` → `{ "ok": true, "done": … }`. `id` is a chore id from the GET. It goes through the kiosk's own tick (`tickChore`), so it is in the sync audit as device `app:<token id>` and every screen picks it up on its next pull.
 
 Both answer `401 { "error": "unauthorized" }` without `Authorization: Bearer <token>`, and the tick answers `404 { "error": "not_found" }` for a chore not on today's sheet. `lib/board-api.ts` is the mapping, `lib/board-store.ts` the reads and the write.
