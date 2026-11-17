@@ -10,7 +10,6 @@ import {
   PageBody,
   PageHeader,
   Pill,
-  RecordCard,
   Section,
   Select,
   TextInput,
@@ -35,50 +34,72 @@ import { CATTLE_SALE_TYPES, type CattleSaleType } from "@galaxy-farm/module-catt
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
+import { candidateDetail, saleEndOf } from "./candidate-detail";
+import { LotCard, countdownLabel } from "./lot-card";
+
 /**
- * Cattle under consideration (spec §5.2, §5.9, issue #27).
+ * Cattle under consideration (spec §5.2, §5.9, issue #27), laid out as a sale.
  *
- * The comparison is the feature, and it sorts on **total acquisition cost**
- * rather than sticker price: a heifer four hundred miles away with a
- * commission on top is not the cheaper animal, and a table sorted on the
- * asking price says she is.
- *
- * The other thing this screen exists to do is make a sale date impossible to
- * miss. "Auction lots are a deadline, not a browse" — a lot you meant to bid
- * on is gone at a time nobody controls, so the days remaining are on the card
- * rather than in a field somebody has to open.
+ * The lots are the page: a photo, a lot number, the next bid and a running
+ * count to close, the way an auction site presents them. The comparison table
+ * below is still there for the question the lots cannot answer on their own,
+ * which is what each animal would cost all in. "Auction lots are a deadline,
+ * not a browse" — so the default order is the one closing soonest.
  */
 
-function formatDate(value: Date | undefined): string {
-  return value === undefined
-    ? "—"
-    : value.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+const STATUS_FILTERS: readonly {
+  readonly value: "open" | CandidateStatus;
+  readonly label: string;
+}[] = [
+  { value: "open", label: "All open" },
+  ...CANDIDATE_STATUSES.filter(
+    (status) => status !== "purchased" && status !== "passed" && status !== "gone",
+  ).map((status) => ({ value: status, label: status.replace(/_/g, " ") })),
+  { value: "passed", label: "Passed" },
+];
+
+const SORTS = ["ending", "price", "lot", "newest"] as const;
+type Sort = (typeof SORTS)[number];
+
+const SORT_LABEL: Readonly<Record<Sort, string>> = {
+  ending: "Closing soonest",
+  price: "Lowest next bid",
+  lot: "Lot number",
+  newest: "Newest listed",
+};
+
+/** Still a live question: not yet bought, passed on, or gone from the sale. */
+function isOpen(candidate: PurchaseCandidate): boolean {
+  return (
+    candidate.status !== "passed" && candidate.status !== "purchased" && candidate.status !== "gone"
+  );
 }
 
-function daysUntil(date: Date, now: Date): number {
-  return Math.ceil((date.getTime() - now.getTime()) / 86_400_000);
+/** Closing soonest first, lots with no end time last. */
+function byEnding(left: PurchaseCandidate, right: PurchaseCandidate): number {
+  const a = saleEndOf(left)?.getTime() ?? Number.POSITIVE_INFINITY;
+  const b = saleEndOf(right)?.getTime() ?? Number.POSITIVE_INFINITY;
+  return a - b;
 }
 
-/** The cattle half, as it is stored on the shared candidate. */
-interface CattleDetail {
-  readonly sex?: string;
-  readonly saleType?: CattleSaleType;
-  readonly saleDate?: string;
-  readonly lotNumber?: string;
-  readonly regNumber?: string;
-  readonly unpapered?: boolean;
-  readonly bred?: boolean;
-}
-
-function detailOf(candidate: PurchaseCandidate): CattleDetail {
-  return (candidate.domainDetail ?? {}) as CattleDetail;
-}
-
-function saleDateOf(candidate: PurchaseCandidate): Date | undefined {
-  const raw = detailOf(candidate).saleDate;
-  if (raw === undefined || raw === "") return undefined;
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? undefined : date;
+function compareFor(sort: Sort): (left: PurchaseCandidate, right: PurchaseCandidate) => number {
+  switch (sort) {
+    case "ending":
+      return byEnding;
+    case "price":
+      return (left, right) => left.askingPrice.cents - right.askingPrice.cents;
+    case "lot":
+      return (left, right) =>
+        (candidateDetail(left).lotNumber ?? "").localeCompare(
+          candidateDetail(right).lotNumber ?? "",
+          undefined,
+          {
+            numeric: true,
+          },
+        );
+    case "newest":
+      return (left, right) => right.firstSeen.getTime() - left.firstSeen.getTime();
+  }
 }
 
 export function CattleCandidatesScreen({
@@ -101,21 +122,35 @@ export function CattleCandidatesScreen({
   );
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
+  const [filter, setFilter] = useState<"open" | CandidateStatus>("open");
+  const [sort, setSort] = useState<Sort>("ending");
 
   const now = new Date();
   // Only the cattle. The same aggregate serves equipment and horses (§5.9).
   const candidates = useMemo(() => all.filter((entry) => entry.domain === "cattle"), [all]);
 
-  const open = candidates.filter(
-    (entry) => entry.status !== "passed" && entry.status !== "purchased",
-  );
+  const open = candidates.filter(isOpen);
 
-  /** Anything with a sale date inside a fortnight, soonest first. */
-  const deadlines = open
-    .map((candidate) => ({ candidate, on: saleDateOf(candidate) }))
-    .filter((entry): entry is { candidate: PurchaseCandidate; on: Date } => entry.on !== undefined)
-    .filter((entry) => daysUntil(entry.on, now) >= 0 && daysUntil(entry.on, now) <= 14)
-    .sort((left, right) => left.on.getTime() - right.on.getTime());
+  const visible = useMemo(() => {
+    const matching =
+      filter === "open"
+        ? candidates.filter(isOpen)
+        : candidates.filter((entry) => entry.status === filter);
+    return [...matching].sort(compareFor(sort));
+  }, [candidates, filter, sort]);
+
+  const closingSoon = open.filter((candidate) => {
+    const ends = saleEndOf(candidate);
+    if (ends === undefined) return false;
+    const label = countdownLabel(ends, now);
+    return (
+      label !== undefined && label !== "Closed" && ends.getTime() - now.getTime() <= 86_400_000
+    );
+  });
+
+  const cheapest = open
+    .map((candidate) => totalAcquisitionCost(candidate))
+    .sort((left, right) => left.cents - right.cents)[0] as Money | undefined;
 
   async function setStatus(candidate: PurchaseCandidate, status: CandidateStatus) {
     await api.update(candidate.id, { status } as Partial<PurchaseCandidate>);
@@ -144,13 +179,13 @@ export function CattleCandidatesScreen({
   }
 
   const columns: readonly Column<PurchaseCandidate>[] = [
-    { key: "title", header: "Animal", primary: true, render: (c) => c.title },
+    { key: "title", header: "Lot", primary: true, render: (c) => c.title },
     {
       key: "status",
       header: "Status",
       render: (c) => <Pill tone={c.status === "passed" ? "neutral" : "action"}>{c.status}</Pill>,
     },
-    { key: "asking", header: "Asking", numeric: true, render: (c) => formatMoney(c.askingPrice) },
+    { key: "asking", header: "Next bid", numeric: true, render: (c) => formatMoney(c.askingPrice) },
     {
       key: "total",
       header: "All in",
@@ -160,69 +195,28 @@ export function CattleCandidatesScreen({
     },
     {
       key: "sale",
-      header: "Sale",
-      render: (c) => {
-        const on = saleDateOf(c);
-        if (on === undefined) return <span className="text-muted">—</span>;
-        const days = daysUntil(on, now);
-        return days < 0 ? (
-          <span className="text-muted">{formatDate(on)}</span>
-        ) : (
-          <Pill tone={days <= 3 ? "danger" : days <= 14 ? "action" : "neutral"} dot={days <= 3}>
-            {days === 0 ? "today" : `${days} d`}
-          </Pill>
-        );
-      },
+      header: "Closes",
+      render: (c) => countdownLabel(saleEndOf(c), now) ?? "—",
     },
     { key: "where", header: "Where", render: (c) => c.location ?? "—" },
-    {
-      key: "actions",
-      header: "",
-      render: (candidate) => (
-        <span className="flex flex-wrap items-end gap-2">
-          {/*
-            A candidate walks watching → contacted → inspected → offer_made,
-            and ends at purchased, passed or gone. A Pass button alone would
-            record only the endings, so the whole ladder is here.
-          */}
-          <Select
-            label="Status"
-            hideLabel
-            value={candidate.status}
-            onChange={(event) => void setStatus(candidate, event.target.value as CandidateStatus)}
-            options={CANDIDATE_STATUSES.map((value) => ({
-              value,
-              label: value.replace(/_/g, " "),
-            }))}
-          />
-          <Button variant="ghost" onClick={() => void remove(candidate)}>
-            Delete
-          </Button>
-        </span>
-      ),
-    },
   ];
-
-  const cheapest = open
-    .map((candidate) => totalAcquisitionCost(candidate))
-    .sort((left, right) => left.cents - right.cents)[0] as Money | undefined;
 
   return (
     <PageBody>
       <PageHeader
         eyebrow="Cattle"
         title="Candidates"
-        subtitle="Cattle under consideration, compared on what they would actually cost to get here — not on the asking price."
+        subtitle="Lots from the sales you are watching, and anything you have added by hand. Ordered by what closes first."
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile label="Under consideration" value={open.length} tone="identity" />
         <Tile
-          label="Sale within a fortnight"
-          value={deadlines.length}
-          tone={deadlines.length > 0 ? "danger" : "neutral"}
-          emphasis={deadlines.length > 0}
-          hint={deadlines.length > 0 ? "A deadline, not a browse" : undefined}
+          label="Closing within a day"
+          value={closingSoon.length}
+          tone={closingSoon.length > 0 ? "danger" : "neutral"}
+          emphasis={closingSoon.length > 0}
+          hint={closingSoon.length > 0 ? "A deadline, not a browse" : undefined}
         />
         <Tile
           label="Cheapest all-in"
@@ -235,55 +229,65 @@ export function CattleCandidatesScreen({
         />
       </div>
 
-      {deadlines.length === 0 ? null : (
-        <Section
-          title="Sale dates coming up"
-          description="A lot you meant to bid on is gone at a time nobody controls."
-        >
-          <div className="grid grid-cols-1 gap-density md:grid-cols-2 xl:grid-cols-3">
-            {deadlines.map(({ candidate, on }) => {
-              const detail = detailOf(candidate);
-              const days = daysUntil(on, now);
-              return (
-                <RecordCard
-                  key={candidate.id}
-                  tone={days <= 3 ? "danger" : "action"}
-                  title={candidate.title}
-                  subtitle={candidate.location}
-                  actions={
-                    <Pill tone={days <= 3 ? "danger" : "action"} dot={days <= 3}>
-                      {days === 0 ? "today" : `${days} d`}
-                    </Pill>
-                  }
-                  meta={
-                    <>
-                      <Pill>{formatMoney(totalAcquisitionCost(candidate))} all in</Pill>
-                      {detail.lotNumber === undefined ? null : (
-                        <Pill tone="identity">lot {detail.lotNumber}</Pill>
-                      )}
-                      {detail.saleType === undefined ? null : (
-                        <Pill>{detail.saleType.replace(/_/g, " ")}</Pill>
-                      )}
-                    </>
-                  }
-                />
-              );
-            })}
-          </div>
-        </Section>
-      )}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-2">
+          {STATUS_FILTERS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={filter === option.value}
+              onClick={() => setFilter(option.value)}
+              className={[
+                "rounded-full border px-3 py-1 text-sm capitalize transition-colors",
+                filter === option.value
+                  ? "border-action bg-action text-white"
+                  : "border-edge bg-panel text-ink hover:border-action",
+              ].join(" ")}
+            >
+              {option.label}
+              <span className="ml-1.5 tabular-nums text-xs opacity-70">
+                {option.value === "open"
+                  ? open.length
+                  : candidates.filter((c) => c.status === option.value).length}
+              </span>
+            </button>
+          ))}
+        </div>
+        <Select
+          label="Sort"
+          hideLabel
+          value={sort}
+          onChange={(event) => setSort(event.target.value as Sort)}
+          options={SORTS.map((value) => ({ value, label: SORT_LABEL[value] }))}
+        />
+      </div>
 
-      <Section title="Add a candidate">
-        <AddCandidate api={api} />
-      </Section>
+      {loading ? (
+        <p className="text-muted">Looking…</p>
+      ) : visible.length === 0 ? (
+        <EmptyState
+          title="No lots here"
+          detail="Lots from the sales you watch arrive here on their own. Add one by hand below if you have a private treaty."
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {visible.map((candidate) => (
+            <LotCard
+              key={candidate.id}
+              candidate={candidate}
+              now={now}
+              onStatus={(status) => void setStatus(candidate, status)}
+              onDelete={() => void remove(candidate)}
+            />
+          ))}
+        </div>
+      )}
 
       <Section
         title="Comparison"
         description="Sorted on total acquisition cost. A cheaper animal four hundred miles away is often not the cheaper animal."
       >
-        {loading ? (
-          <p className="text-muted">Looking…</p>
-        ) : (
+        {loading ? null : (
           <Card>
             <DataTable
               caption="Cattle candidates"
@@ -296,12 +300,16 @@ export function CattleCandidatesScreen({
               empty={
                 <EmptyState
                   title="Nothing under consideration"
-                  detail="Add a heifer or a show prospect above. Hauling and commission go on the record, so the comparison is on what it would really cost."
+                  detail="Add a heifer or a show prospect below. Hauling and commission go on the record, so the comparison is on what it would really cost."
                 />
               }
             />
           </Card>
         )}
+      </Section>
+
+      <Section title="Add a candidate">
+        <AddCandidate api={api} />
       </Section>
     </PageBody>
   );
@@ -363,7 +371,7 @@ function AddCandidate({
       setAsking("");
       setHaul("");
       setLot("");
-      show({ message: "Added to the comparison", tone: "success" });
+      show({ message: "Added to the candidates", tone: "success" });
     } finally {
       setBusy(false);
     }
