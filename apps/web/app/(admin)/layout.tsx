@@ -6,6 +6,7 @@ import { ConfirmProvider, ToastProvider } from "@galaxy-farm/ui";
 import { AdminNav, BottomTabs } from "@/app/(admin)/_components/admin-nav";
 import { BackLink } from "@/app/(admin)/_components/back-link";
 import { SearchPaletteProvider } from "@/app/(admin)/_components/search-palette";
+import { ShareProvider } from "@/app/(admin)/_components/share-button";
 import { ThemeSync } from "@/app/(admin)/_components/theme-sync";
 import { APPEARANCE_BOOT_SCRIPT } from "@/lib/appearance";
 import { Refreshable } from "@/app/(admin)/_components/refreshable";
@@ -58,15 +59,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <ToastProvider>
           <ConfirmProvider>
             <SearchPaletteProvider propertyId={actor.propertyId}>
-              <div className="flex min-h-screen flex-col md:flex-row">
-                {/*
+              <ShareProvider>
+                <div className="flex min-h-screen flex-col md:flex-row">
+                  {/*
                 Sticky and full height so the sidebar scrolls in its own right.
                 That is what preserves its position across a navigation: the
                 layout does not remount, so the scrolled element survives — and
                 a nav that jumps back to the top every time you click a link is
                 the thing that makes a long list unusable.
               */}
-                {/*
+                  {/*
                 Sticky on both, for two different reasons. On a laptop it is a
                 full-height column that scrolls in its own right, which is what
                 preserves its position across a navigation — the layout does
@@ -78,34 +80,35 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 on screen forty rows into the herd, rather than back at the top
                 where you would have to scroll to reach it.
               */}
-                <aside className="sticky top-0 z-20 border-b border-rule bg-panel md:h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
-                  <AdminNav propertyId={actor.propertyId} farmName={farmName} />
-                </aside>
-                {/* Tighter gutters on a phone: 14px of padding either side of a
+                  <aside className="sticky top-0 z-20 border-b border-rule bg-panel md:h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
+                    <AdminNav propertyId={actor.propertyId} farmName={farmName} />
+                  </aside>
+                  {/* Tighter gutters on a phone: 14px of padding either side of a
                   375px screen is 7% of the width, and every table and form
                   inside is competing for the rest. */}
-                {/* The bottom padding on a phone clears the tab bar, the floating
+                  {/* The bottom padding on a phone clears the tab bar, the floating
                   add button above it and the home-indicator inset, so the last
                   row of a list scrolls clear of both rather than under them. */}
-                <main className="min-w-0 flex-1 px-3 pb-[calc(9rem+env(safe-area-inset-bottom))] pt-density md:p-density md:pb-density">
-                  <Refreshable>
-                    {/*
+                  <main className="min-w-0 flex-1 px-3 pb-[calc(9rem+env(safe-area-inset-bottom))] pt-density md:p-density md:pb-density">
+                    <Refreshable>
+                      {/*
                     In the layout rather than in each screen, so a page cannot
                     forget it and so it survives a navigation without
                     remounting — which is what keeps a thirteen-tab strip from
                     losing its scroll every time you change view.
                   */}
-                    {/*
+                      {/*
                     The way back, in the same place on every page that has one
                     — above the strip, where a thumb looks for it.
                   */}
-                    <BackLink />
-                    <SectionStrip />
-                    {children}
-                  </Refreshable>
-                </main>
-              </div>
-              <BottomTabs />
+                      <BackLink />
+                      <SectionStrip />
+                      {children}
+                    </Refreshable>
+                  </main>
+                </div>
+                <BottomTabs />
+              </ShareProvider>
             </SearchPaletteProvider>
           </ConfirmProvider>
         </ToastProvider>

@@ -19,6 +19,7 @@ import {
 
 import { formatDate } from "@/app/(admin)/admin/garden/_components/labels";
 import { LandRow, RowAction, RowList } from "@/app/(admin)/admin/pastures/_components/land-kit";
+import { useShareSummary } from "@/app/(admin)/_components/share-button";
 import { varietyFacts, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
@@ -160,6 +161,14 @@ export function UpNextPanel({
         : `${formatDate(job.due)} – ${formatDate(job.until)}`;
     return job.due <= now ? `now · until ${formatDate(job.until ?? job.due)}` : span;
   }
+
+  useShareSummary({
+    title: "Garden — up next",
+    lines:
+      jobs.length === 0
+        ? ["Nothing due in the next two weeks."]
+        : jobs.map((job) => `${GARDEN_JOB_LABELS[job.kind]} ${name(job.varietyId)} — ${when(job)}`),
+  });
 
   if (jobs.length === 0) {
     return (

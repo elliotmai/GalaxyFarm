@@ -261,7 +261,11 @@ describe("the navigation", () => {
     // the nav did not read it itself.
     stored.current = { brandingConfigs: [config("Rocking M Cattle")] };
 
-    render(<AdminNav propertyId={PROPERTY} farmName="Flying Double M" />);
+    render(
+      <ToastProvider>
+        <AdminNav propertyId={PROPERTY} farmName="Flying Double M" />
+      </ToastProvider>,
+    );
 
     const nav = screen.getByRole("navigation", { name: "Admin sections" });
     expect(within(nav).getByRole("link", { name: /Rocking M Cattle/ })).toBeInTheDocument();
@@ -272,7 +276,11 @@ describe("the navigation", () => {
     // placeholder here would flash the wrong farm name on every page load.
     stored.current = {};
 
-    render(<AdminNav propertyId={PROPERTY} farmName="Flying Double M" />);
+    render(
+      <ToastProvider>
+        <AdminNav propertyId={PROPERTY} farmName="Flying Double M" />
+      </ToastProvider>,
+    );
 
     const nav = screen.getByRole("navigation", { name: "Admin sections" });
     expect(within(nav).getByRole("link", { name: /Flying Double M/ })).toBeInTheDocument();
@@ -288,7 +296,11 @@ describe("the navigation", () => {
       ],
     };
 
-    render(<AdminNav propertyId={PROPERTY} farmName="Flying Double M" />);
+    render(
+      <ToastProvider>
+        <AdminNav propertyId={PROPERTY} farmName="Flying Double M" />
+      </ToastProvider>,
+    );
 
     const nav = screen.getByRole("navigation", { name: "Admin sections" });
     expect(within(nav).getByRole("link", { name: /First/ })).toBeInTheDocument();

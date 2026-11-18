@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 
 import { SEGMENT_TRACK_CLASS, segmentClass } from "./button-styles.js";
@@ -17,6 +17,12 @@ import { SEGMENT_TRACK_CLASS, segmentClass } from "./button-styles.js";
  * place, and the underline belongs to the section strip, which goes to
  * another page; with both underlined, a page like Supplies had two identical
  * rows that did different things. See `SEGMENT_TRACK_CLASS`.
+ *
+ * **A shared link opens on the tab it was shared from.** The share button
+ * puts each strip's open tab in the link as a `tab` value, and a strip
+ * arriving at a page reads them once and takes the first that is its own —
+ * through `onTabChange` like a tap, so a strip whose parent holds the state
+ * follows too. `data-tab-id` is how the button finds the open tabs.
  */
 
 export interface TabDefinition {
@@ -61,6 +67,17 @@ export function Tabs({ tabs, children, defaultTab, activeTab, onTabChange, label
     [activeTab, onTabChange],
   );
 
+  // Once, on arrival: the tab a shared link names, if it is one of ours.
+  const arrived = useRef(false);
+  useEffect(() => {
+    if (arrived.current || typeof window === "undefined") return;
+    arrived.current = true;
+    const wanted = new URLSearchParams(window.location.search)
+      .getAll("tab")
+      .find((id) => tabs.some((tab) => tab.id === id));
+    if (wanted !== undefined && wanted !== active) select(wanted);
+  }, [tabs, active, select]);
+
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const index = tabs.findIndex((tab) => tab.id === active);
     if (index === -1) return;
@@ -98,6 +115,7 @@ export function Tabs({ tabs, children, defaultTab, activeTab, onTabChange, label
               role="tab"
               id={`${baseId}-tab-${tab.id}`}
               aria-selected={selected}
+              data-tab-id={tab.id}
               aria-controls={`${baseId}-panel-${tab.id}`}
               // One stop for the strip: the selected tab is the only one in
               // the tab order, and the arrows do the rest.

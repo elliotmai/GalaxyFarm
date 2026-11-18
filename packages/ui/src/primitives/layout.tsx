@@ -121,7 +121,9 @@ export function PageHeader({ title, subtitle, eyebrow, actions, meta }: PageHead
             {isExplanation(subtitle) ? <HelpToggle about={title}>{subtitle}</HelpToggle> : null}
           </div>
           {subtitle === undefined || isExplanation(subtitle) ? null : (
-            <div className="max-w-prose text-sm text-muted">{subtitle}</div>
+            <div data-share-detail className="max-w-prose text-sm text-muted">
+              {subtitle}
+            </div>
           )}
         </div>
         {actions === undefined ? null : (

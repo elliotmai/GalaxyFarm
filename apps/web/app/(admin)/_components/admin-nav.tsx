@@ -12,6 +12,7 @@ import { logHref } from "@/app/(admin)/admin/log/_components/log-kinds";
 import { markMove } from "@/app/(admin)/_components/back-link";
 import { SyncStatus } from "@/app/(admin)/_components/sync-status";
 import { useSearchPalette } from "@/app/(admin)/_components/search-palette";
+import { ShareButton } from "@/app/(admin)/_components/share-button";
 import { useFarmName } from "@/lib/branding";
 import { useAnimalHome } from "@/lib/use-animal-home";
 
@@ -145,6 +146,7 @@ export function AdminNav({
             one opens the details. */}
         <div className="flex shrink-0 items-center gap-1 md:hidden">
           <SyncStatus quiet />
+          <ShareButton variant="bar" />
           <button
             type="button"
             onClick={search.open}
@@ -168,6 +170,7 @@ export function AdminNav({
             <span className="flex-1 text-left">Search</span>
             <kbd className="rounded border border-rule bg-panel px-1.5 text-xs">⌘K</kbd>
           </button>
+          <ShareButton variant="rail" />
           <Link
             href={logHref({ from: pathname })}
             prefetch

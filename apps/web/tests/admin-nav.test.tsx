@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Ulid } from "@galaxy-farm/core";
+import { ToastProvider } from "@galaxy-farm/ui";
 
 const pathname = vi.hoisted(() => ({ current: "/admin" }));
 
@@ -49,7 +50,11 @@ function at(route: string) {
 describe("AdminNav", () => {
   it("shows four places and Log, not fifty-five links", () => {
     at("/admin");
-    render(<AdminNav propertyId={PROPERTY} farmName="Flying Double M" />);
+    render(
+      <ToastProvider>
+        <AdminNav propertyId={PROPERTY} farmName="Flying Double M" />
+      </ToastProvider>,
+    );
 
     const nav = screen.getByRole("navigation", { name: "Admin sections" });
     for (const label of ["Today", "Animals", "Farm", "More", "Log"]) {
@@ -72,7 +77,11 @@ describe("AdminNav", () => {
 
   it("marks exactly one destination as current", () => {
     at("/admin/cattle/breeding");
-    render(<AdminNav propertyId={PROPERTY} farmName="Flying Double M" />);
+    render(
+      <ToastProvider>
+        <AdminNav propertyId={PROPERTY} farmName="Flying Double M" />
+      </ToastProvider>,
+    );
 
     const nav = screen.getByRole("navigation", { name: "Admin sections" });
     const current = within(nav)

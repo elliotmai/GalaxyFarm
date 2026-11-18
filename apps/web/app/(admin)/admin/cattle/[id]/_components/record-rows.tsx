@@ -195,7 +195,9 @@ export function ScreenHeader({
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5">
         <h1 className="text-ink">{title}</h1>
         {line === undefined || line === "" ? null : (
-          <span className="text-sm text-muted">{line}</span>
+          <span data-share-detail className="text-sm text-muted">
+            {line}
+          </span>
         )}
       </div>
       {/* A screen with a floating add button hides this one on a phone by

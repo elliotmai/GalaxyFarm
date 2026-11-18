@@ -9,6 +9,7 @@ import { ACTION_TILE_CLASS, Pill, Section, type Tone, useToast } from "@galaxy-f
 
 import { Row, Rows } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
 import { useAttachPhotos } from "@/lib/photos/use-photos";
+import { useShareSummary } from "@/app/(admin)/_components/share-button";
 
 /**
  * The parts every animal's own page is built from (V2 Animal).
@@ -453,6 +454,11 @@ export function AnimalHeader({
   /** Anything that must be said before anybody opens the gate. */
   readonly children?: ReactNode;
 }) {
+  // Shared as it reads: the name, the tag, and the line of facts under them.
+  useShareSummary({
+    title: badge === undefined || badge === "" || badge === title ? title : `${title} · ${badge}`,
+    lines: [facts],
+  });
   return (
     <header className="flex flex-col gap-2">
       {back === undefined ? null : (
@@ -477,7 +483,11 @@ export function AnimalHeader({
             <h1 className="min-w-0 break-words text-ink">{title}</h1>
             {chip ?? null}
           </div>
-          {facts === "" ? null : <p className="text-sm text-muted">{facts}</p>}
+          {facts === "" ? null : (
+            <p data-share-detail className="text-sm text-muted">
+              {facts}
+            </p>
+          )}
         </div>
       </div>
       {children}

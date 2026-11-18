@@ -26,6 +26,7 @@ import {
 } from "@galaxy-farm/module-feed";
 
 import { FeedingPlanEditor, usePlanFlocks } from "@/app/(admin)/_components/feeding-plan-editor";
+import { useShareSummary } from "@/app/(admin)/_components/share-button";
 import { toggleChore } from "@/lib/chores";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { useMutations } from "@/lib/local/mutations";
@@ -195,6 +196,21 @@ export function FeedScreen({
     return choreDaySheet({ tasks: feedingTasks, templates: [], derived }, day, at);
   }, [plans, zones, feeds, propertyId, tasks, minute]);
   const fed = feedings.filter((entry) => entry.completedAt !== undefined).length;
+
+  // The feeding round, as somebody covering it needs it: when, which ration,
+  // what goes in, and whether it is done yet.
+  useShareSummary({
+    title: "Feeding today",
+    lines:
+      feedings.length === 0
+        ? ["No feeding plans are switched on."]
+        : feedings.map(
+            (entry) =>
+              `${entry.completedAt === undefined ? "☐" : "☑"} ${entry.title}${
+                entry.detail === undefined ? "" : ` — ${entry.detail}`
+              }`,
+          ),
+  });
 
   const tasksApi = useMutations<Task>("tasks", "tasks", taskSchema, propertyId, actorId);
   const { show } = useToast();

@@ -51,6 +51,7 @@ import {
 import { useRecords } from "@/lib/local/use-records";
 import type { WeatherChores } from "@/lib/use-weather-chores";
 import { isForecastDay, type WeatherJobs } from "@/lib/weather-jobs";
+import { useShareSummary } from "@/app/(admin)/_components/share-button";
 
 /**
  * The admin dashboard — "Today".
@@ -351,6 +352,27 @@ function Today({
     month: "short",
   });
   const weather = weatherFact(calving.forecast, calving.settings, chores.weather, now);
+
+  // What somebody sending this to the household means by "today": what
+  // needs a person, how the chores stand, and what is still to do.
+  const open = chores.sheet.filter((entry) => entry.completedAt === undefined);
+  useShareSummary({
+    title: `Today on the farm · ${date}`,
+    lines: [
+      weather === undefined ? undefined : `Weather: ${weather}`,
+      ...needs.map((need) => `${need.title}${need.line === "" ? "" : ` — ${need.line}`}`),
+      chores.sheet.length === 0
+        ? undefined
+        : `Chores: ${chores.sheet.length - open.length} of ${chores.sheet.length} done`,
+      open.length === 0
+        ? undefined
+        : `Still to do: ${open
+            .slice(0, 4)
+            .map((entry) => entry.title)
+            .join(", ")}${open.length > 4 ? ` and ${open.length - 4} more` : ""}`,
+      needs.length === 0 ? allClear : undefined,
+    ],
+  });
 
   return (
     <PageBody>

@@ -258,7 +258,9 @@ export function KitHeader({
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5">
           <h1 className="text-ink">{title}</h1>
           {facts === undefined || facts === "" ? null : (
-            <span className="text-sm text-muted">{facts}</span>
+            <span data-share-detail className="text-sm text-muted">
+              {facts}
+            </span>
           )}
         </div>
       </div>
