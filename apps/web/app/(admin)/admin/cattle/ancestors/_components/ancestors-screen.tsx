@@ -5,10 +5,12 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 import {
   Button,
   EmptyState,
+  Fab,
   Modal,
   PageBody,
   PageHeader,
   Pill,
+  PlusIcon,
   SearchSelect,
   Section,
   Select,
@@ -673,7 +675,8 @@ export function AncestorsScreen({
                   would win over a `hidden` passed to it. */}
               <span className="hidden sm:block">
                 <Button variant="primary" onClick={startCreate}>
-                  <span aria-hidden="true">+</span> Add an ancestor
+                  <PlusIcon />
+                  Add ancestor
                 </Button>
               </span>
             </span>
@@ -842,16 +845,7 @@ export function AncestorsScreen({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={startCreate}
-          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-        >
-          <span aria-hidden="true" className="text-xl leading-none">
-            +
-          </span>
-          Add an ancestor
-        </button>
+        <Fab onClick={startCreate}>Add ancestor</Fab>
       </div>
 
       {filtersOpen ? (
@@ -1048,7 +1042,7 @@ export function AncestorsScreen({
         <Modal
           key={editing?.id ?? "new"}
           placement="side"
-          title={editing === undefined ? "New ancestor" : `Editing ${editing.name}`}
+          title={editing === undefined ? "New ancestor" : `Edit ${editing.name}`}
           description="Off the certificate. Only the name is required."
           onClose={() => setDraft(undefined)}
           footer={

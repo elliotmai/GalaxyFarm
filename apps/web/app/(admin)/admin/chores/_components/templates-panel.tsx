@@ -8,6 +8,7 @@ import {
   EmptyState,
   Modal,
   Pill,
+  PlusIcon,
   Select,
   TextArea,
   TextInput,
@@ -267,7 +268,8 @@ export function TemplatesPanel({
           it repeating and keeps every chore it already produced. */}
       <div className="flex justify-end">
         <Button variant="primary" onClick={startCreate}>
-          <span aria-hidden="true">+</span> Add template
+          <PlusIcon />
+          Add template
         </Button>
       </div>
 
@@ -275,7 +277,7 @@ export function TemplatesPanel({
         <Modal
           key={editing?.id ?? "new"}
           placement="side"
-          title={editing === undefined ? "New template" : `Editing ${editing.title}`}
+          title={editing === undefined ? "New template" : `Edit ${editing.title}`}
           description="A job that comes round on its own."
           onClose={() => setDraft(undefined)}
           footer={

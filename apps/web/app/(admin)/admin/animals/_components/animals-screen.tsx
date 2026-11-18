@@ -4,7 +4,18 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { Button, EmptyState, Modal, Select, TextInput, optionLabel } from "@galaxy-farm/ui";
+import {
+  ACTION_TILE_CLASS,
+  Button,
+  buttonClass,
+  EmptyState,
+  FAB_CLASS,
+  Modal,
+  optionLabel,
+  PlusIcon,
+  Select,
+  TextInput,
+} from "@galaxy-farm/ui";
 import type { Animal, Ulid, Zone, ZoneAssignment } from "@galaxy-farm/core";
 import type { BreedingRecord, CalvingRecord, HealthRecord } from "@galaxy-farm/module-cattle";
 import type { EggLog, Flock, FlockAdjustment } from "@galaxy-farm/module-poultry";
@@ -69,11 +80,7 @@ export interface AddAction {
 const SPECIES_LINK =
   "inline-flex min-h-target shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm font-medium text-muted hover:bg-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
 
-const ACTION_TILE =
-  "flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-density border border-rule bg-panel px-1 text-center text-[13px] font-medium text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
-
-const ACTION_LINK =
-  "inline-flex min-h-target items-center justify-center rounded-density bg-action px-4 font-semibold text-action-ink hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
+const ACTION_LINK = buttonClass("primary");
 
 export function AnimalsScreen({
   propertyId,
@@ -243,7 +250,8 @@ export function AnimalsScreen({
             {addButton(
               ACTION_LINK,
               <>
-                <span aria-hidden="true">+</span>&nbsp;{add.label}
+                <PlusIcon />
+                {add.label}
               </>,
             )}
           </span>
@@ -256,7 +264,7 @@ export function AnimalsScreen({
           className="grid grid-cols-4 gap-2"
         >
           {actions.map((action) => (
-            <Link key={action.label} href={action.href} className={ACTION_TILE}>
+            <Link key={action.label} href={action.href} className={ACTION_TILE_CLASS}>
               <span aria-hidden="true" className="text-xl leading-none">
                 {action.glyph}
               </span>
@@ -486,7 +494,7 @@ export function AnimalsScreen({
       {selecting ? (
         // Sticky rather than fixed, so it sits above the phone's tab bar and
         // inside the page column on a laptop without knowing where the rail is.
-        <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex items-center justify-between gap-3 rounded-density border border-rule bg-panel p-2 pl-4 shadow-lg md:bottom-4">
+        <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex items-center justify-between gap-3 rounded-density border border-rule bg-panel p-2 pl-4 shadow-float md:bottom-4">
           <span className="text-sm font-semibold text-ink" aria-live="polite">
             {selected.length} selected
           </span>
@@ -502,11 +510,9 @@ export function AnimalsScreen({
         </div>
       ) : (
         addButton(
-          "fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden",
+          FAB_CLASS,
           <>
-            <span aria-hidden="true" className="text-xl leading-none">
-              +
-            </span>
+            <PlusIcon size={20} />
             {add.label}
           </>,
         )

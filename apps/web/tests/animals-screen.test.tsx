@@ -142,7 +142,7 @@ describe("the Animals list", () => {
         species="dogs"
         basePath="/admin/pets/dogs"
         add={{
-          label: "Add a dog",
+          label: "Add dog",
           render: () => {
             added += 1;
             return <p>The dog form</p>;
@@ -161,7 +161,7 @@ describe("the Animals list", () => {
     // No species chips on a species page.
     expect(screen.queryByRole("link", { name: /Cattle/ })).toBeNull();
 
-    await user.click(screen.getAllByRole("button", { name: /Add a dog/ })[0] as HTMLElement);
+    await user.click(screen.getAllByRole("button", { name: /Add dog/ })[0] as HTMLElement);
     expect(screen.getByText("The dog form")).toBeTruthy();
     expect(added).toBeGreaterThan(0);
   });

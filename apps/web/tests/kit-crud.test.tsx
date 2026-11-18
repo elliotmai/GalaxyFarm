@@ -315,7 +315,7 @@ describe("Prices left blank", () => {
     expect(within(rows[1] as HTMLElement).getByText("No price")).toBeTruthy();
 
     await user.click(screen.getAllByRole("button", { name: /Add candidate/ })[0] as HTMLElement);
-    const panel = screen.getByRole("dialog", { name: "Add a candidate" });
+    const panel = screen.getByRole("dialog", { name: "Add candidate" });
     await user.type(within(panel).getByLabelText(/^What it is/), "Kubota at the sale barn");
     await user.click(within(panel).getByRole("button", { name: "Add candidate" }));
 

@@ -487,7 +487,7 @@ export function TypeForm({
 
   return (
     <FormPanel
-      title={editing === undefined ? "Add a feed" : `Edit ${editing.name}`}
+      title={editing === undefined ? "Add feed" : `Edit ${editing.name}`}
       submitLabel={editing === undefined ? "Add feed" : "Save feed"}
       busy={busy}
       error={error}

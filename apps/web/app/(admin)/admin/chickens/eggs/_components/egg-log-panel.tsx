@@ -231,7 +231,7 @@ export function EggLogPanel({
         <Modal
           key={editing.id}
           placement="side"
-          title={`Editing ${formatDate(editing.collectedOn)}`}
+          title={`Edit ${formatDate(editing.collectedOn)}`}
           description="Correct the count, the day, or which coop it came from."
           onClose={closeEdit}
           footer={

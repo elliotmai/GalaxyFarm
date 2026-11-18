@@ -550,7 +550,7 @@ export function CarePanel({
         <Modal
           key={editing.id}
           placement="side"
-          title={`Editing ${ACTION_LABEL[editing.action]} — ${zoneName(editing.zoneId)}`}
+          title={`Edit ${ACTION_LABEL[editing.action]} — ${zoneName(editing.zoneId)}`}
           onClose={closeEdit}
           footer={
             <>

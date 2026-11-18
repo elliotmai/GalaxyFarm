@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 
 import { Suspense, use, useState, useTransition } from "react";
 
-import { Pill } from "@galaxy-farm/ui";
+import { Pill, tickBoxClass } from "@galaxy-farm/ui";
 import { choreProgress, type ChoreEntry, type Ulid, type Zone } from "@galaxy-farm/core";
 
 import { setChoreDone } from "@/app/(sitter)/sitter/_components/chore-actions";
@@ -72,14 +72,7 @@ function DoneLine({
 
 function Box({ done }: { readonly done: boolean }) {
   return (
-    <span
-      aria-hidden
-      className={[
-        "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2",
-        "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-action",
-        done ? "border-action bg-action text-action-ink" : "border-edge bg-panel",
-      ].join(" ")}
-    >
+    <span aria-hidden className={tickBoxClass(done)}>
       {done ? (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
           <path
@@ -221,10 +214,7 @@ export function SitterChores({
 
   return (
     <section aria-labelledby="sitter-today" className="flex min-w-0 flex-col gap-2.5">
-      <h2
-        id="sitter-today"
-        className="font-body text-xs font-semibold uppercase tracking-wide text-muted"
-      >
+      <h2 id="sitter-today" className="gf-label">
         Today
         {entries.length === 0 ? "" : progress.open === 0 ? " · done" : ` · ${progress.open} to do`}
         {mayTick ? "" : " · read-only"}

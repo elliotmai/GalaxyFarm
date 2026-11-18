@@ -353,7 +353,7 @@ export function PantryPanel({
         <Modal
           key={editing?.id ?? "new"}
           placement="side"
-          title={editing === undefined ? "Put something by" : `Editing ${editing.label}`}
+          title={editing === undefined ? "Put something by" : `Edit ${editing.label}`}
           onClose={() => setDraft(undefined)}
           footer={
             <>

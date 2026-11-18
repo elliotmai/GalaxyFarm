@@ -319,7 +319,7 @@ export function CareLogPanel({
         <Modal
           key={editing?.id ?? "new"}
           placement="side"
-          title={editing === undefined ? "Record care" : "Editing an entry"}
+          title={editing === undefined ? "Record care" : "Edit entry"}
           onClose={() => setDraft(undefined)}
           footer={
             <>

@@ -258,7 +258,7 @@ export function BottomTabs() {
         aria-current={pathname === LOG_HREF ? "page" : undefined}
         className="flex min-h-14 flex-1 flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-semibold text-action"
       >
-        <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-action text-action-ink shadow-[0_6px_16px_rgba(27,58,92,0.35)]">
+        <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-action text-action-ink shadow-float">
           <PlusIcon size={26} />
         </span>
         Log

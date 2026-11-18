@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { Pill, SafetyBadge } from "@galaxy-farm/ui";
+import { Pill, SafetyBadge, TagMark, tickBoxClass } from "@galaxy-farm/ui";
 
 import type { AnimalEntry } from "@/app/(admin)/admin/animals/_components/animal-entries";
 
@@ -36,7 +36,7 @@ export function AnimalListRow({
       ) : (
         <span aria-hidden="true" className="w-[26px] shrink-0" />
       )}
-      <Badge text={entry.badge} />
+      <TagMark tag={entry.badge} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate font-semibold">{entry.title}</span>
         {entry.line === "" ? null : (
@@ -81,32 +81,10 @@ export function AnimalListRow({
   );
 }
 
-/**
- * The round badge. Stretches into a lozenge rather than truncating a long
- * tag — half a tag number is the wrong tag number — and an untagged calf is a
- * dash hidden from a screen reader, as on the herd.
- */
-function Badge({ text }: { readonly text: string | undefined }) {
-  return (
-    <span
-      aria-hidden={text === undefined ? true : undefined}
-      className="gf-numeric flex h-[42px] min-w-[42px] max-w-[5.5rem] shrink-0 items-center justify-center rounded-full bg-raised px-2 text-[13px] font-semibold text-action"
-    >
-      <span className="truncate">{text ?? "–"}</span>
-    </span>
-  );
-}
-
 /** The drawn checkbox. The row itself carries the checkbox role and state. */
 function Tick({ on }: { readonly on: boolean }) {
   return (
-    <span
-      aria-hidden="true"
-      className={[
-        "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-density border-2",
-        on ? "border-action bg-action text-action-ink" : "border-edge bg-panel",
-      ].join(" ")}
-    >
+    <span aria-hidden="true" className={tickBoxClass(on)}>
       {on ? (
         <svg
           width="16"

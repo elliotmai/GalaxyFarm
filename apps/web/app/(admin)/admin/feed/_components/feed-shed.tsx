@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
-import { Button, EmptyState } from "@galaxy-farm/ui";
+import { Button, EmptyState, PlusIcon } from "@galaxy-farm/ui";
 import type { FeedProjection, FeedType } from "@galaxy-farm/module-feed";
 
 import { formatDate, line, qty, unitLabel } from "./feed-format";
@@ -12,7 +12,7 @@ import { formatDate, line, qty, unitLabel } from "./feed-format";
  *
  * One row a feed: how much is left, a small gauge, and "Restock" opening the
  * purchase form already on that feed. The row itself counts the feed — a
- * correction, which is where the projection restarts. "Add a feed" sits in
+ * correction, which is where the projection restarts. "Add feed" sits in
  * the header whatever the shed holds — it used to appear only on an empty
  * shed, so the second feed anybody bought had nowhere to go. The logs behind the
  * numbers (purchases, counts, feed types, cost a head) fold underneath, as
@@ -95,7 +95,8 @@ export function ShedView({
           {/* The empty shed's own call to action says the same thing. */}
           {!loading && rows.length === 0 ? null : (
             <Button aria-haspopup="dialog" onClick={onAddFeed}>
-              <span aria-hidden="true">+</span> Add a feed
+              <PlusIcon />
+              Add feed
             </Button>
           )}
           <Button aria-haspopup="dialog" onClick={() => onCount()}>
@@ -103,7 +104,8 @@ export function ShedView({
           </Button>
           <span className="hidden sm:block">
             <Button variant="primary" aria-haspopup="dialog" onClick={() => onRestock()}>
-              <span aria-hidden="true">+</span> Record purchase
+              <PlusIcon />
+              Record purchase
             </Button>
           </span>
         </span>
@@ -117,7 +119,7 @@ export function ShedView({
           detail="Add the feeds you buy, then record a purchase. The run-out date follows from the plans."
           action={
             <Button variant="primary" aria-haspopup="dialog" onClick={onAddFeed}>
-              Add a feed
+              Add feed
             </Button>
           }
         />

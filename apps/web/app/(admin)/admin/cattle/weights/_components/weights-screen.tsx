@@ -5,14 +5,16 @@ import { useId, useMemo, useState } from "react";
 import {
   Button,
   EmptyState,
+  Fab,
   Modal,
   PageBody,
+  PlusIcon,
   Section,
   Select,
   TextInput,
+  toOptions,
   useConfirmDelete,
   useToast,
-  toOptions,
 } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -28,7 +30,6 @@ import {
 } from "@galaxy-farm/module-cattle";
 
 import {
-  AddFab,
   Chip,
   ChipRow,
   facts,
@@ -172,7 +173,8 @@ export function WeightsScreen({
           action={
             <span className="hidden sm:block">
               <Button variant="primary" aria-haspopup="dialog" onClick={() => setAdding(true)}>
-                <span aria-hidden="true">+</span> Record weight
+                <PlusIcon />
+                Record weight
               </Button>
             </span>
           }
@@ -257,7 +259,7 @@ export function WeightsScreen({
           </Rows>
         )}
 
-        <AddFab onClick={() => setAdding(true)}>Record weight</AddFab>
+        <Fab onClick={() => setAdding(true)}>Record weight</Fab>
 
         {adding ? <AddWeight cattle={cattle} api={api} onClose={() => setAdding(false)} /> : null}
       </div>

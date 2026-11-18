@@ -83,7 +83,7 @@ describe("The fleet", () => {
 
     // The header's button and the phone's floating one; either opens the panel.
     await user.click(screen.getAllByRole("button", { name: /Add machine/ })[0] as HTMLElement);
-    const panel = screen.getByRole("dialog", { name: "Add a machine" });
+    const panel = screen.getByRole("dialog", { name: "Add machine" });
     await user.type(within(panel).getByLabelText(/^Name/), "Gooseneck trailer");
     await user.click(within(panel).getByRole("button", { name: "Add machine" }));
 

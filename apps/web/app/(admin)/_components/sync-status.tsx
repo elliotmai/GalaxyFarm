@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { Badge, Button, Modal } from "@galaxy-farm/ui";
+import { Pill, Button, Modal } from "@galaxy-farm/ui";
 
 import { useSync } from "@/app/_components/sync-provider";
 import { deviceId } from "@/lib/local/device-id";
@@ -62,7 +62,7 @@ export function SyncStatus({ quiet = false }: { readonly quiet?: boolean }) {
             <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-calm" />
           </span>
         ) : (
-          <Badge tone={pill.tone}>{pill.label}</Badge>
+          <Pill tone={pill.tone}>{pill.label}</Pill>
         )}
       </button>
       {open ? <SyncDetails onClose={() => setOpen(false)} /> : null}
@@ -184,7 +184,7 @@ function SyncDetails({ onClose }: { readonly onClose: () => void }) {
                       {item.what}
                       {item.name === undefined ? "" : ` · ${item.name}`}
                     </span>
-                    {item.stuck ? <Badge tone="danger">Set aside</Badge> : null}
+                    {item.stuck ? <Pill tone="danger">Set aside</Pill> : null}
                   </span>
                   <span className="text-xs text-muted">
                     {item.how} · {ago(item.queuedAt, now)}

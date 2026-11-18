@@ -7,16 +7,18 @@ import {
   Button,
   Checkbox,
   EmptyState,
-  PageBody,
+  Fab,
   Modal,
+  optionLabel,
+  PageBody,
   Pill,
+  PlusIcon,
   Section,
   Select,
   TextInput,
+  toOptions,
   useConfirmDelete,
   useToast,
-  toOptions,
-  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   displayName,
@@ -53,7 +55,6 @@ import {
 } from "@galaxy-farm/module-feed";
 
 import {
-  AddFab,
   Chip,
   ChipRow,
   facts,
@@ -229,11 +230,13 @@ export function CattleFeedScreen({
   const addButton =
     view === "catalog" ? (
       <Button variant="primary" aria-haspopup="dialog" onClick={() => setEditingFeed("new")}>
-        <span aria-hidden="true">+</span> Add feed
+        <PlusIcon />
+        Add feed
       </Button>
     ) : (
       <Button variant="primary" aria-haspopup="dialog" onClick={() => setEditing("new")}>
-        <span aria-hidden="true">+</span> Add plan
+        <PlusIcon />
+        Add plan
       </Button>
     );
 
@@ -315,7 +318,7 @@ export function CattleFeedScreen({
               detail="A group plan covers the herd; an animal plan overrides it for one cow."
               action={
                 <Button variant="primary" onClick={() => setEditing("new")}>
-                  Add a plan
+                  Add plan
                 </Button>
               }
             />
@@ -397,7 +400,7 @@ export function CattleFeedScreen({
                 detail="Add a feed and plans can start naming it."
                 action={
                   <Button variant="primary" onClick={() => setEditingFeed("new")}>
-                    Add a feed
+                    Add feed
                   </Button>
                 }
               />
@@ -423,9 +426,9 @@ export function CattleFeedScreen({
         )}
 
         {view === "catalog" ? (
-          <AddFab onClick={() => setEditingFeed("new")}>Add feed</AddFab>
+          <Fab onClick={() => setEditingFeed("new")}>Add feed</Fab>
         ) : (
-          <AddFab onClick={() => setEditing("new")}>Add plan</AddFab>
+          <Fab onClick={() => setEditing("new")}>Add plan</Fab>
         )}
 
         {editingFeedId === undefined ? null : (
@@ -529,7 +532,7 @@ export function FeedTypeForm({
   return (
     <Modal
       placement="side"
-      title={editing ? `Edit ${feed.name}` : "Add a feed"}
+      title={editing ? `Edit ${feed.name}` : "Add feed"}
       onClose={onClose}
       footer={
         <>
@@ -796,7 +799,7 @@ export function PlanForm({
   return (
     <Modal
       placement="side"
-      title={editing ? `Edit ${plan.name}` : "Add a plan"}
+      title={editing ? `Edit ${plan.name}` : "Add plan"}
       onClose={onClose}
       footer={
         <>
@@ -998,7 +1001,8 @@ export function PlanForm({
 
         <div>
           <Button variant="ghost" type="button" onClick={() => setLines([...lines, blankLine()])}>
-            <span aria-hidden="true">+</span> Add another feed
+            <PlusIcon />
+            Add another feed
           </Button>
         </div>
 

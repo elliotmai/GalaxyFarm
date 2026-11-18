@@ -54,7 +54,7 @@ export function PhotoCapture({
   accept = "image/*",
   camera = false,
   multiple = true,
-  label = "Add a photo",
+  label = "Add photo",
   busy = false,
   disabled = false,
   variant = "secondary",

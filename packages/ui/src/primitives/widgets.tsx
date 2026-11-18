@@ -48,13 +48,12 @@ export interface PillProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 /**
- * A filled chip, as distinct from `Badge`, which is outlined.
+ * The one chip: a short state or label on a record ("Calving window",
+ * "3 not sent", "Papered").
  *
- * The two are not interchangeable and the difference carries meaning: an
- * outlined badge is a *label* on something ("Papered", "8 zones"), and a
- * filled pill is a *state* it is currently in ("Calving window", "3 not
- * sent"). Somebody scanning a screen should be able to tell those apart
- * without reading either.
+ * Filled with a pale tint of its tone rather than a saturated block, so a row
+ * of them never competes with the safety chips — the one place a full fill
+ * of colour means something specific. Add `dot` for a live state.
  */
 export function Pill({ tone = "neutral", dot = false, children, className, ...rest }: PillProps) {
   return (
@@ -183,8 +182,11 @@ export function Tile({ label, value, hint, tone = "neutral", emphasis = false, b
       </div>
       <span
         className={[
-          emphasis ? "gf-figure" : "gf-numeric text-[1.35em] font-semibold",
-          emphasis ? TONE_TEXT[tone] : "text-ink",
+          // One size for every figure in a row. Emphasis used to double the
+          // size of one tile, so a rank of four numbers read as one number
+          // and three captions; colour does the drawing of the eye instead.
+          "gf-numeric text-[1.5em] font-semibold leading-tight",
+          emphasis && tone !== "neutral" ? TONE_TEXT[tone] : "text-ink",
         ].join(" ")}
       >
         {value}
@@ -316,5 +318,27 @@ export function Callout({ tone = "danger", title, children, actions }: CalloutPr
         <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>
       )}
     </div>
+  );
+}
+
+/**
+ * An animal's tag number, as the round mark at the start of its row.
+ *
+ * Stretches into a lozenge rather than truncating a long tag — half a tag
+ * number is the wrong tag number. No tag is a dash hidden from a screen
+ * reader, because "dash" read in front of every untagged calf is noise.
+ *
+ * It was drawn by three list rows separately, and two of them truncated at
+ * 5.5rem while the comment above one of those said it never truncates.
+ */
+export function TagMark({ tag }: { readonly tag: ReactNode }) {
+  const has = tag !== undefined && tag !== null && tag !== "";
+  return (
+    <span
+      aria-hidden={has ? undefined : true}
+      className="gf-numeric flex h-[2.625rem] min-w-[2.625rem] shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-raised px-2.5 text-sm font-semibold text-action"
+    >
+      {has ? tag : "–"}
+    </span>
   );
 }

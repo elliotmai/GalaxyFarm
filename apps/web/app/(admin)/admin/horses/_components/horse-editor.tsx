@@ -203,7 +203,7 @@ export function HorseEditor({
   return (
     <Modal
       placement="side"
-      title={editing === undefined ? "Add a horse" : `Editing ${displayName(editing)}`}
+      title={editing === undefined ? "Add horse" : `Edit ${displayName(editing)}`}
       description="The handling level and why are what anyone reads before going into the pen."
       onClose={onClose}
       footer={

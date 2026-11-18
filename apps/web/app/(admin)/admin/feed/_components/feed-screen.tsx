@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 
-import { PageBody, Tabs, useToast } from "@galaxy-farm/ui";
+import { Fab, PageBody, Tabs, useToast } from "@galaxy-farm/ui";
 import {
   choreDaySheet,
   openAssignments,
@@ -36,7 +36,7 @@ import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
-import { AddFab, KitHeader } from "../../equipment/_components/kit-controls";
+import { KitHeader } from "../../equipment/_components/kit-controls";
 import { feedUsage, line } from "./feed-format";
 import { PurchaseForm, TypeForm, UseForm, useFeedRemovals } from "./feed-forms";
 import { PlanView } from "./feed-plan";
@@ -347,7 +347,7 @@ export function FeedScreen({
                   "min-h-target flex-1 rounded-density text-density",
                   "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-action",
                   selected
-                    ? "bg-panel font-semibold text-ink shadow-sm"
+                    ? "bg-panel font-semibold text-ink shadow-card"
                     : "font-medium text-muted hover:text-ink",
                 ].join(" ")}
               >
@@ -479,9 +479,9 @@ export function FeedScreen({
         </div>
 
         {view === "plan" ? (
-          <AddFab label="Add plan" onClick={addPlan} />
+          <Fab onClick={addPlan}>Add plan</Fab>
         ) : view === "shed" ? (
-          <AddFab label="Record purchase" onClick={() => restock()} />
+          <Fab onClick={() => restock()}>Record purchase</Fab>
         ) : null}
       </div>
 

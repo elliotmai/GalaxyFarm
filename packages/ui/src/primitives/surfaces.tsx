@@ -3,7 +3,7 @@ import type { HTMLAttributes, ReactNode, TableHTMLAttributes } from "react";
 /**
  * The containers everything else sits in (spec §8).
  *
- * Card, Badge, and DataTable, plus `EmptyState` — which is here rather than
+ * Card and DataTable, plus `EmptyState` — which is here rather than
  * left to each screen because "no records" is the state a new install spends
  * its first week in, and a bare blank panel teaches nobody what the screen is
  * for or how to put something in it.
@@ -26,7 +26,7 @@ export function Card({ title, actions, children, className, ...rest }: CardProps
         // outlines. The panel is white on a light grey canvas, so the surface
         // itself now does the separating and the hairline only tidies it.
         "rounded-density border border-rule bg-panel p-density text-ink",
-        "shadow-[0_1px_2px_rgba(20,23,27,0.04),0_8px_20px_-14px_rgba(20,23,27,0.16)]",
+        "shadow-card",
         className ?? "",
       ]
         .filter(Boolean)
@@ -44,48 +44,13 @@ export function Card({ title, actions, children, className, ...rest }: CardProps
   );
 }
 
-export type BadgeTone = "neutral" | "action" | "calm" | "danger" | "identity";
-
-export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  readonly tone?: BadgeTone;
-  readonly children: ReactNode;
-}
-
-// Filled with a tint of the tone rather than outlined. An outline is the
-// border a control wears, so a row of outlined badges read as a row of buttons
-// nobody could press — and six small outlines in one row is most of what
-// "chip soup" meant.
-const TONES: Record<BadgeTone, string> = {
-  neutral: "bg-raised text-muted",
-  action: "bg-action/10 text-action",
-  calm: "bg-calm/15 text-calm",
-  danger: "bg-danger/10 text-danger",
-  identity: "bg-identity/10 text-identity",
-};
-
-/**
- * A badge is outlined, not filled.
- *
- * Filled badges in five tones would compete with the safety chips, which are
- * the one place on these screens where a saturated block of colour means
- * something specific. Outline keeps that signal exclusive.
+/*
+ * There is no Badge. There was one, documented as "outlined, not filled" and
+ * then built filled — the same tint, radius and padding as `Pill` — while
+ * `Pill` was documented as the filled one so the two could be told apart. Two
+ * names for one chip meant every screen picked one at random. `Pill` is the
+ * chip; `Tone` is its colour.
  */
-export function Badge({ tone = "neutral", children, className, ...rest }: BadgeProps) {
-  return (
-    <span
-      className={[
-        "inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-sm font-medium",
-        TONES[tone],
-        className ?? "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      {...rest}
-    >
-      {children}
-    </span>
-  );
-}
 
 export interface Column<T> {
   readonly key: string;
@@ -189,7 +154,7 @@ export function DataTable<T>({
           {/* Named for screen readers; a page of unlabelled tables is a maze. */}
           <caption className="sr-only">{caption}</caption>
           <thead>
-            <tr className="border-b border-rule text-left text-xs uppercase tracking-wide text-muted">
+            <tr className="gf-label border-b border-rule text-left">
               {columns.map((column) => (
                 <th
                   key={column.key}

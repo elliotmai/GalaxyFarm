@@ -7,15 +7,17 @@ import { useId, useMemo, useState } from "react";
 import {
   Button,
   EmptyState,
+  Fab,
   Modal,
   PageBody,
   Pill,
+  PlusIcon,
   Section,
   Select,
   TextInput,
+  toOptions,
   useConfirmDelete,
   useToast,
-  toOptions,
 } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -35,7 +37,6 @@ import {
 } from "@galaxy-farm/module-cattle";
 
 import {
-  AddFab,
   Chip,
   ChipRow,
   facts,
@@ -163,7 +164,8 @@ export function HealthScreen({
 
   const add = (
     <Button variant="primary" aria-haspopup="dialog" onClick={() => setPanel("new")}>
-      <span aria-hidden="true">+</span> Record treatment
+      <PlusIcon />
+      Record treatment
     </Button>
   );
 
@@ -317,7 +319,7 @@ export function HealthScreen({
           )}
         </Section>
 
-        <AddFab onClick={() => setPanel("new")}>Record</AddFab>
+        <Fab onClick={() => setPanel("new")}>Record treatment</Fab>
 
         {panel === "closed" ? null : (
           <AddHealth

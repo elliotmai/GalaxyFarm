@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { Pill, SafetyBadge, type Tone } from "@galaxy-farm/ui";
+import { Pill, SafetyBadge, TagMark, type Tone } from "@galaxy-farm/ui";
 import { ageInDays, type Animal, type SafetyLevel } from "@galaxy-farm/core";
 
 /**
@@ -48,7 +48,7 @@ export function HerdRow({ animal, href, title, line, flag, onEdit }: HerdRowProp
         href={href}
         className="flex min-h-[66px] min-w-0 flex-1 items-center gap-3 py-2 pl-4 pr-2 text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
       >
-        <TagBadge tag={animal.tagNumber} />
+        <TagMark tag={animal.tagNumber} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate font-semibold">{title}</span>
           {line === "" ? null : <span className="truncate text-sm text-muted">{line}</span>}
@@ -83,26 +83,6 @@ export function HerdRow({ animal, href, title, line, flag, onEdit }: HerdRowProp
         </svg>
       </button>
     </li>
-  );
-}
-
-/**
- * The ear tag, in a round badge.
- *
- * Round while the tag is short, which nearly all of them are, and stretching
- * into a lozenge rather than truncating when it is not: half a tag number is
- * the wrong tag number. No tag reads as a dash, hidden from a screen reader,
- * because "dash" in front of every untagged calf's name is noise.
- */
-function TagBadge({ tag }: { readonly tag: string | undefined }) {
-  const has = tag !== undefined && tag !== "";
-  return (
-    <span
-      aria-hidden={has ? undefined : true}
-      className="gf-numeric flex h-[42px] min-w-[42px] max-w-[5.5rem] shrink-0 items-center justify-center rounded-full bg-raised px-2 text-[13px] font-semibold text-action"
-    >
-      <span className="truncate">{has ? tag : "–"}</span>
-    </span>
   );
 }
 

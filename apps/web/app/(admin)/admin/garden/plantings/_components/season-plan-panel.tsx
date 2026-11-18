@@ -644,7 +644,7 @@ export function SeasonPlanPanel({
         <Modal
           key={editingPlan?.id ?? "new-plan"}
           placement="side"
-          title={editingPlan === undefined ? "New season plan" : `Editing ${editingPlan.name}`}
+          title={editingPlan === undefined ? "New season plan" : `Edit ${editingPlan.name}`}
           onClose={() => setPlanDraft(undefined)}
           footer={
             <>
@@ -714,7 +714,7 @@ export function SeasonPlanPanel({
         <Modal
           key={editingEntry?.id ?? "new-entry"}
           placement="side"
-          title={editingEntry === undefined ? "Add to the plan" : "Editing a plan entry"}
+          title={editingEntry === undefined ? "Add to the plan" : "Edit plan entry"}
           description="A window is a fortnight, not a date — the notification speaks from it."
           onClose={closeEntry}
           footer={

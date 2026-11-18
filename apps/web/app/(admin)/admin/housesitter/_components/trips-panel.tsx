@@ -7,6 +7,7 @@ import {
   EmptyState,
   Modal,
   Pill,
+  PlusIcon,
   Select,
   TextArea,
   TextInput,
@@ -278,7 +279,8 @@ export function TripsPanel({
           to reach you. */}
       <div className="flex justify-end">
         <Button variant="primary" onClick={() => start()}>
-          <span aria-hidden="true">+</span> Add trip
+          <PlusIcon />
+          Add trip
         </Button>
       </div>
 
@@ -332,7 +334,7 @@ export function TripsPanel({
       {draft === undefined ? null : (
         <Modal
           placement="side"
-          title={editing === undefined ? "Add a trip" : locked ? "Trip from Wander" : "Edit trip"}
+          title={editing === undefined ? "Add trip" : locked ? "Trip from Wander" : "Edit trip"}
           onClose={() => setDraft(undefined)}
           footer={
             <>
@@ -557,7 +559,7 @@ export function TripsPanel({
 
               {locked ? null : (
                 <Button onClick={() => setDraft({ ...draft, legs: [...draft.legs, emptyLeg()] })}>
-                  Add a leg
+                  Add leg
                 </Button>
               )}
             </fieldset>

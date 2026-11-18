@@ -232,7 +232,7 @@ export function RuleForm({
 
   return (
     <FormPanel
-      title={editing === undefined ? "Add a rule" : `Edit ${editing.task}`}
+      title={editing === undefined ? "Add rule" : `Edit ${editing.task}`}
       // Said once, where the triggers are chosen: it is what keeps oil in an
       // engine that sits all winter.
       description="Hours, miles, months, or any mix. It comes due at whichever arrives first."

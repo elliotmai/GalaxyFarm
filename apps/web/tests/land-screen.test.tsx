@@ -213,7 +213,7 @@ describe("zone editor", () => {
   it("opens the zone the address names — the map's way in", async () => {
     view(TRAP.id);
 
-    expect(await screen.findByRole("dialog", { name: /Editing North Trap/ })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: /Edit North Trap/ })).toBeInTheDocument();
   });
 });
 

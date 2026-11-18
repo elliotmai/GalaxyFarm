@@ -525,7 +525,7 @@ export function PlantingsPanel({
         <Modal
           key={editing?.id ?? "new"}
           placement="side"
-          title={editing === undefined ? "New planting" : "Editing a planting"}
+          title={editing === undefined ? "New planting" : "Edit planting"}
           onClose={() => setDraft(undefined)}
           footer={
             <>

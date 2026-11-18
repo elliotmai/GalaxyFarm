@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Select, TextInput, useToast, toOptions } from "@galaxy-farm/ui";
+import { Select, TextInput, tickBoxClass, toOptions, useToast } from "@galaxy-farm/ui";
 import {
   choreDaySheet,
   startOfDay,
@@ -151,7 +151,7 @@ export function FeedingDetails({ propertyId, actorId, onSaved }: DetailsProps) {
       error={error}
     >
       <section aria-labelledby="log-feedings" className="flex flex-col gap-2">
-        <h2 id="log-feedings" className="text-xs font-semibold uppercase tracking-wide text-muted">
+        <h2 id="log-feedings" className="gf-label">
           Today{sheet.length === 0 ? "" : ` · ${done} of ${sheet.length}`}
         </h2>
         {sheet.length === 0 ? (
@@ -170,14 +170,7 @@ export function FeedingDetails({ propertyId, actorId, onSaved }: DetailsProps) {
                       disabled={ticking === entry.id}
                       onChange={() => void tick(entry)}
                     />
-                    <span
-                      aria-hidden
-                      className={[
-                        "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2",
-                        "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-action",
-                        ticked ? "border-action bg-action text-action-ink" : "border-edge bg-panel",
-                      ].join(" ")}
-                    >
+                    <span aria-hidden className={tickBoxClass(ticked)}>
                       {ticked ? <Tick /> : null}
                     </span>
                     <span
@@ -200,7 +193,7 @@ export function FeedingDetails({ propertyId, actorId, onSaved }: DetailsProps) {
       </section>
 
       <section aria-labelledby="log-extra" className="flex flex-col gap-density">
-        <h2 id="log-extra" className="text-xs font-semibold uppercase tracking-wide text-muted">
+        <h2 id="log-extra" className="gf-label">
           Extra or a count
         </h2>
         <Select

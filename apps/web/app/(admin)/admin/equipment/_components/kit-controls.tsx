@@ -114,35 +114,6 @@ export function FilteredLine({
   );
 }
 
-/**
- * The add button that floats bottom-right on a phone.
- *
- * Where a thumb already is, and clear of the tab bar below it. On anything
- * wider the header carries the button and this one is not drawn. A plain
- * button rather than `Button`: its shape and shadow are its own, and
- * overriding a primitive's radius from outside is a fight over class order.
- */
-export function AddFab({
-  label,
-  onClick,
-}: {
-  readonly label: string;
-  readonly onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-    >
-      <span aria-hidden="true" className="text-xl leading-none">
-        +
-      </span>
-      {label}
-    </button>
-  );
-}
-
 /** The list a run of `KitRow`s sits in: one surface, hairlines between. */
 export function KitList({
   label,
@@ -262,7 +233,7 @@ function PencilIcon() {
  *
  * The action is hidden on a phone by a wrapper, not a class on the button —
  * the button's own `inline-flex` wins over a `hidden` passed in — because the
- * floating `AddFab` is the phone's version of it.
+ * floating `Fab` is the phone's version of it.
  */
 export function KitHeader({
   title,

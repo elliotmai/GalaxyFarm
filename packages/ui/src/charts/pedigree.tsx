@@ -191,9 +191,7 @@ function Cell({
           {ancestor.repeated === true ? (
             // A word, not a hue: `identity` and `action` are the same navy in
             // this palette, and colour alone would not carry it anyway.
-            <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-identity">
-              Repeat
-            </span>
+            <span className="shrink-0 gf-label text-identity">Repeat</span>
           ) : null}
         </span>
       </Tag>

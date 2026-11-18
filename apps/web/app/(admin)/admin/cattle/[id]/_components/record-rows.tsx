@@ -180,36 +180,6 @@ export function FilteredLine({
   );
 }
 
-/**
- * The phone's add button, floating bottom-right where a thumb already is and
- * clear of the tab bar. Not drawn on anything wider, where the same action
- * sits in the header.
- *
- * A plain button rather than `Button`: its shape and shadow are its own, and
- * overriding a primitive's radius from outside is a fight over class order.
- */
-export function AddFab({
-  onClick,
-  children,
-}: {
-  readonly onClick: () => void;
-  readonly children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-haspopup="dialog"
-      className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-    >
-      <span aria-hidden="true" className="text-xl leading-none">
-        +
-      </span>
-      {children}
-    </button>
-  );
-}
-
 /** A screen's title with its facts beside it and one action opposite. */
 export function ScreenHeader({
   title,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, EmptyState, Pill } from "@galaxy-farm/ui";
+import { Button, EmptyState, Pill, PlusIcon } from "@galaxy-farm/ui";
 import {
   animalsFedBy,
   displayName,
@@ -118,7 +118,7 @@ export function PlanView({
         detail="A plan says who gets what. Today's feedings and the shed's run-out dates follow from it."
         action={
           <Button variant="primary" onClick={onAdd}>
-            Add a plan
+            Add plan
           </Button>
         }
       />
@@ -181,7 +181,8 @@ export function PlanView({
         </p>
         <span className="hidden sm:block">
           <Button variant="primary" aria-haspopup="dialog" onClick={onAdd}>
-            <span aria-hidden="true">+</span> Add plan
+            <PlusIcon />
+            Add plan
           </Button>
         </span>
       </div>

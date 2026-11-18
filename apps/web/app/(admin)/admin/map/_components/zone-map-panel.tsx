@@ -135,7 +135,7 @@ export function ZoneMapPanel({
           )}
           <div>
             <Button onClick={onAddFence} disabled={fences.length >= MOST_FENCES}>
-              Add a fence
+              Add fence
             </Button>
           </div>
           {fences.length < MOST_FENCES ? null : (
@@ -190,7 +190,7 @@ export function FenceEditor({
   return (
     <Modal
       placement="side"
-      title={editing === undefined ? `New fence in ${zone.name}` : `Editing ${editing.name}`}
+      title={editing === undefined ? `New fence in ${zone.name}` : `Edit ${editing.name}`}
       description="Temporary fencing: a hot wire or panels run across part of the zone."
       onClose={onCancel}
       footer={

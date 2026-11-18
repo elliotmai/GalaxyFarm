@@ -302,9 +302,7 @@ function SearchPalette({
         <div className="flex flex-col gap-4">
           {groups.map((group) => (
             <section key={group.label} aria-label={group.label} className="flex flex-col gap-1">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                {group.label}
-              </h3>
+              <h3 className="gf-label">{group.label}</h3>
               <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule">
                 {group.hits.map((hit) => (
                   <li key={hit.key}>

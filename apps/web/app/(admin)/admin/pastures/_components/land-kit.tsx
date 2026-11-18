@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 
-import { Pill, type Tone } from "@galaxy-farm/ui";
+import { Button, Fab, Pill, PlusIcon, type Tone } from "@galaxy-farm/ui";
 
 /**
  * The small parts every Land screen is built from — pastures, the property
@@ -116,7 +116,7 @@ export function RowAction({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="inline-flex min-h-target items-center whitespace-nowrap rounded-density px-3 text-sm font-semibold text-action hover:bg-raised focus-visible:outline-2 focus-visible:outline-action"
+      className="inline-flex min-h-target items-center gap-1.5 whitespace-nowrap rounded-density px-3 text-sm font-semibold text-action hover:bg-raised focus-visible:outline-2 focus-visible:outline-action"
     >
       {children}
     </button>
@@ -238,29 +238,19 @@ export function AddAction({
   return (
     <>
       <span className="hidden sm:block">
-        <button
-          type="button"
+        <Button
+          variant="primary"
           onClick={onClick}
           disabled={disabled}
-          className="inline-flex min-h-target items-center gap-2 whitespace-nowrap rounded-density bg-action px-4 font-medium text-action-ink hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action disabled:cursor-not-allowed disabled:opacity-50"
+          className="whitespace-nowrap"
         >
-          <span aria-hidden="true">+</span> {label}
-        </button>
+          <PlusIcon />
+          {label}
+        </Button>
       </span>
-      {/* A plain button rather than `Button`: its shape and shadow are its
-          own, and overriding a primitive's radius from outside is a fight over
-          class order the stylesheet decides. */}
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action disabled:opacity-50 sm:hidden"
-      >
-        <span aria-hidden="true" className="text-xl leading-none">
-          +
-        </span>
+      <Fab onClick={onClick} disabled={disabled}>
         {label}
-      </button>
+      </Fab>
     </>
   );
 }

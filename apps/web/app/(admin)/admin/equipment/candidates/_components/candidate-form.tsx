@@ -277,7 +277,7 @@ export function CandidateForm({
   return (
     <Modal
       placement="side"
-      title={editing === undefined ? "Add a candidate" : `Edit ${editing.title}`}
+      title={editing === undefined ? "Add candidate" : `Edit ${editing.title}`}
       onClose={onClose}
       footer={
         <>
@@ -467,9 +467,7 @@ export function CandidateForm({
         </div>
 
         <fieldset className="flex flex-col gap-3">
-          <legend className="text-xs font-semibold uppercase tracking-wide text-muted">
-            Costs on top
-          </legend>
+          <legend className="gf-label">Costs on top</legend>
           <div className="flex flex-col gap-density">
             {draft.additionalCosts.map((cost, index) => (
               <div key={index} className="flex items-end gap-2">

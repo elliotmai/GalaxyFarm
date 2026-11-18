@@ -1,5 +1,6 @@
 "use client";
 
+import { TagMark } from "@galaxy-farm/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -45,11 +46,7 @@ export function ListRow({
   const facts = line.filter((part): part is string => typeof part === "string" && part !== "");
   const face = (
     <>
-      {lead === undefined ? null : (
-        <span className="gf-numeric flex h-[42px] min-w-[42px] shrink-0 items-center justify-center rounded-full bg-raised px-2 text-[13px] font-semibold text-action">
-          {lead}
-        </span>
-      )}
+      {lead === undefined ? null : <TagMark tag={lead} />}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
         <span className="truncate font-semibold text-ink">{title}</span>
         {facts.length === 0 ? null : (
@@ -112,33 +109,6 @@ export function RowList({
     >
       {children}
     </ul>
-  );
-}
-
-/**
- * The floating add button on a phone, clear of the tab bar — the herd screen's.
- *
- * A plain button rather than `Button`: its shape and shadow are its own, and
- * overriding a primitive's radius from outside is a fight over class order.
- */
-export function PhoneAddButton({
-  onClick,
-  children,
-}: {
-  readonly onClick: () => void;
-  readonly children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-    >
-      <span aria-hidden="true" className="text-xl leading-none">
-        +
-      </span>
-      {children}
-    </button>
   );
 }
 

@@ -256,7 +256,7 @@ export function FlockEditor({
   return (
     <Modal
       placement="side"
-      title={flock === undefined ? "New flock" : `Editing ${flock.name}`}
+      title={flock === undefined ? "New flock" : `Edit ${flock.name}`}
       description="Quail go here too — same screen, different species."
       onClose={onClose}
       footer={

@@ -441,7 +441,7 @@ export function HeadcountPanel({
         <Modal
           key={editing.id}
           placement="side"
-          title={`Editing ${REASON_LABEL[editing.reason]} ${editing.quantity}`}
+          title={`Edit ${REASON_LABEL[editing.reason]} ${editing.quantity}`}
           description="Correct what happened, to which flock, and when."
           onClose={closeEdit}
           footer={

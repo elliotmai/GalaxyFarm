@@ -179,11 +179,11 @@ export function ItemsTab({
     <div className="flex flex-col gap-density">
       <TabHead
         facts={`${items.length} item${items.length === 1 ? "" : "s"}`}
-        action={<Button onClick={onAdd}>Add an item</Button>}
+        action={<Button onClick={onAdd}>Add item</Button>}
       />
       {items.length === 0 ? (
         <EmptyState
-          title="Nothing here yet"
+          title="No supply items yet"
           detail="Shavings and nesting pads are consumables; panels, halters and show sticks are durables."
         />
       ) : (

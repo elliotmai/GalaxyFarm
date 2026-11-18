@@ -319,7 +319,7 @@ export function SeedBoxPanel({
         <Modal
           key={editing?.id ?? "new"}
           placement="side"
-          title={editing === undefined ? "Add seed" : `Editing ${nameOf(editing.varietyId)}`}
+          title={editing === undefined ? "Add seed" : `Edit ${nameOf(editing.varietyId)}`}
           description="Packets for what you bought, grams for what you saved."
           onClose={() => setDraft(undefined)}
           footer={

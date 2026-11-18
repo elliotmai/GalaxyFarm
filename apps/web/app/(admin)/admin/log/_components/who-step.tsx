@@ -286,7 +286,7 @@ export function WhoStep({
                       aria-hidden="true"
                       className={[
                         "flex h-[26px] w-[26px] shrink-0 items-center justify-center border-2",
-                        single ? "rounded-full" : "rounded-lg",
+                        single ? "rounded-full" : "rounded-density",
                         on ? "border-action bg-action text-action-ink" : "border-edge bg-panel",
                       ].join(" ")}
                     >

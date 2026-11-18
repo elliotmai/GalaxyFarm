@@ -60,6 +60,11 @@
   --spacing-control: var(--gf-control);
   --radius-density: var(--gf-radius);
   --text-density: var(--gf-text-size);
+
+  /* Three heights; see the elevation note in theme.css. */
+  --shadow-card: var(--gf-shadow-card);
+  --shadow-float: var(--gf-shadow-float);
+  --shadow-overlay: var(--gf-shadow-overlay);
 }
 
 html {

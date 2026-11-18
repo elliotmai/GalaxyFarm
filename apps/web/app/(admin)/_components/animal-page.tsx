@@ -5,7 +5,7 @@ import { useEffect, useId, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 
 import type { Animal, Ulid } from "@galaxy-farm/core";
-import { Pill, Section, useToast, type Tone } from "@galaxy-farm/ui";
+import { ACTION_TILE_CLASS, Pill, Section, type Tone, useToast } from "@galaxy-farm/ui";
 
 import { Row, Rows } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
 import { useAttachPhotos } from "@/lib/photos/use-photos";
@@ -24,9 +24,6 @@ import { useAttachPhotos } from "@/lib/photos/use-photos";
  */
 
 // ── Action tiles ──────────────────────────────────────────────────────────
-
-const TILE =
-  "flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-density border border-rule bg-panel px-1 text-center text-[13px] font-medium text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
 
 /** The grid of big buttons under an animal's name: four across, always. */
 export function ActionGrid({
@@ -54,7 +51,7 @@ export function ActionLink({
   readonly children: ReactNode;
 }) {
   return (
-    <Link href={href} className={TILE}>
+    <Link href={href} className={ACTION_TILE_CLASS}>
       <ActionIcon name={icon} />
       {children}
     </Link>
@@ -72,7 +69,7 @@ export function ActionButton({
   readonly children: ReactNode;
 }) {
   return (
-    <button type="button" onClick={onClick} aria-haspopup="dialog" className={TILE}>
+    <button type="button" onClick={onClick} aria-haspopup="dialog" className={ACTION_TILE_CLASS}>
       <ActionIcon name={icon} />
       {children}
     </button>
@@ -119,7 +116,7 @@ export function PhotoAction({
   return (
     <label
       htmlFor={id}
-      className={`${TILE} relative cursor-pointer ${intake.busy ? "opacity-60" : ""}`}
+      className={`${ACTION_TILE_CLASS} relative cursor-pointer ${intake.busy ? "opacity-60" : ""}`}
     >
       <input
         id={id}

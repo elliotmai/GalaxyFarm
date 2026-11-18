@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Logomark } from "@galaxy-farm/ui";
+import { buttonClass, Logomark } from "@galaxy-farm/ui";
 
 /**
  * The offline fallback (spec §3, §7).
@@ -43,14 +43,14 @@ export default function OfflinePage() {
           with — the network is down, which is why this page is on screen. */}
       <div className="flex w-full max-w-sm flex-col gap-2 sm:flex-row">
         <Link
-          className="inline-flex min-h-target flex-1 items-center justify-center rounded-density bg-action px-4 font-semibold text-action-ink"
+          className={buttonClass("primary", { className: "flex-1" })}
           href="/admin"
           prefetch={false}
         >
           Open Today
         </Link>
         <Link
-          className="inline-flex min-h-target flex-1 items-center justify-center rounded-density border border-edge bg-panel px-4 font-semibold text-ink hover:bg-raised"
+          className={buttonClass("secondary", { className: "flex-1" })}
           href="/kiosk"
           prefetch={false}
         >

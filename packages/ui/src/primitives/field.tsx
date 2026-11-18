@@ -95,7 +95,8 @@ export function Field({
   );
 }
 
-const CONTROL =
+/** Every text control's box. Exported so a composite field (TagInput) is the same box. */
+export const CONTROL_CLASS =
   "w-full min-h-target rounded-density border bg-panel px-3 text-density text-ink " +
   "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-action " +
   "disabled:cursor-not-allowed disabled:opacity-50";
@@ -136,7 +137,7 @@ export function TextInput({
           aria-describedby={describedBy}
           aria-invalid={invalid}
           required={required ?? false}
-          className={[CONTROL, borderFor(invalid), numeric ? "gf-numeric" : ""]
+          className={[CONTROL_CLASS, borderFor(invalid), numeric ? "gf-numeric" : ""]
             .filter(Boolean)
             .join(" ")}
           {...rest}
@@ -175,7 +176,7 @@ export function TextArea({
           aria-describedby={describedBy}
           aria-invalid={invalid}
           required={required ?? false}
-          className={[CONTROL, borderFor(invalid), "py-2"].join(" ")}
+          className={[CONTROL_CLASS, borderFor(invalid), "py-2"].join(" ")}
           {...rest}
         />
       )}
@@ -223,7 +224,7 @@ export function Select({
           aria-describedby={describedBy}
           aria-invalid={invalid}
           required={required ?? false}
-          className={[CONTROL, borderFor(invalid)].join(" ")}
+          className={[CONTROL_CLASS, borderFor(invalid)].join(" ")}
           {...rest}
         >
           {placeholder === undefined ? null : (

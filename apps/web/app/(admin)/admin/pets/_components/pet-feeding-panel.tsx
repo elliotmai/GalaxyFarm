@@ -171,9 +171,7 @@ export function PetFeedingPanel({
               className="flex flex-col gap-2"
             >
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                  {displayName(pet)}
-                </h2>
+                <h2 className="gf-label">{displayName(pet)}</h2>
                 <Button
                   variant="ghost"
                   aria-haspopup="dialog"
@@ -480,7 +478,7 @@ export function RationEditor({
       title={
         editing === undefined
           ? `A ration for ${nameList(draft.fedIds.map((held) => petName(held as Ulid)))}`
-          : `Editing ${editing.name}`
+          : `Edit ${editing.name}`
       }
       description="One line per feed and per time of day."
       onClose={onClose}
@@ -694,7 +692,7 @@ export function RationEditor({
                 })
               }
             >
-              Add a line
+              Add line
             </Button>
           </div>
         </fieldset>

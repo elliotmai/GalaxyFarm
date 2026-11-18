@@ -147,7 +147,7 @@ export function PwaShell({ unattended = false, offerInstall = true }: PwaShellPr
 const BAR =
   "fixed inset-x-0 bottom-0 z-50 mx-auto flex w-full max-w-2xl flex-wrap " +
   "items-center justify-between gap-density rounded-density border border-edge " +
-  "bg-panel p-density text-ink shadow-lg";
+  "bg-panel p-density text-ink shadow-overlay";
 
 function UpdateBar({ onReload }: { readonly onReload: () => void }) {
   return (

@@ -2,10 +2,11 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { Button } from "../src/primitives/button.js";
+import { Button, Fab } from "../src/primitives/button.js";
 import { Checkbox, Select, TextArea, TextInput } from "../src/primitives/field.js";
-import { Badge, Card, DataTable, EmptyState } from "../src/primitives/surfaces.js";
+import { Card, DataTable, EmptyState } from "../src/primitives/surfaces.js";
 import { Tabs } from "../src/primitives/tabs.js";
+import { Pill } from "../src/primitives/widgets.js";
 
 /**
  * What the primitives promise.
@@ -229,7 +230,7 @@ describe("DataTable", () => {
   });
 });
 
-describe("Card and Badge", () => {
+describe("Card and Pill", () => {
   it("gives a titled card a heading, so the page has an outline", () => {
     render(<Card title="Breeding">content</Card>);
 
@@ -242,12 +243,31 @@ describe("Card and Badge", () => {
     expect(container.querySelector("header")).toBeNull();
   });
 
-  it("shows a badge's text, which is what carries its meaning", () => {
-    // A pale tint rather than a block of colour: a page of saturated badges
+  it("shows a pill's text, which is what carries its meaning", () => {
+    // A pale tint rather than a block of colour: a page of saturated chips
     // would compete with the safety chips, where a full fill means something.
-    render(<Badge tone="danger">Overdue</Badge>);
+    render(<Pill tone="danger">Overdue</Pill>);
 
     expect(screen.getByText("Overdue")).toBeInTheDocument();
+  });
+});
+
+describe("Fab", () => {
+  it("is named by its label alone, with the plus hidden from assistive tech", () => {
+    render(<Fab onClick={() => undefined}>Add animal</Fab>);
+
+    const button = screen.getByRole("button", { name: "Add animal" });
+    expect(button).toHaveAttribute("type", "button");
+    expect(button).toHaveAttribute("aria-haspopup", "dialog");
+    expect(button.querySelector("svg")).toHaveAttribute("aria-hidden");
+  });
+
+  it("calls back when tapped", async () => {
+    const onClick = vi.fn();
+    render(<Fab onClick={onClick}>Record a calving</Fab>);
+
+    await userEvent.click(screen.getByRole("button", { name: "Record a calving" }));
+    expect(onClick).toHaveBeenCalledOnce();
   });
 });
 

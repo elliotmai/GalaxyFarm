@@ -7,12 +7,13 @@ import {
   Checkbox,
   EmptyState,
   Modal,
+  optionLabel,
   Pill,
+  PlusIcon,
   SafetyBadge,
   Select,
   TextArea,
   TextInput,
-  optionLabel,
   toOptions,
   useConfirmDelete,
   useToast,
@@ -149,7 +150,8 @@ export function PetPanel({
           aria-haspopup="dialog"
           onClick={() => setEditor({ pet: undefined })}
         >
-          <span aria-hidden="true">+</span> Add a pet
+          <PlusIcon />
+          Add pet
         </Button>
       </div>
 
@@ -375,7 +377,7 @@ export function PetEditor({
   return (
     <Modal
       placement="side"
-      title={editing === undefined ? "Add a pet" : `Editing ${displayName(editing)}`}
+      title={editing === undefined ? "Add pet" : `Edit ${displayName(editing)}`}
       description="The handling level and instructions are what a housesitter reads first."
       onClose={onClose}
       footer={

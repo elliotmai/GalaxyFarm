@@ -6,16 +6,18 @@ import {
   Button,
   DetailList,
   EmptyState,
+  Fab,
   Modal,
   PageBody,
   PageHeader,
   Pill,
+  PlusIcon,
   Section,
   Select,
   TextInput,
+  toOptions,
   useConfirmDelete,
   useToast,
-  toOptions,
 } from "@galaxy-farm/ui";
 import { displayName, encodeUlid, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -233,7 +235,8 @@ export function CattleRoadmapScreen({
             // would win over a `hidden` passed to it.
             <span className="hidden sm:block">
               <Button variant="primary" onClick={() => setPlanning(true)}>
-                <span aria-hidden="true">+</span> Plan a mating
+                <PlusIcon />
+                Plan a mating
               </Button>
             </span>
           }
@@ -305,7 +308,7 @@ export function CattleRoadmapScreen({
 
         <Section
           title="What we are selecting for"
-          actions={<Button onClick={() => setAddingGoal(true)}>Add a goal</Button>}
+          actions={<Button onClick={() => setAddingGoal(true)}>Add goal</Button>}
         >
           {goals.length === 0 ? (
             <EmptyState
@@ -334,16 +337,7 @@ export function CattleRoadmapScreen({
           )}
         </Section>
 
-        <button
-          type="button"
-          onClick={() => setPlanning(true)}
-          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-        >
-          <span aria-hidden="true" className="text-xl leading-none">
-            +
-          </span>
-          Plan a mating
-        </button>
+        <Fab onClick={() => setPlanning(true)}>Plan a mating</Fab>
       </div>
 
       {planning ? (
@@ -501,7 +495,7 @@ function AddGoal({
 
   return (
     <Modal
-      title="Add a goal"
+      title="Add goal"
       description="Free text — every herd's traits are its own."
       placement="side"
       onClose={onClose}

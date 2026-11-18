@@ -5,21 +5,23 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useId, useMemo, useState } from "react";
 
 import {
-  Badge,
   Button,
   Checkbox,
+  type Column,
   DataTable,
   EmptyState,
+  Fab,
   Modal,
   PageBody,
   PageHeader,
+  Pill,
+  PlusIcon,
   Section,
   Select,
   TextInput,
+  toOptions,
   useConfirmDelete,
   useToast,
-  type Column,
-  toOptions,
 } from "@galaxy-farm/ui";
 import {
   animalSchema,
@@ -226,11 +228,11 @@ export function CalvingScreen({
       // a column of green chips is a column nobody reads.
       render: (record) =>
         record.vigour === "stillborn" ? (
-          <Badge tone="danger">Stillborn</Badge>
+          <Pill tone="danger">Stillborn</Pill>
         ) : record.vigour === "vigorous" ? (
           <span className="text-muted">vigorous</span>
         ) : (
-          <Badge tone="action">{record.vigour}</Badge>
+          <Pill tone="action">{record.vigour}</Pill>
         ),
     },
     {
@@ -306,7 +308,8 @@ export function CalvingScreen({
             // would win over a `hidden` passed to it.
             <span className="hidden sm:block">
               <Button variant="primary" onClick={() => setRecordingFor("")}>
-                <span aria-hidden="true">+</span> Record a calving
+                <PlusIcon />
+                Record a calving
               </Button>
             </span>
           }
@@ -373,16 +376,7 @@ export function CalvingScreen({
           )}
         </Section>
 
-        <button
-          type="button"
-          onClick={() => setRecordingFor("")}
-          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-        >
-          <span aria-hidden="true" className="text-xl leading-none">
-            +
-          </span>
-          Record a calving
-        </button>
+        <Fab onClick={() => setRecordingFor("")}>Record a calving</Fab>
       </div>
 
       {recordingFor === undefined ? null : (

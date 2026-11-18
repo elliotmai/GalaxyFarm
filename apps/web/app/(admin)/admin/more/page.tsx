@@ -23,9 +23,7 @@ export default function MorePage() {
       <PageHeader title="More" />
       {MORE.map((group) => (
         <section key={group.label} className="flex flex-col gap-2" aria-label={group.label}>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
-            {group.label}
-          </h2>
+          <h2 className="gf-label">{group.label}</h2>
           <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
             {group.items.map((item) => (
               <li key={item.href}>

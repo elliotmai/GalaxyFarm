@@ -172,7 +172,7 @@ describe("the herd list", () => {
     // Two add buttons are drawn — the header one for a laptop, the floating
     // one for a phone — and CSS decides which shows. Either opens the same.
     await userEvent.click(screen.getAllByRole("button", { name: /Add animal/ })[0]!);
-    expect(screen.getByRole("dialog", { name: "Add an animal" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Add animal" })).toBeInTheDocument();
   });
 
   it("toggles a class from the chip row and back", async () => {

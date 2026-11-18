@@ -1,3 +1,4 @@
+import { buttonClass } from "@galaxy-farm/ui";
 import Link from "next/link";
 
 import { SiteHeader } from "@/app/(public)/_components/public-shell";
@@ -72,9 +73,7 @@ export function Landing({
 
       <main className="flex flex-1 flex-col">
         <section className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-12 sm:px-6 sm:py-20">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted">
-            Wise County, Texas
-          </p>
+          <p className="gf-label">Wise County, Texas</p>
           <h1 className="max-w-3xl text-4xl leading-tight text-ink sm:text-5xl">
             A family cattle operation, and a place to send a show calf.
           </h1>
@@ -85,20 +84,14 @@ export function Landing({
               : `${businessName} is our show calf boarding and daily care program.`}
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
-            <Link
-              href="/book"
-              className="inline-flex min-h-target items-center rounded-density bg-action px-5 text-density font-semibold text-action-ink"
-            >
+            <Link href="/book" className={buttonClass("primary")}>
               Ask about boarding
             </Link>
             {/* To sign-in rather than to /account: the farm's owner and a
                 calf's owner both press this, and sign-in sends each to their
                 own surface. Pointing at /account landed the farm's owner on a
                 customer page that does not exist yet. */}
-            <Link
-              href="/login"
-              className="inline-flex min-h-target items-center rounded-density border border-edge bg-panel px-5 text-density font-semibold text-ink hover:bg-raised"
-            >
+            <Link href="/login" className={buttonClass("secondary")}>
               Owner sign in
             </Link>
           </div>

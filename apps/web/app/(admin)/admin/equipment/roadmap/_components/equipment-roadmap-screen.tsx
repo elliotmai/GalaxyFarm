@@ -3,7 +3,16 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { Button, EmptyState, PageBody, Pill, useConfirmDelete, useToast } from "@galaxy-farm/ui";
+import {
+  Button,
+  EmptyState,
+  Fab,
+  PageBody,
+  Pill,
+  PlusIcon,
+  useConfirmDelete,
+  useToast,
+} from "@galaxy-farm/ui";
 import {
   byPriority,
   compareToBudget,
@@ -24,7 +33,7 @@ import {
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
-import { AddFab, ChipRow, KitHeader, KitList, KitRow } from "../../_components/kit-controls";
+import { ChipRow, KitHeader, KitList, KitRow } from "../../_components/kit-controls";
 import { RoadmapForm } from "./roadmap-form";
 
 /**
@@ -266,7 +275,8 @@ export function EquipmentRoadmapScreen({
           facts={loading ? undefined : facts}
           action={
             <Button variant="primary" onClick={openEditor}>
-              <span aria-hidden="true">+</span> Add to roadmap
+              <PlusIcon />
+              Add to roadmap
             </Button>
           }
         />
@@ -329,7 +339,7 @@ export function EquipmentRoadmapScreen({
           </KitList>
         )}
 
-        <AddFab label="Add to roadmap" onClick={openEditor} />
+        <Fab onClick={openEditor}>Add to roadmap</Fab>
       </div>
 
       {panel === undefined ? null : (

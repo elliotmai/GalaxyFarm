@@ -8,6 +8,7 @@ import {
   EmptyState,
   Modal,
   Pill,
+  PlusIcon,
   Section,
   Select,
   TextInput,
@@ -269,7 +270,8 @@ export function DevicesScreen({
             disabled={pending || unavailable !== undefined}
             onClick={() => setAddingName("")}
           >
-            <span aria-hidden="true">+</span> Add screen
+            <PlusIcon />
+            Add screen
           </Button>
         }
       >
@@ -396,7 +398,7 @@ export function DevicesScreen({
       {addingName === undefined ? null : (
         <Modal
           placement="side"
-          title="Add a screen"
+          title="Add screen"
           onClose={() => setAddingName(undefined)}
           footer={
             <>

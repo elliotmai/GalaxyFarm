@@ -37,7 +37,7 @@ describe("PhotoCapture", () => {
     // something anybody reports as a bug.
     render(<PhotoCapture onPick={() => {}} />);
 
-    expect(screen.getByLabelText("Add a photo")).toHaveAttribute("type", "file");
+    expect(screen.getByLabelText("Add photo")).toHaveAttribute("type", "file");
   });
 
   it("asks for the camera when it is beside the animal", () => {
@@ -49,20 +49,20 @@ describe("PhotoCapture", () => {
   it("offers the camera roll when it is not", () => {
     render(<PhotoCapture onPick={() => {}} />);
 
-    expect(screen.getByLabelText("Add a photo")).not.toHaveAttribute("capture");
+    expect(screen.getByLabelText("Add photo")).not.toHaveAttribute("capture");
   });
 
   it("takes photographs and nothing else", () => {
     render(<PhotoCapture onPick={() => {}} />);
 
-    expect(screen.getByLabelText("Add a photo")).toHaveAttribute("accept", "image/*");
+    expect(screen.getByLabelText("Add photo")).toHaveAttribute("accept", "image/*");
   });
 
   it("hands over what was picked", () => {
     const picked = vi.fn();
     render(<PhotoCapture onPick={picked} />);
 
-    pick(screen.getByLabelText("Add a photo"), [photo()]);
+    pick(screen.getByLabelText("Add photo"), [photo()]);
 
     expect(picked).toHaveBeenCalledTimes(1);
     expect(picked.mock.calls[0]?.[0]).toHaveLength(1);
@@ -73,7 +73,7 @@ describe("PhotoCapture", () => {
     // second one fires no change event at all.
     const picked = vi.fn();
     render(<PhotoCapture onPick={picked} />);
-    const input = screen.getByLabelText("Add a photo") as HTMLInputElement;
+    const input = screen.getByLabelText("Add photo") as HTMLInputElement;
 
     pick(input, [photo()]);
     expect(input.value).toBe("");
@@ -86,7 +86,7 @@ describe("PhotoCapture", () => {
     const picked = vi.fn();
     render(<PhotoCapture onPick={picked} />);
 
-    pick(screen.getByLabelText("Add a photo"), []);
+    pick(screen.getByLabelText("Add photo"), []);
 
     expect(picked).not.toHaveBeenCalled();
   });
@@ -95,7 +95,7 @@ describe("PhotoCapture", () => {
     render(<PhotoCapture onPick={() => {}} busy />);
 
     expect(screen.getByText("Adding…")).toBeInTheDocument();
-    expect(screen.getByLabelText("Add a photo")).toBeDisabled();
+    expect(screen.getByLabelText("Add photo")).toBeDisabled();
   });
 });
 

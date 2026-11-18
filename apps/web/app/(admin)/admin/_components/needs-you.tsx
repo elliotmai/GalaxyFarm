@@ -137,7 +137,7 @@ export function NeedsYou({
 }) {
   return (
     <section aria-labelledby="today-needs" className="flex min-w-0 flex-col gap-2.5">
-      <h2 id="today-needs" className="text-xs font-semibold uppercase tracking-wide text-muted">
+      <h2 id="today-needs" className="gf-label">
         Needs you{needs.length === 0 ? "" : ` · ${needs.length}`}
       </h2>
 

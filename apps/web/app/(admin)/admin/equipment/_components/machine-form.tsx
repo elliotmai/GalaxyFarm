@@ -127,7 +127,7 @@ export function MachineForm({
 
   return (
     <FormPanel
-      title={machine === undefined ? "Add a machine" : `Edit ${machine.name}`}
+      title={machine === undefined ? "Add machine" : `Edit ${machine.name}`}
       submitLabel={machine === undefined ? "Add machine" : "Save machine"}
       busy={busy}
       error={error}

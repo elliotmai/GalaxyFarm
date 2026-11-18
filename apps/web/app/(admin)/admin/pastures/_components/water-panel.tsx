@@ -480,7 +480,7 @@ export function WaterPanel({
         <Modal
           key={editing?.id ?? "new"}
           placement="side"
-          title={editing === undefined ? "New tank" : `Editing ${editing.name}`}
+          title={editing === undefined ? "New tank" : `Edit ${editing.name}`}
           description="A trough, a tank, a pond — anywhere the stock drinks."
           onClose={() => setDraft(undefined)}
           footer={

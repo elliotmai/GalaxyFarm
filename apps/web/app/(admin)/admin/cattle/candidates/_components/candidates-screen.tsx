@@ -6,16 +6,18 @@ import {
   Button,
   DetailList,
   EmptyState,
+  Fab,
   Modal,
+  optionLabel,
   PageBody,
   PageHeader,
   Pill,
+  PlusIcon,
   Section,
   Select,
   TextInput,
   useConfirmDelete,
   useToast,
-  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   CANDIDATE_STATUSES,
@@ -194,7 +196,8 @@ export function CattleCandidatesScreen({
             // would win over a `hidden` passed to it.
             <span className="hidden sm:block">
               <Button variant="primary" onClick={() => setAdding(true)}>
-                <span aria-hidden="true">+</span> Add a candidate
+                <PlusIcon />
+                Add candidate
               </Button>
             </span>
           }
@@ -288,7 +291,7 @@ export function CattleCandidatesScreen({
                     detail: "Hauling goes on the record, so the comparison is on the real cost.",
                     action: (
                       <Button variant="primary" onClick={() => setAdding(true)}>
-                        Add a candidate
+                        Add candidate
                       </Button>
                     ),
                   }
@@ -318,16 +321,7 @@ export function CattleCandidatesScreen({
           )}
         </Section>
 
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-        >
-          <span aria-hidden="true" className="text-xl leading-none">
-            +
-          </span>
-          Add a candidate
-        </button>
+        <Fab onClick={() => setAdding(true)}>Add candidate</Fab>
       </div>
 
       {adding ? <AddCandidate api={api} onClose={() => setAdding(false)} /> : null}
@@ -508,7 +502,7 @@ function AddCandidate({
 
   return (
     <Modal
-      title="Add a candidate"
+      title="Add candidate"
       placement="side"
       onClose={onClose}
       footer={

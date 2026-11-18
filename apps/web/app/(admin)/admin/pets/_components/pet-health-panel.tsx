@@ -7,6 +7,7 @@ import {
   EmptyState,
   Modal,
   Pill,
+  PlusIcon,
   Select,
   TextArea,
   TextInput,
@@ -163,7 +164,8 @@ export function PetHealthPanel({
     <div className="flex flex-col gap-density">
       <div className="flex justify-end">
         <Button variant="primary" aria-haspopup="dialog" onClick={() => setRecording(true)}>
-          <span aria-hidden="true">+</span> Record a visit
+          <PlusIcon />
+          Record a visit
         </Button>
       </div>
 
@@ -177,10 +179,7 @@ export function PetHealthPanel({
         </p>
       ) : (
         <section aria-labelledby="pets-coming-up" className="flex flex-col gap-2.5">
-          <h2
-            id="pets-coming-up"
-            className="text-xs font-semibold uppercase tracking-wide text-muted"
-          >
+          <h2 id="pets-coming-up" className="gf-label">
             Coming up · {due.length}
           </h2>
           <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
@@ -202,7 +201,7 @@ export function PetHealthPanel({
       )}
 
       <section aria-labelledby="pets-history" className="flex flex-col gap-2.5">
-        <h2 id="pets-history" className="text-xs font-semibold uppercase tracking-wide text-muted">
+        <h2 id="pets-history" className="gf-label">
           Everything recorded
         </h2>
 
@@ -570,7 +569,7 @@ export function EditVisit({
   return (
     <Modal
       placement="side"
-      title={`Editing ${PET_HEALTH_LABELS[entry.type]} — ${petName(entry.animalId)}`}
+      title={`Edit ${PET_HEALTH_LABELS[entry.type]} — ${petName(entry.animalId)}`}
       description="Correct what was given, by whom, and when the next one is due."
       onClose={onClose}
       footer={

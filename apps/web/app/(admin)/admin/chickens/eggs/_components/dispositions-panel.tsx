@@ -6,6 +6,7 @@ import {
   Button,
   EmptyState,
   Modal,
+  PlusIcon,
   Select,
   TextArea,
   TextInput,
@@ -256,7 +257,8 @@ export function DispositionsPanel({
             setLogging(true);
           }}
         >
-          <span aria-hidden="true">+</span> Log where some went
+          <PlusIcon />
+          Log where some went
         </Button>
       </div>
 
@@ -389,7 +391,7 @@ export function DispositionsPanel({
         <Modal
           key={editing.id}
           placement="side"
-          title={`Editing ${KIND_LABEL[editing.kind]} ${editing.quantity}`}
+          title={`Edit ${KIND_LABEL[editing.kind]} ${editing.quantity}`}
           description="Correct the count, the day, who, or what they brought."
           onClose={closeEdit}
           footer={

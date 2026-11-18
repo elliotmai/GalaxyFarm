@@ -68,17 +68,17 @@ function Column({
 function Header({ farmName, title, day }: { farmName: string; title: string; day?: Date }) {
   return (
     <header className="flex flex-col gap-1">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{farmName}</p>
+      <p className="gf-label">{farmName}</p>
       <h1 className="text-ink">{title}</h1>
       {day === undefined ? null : <p className="text-sm text-muted">{formatDay(day)}</p>}
     </header>
   );
 }
 
-/** A small uppercase label over a list — the admin's section heading. */
+/** A small label over a list — the admin's section heading. */
 function Label({ id, children }: { readonly id?: string; readonly children: ReactNode }) {
   return (
-    <h2 id={id} className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+    <h2 id={id} className="gf-label">
       {children}
     </h2>
   );

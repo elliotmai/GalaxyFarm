@@ -189,7 +189,7 @@ export function TypesTab({
     <div className="flex flex-col gap-density">
       <TabHead
         facts={`${feeds.filter((feed) => feed.active).length} still bought`}
-        action={<Button onClick={onAdd}>Add a feed</Button>}
+        action={<Button onClick={onAdd}>Add feed</Button>}
       />
       {feeds.length === 0 ? (
         <EmptyState

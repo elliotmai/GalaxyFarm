@@ -41,9 +41,7 @@ export function AppearanceSetting() {
               aria-checked={on}
               onClick={() => setAppearance(choice.value)}
               className={`min-h-target rounded-density px-3 text-sm ${
-                on
-                  ? "bg-panel font-semibold text-ink shadow-[0_1px_3px_rgba(20,23,27,0.15)]"
-                  : "text-muted hover:text-ink"
+                on ? "bg-panel font-semibold text-ink shadow-card" : "text-muted hover:text-ink"
               }`}
             >
               {choice.label}

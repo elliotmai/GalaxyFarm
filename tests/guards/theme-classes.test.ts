@@ -113,6 +113,10 @@ const NOT_COLOURS = new Set([
   "shadow-2xl",
   "shadow-none",
   "shadow-inner",
+  // The three elevation tokens (theme.css), which are heights, not colours.
+  "shadow-card",
+  "shadow-float",
+  "shadow-overlay",
   "divide-x",
   "divide-y",
   "fill-none",

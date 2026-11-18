@@ -352,7 +352,7 @@ export function BedsPanel({
         <Modal
           key={editing?.id ?? "new"}
           placement="side"
-          title={editing === undefined ? "New bed" : `Editing ${editing.name}`}
+          title={editing === undefined ? "New bed" : `Edit ${editing.name}`}
           onClose={() => setDraft(undefined)}
           footer={
             <>

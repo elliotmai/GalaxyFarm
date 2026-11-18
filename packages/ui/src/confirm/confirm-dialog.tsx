@@ -79,7 +79,7 @@ export function ConfirmDialog({ request, onConfirm, onCancel }: ConfirmDialogPro
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         data-tier={request.tier}
-        className="flex max-h-[90dvh] w-full max-w-lg flex-col gap-density overflow-y-auto rounded-t-density border border-edge bg-panel p-density text-ink shadow-[0_-8px_32px_rgba(0,0,0,0.5)] sm:rounded-density"
+        className="flex max-h-[90dvh] w-full max-w-lg flex-col gap-density overflow-y-auto rounded-t-density border border-edge bg-panel p-density text-ink shadow-overlay sm:rounded-density"
       >
         <h2 id={titleId}>{confirmTitle(request)}</h2>
 

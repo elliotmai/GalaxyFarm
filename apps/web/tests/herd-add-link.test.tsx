@@ -55,7 +55,7 @@ describe("the herd's add link", () => {
     window.history.replaceState(null, "", "/admin/cattle?add=1");
     view();
 
-    expect(screen.getByRole("dialog", { name: "Add an animal" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Add animal" })).toBeTruthy();
     expect(window.location.search).toBe("");
   });
 

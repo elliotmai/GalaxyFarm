@@ -7,17 +7,19 @@ import {
   Button,
   DetailList,
   EmptyState,
+  Fab,
   Modal,
   PageBody,
   PageHeader,
   Pill,
+  PlusIcon,
   SearchSelect,
   Select,
   Tabs,
   TextInput,
+  toOptions,
   useConfirmDelete,
   useToast,
-  toOptions,
 } from "@galaxy-farm/ui";
 import { displayName, formatMoney, fromDollars, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -76,9 +78,9 @@ const TABS: readonly { readonly id: TabId; readonly label: string }[] = [
 
 /** What the header's one button adds, on each tab. */
 const ADD_LABEL: Readonly<Record<TabId, string>> = {
-  semen: "Add a sire",
-  meds: "Add a product",
-  protocols: "Add a protocol",
+  semen: "Add sire",
+  meds: "Add product",
+  protocols: "Add protocol",
 };
 
 const LIST =
@@ -153,7 +155,8 @@ export function CattleSuppliesScreen({
             // would win over a `hidden` passed to it.
             <span className="hidden sm:block">
               <Button variant="primary" onClick={() => setAdding(tab)}>
-                <span aria-hidden="true">+</span> {ADD_LABEL[tab]}
+                <PlusIcon />
+                {ADD_LABEL[tab]}
               </Button>
             </span>
           }
@@ -242,16 +245,7 @@ export function CattleSuppliesScreen({
           }
         </Tabs>
 
-        <button
-          type="button"
-          onClick={() => setAdding(tab)}
-          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-        >
-          <span aria-hidden="true" className="text-xl leading-none">
-            +
-          </span>
-          {ADD_LABEL[tab]}
-        </button>
+        <Fab onClick={() => setAdding(tab)}>{ADD_LABEL[tab]}</Fab>
       </div>
     </PageBody>
   );
@@ -384,7 +378,7 @@ function SemenTab({
           detail="Straws drawn for an AI breeding come off here."
           action={
             <Button variant="primary" onClick={() => onAdding(true)}>
-              Add a sire
+              Add sire
             </Button>
           }
         />
@@ -606,7 +600,7 @@ function AddStraw({
 
   return (
     <Modal
-      title="Add a sire"
+      title="Add sire"
       placement="side"
       onClose={onClose}
       footer={
@@ -870,7 +864,7 @@ function MedsTab({
           detail="A product's withdrawal period fills in on every treatment given from it."
           action={
             <Button variant="primary" onClick={() => onAdding(true)}>
-              Add a product
+              Add product
             </Button>
           }
         />
@@ -964,7 +958,7 @@ function AddMed({
 
   return (
     <Modal
-      title="Add a product"
+      title="Add product"
       placement="side"
       onClose={onClose}
       footer={
@@ -1083,7 +1077,7 @@ function ProtocolsTab({
           detail="A protocol turns one date into a schedule of dated steps."
           action={
             <Button variant="primary" onClick={() => onAdding(true)}>
-              Add a protocol
+              Add protocol
             </Button>
           }
         />
@@ -1210,7 +1204,7 @@ function AddProtocol({
 
   return (
     <Modal
-      title="Add a protocol"
+      title="Add protocol"
       description="Starts with CIDR in on day 0; add the rest next."
       placement="side"
       onClose={onClose}

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Button, EmptyState, PageBody, Pill, useToast } from "@galaxy-farm/ui";
+import { Button, EmptyState, Fab, PageBody, Pill, PlusIcon, useToast } from "@galaxy-farm/ui";
 import { formatMoney, type Money, type Ulid } from "@galaxy-farm/core";
 import {
   latestReadings,
@@ -20,7 +20,7 @@ import {
 
 import { useRecords } from "@/lib/local/use-records";
 
-import { AddFab, ChipRow, FilteredLine, KitHeader, KitList, KitRow } from "./kit-controls";
+import { ChipRow, FilteredLine, KitHeader, KitList, KitRow } from "./kit-controls";
 import { MachineForm } from "./machine-form";
 import { useMachineRemoval } from "./machine-removal";
 
@@ -239,7 +239,8 @@ export function FleetScreen({
 
   const addButton = (
     <Button variant="primary" onClick={startCreate}>
-      <span aria-hidden="true">+</span> Add machine
+      <PlusIcon />
+      Add machine
     </Button>
   );
 
@@ -329,7 +330,7 @@ export function FleetScreen({
           </KitList>
         )}
 
-        <AddFab label="Add machine" onClick={startCreate} />
+        <Fab onClick={startCreate}>Add machine</Fab>
       </div>
 
       {panel?.kind === "add" ? (

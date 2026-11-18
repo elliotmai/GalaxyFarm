@@ -4,26 +4,27 @@ import Link from "next/link";
 import { useEffect, useId, useMemo, useState } from "react";
 
 import {
-  Badge,
   Button,
+  type Column,
   DataTable,
   EmptyState,
+  Fab,
   Modal,
   PageBody,
   PageHeader,
   Pill,
-  Section,
+  PlusIcon,
+  type SearchOption,
   SearchSelect,
+  Section,
   Select,
   StatRow,
   Tabs,
-  Tile,
   TextInput,
+  Tile,
+  toOptions,
   useConfirmDelete,
   useToast,
-  type Column,
-  type SearchOption,
-  toOptions,
 } from "@galaxy-farm/ui";
 import { asDate, displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -361,19 +362,19 @@ export function BreedingScreen({
         // window, the preg check and the day count are all history.
         const calving = attempt?.calving;
         if (calving !== undefined && attempt?.standing.id === record.id) {
-          return <Badge tone="calm">Calved</Badge>;
+          return <Pill tone="calm">Calved</Pill>;
         }
         // Answered by breeding her again. It keeps its place in the history
         // and loses its future: no due date, no window, no preg check.
         if (attempt !== undefined && attempt.standing.id !== record.id) {
-          return <Badge tone="neutral">Re-bred</Badge>;
+          return <Pill tone="neutral">Re-bred</Pill>;
         }
-        if (record.pregCheck?.result === "open") return <Badge tone="danger">Open</Badge>;
-        if (isInCalvingWindow(record, now)) return <Badge tone="danger">Calving window</Badge>;
-        if (record.pregCheck?.result === "bred") return <Badge tone="calm">Confirmed bred</Badge>;
+        if (record.pregCheck?.result === "open") return <Pill tone="danger">Open</Pill>;
+        if (isInCalvingWindow(record, now)) return <Pill tone="danger">Calving window</Pill>;
+        if (record.pregCheck?.result === "bred") return <Pill tone="calm">Confirmed bred</Pill>;
         const due = pregCheckDue(record);
-        if (due !== undefined && due <= now) return <Badge tone="action">Preg check due</Badge>;
-        return <Badge tone="neutral">Waiting</Badge>;
+        if (due !== undefined && due <= now) return <Pill tone="action">Preg check due</Pill>;
+        return <Pill tone="neutral">Waiting</Pill>;
       },
     },
     {
@@ -450,7 +451,8 @@ export function BreedingScreen({
             // button's own `inline-flex` wins over a `hidden` passed in.
             <span className="hidden sm:block">
               <Button variant="primary" onClick={() => startRecording()}>
-                <span aria-hidden="true">+</span> Record a breeding
+                <PlusIcon />
+                Record a breeding
               </Button>
             </span>
           }
@@ -557,16 +559,7 @@ export function BreedingScreen({
           On a phone the button floats bottom-right, where a thumb already is,
           and clear of the tab bar. On anything wider it is in the header.
         */}
-        <button
-          type="button"
-          onClick={() => startRecording()}
-          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-        >
-          <span aria-hidden="true" className="text-xl leading-none">
-            +
-          </span>
-          Record a breeding
-        </button>
+        <Fab onClick={() => startRecording()}>Record a breeding</Fab>
       </div>
 
       {recording ? (

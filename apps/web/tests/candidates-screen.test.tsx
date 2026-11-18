@@ -127,8 +127,8 @@ describe("The comparison", () => {
     const user = userEvent.setup();
     view();
 
-    await user.click(screen.getAllByRole("button", { name: "Add a candidate" })[0] as HTMLElement);
-    const panel = screen.getByRole("dialog", { name: "Add a candidate" });
+    await user.click(screen.getAllByRole("button", { name: "Add candidate" })[0] as HTMLElement);
+    const panel = screen.getByRole("dialog", { name: "Add candidate" });
     await user.type(within(panel).getByLabelText(/^Animal/), "Red heifer");
     await user.type(within(panel).getByLabelText(/^Asking/), "1800");
     await user.type(within(panel).getByLabelText(/^Hauling/), "300");

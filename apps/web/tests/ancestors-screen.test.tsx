@@ -151,7 +151,7 @@ describe("The ancestors list", () => {
     const user = userEvent.setup();
     view();
 
-    await user.click(screen.getAllByRole("button", { name: "Add an ancestor" })[0] as HTMLElement);
+    await user.click(screen.getAllByRole("button", { name: "Add ancestor" })[0] as HTMLElement);
 
     const panel = screen.getByRole("dialog", { name: "New ancestor" });
     expect(within(panel).getByRole("button", { name: "Add ancestor" })).toBeTruthy();

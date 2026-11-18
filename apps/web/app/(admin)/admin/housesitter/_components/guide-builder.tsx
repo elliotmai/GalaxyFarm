@@ -289,7 +289,7 @@ export function GuideBuilder({
     return (
       <Modal
         placement="side"
-        title={editingGuide === undefined ? "Start a guide" : `Editing ${editingGuide.title}`}
+        title={editingGuide === undefined ? "Start a guide" : `Edit ${editingGuide.title}`}
         onClose={() => {
           setGuideDraft(undefined);
           setEditingGuide(undefined);
@@ -445,7 +445,7 @@ export function GuideBuilder({
       <Section
         title="Sections you write"
         description="What the app cannot know: the alarm code, who has the spare key."
-        actions={<Button onClick={() => startSection()}>Add a section</Button>}
+        actions={<Button onClick={() => startSection()}>Add section</Button>}
       >
         {sections.length === 0 ? (
           <EmptyState
@@ -480,9 +480,7 @@ export function GuideBuilder({
         <Modal
           placement="side"
           title={
-            editingSection === undefined
-              ? "A section of your own"
-              : `Editing ${editingSection.title}`
+            editingSection === undefined ? "A section of your own" : `Edit ${editingSection.title}`
           }
           description="Plain text, or Markdown if you like. It prints as written."
           onClose={() => {

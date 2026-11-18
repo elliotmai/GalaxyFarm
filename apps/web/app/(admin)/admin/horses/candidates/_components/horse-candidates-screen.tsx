@@ -8,17 +8,19 @@ import {
   Checkbox,
   DetailList,
   EmptyState,
+  Fab,
   Modal,
+  optionLabel,
   PageBody,
   PageHeader,
   Pill,
+  PlusIcon,
   Select,
   TagInput,
   TextArea,
   TextInput,
   useConfirmDelete,
   useToast,
-  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   CANDIDATE_STATUSES,
@@ -61,7 +63,6 @@ import {
   ChipRow,
   FilteredLine,
   ListRow,
-  PhoneAddButton,
   RowList,
 } from "@/app/(admin)/admin/horses/_components/list-row";
 
@@ -527,7 +528,8 @@ export function HorseCandidatesScreen({
             // wins over a `hidden` passed in.
             <span className="hidden sm:block">
               <Button variant="primary" onClick={startCreate}>
-                <span aria-hidden="true">+</span> Add a horse
+                <PlusIcon />
+                Add horse
               </Button>
             </span>
           }
@@ -603,7 +605,7 @@ export function HorseCandidatesScreen({
           .
         </p>
 
-        <PhoneAddButton onClick={startCreate}>Add a horse</PhoneAddButton>
+        <Fab onClick={startCreate}>Add horse</Fab>
       </div>
 
       {looking === undefined ? null : (
@@ -767,7 +769,7 @@ export function HorseCandidatesScreen({
         <Modal
           key={editing?.id ?? "new"}
           placement="side"
-          title={editing === undefined ? "A horse worth looking at" : `Editing ${editing.title}`}
+          title={editing === undefined ? "A horse worth looking at" : `Edit ${editing.title}`}
           description="A name and a price is enough to start."
           onClose={() => setDraft(undefined)}
           footer={

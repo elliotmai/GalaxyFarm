@@ -7,16 +7,18 @@ import {
   Button,
   DetailList,
   EmptyState,
+  Fab,
   Modal,
+  optionLabel,
   PageBody,
   PageHeader,
   Pill,
+  PlusIcon,
   Select,
   TextArea,
   TextInput,
   useConfirmDelete,
   useToast,
-  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   formatMoney,
@@ -40,7 +42,7 @@ import { budgetOutlook, nextUp, shoppingFor } from "@galaxy-farm/module-horses";
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
-import { ListRow, PhoneAddButton, RowList } from "@/app/(admin)/admin/horses/_components/list-row";
+import { ListRow, RowList } from "@/app/(admin)/admin/horses/_components/list-row";
 
 /**
  * The horse roadmap (spec §5.9, §5.1's generic Roadmap with `domain: horses`).
@@ -319,7 +321,8 @@ export function HorseRoadmapScreen({
           actions={
             <span className="hidden sm:block">
               <Button variant="primary" onClick={() => startCreate("wishlist")}>
-                <span aria-hidden="true">+</span> Add a want
+                <PlusIcon />
+                Add want
               </Button>
             </span>
           }
@@ -347,7 +350,7 @@ export function HorseRoadmapScreen({
               detail="A want: “a quiet ranch gelding, under $6,000, by next spring”."
               action={
                 <Button variant="primary" onClick={() => startCreate("wishlist")}>
-                  Add a want
+                  Add want
                 </Button>
               }
             />
@@ -442,7 +445,7 @@ export function HorseRoadmapScreen({
         */}
         {closed.length === 0 ? null : (
           <details className="group flex flex-col gap-2.5">
-            <summary className="inline-flex min-h-target cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted hover:text-ink">
+            <summary className="inline-flex min-h-target cursor-pointer items-center gap-2 gf-label hover:text-ink">
               Settled · {closed.length}
             </summary>
             <RowList label="Settled">
@@ -463,7 +466,7 @@ export function HorseRoadmapScreen({
           </details>
         )}
 
-        <PhoneAddButton onClick={() => startCreate("wishlist")}>Add a want</PhoneAddButton>
+        <Fab onClick={() => startCreate("wishlist")}>Add want</Fab>
       </div>
 
       {looking === undefined ? null : (
@@ -567,7 +570,7 @@ export function HorseRoadmapScreen({
           title={
             editing === undefined
               ? `New ${TYPE_LABEL[draft.type].toLowerCase()}`
-              : `Editing ${editing.title}`
+              : `Edit ${editing.title}`
           }
           description="The horses themselves go on the candidates screen."
           onClose={() => setDraft(undefined)}
@@ -693,7 +696,7 @@ function RoadmapSection({
   return (
     <section className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
+        <h2 className="gf-label">
           {title}
           {count === 0 ? "" : ` · ${count}`}
         </h2>

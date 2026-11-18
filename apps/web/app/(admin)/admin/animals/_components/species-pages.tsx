@@ -43,7 +43,7 @@ export function HorsesPage({ propertyId, actorId }: PageProps) {
       glance={<HorsesGlance propertyId={propertyId} />}
       actions={HORSE_ACTIONS}
       add={{
-        label: "Add a horse",
+        label: "Add horse",
         render: (close) => (
           <HorseEditor
             horse={undefined}
@@ -78,7 +78,7 @@ function PetsPage({
       glance={<PetsGlance propertyId={propertyId} species={species} />}
       actions={petActions(species)}
       add={{
-        label: species === "dog" ? "Add a dog" : "Add a cat",
+        label: species === "dog" ? "Add dog" : "Add cat",
         render: (close) => (
           <PetEditor
             pet={undefined}
@@ -110,7 +110,7 @@ export function ChickensPage({ propertyId, actorId }: PageProps) {
       glance={<ChickensGlance propertyId={propertyId} />}
       actions={CHICKEN_ACTIONS}
       add={{
-        label: "Add a flock",
+        label: "Add flock",
         render: (close) => (
           <FlockEditor
             adjustments={adjustments}

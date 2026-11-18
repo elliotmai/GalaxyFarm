@@ -142,7 +142,7 @@ describe("a zone's map panel", () => {
 
     await user.click(screen.getByRole("button", { name: "Adjust on the map" }));
     await user.click(screen.getByRole("button", { name: "Remove boundary" }));
-    await user.click(screen.getByRole("button", { name: "Add a fence" }));
+    await user.click(screen.getByRole("button", { name: "Add fence" }));
     await user.click(screen.getByRole("button", { name: "Edit Creek wire" }));
     await user.click(screen.getByRole("button", { name: "Take Creek wire down" }));
 

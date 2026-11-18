@@ -8,9 +8,12 @@ import {
   Callout,
   Checkbox,
   EmptyState,
+  Fab,
   Modal,
+  optionLabel,
   PageBody,
   Pill,
+  PlusIcon,
   Section,
   Select,
   StatRow,
@@ -19,7 +22,6 @@ import {
   Tile,
   useConfirmDelete,
   useToast,
-  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   displayName,
@@ -48,7 +50,6 @@ import {
 } from "@galaxy-farm/module-cattle";
 
 import {
-  AddFab,
   facts,
   Row,
   Rows,
@@ -183,7 +184,8 @@ export function SalesScreen({
           action={
             <span className="hidden sm:block">
               <Button variant="primary" aria-haspopup="dialog" onClick={startAdd}>
-                <span aria-hidden="true">+</span> {ADD_LABEL[tab]}
+                <PlusIcon />
+                {ADD_LABEL[tab]}
               </Button>
             </span>
           }
@@ -276,7 +278,7 @@ export function SalesScreen({
           }
         </Tabs>
 
-        <AddFab onClick={startAdd}>{ADD_LABEL[tab]}</AddFab>
+        <Fab onClick={startAdd}>{ADD_LABEL[tab]}</Fab>
       </div>
     </PageBody>
   );

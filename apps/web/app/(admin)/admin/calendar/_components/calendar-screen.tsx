@@ -5,9 +5,11 @@ import { useMemo, useState } from "react";
 import {
   Button,
   Checkbox,
+  Fab,
   Modal,
   PageBody,
   PageHeader,
+  PlusIcon,
   TextArea,
   TextInput,
   useConfirmDelete,
@@ -270,7 +272,8 @@ export function CalendarScreen({
             // button's own `inline-flex` wins over a `hidden` passed in.
             <span className="hidden sm:block">
               <Button variant="primary" onClick={() => setDraft(blankDraft(period.from, now))}>
-                <span aria-hidden="true">+</span> Add event
+                <PlusIcon />
+                Add event
               </Button>
             </span>
           }
@@ -374,16 +377,7 @@ export function CalendarScreen({
         )}
 
         {/* On a phone the add button floats where a thumb already is. */}
-        <button
-          type="button"
-          onClick={() => setDraft(blankDraft(period.from, now))}
-          className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-        >
-          <span aria-hidden="true" className="text-xl leading-none">
-            +
-          </span>
-          Add event
-        </button>
+        <Fab onClick={() => setDraft(blankDraft(period.from, now))}>Add event</Fab>
 
         {draft === undefined ? null : (
           <Modal

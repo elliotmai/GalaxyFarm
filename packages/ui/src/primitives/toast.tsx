@@ -193,7 +193,7 @@ export function ToastProvider({ children, setTimer, clearTimer }: ToastProviderP
               // a saturated block of colour means something specific.
               "pointer-events-auto relative flex min-h-target w-full max-w-md items-center justify-between gap-4",
               "overflow-hidden rounded-density border border-edge bg-panel py-2 pl-4 pr-2 text-density text-ink",
-              "shadow-[0_2px_4px_rgba(0,0,0,0.3),0_12px_32px_-8px_rgba(0,0,0,0.55)]",
+              "shadow-overlay",
               "before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:content-['']",
               TONE_EDGE[toast.tone ?? "info"],
             ].join(" ")}

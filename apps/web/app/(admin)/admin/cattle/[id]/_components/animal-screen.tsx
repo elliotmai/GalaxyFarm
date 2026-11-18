@@ -10,16 +10,17 @@ import {
   DetailList,
   EmptyState,
   Modal,
-  Pill,
-  Select,
-  TextInput,
   PageBody,
+  Pill,
+  PlusIcon,
   SafetyBadge,
   Section,
+  Select,
   TextArea,
+  TextInput,
+  toOptions,
   useConfirmDelete,
   useToast,
-  toOptions,
 } from "@galaxy-farm/ui";
 import {
   animalsWithoutOutside,
@@ -715,7 +716,8 @@ function Registrations({
       description={registrations.length === 0 ? undefined : `${registrations.length} on file`}
       actions={
         <Button aria-haspopup="dialog" onClick={startAdd}>
-          <span aria-hidden="true">+</span> Add registration
+          <PlusIcon />
+          Add registration
         </Button>
       }
     >
@@ -756,7 +758,7 @@ function Registrations({
       {open ? (
         <Modal
           placement="side"
-          title={editingKey === undefined ? "Add a registration" : "Edit this registration"}
+          title={editingKey === undefined ? "Add registration" : "Edit this registration"}
           onClose={reset}
           footer={
             <>

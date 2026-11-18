@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { Button, PageBody, Tabs } from "@galaxy-farm/ui";
+import { Button, Fab, PageBody, PlusIcon, Tabs } from "@galaxy-farm/ui";
 import { formatMoney, type Animal, type Contact, type Ulid, type Zone } from "@galaxy-farm/core";
 import {
   currentlyAssigned,
@@ -17,7 +17,7 @@ import {
 
 import { useRecords } from "@/lib/local/use-records";
 
-import { AddFab, KitHeader } from "../../equipment/_components/kit-controls";
+import { KitHeader } from "../../equipment/_components/kit-controls";
 import { isEnding, itemHolds, line, qty, unitLabel } from "./supplies-format";
 import { DurableForm, ItemForm, PurchaseForm, UsageForm, useSupplyActions } from "./supplies-forms";
 import { DurablesTab, ItemsTab, PurchasesTab, ShelfTab, UsedTab } from "./supplies-views";
@@ -133,7 +133,8 @@ export function SuppliesScreen({
           facts={loading ? undefined : facts}
           action={
             <Button variant="primary" onClick={recordUse}>
-              <span aria-hidden="true">+</span> Record use
+              <PlusIcon />
+              Record use
             </Button>
           }
         />
@@ -226,7 +227,7 @@ export function SuppliesScreen({
           }
         </Tabs>
 
-        <AddFab label="Record use" onClick={recordUse} />
+        <Fab onClick={recordUse}>Record use</Fab>
       </div>
 
       {panel?.kind === "item" ? (

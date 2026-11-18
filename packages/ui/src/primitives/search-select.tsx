@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { Field } from "./field.js";
+import { CONTROL_CLASS, Field } from "./field.js";
 
 /**
  * A picker you can type into (spec §8, §4.5 clause 2).
@@ -65,10 +65,6 @@ export interface SearchSelectProps {
   readonly disabled?: boolean | undefined;
   readonly className?: string | undefined;
 }
-
-const CONTROL =
-  "w-full min-h-target rounded-density border bg-panel px-3 text-density text-ink " +
-  "outline-none focus-visible:ring-2 focus-visible:ring-action disabled:opacity-60";
 
 /**
  * Fold case and punctuation for comparison.
@@ -220,7 +216,7 @@ export function SearchSelect({
             aria-activedescendant={open ? `${listId}-${active}` : undefined}
             autoComplete="off"
             disabled={disabled ?? false}
-            className={[CONTROL, invalid ? "border-danger" : "border-edge"].join(" ")}
+            className={[CONTROL_CLASS, invalid ? "border-danger" : "border-edge"].join(" ")}
             // Showing the chosen label when closed and the search when open is
             // what makes one box do both jobs. Clearing the search on close is
             // what stops a half-typed name reading as a selection.
@@ -241,7 +237,7 @@ export function SearchSelect({
               id={listId}
               role="listbox"
               aria-label={label}
-              className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-density border border-edge bg-panel shadow-xl"
+              className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-density border border-edge bg-panel shadow-float"
             >
               {matches.length === 0 ? (
                 <li className="px-density py-density text-density text-muted">

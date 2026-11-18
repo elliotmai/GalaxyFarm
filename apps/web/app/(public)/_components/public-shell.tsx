@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { Logomark } from "@galaxy-farm/ui";
+import { buttonClass, Logomark } from "@galaxy-farm/ui";
 
 /**
  * The frames every public page sits in (spec §7, §8).
@@ -25,10 +25,7 @@ export function SiteHeader({ farmName }: { readonly farmName: string }) {
           <Logomark size="small" decorative />
           <span className="truncate font-heading text-lg font-semibold text-ink">{farmName}</span>
         </Link>
-        <Link
-          href="/book"
-          className="inline-flex min-h-target shrink-0 items-center rounded-density bg-action px-4 text-density font-semibold text-action-ink"
-        >
+        <Link href="/book" className={buttonClass("primary", { className: "shrink-0" })}>
           Enquire
         </Link>
       </div>

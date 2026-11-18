@@ -6,7 +6,7 @@ import { useEffect, useId } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 
 import type { Ulid } from "@galaxy-farm/core";
-import { useToast } from "@galaxy-farm/ui";
+import { ACTION_TILE_CLASS, useToast } from "@galaxy-farm/ui";
 
 import { logHref } from "@/app/(admin)/admin/log/_components/log-kinds";
 import { useAttachPhotos } from "@/lib/photos/use-photos";
@@ -27,9 +27,6 @@ import { useAttachPhotos } from "@/lib/photos/use-photos";
 
 export type FlockAction = "headcount" | "move" | "note";
 
-const TILE =
-  "flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-density border border-rule bg-panel px-1 text-[13px] font-medium text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
-
 export function FlockActions({
   flockId,
   propertyId,
@@ -45,7 +42,12 @@ export function FlockActions({
   const pathname = usePathname();
 
   const panel = (action: FlockAction, label: string, icon: ReactNode) => (
-    <button type="button" aria-haspopup="dialog" onClick={() => onAction(action)} className={TILE}>
+    <button
+      type="button"
+      aria-haspopup="dialog"
+      onClick={() => onAction(action)}
+      className={ACTION_TILE_CLASS}
+    >
       {icon}
       {label}
     </button>
@@ -53,7 +55,10 @@ export function FlockActions({
 
   return (
     <nav aria-label="Log for this flock" className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-      <Link href={logHref({ kind: "eggs", flock: flockId, from: pathname })} className={TILE}>
+      <Link
+        href={logHref({ kind: "eggs", flock: flockId, from: pathname })}
+        className={ACTION_TILE_CLASS}
+      >
         <Icon>
           <path d="M12 3c-3.5 0-6 5-6 9a6 6 0 0 0 12 0c0-4-2.5-9-6-9z" />
         </Icon>
@@ -121,7 +126,7 @@ function PhotoTile({
   return (
     <label
       htmlFor={id}
-      className={`${TILE} relative cursor-pointer ${intake.busy ? "opacity-60" : ""}`}
+      className={`${ACTION_TILE_CLASS} relative cursor-pointer ${intake.busy ? "opacity-60" : ""}`}
     >
       <input
         id={id}

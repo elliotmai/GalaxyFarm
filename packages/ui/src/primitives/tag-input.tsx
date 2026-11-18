@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Field } from "./field.js";
+import { CONTROL_CLASS, Field } from "./field.js";
 
 /**
  * A short list of words, edited in place (spec §8, §4.5 clause 2).
@@ -156,9 +156,10 @@ export function TagInput({
               }
             }}
             onBlur={() => add(draft)}
-            className={`min-h-11 w-full rounded-md border bg-surface px-3 py-2 text-density text-ink ${
-              invalid ? "border-danger" : "border-edge"
-            }`}
+            // The same box as every other text field. It had its own — a
+            // fixed 44px, a 6px corner and a "surface" background the theme
+            // never declared, so the box was transparent on every surface.
+            className={`${CONTROL_CLASS} py-2 ${invalid ? "border-danger" : "border-edge"}`}
           />
 
           {offered.length === 0 ? null : (

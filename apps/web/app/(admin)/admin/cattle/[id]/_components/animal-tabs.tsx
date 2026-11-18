@@ -5,23 +5,24 @@ import { useId, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import {
+  type Ancestor,
   Button,
+  buttonClass,
   EmptyState,
   Meter,
   Modal,
   PedigreeChart,
   Pill,
+  type SearchOption,
   SearchSelect,
   Section,
   StatRow,
   TagInput,
   TextInput,
   Tile,
+  type Tone,
   useConfirmDelete,
   useToast,
-  type Ancestor,
-  type SearchOption,
-  type Tone,
 } from "@galaxy-farm/ui";
 import { displayName, formatMoney, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
@@ -103,10 +104,7 @@ function lb(value: number | undefined): string {
 /** A link styled as a secondary button, for "go and record it over there". */
 function ActionLink({ href, children }: { readonly href: string; readonly children: ReactNode }) {
   return (
-    <Link
-      href={href}
-      className="inline-flex min-h-target items-center rounded-density border border-edge bg-panel px-4 text-density font-medium text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
-    >
+    <Link href={href} className={buttonClass("secondary")}>
       {children}
     </Link>
   );

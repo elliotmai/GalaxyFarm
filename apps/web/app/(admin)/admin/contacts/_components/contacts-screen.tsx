@@ -5,10 +5,12 @@ import { useState } from "react";
 import {
   Button,
   EmptyState,
+  Fab,
   Modal,
   PageBody,
   PageHeader,
   Pill,
+  PlusIcon,
   Select,
   TextInput,
   useConfirmDelete,
@@ -290,7 +292,8 @@ export function ContactsScreen({
             // button's own `inline-flex` wins over a `hidden` passed in.
             <span className="hidden sm:block">
               <Button variant="primary" onClick={startAdd}>
-                <span aria-hidden="true">+</span> Add contact
+                <PlusIcon />
+                Add contact
               </Button>
             </span>
           }
@@ -463,17 +466,8 @@ export function ContactsScreen({
       </PageBody>
 
       {/* On a phone the add button floats where a thumb already is, clear of
-          the tab bar. A plain button: its shape and shadow are its own. */}
-      <button
-        type="button"
-        onClick={startAdd}
-        className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-      >
-        <span aria-hidden="true" className="text-xl leading-none">
-          +
-        </span>
-        Add contact
-      </button>
+          the tab bar. */}
+      <Fab onClick={startAdd}>Add contact</Fab>
 
       {filtersOpen ? (
         <Modal
@@ -509,7 +503,7 @@ export function ContactsScreen({
       {draft === undefined ? null : (
         <Modal
           placement="side"
-          title={editing === undefined ? "Add a contact" : `Editing ${editing.name}`}
+          title={editing === undefined ? "Add contact" : `Edit ${editing.name}`}
           onClose={closeForm}
           footer={
             <>

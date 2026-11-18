@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import {
   Button,
   Modal,
+  PlusIcon,
   Section,
   Select,
   TextArea,
@@ -364,7 +365,15 @@ function Crops({
   return (
     // The family is what the rotation guard checks, so two nightshades filed
     // under the same family is the point rather than an accident.
-    <Section title="Crops" actions={<RowAction onClick={startCreate}>+ Add crop</RowAction>}>
+    <Section
+      title="Crops"
+      actions={
+        <RowAction onClick={startCreate}>
+          <PlusIcon />
+          Add crop
+        </RowAction>
+      }
+    >
       {crops.length === 0 ? (
         <p className="text-sm text-muted">
           No crops yet. Add tomatoes, then the varieties under them.
@@ -399,7 +408,7 @@ function Crops({
         <Modal
           key={editing?.id ?? "new-crop"}
           placement="side"
-          title={editing === undefined ? "New crop" : `Editing ${editing.name}`}
+          title={editing === undefined ? "New crop" : `Edit ${editing.name}`}
           description="Type a name or pick a match — the family and how it grows are filled in."
           onClose={() => setDraft(undefined)}
           footer={
@@ -880,7 +889,7 @@ function Varieties({
         <Modal
           key={editing?.id ?? "new-variety"}
           placement="side"
-          title={editing === undefined ? "New variety" : `Editing ${editing.name}`}
+          title={editing === undefined ? "New variety" : `Edit ${editing.name}`}
           description="Off the packet: name, days to maturity, spacing."
           onClose={() => setDraft(undefined)}
           footer={

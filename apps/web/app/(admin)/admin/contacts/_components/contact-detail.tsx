@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Badge,
   Card,
   DataTable,
   DetailList,
@@ -127,7 +126,7 @@ export function ContactDetail({
     {
       key: "kind",
       header: "What",
-      render: (link) => <Badge tone={KIND_TONES[link.kind]}>{KIND_LABELS[link.kind]}</Badge>,
+      render: (link) => <Pill tone={KIND_TONES[link.kind]}>{KIND_LABELS[link.kind]}</Pill>,
     },
     {
       key: "subject",

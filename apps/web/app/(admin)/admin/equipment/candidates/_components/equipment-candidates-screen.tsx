@@ -5,15 +5,17 @@ import { useMemo, useState } from "react";
 
 import {
   Button,
+  type Column,
   DataTable,
   EmptyState,
+  Fab,
   Modal,
   PageBody,
   Pill,
+  PlusIcon,
   Select,
   useConfirmDelete,
   useToast,
-  type Column,
 } from "@galaxy-farm/ui";
 import {
   compareToBudget,
@@ -41,7 +43,7 @@ import {
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
 
-import { AddFab, ChipRow, FilteredLine, KitHeader } from "../../_components/kit-controls";
+import { ChipRow, FilteredLine, KitHeader } from "../../_components/kit-controls";
 import { daysUntil, detailOf, num, rate } from "./candidate-format";
 import { CandidateForm } from "./candidate-form";
 import { CandidatePanel } from "./candidate-panel";
@@ -431,7 +433,8 @@ export function EquipmentCandidatesScreen({
           facts={loading ? undefined : facts}
           action={
             <Button variant="primary" onClick={startCreate}>
-              <span aria-hidden="true">+</span> Add candidate
+              <PlusIcon />
+              Add candidate
             </Button>
           }
         />
@@ -538,7 +541,7 @@ export function EquipmentCandidatesScreen({
           </div>
         )}
 
-        <AddFab label="Add candidate" onClick={startCreate} />
+        <Fab onClick={startCreate}>Add candidate</Fab>
       </div>
 
       {viewing === undefined ? null : (

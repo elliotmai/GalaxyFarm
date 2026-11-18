@@ -254,7 +254,7 @@ describe("the flock page", () => {
     // The undated notes only — the dated line is already in History.
     expect(screen.getByText("The one with the red door.")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Edit flock" }));
-    expect(screen.getByRole("dialog", { name: /Editing The big coop/ })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: /Edit The big coop/ })).toBeTruthy();
   });
 
   it("shows the birds kept by name in the coop, each with a note into the Log", () => {

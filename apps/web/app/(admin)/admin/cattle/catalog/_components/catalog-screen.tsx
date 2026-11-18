@@ -685,10 +685,7 @@ function ResultList({
 
   return (
     <div className="overflow-hidden rounded-density border border-rule bg-panel">
-      <div
-        aria-hidden="true"
-        className={`hidden gap-4 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted md:grid ${columns}`}
-      >
+      <div aria-hidden="true" className={`hidden gap-4 px-4 py-2 gf-label md:grid ${columns}`}>
         <span>Name</span>
         <span>Registration</span>
         <span>Colour · horn</span>
@@ -938,7 +935,7 @@ function BringAcross({
 
       <div className="flex flex-col">
         <div className="flex items-baseline justify-between gap-3 pb-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Pedigree</h3>
+          <h3 className="gf-label">Pedigree</h3>
           <span role="status" className="text-sm text-muted">
             {reading
               ? "Reading…"

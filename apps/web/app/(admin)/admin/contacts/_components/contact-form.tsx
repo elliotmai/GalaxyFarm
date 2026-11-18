@@ -156,7 +156,7 @@ export function ContactForm({
 
       <RowEditor
         legend="Phone numbers"
-        addLabel="Add a number"
+        addLabel="Add number"
         valueLabel="Number"
         valueType="tel"
         defaultRowLabel="Other"
@@ -167,7 +167,7 @@ export function ContactForm({
 
       <RowEditor
         legend="Email addresses"
-        addLabel="Add an address"
+        addLabel="Add address"
         valueLabel="Address"
         valueType="email"
         defaultRowLabel="Email"

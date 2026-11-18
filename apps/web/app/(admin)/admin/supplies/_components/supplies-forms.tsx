@@ -136,7 +136,7 @@ export function ItemForm({
 
   return (
     <FormPanel
-      title={editing === undefined ? "Add an item" : `Edit ${editing.name}`}
+      title={editing === undefined ? "Add item" : `Edit ${editing.name}`}
       // The one thing about the count that is easy to get wrong.
       description="The opening count is what is on the shelf today. After that it is purchases and use."
       submitLabel={editing === undefined ? "Add item" : "Save item"}

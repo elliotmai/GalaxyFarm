@@ -77,7 +77,7 @@ export function HelpToggle({
           "fixed inset-x-4 top-24 z-30 hidden group-open:block rounded-density",
           "md:absolute md:inset-x-auto md:left-0 md:top-9 md:w-[22rem]",
           "border border-rule bg-panel p-density text-sm font-normal leading-relaxed text-ink",
-          "shadow-[0_12px_32px_-12px_rgba(20,23,27,0.35)]",
+          "shadow-float",
         ].join(" ")}
       >
         {children}
@@ -215,7 +215,7 @@ export function DetailList({ items, columns = 2 }: DetailListProps) {
           key={item.label}
           className={`flex flex-col gap-1 ${item.wide === true ? "sm:col-span-full" : ""}`}
         >
-          <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{item.label}</dt>
+          <dt className="gf-label">{item.label}</dt>
           <dd className="text-density text-ink [font-variant-numeric:tabular-nums]">
             {item.value === undefined || item.value === null || item.value === "" ? (
               <span className="text-muted">—</span>
@@ -262,7 +262,7 @@ export function Divider({ label }: { readonly label?: string }) {
 
   return (
     <div className="flex items-center gap-3" role="separator" aria-label={label}>
-      <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
+      <span className="gf-label">{label}</span>
       <span className="h-px flex-1 bg-rule" />
     </div>
   );

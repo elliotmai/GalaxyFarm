@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { Button, EmptyState, Modal, PageBody, Pill } from "@galaxy-farm/ui";
+import { Button, buttonClass, EmptyState, Modal, PageBody, Pill } from "@galaxy-farm/ui";
 import { displayName, type Animal, type Ulid } from "@galaxy-farm/core";
 import {
   assessRisks,
@@ -221,10 +221,7 @@ export function RisksScreen({ propertyId }: { readonly propertyId: Ulid }) {
           footer={
             <>
               {openAnimal === undefined ? null : (
-                <Link
-                  href={animalHref(openAnimal)}
-                  className="inline-flex min-h-target items-center rounded-density bg-action px-4 font-medium text-action-ink hover:opacity-90"
-                >
+                <Link href={animalHref(openAnimal)} className={buttonClass("primary")}>
                   Open profile
                 </Link>
               )}

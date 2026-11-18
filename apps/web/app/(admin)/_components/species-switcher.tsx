@@ -125,7 +125,7 @@ export function SpeciesSwitcher({
           id={menuId}
           role="menu"
           aria-label="Species"
-          className="absolute left-0 top-full z-30 mt-2 flex w-64 flex-col overflow-hidden rounded-density border border-rule bg-panel py-1 shadow-lg"
+          className="absolute left-0 top-full z-30 mt-2 flex w-64 flex-col overflow-hidden rounded-density border border-rule bg-panel py-1 shadow-float"
         >
           {CHOICES.map((choice) => {
             const isHere = choice.home === current;

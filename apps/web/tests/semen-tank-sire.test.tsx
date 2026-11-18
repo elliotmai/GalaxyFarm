@@ -107,7 +107,7 @@ const named = (label: string) => new RegExp(`^${label}\\b`);
 
 /** Adding a cane is a side panel, opened from the header. */
 async function openAddPanel(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getAllByRole("button", { name: "Add a sire" })[0] as HTMLElement);
+  await user.click(screen.getAllByRole("button", { name: "Add sire" })[0] as HTMLElement);
 }
 
 /**

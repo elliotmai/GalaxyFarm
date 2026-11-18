@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Button, PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
+import { Button, Fab, PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
 import { addCalendarDays, endOfDay, startOfDay, type Ulid, type Zone } from "@galaxy-farm/core";
 import {
   lossesIn,
@@ -17,7 +17,6 @@ import {
   HeadcountPanel,
   RecordChange,
 } from "@/app/(admin)/admin/chickens/flock/_components/headcount-panel";
-import { PhoneAddButton } from "@/app/(admin)/admin/horses/_components/list-row";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -209,7 +208,7 @@ export function FlockScreen({
           }
         </Tabs>
 
-        <PhoneAddButton onClick={() => setRecording("any")}>Record a change</PhoneAddButton>
+        <Fab onClick={() => setRecording("any")}>Record a change</Fab>
       </div>
 
       {recording === undefined ? null : (

@@ -10,6 +10,7 @@ import {
   EmptyState,
   Modal,
   Pill,
+  PlusIcon,
   Section,
   TextInput,
   useToast,
@@ -230,7 +231,8 @@ export function SitterAccess({
         description="Outside their window they have no access at all."
         actions={
           <Button variant="primary" onClick={startAdd}>
-            <span aria-hidden="true">+</span> Add sitter
+            <PlusIcon />
+            Add sitter
           </Button>
         }
       >
@@ -282,7 +284,7 @@ export function SitterAccess({
       {draft === undefined ? null : (
         <Modal
           placement="side"
-          title={editing === undefined ? "Add a sitter" : `${editing.name}'s visit`}
+          title={editing === undefined ? "Add sitter" : `${editing.name}'s visit`}
           description="A start and an end — both are required."
           onClose={() => {
             setDraft(undefined);

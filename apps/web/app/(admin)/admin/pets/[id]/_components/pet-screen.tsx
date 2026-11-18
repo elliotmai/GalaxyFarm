@@ -8,11 +8,12 @@ import {
   Button,
   DetailList,
   EmptyState,
+  optionLabel,
   PageBody,
   Pill,
+  PlusIcon,
   SafetyBadge,
   Section,
-  optionLabel,
 } from "@galaxy-farm/ui";
 import {
   displayName,
@@ -395,7 +396,8 @@ export function PetScreen({
               aria-haspopup="dialog"
               onClick={() => setPanel({ kind: "ration", plan: undefined })}
             >
-              <span aria-hidden="true">+</span> Ration
+              <PlusIcon />
+              Ration
             </Button>
           }
         >

@@ -87,7 +87,7 @@ function Strip({
               segmented
                 ? `flex min-h-target flex-1 shrink-0 items-center justify-center rounded-density px-4 text-sm sm:flex-none ${
                     here
-                      ? "bg-panel font-semibold text-ink shadow-[0_1px_3px_rgba(20,23,27,0.15)]"
+                      ? "bg-panel font-semibold text-ink shadow-card"
                       : "text-muted hover:text-ink"
                   }`
                 : quiet

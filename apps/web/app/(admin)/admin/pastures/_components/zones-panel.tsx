@@ -533,7 +533,7 @@ export function ZonesPanel({
         <Modal
           key={editing?.id ?? "new"}
           placement="side"
-          title={editing === undefined ? "New zone" : `Editing ${editing.name}`}
+          title={editing === undefined ? "New zone" : `Edit ${editing.name}`}
           description="A pen, a trap, a pasture — anywhere an animal can be."
           onClose={closeEditor}
           footer={

@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import {
+  buttonClass,
   CardGrid,
   EmptyState,
   PageBody,
@@ -100,9 +101,17 @@ export function Dashboard({
     return (
       <PageBody>
         <PageHeader title="Today" />
+        {/* Today is built from the places on the farm — what is in each pen,
+            what each one needs. So the first thing to add is a place, and the
+            empty state says that rather than naming a developer command. */}
         <EmptyState
-          title="Nothing here yet"
-          detail="Run pnpm db:seed to load the property, or add a zone to get started."
+          title="Add your first zone"
+          detail="Today shows what each pasture and pen needs, so it starts with the zones on the farm."
+          action={
+            <Link href="/admin/pastures" className={buttonClass("primary")}>
+              Go to Pastures
+            </Link>
+          }
         />
       </PageBody>
     );

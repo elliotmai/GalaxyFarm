@@ -9,6 +9,7 @@ import {
   EmptyState,
   Modal,
   Pill,
+  PlusIcon,
   Section,
   Select,
   TextInput,
@@ -363,7 +364,8 @@ export function PeopleScreen({
             disabled={pending || unavailable !== undefined}
             onClick={startInvite}
           >
-            <span aria-hidden="true">+</span> Add person
+            <PlusIcon />
+            Add person
           </Button>
         }
       >
@@ -511,7 +513,7 @@ export function PeopleScreen({
         <Modal
           key={editing?.user.id ?? "new"}
           placement="side"
-          title={editing === undefined ? "Add a person" : editing.user.name}
+          title={editing === undefined ? "Add person" : editing.user.name}
           description={
             editing === undefined
               ? "They are emailed a link, never a password."

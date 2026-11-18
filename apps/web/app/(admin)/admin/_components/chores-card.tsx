@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, use, useState } from "react";
 
-import { Pill, useToast } from "@galaxy-farm/ui";
+import { Pill, tickBoxClass, useToast } from "@galaxy-farm/ui";
 import {
   choreDaySheet,
   choreProgress,
@@ -259,7 +259,7 @@ export function TickList({
   return (
     <section aria-labelledby={id} className="flex min-w-0 flex-col gap-2.5">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 id={id} className="text-xs font-semibold uppercase tracking-wide text-muted">
+        <h2 id={id} className="gf-label">
           {title}
           {left === 0 ? " · done" : ` · ${left} to do`}
         </h2>
@@ -296,14 +296,7 @@ export function TickList({
                   disabled={busy === entry.id}
                   onChange={() => void tick(entry)}
                 />
-                <span
-                  aria-hidden
-                  className={[
-                    "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-lg border-2",
-                    "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-action",
-                    done ? "border-action bg-action text-action-ink" : "border-edge bg-panel",
-                  ].join(" ")}
-                >
+                <span aria-hidden className={tickBoxClass(done)}>
                   {done ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                       <path

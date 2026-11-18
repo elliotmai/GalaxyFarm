@@ -258,7 +258,7 @@ describe("Farm › Feed › Plan", () => {
     wrap(<FeedScreen propertyId={PROPERTY} actorId={ACTOR} initialView="plan" />);
 
     await user.click(screen.getAllByRole("button", { name: /Add plan/ })[0] as HTMLElement);
-    const panel = screen.getByRole("dialog", { name: "Add a plan" });
+    const panel = screen.getByRole("dialog", { name: "Add plan" });
     await user.type(within(panel).getByLabelText(/^Plan name/), "Morning hay");
     await user.selectOptions(within(panel).getByLabelText(/^Feeds/), "animal");
     await user.selectOptions(within(panel).getByLabelText(/^Animal/), BISCUIT);
@@ -313,13 +313,13 @@ describe("Farm › Feed › Shed", () => {
     expect((within(panel).getByLabelText(/^Feed/) as HTMLSelectElement).value).toBe(HAY);
   });
 
-  it("offers Add a feed when the shed already has feed in it", async () => {
+  it("offers Add feed when the shed already has feed in it", async () => {
     const user = userEvent.setup();
     farm();
     wrap(<FeedScreen propertyId={PROPERTY} actorId={ACTOR} initialView="shed" />);
 
-    await user.click(screen.getByRole("button", { name: "Add a feed" }));
-    const panel = screen.getByRole("dialog", { name: "Add a feed" });
+    await user.click(screen.getByRole("button", { name: "Add feed" }));
+    const panel = screen.getByRole("dialog", { name: "Add feed" });
     await user.type(within(panel).getByLabelText(/^Name/), "Sweet feed");
     // The lead time is not required: blank is a week.
     await user.clear(within(panel).getByLabelText(/^Reorder lead/));

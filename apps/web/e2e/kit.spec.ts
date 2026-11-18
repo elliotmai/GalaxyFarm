@@ -87,10 +87,10 @@ test.describe("kit", () => {
     await page.goto("/admin/supplies");
 
     await page.getByRole("tab", { name: "Items" }).click();
-    // The item form lives in a side dialog now, behind "Add an item" — the
+    // The item form lives in a side dialog now, behind "Add item" — the
     // catalog is the thing the tab is for, and the form was pushing it below
     // the fold.
-    await page.getByRole("button", { name: "Add an item" }).click();
+    await page.getByRole("button", { name: "Add item" }).click();
     const item = page.getByRole("dialog");
     await item.getByLabel("Name").fill("Pine shavings");
     await item.getByLabel("Unit").selectOption("bag");

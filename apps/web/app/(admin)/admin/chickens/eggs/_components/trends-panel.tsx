@@ -181,10 +181,7 @@ export function TrendsPanel({
         many — §5.4 keeps it optional, so this is a sample, not the basket.
       */}
       <section aria-labelledby="eggs-breakdown" className="flex flex-col gap-2.5">
-        <h2
-          id="eggs-breakdown"
-          className="text-xs font-semibold uppercase tracking-wide text-muted"
-        >
+        <h2 id="eggs-breakdown" className="gf-label">
           Colour and size
         </h2>
         {withBreakdown.length === 0 ? (
@@ -214,10 +211,7 @@ export function TrendsPanel({
       {/* Who is actually laying, and how many are in there. */}
       {flocks.length < 2 ? null : (
         <section aria-labelledby="eggs-per-flock" className="flex flex-col gap-2.5">
-          <h2
-            id="eggs-per-flock"
-            className="text-xs font-semibold uppercase tracking-wide text-muted"
-          >
+          <h2 id="eggs-per-flock" className="gf-label">
             Per flock
           </h2>
           <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">

@@ -5,8 +5,10 @@ import { useState } from "react";
 import {
   Button,
   EmptyState,
+  Fab,
   Modal,
   Pill,
+  PlusIcon,
   Section,
   Select,
   TextArea,
@@ -330,7 +332,8 @@ export function DaySheet({
           // wins over a `hidden` passed in. The floating one stands in.
           <span className="hidden sm:block">
             <Button variant="primary" onClick={startCreate}>
-              <span aria-hidden="true">+</span> Add chore
+              <PlusIcon />
+              Add chore
             </Button>
           </span>
         }
@@ -347,7 +350,7 @@ export function DaySheet({
               ? {
                   action: (
                     <Button variant="primary" onClick={startCreate}>
-                      Add a chore
+                      Add chore
                     </Button>
                   ),
                 }
@@ -364,16 +367,7 @@ export function DaySheet({
         </Section>
       )}
 
-      <button
-        type="button"
-        onClick={startCreate}
-        className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-      >
-        <span aria-hidden="true" className="text-xl leading-none">
-          +
-        </span>
-        Add chore
-      </button>
+      <Fab onClick={startCreate}>Add chore</Fab>
 
       {draft === undefined ? null : (
         <Modal

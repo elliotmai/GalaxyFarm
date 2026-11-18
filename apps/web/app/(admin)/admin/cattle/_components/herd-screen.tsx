@@ -4,16 +4,19 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  ACTION_TILE_CLASS,
   Button,
   Checkbox,
   EmptyState,
+  Fab,
   Modal,
+  PlusIcon,
   Select,
   TextArea,
   TextInput,
+  toOptions,
   useConfirmDelete,
   useToast,
-  toOptions,
 } from "@galaxy-farm/ui";
 import {
   ANIMAL_STATUSES,
@@ -110,9 +113,6 @@ interface Filters {
   /** Only the animals with no pen recorded — what the alert line opens. */
   readonly unplacedOnly: boolean;
 }
-
-const ACTION_TILE =
-  "flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-density border border-rule bg-panel px-1 text-center text-[13px] font-medium text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action";
 
 const NO_FILTERS: Filters = {
   zoneId: "",
@@ -393,7 +393,7 @@ export function HerdScreen({
     setErrors({});
   }
 
-  // `?add=1` lands on the add form — the Animals list's "+ Add animal" comes
+  // `?add=1` lands on the add form — the Animals list's "Add animal" comes
   // here rather than keeping a second add form. Read once, off `window`
   // rather than `useSearchParams`, so the page needs no Suspense boundary;
   // the flag is then dropped from the address so a reload does not reopen it.
@@ -585,7 +585,8 @@ export function HerdScreen({
             button's own `inline-flex` wins over a `hidden` passed in. */}
         <span className="hidden sm:block">
           <Button variant="primary" onClick={startCreate}>
-            <span aria-hidden="true">+</span> Add animal
+            <PlusIcon />
+            Add animal
           </Button>
         </span>
       </header>
@@ -593,7 +594,7 @@ export function HerdScreen({
       {/* The cattle page's own jobs and facts (decision 45). */}
       <nav aria-label="Quick actions for cattle" className="grid grid-cols-4 gap-2">
         {CATTLE_ACTIONS.map((action) => (
-          <Link key={action.label} href={action.href} className={ACTION_TILE}>
+          <Link key={action.label} href={action.href} className={ACTION_TILE_CLASS}>
             <span aria-hidden="true" className="text-xl leading-none">
               {action.glyph}
             </span>
@@ -769,19 +770,7 @@ export function HerdScreen({
         is, and clear of the tab bar below it. On anything wider it sits in the
         header and this one is not drawn.
       */}
-      {/* A plain button rather than `Button`: its shape and shadow are its own,
-          and overriding a primitive's radius from outside is a fight over
-          class order that the stylesheet decides, not this file. */}
-      <button
-        type="button"
-        onClick={startCreate}
-        className="fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 font-semibold text-action-ink shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:hidden"
-      >
-        <span aria-hidden="true" className="text-xl leading-none">
-          +
-        </span>
-        Add animal
-      </button>
+      <Fab onClick={startCreate}>Add animal</Fab>
 
       {filtersOpen ? (
         <Modal
@@ -861,7 +850,7 @@ export function HerdScreen({
         <Modal
           key={editing?.id ?? "new"}
           placement="side"
-          title={editing === undefined ? "Add an animal" : `Editing ${animalTitle(editing)}`}
+          title={editing === undefined ? "Add animal" : `Edit ${animalTitle(editing)}`}
           description="Tag or name is enough to start. Everything else can be filled in later."
           onClose={() => setDraft(undefined)}
           footer={
