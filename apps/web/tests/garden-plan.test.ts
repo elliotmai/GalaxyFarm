@@ -17,6 +17,8 @@ import {
   gardenOrigin,
   plantingChips,
   type BedGeometry,
+  bedReport,
+  fillLabel,
 } from "@/lib/garden-plan";
 
 /**
@@ -321,5 +323,71 @@ describe("plantings as chips", () => {
     expect(chip?.accentLabel).toBeUndefined();
     expect(familyAccent(undefined)).toBeUndefined();
     expect(familyAccent("  ")).toBeUndefined();
+  });
+});
+
+describe("bedReport", () => {
+  const BASIL_CROP = { ...base, id: id(82), name: "Basil" } as Crop;
+  const GENOVESE = { ...base, id: id(92), cropId: BASIL_CROP.id, name: "Genovese" } as Variety;
+  const crops = [...CROPS, BASIL_CROP];
+  const varieties = [...VARIETIES, GENOVESE];
+  const raised = bed({ id: id(1), name: "Bed 1", lengthFt: 8, widthFt: 4 });
+
+  it("says how full a bed is from its plantings' counts and spacing", () => {
+    // Four tomatoes at 24" fill half of an 8 × 4 (which fits eight).
+    const report = bedReport(
+      raised,
+      [planting({ id: id(10), bedId: raised.id, varietyId: CHEROKEE.id, quantity: 4 })],
+      varieties,
+      crops,
+    );
+    expect(report.fill).toBeCloseTo(0.5, 6);
+    expect(fillLabel(report.fill)).toBe("about 50% full");
+  });
+
+  it("names the bad neighbours already sharing it", () => {
+    const report = bedReport(
+      raised,
+      [
+        planting({ id: id(10), bedId: raised.id, varietyId: CHEROKEE.id }),
+        planting({ id: id(11), bedId: raised.id, varietyId: RED_RUSSIAN.id }),
+      ],
+      varieties,
+      crops,
+    );
+    expect(report.clashes).toEqual([expect.objectContaining({ a: "Tomato", b: "Kale" })]);
+  });
+
+  it("says whether a candidate gets on with what is there, and how many more fit", () => {
+    const report = bedReport(
+      raised,
+      [planting({ id: id(10), bedId: raised.id, varietyId: CHEROKEE.id, quantity: 4 })],
+      varieties,
+      crops,
+      GENOVESE.id,
+    );
+    expect(report.friends).toEqual(["Tomato"]);
+    expect(report.foes).toEqual([]);
+    // Basil at 12" fits 32 in the whole bed; half is taken.
+    expect(report.roomFor).toBe(16);
+  });
+
+  it("leaves out what has finished, failed or is only planned", () => {
+    const report = bedReport(
+      raised,
+      [
+        planting({
+          id: id(10),
+          bedId: raised.id,
+          varietyId: CHEROKEE.id,
+          quantity: 8,
+          status: "finished",
+        }),
+      ],
+      varieties,
+      crops,
+    );
+    expect(report.fill).toBeUndefined();
+    expect(fillLabel(1.3)).toBe("overcrowded");
   });
 });

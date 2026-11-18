@@ -21,7 +21,9 @@ import {
   type Bed,
   type BedType,
   type GardenCareLog,
+  type Crop,
   type Planting,
+  type Variety,
 } from "@galaxy-farm/module-garden";
 
 import {
@@ -38,6 +40,7 @@ import {
   StatusLine,
 } from "@/app/(admin)/admin/pastures/_components/land-kit";
 import { byId } from "@/lib/garden";
+import { bedReport, fillLabel } from "@/lib/garden-plan";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -79,6 +82,8 @@ export function BedsPanel({
   beds,
   zones,
   plantings,
+  varieties = [],
+  crops = [],
   care,
   loading,
   propertyId,
@@ -89,6 +94,9 @@ export function BedsPanel({
   readonly beds: readonly Bed[];
   readonly zones: readonly Zone[];
   readonly plantings: readonly Planting[];
+  /** For how full each bed is and who is sharing it. */
+  readonly varieties?: readonly Variety[];
+  readonly crops?: readonly Crop[];
   readonly care: readonly GardenCareLog[];
   readonly loading: boolean;
   readonly propertyId: Ulid;
@@ -283,11 +291,14 @@ export function BedsPanel({
   function lineFor(bed: Bed): string {
     const area = bedAreaSqFt(bed);
     const inIt = growingIn.get(bed.id) ?? 0;
+    const report = bedReport(bed, plantings, varieties, crops);
     return [
       BED_TYPE_LABEL[bed.type],
       zoneName(bed.zoneId),
       area === undefined ? "no dimensions" : `${bed.lengthFt}′ × ${bed.widthFt}′ · ${area} sq ft`,
       inIt === 0 ? "empty" : `${inIt} growing`,
+      inIt === 0 ? undefined : fillLabel(report.fill),
+      ...report.clashes.map((clash) => `${clash.a} and ${clash.b} are bad neighbours`),
     ]
       .filter((part) => part !== undefined)
       .join(" · ");
@@ -330,7 +341,13 @@ export function BedsPanel({
                   title={bed.name}
                   openLabel={`Edit ${bed.name}`}
                   line={lineFor(bed)}
-                  chip={bed.active ? undefined : { tone: "neutral", label: "Switched off" }}
+                  chip={
+                    !bed.active
+                      ? { tone: "neutral", label: "Switched off" }
+                      : bedReport(bed, plantings, varieties, crops).clashes.length > 0
+                        ? { tone: "danger", label: "Bad neighbours" }
+                        : undefined
+                  }
                   quiet={!bed.active}
                   onOpen={() => startEdit(bed)}
                   action={

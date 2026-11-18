@@ -8,6 +8,10 @@ import {
   type SpatialShape,
 } from "@galaxy-farm/ui";
 import {
+  bedFill,
+  clashesAmong,
+  companionship,
+  plantsThatFit,
   rotationWarning,
   type Bed,
   type Crop,
@@ -17,7 +21,7 @@ import {
   type Variety,
 } from "@galaxy-farm/module-garden";
 
-import { byId, familyHistory, familyOf, varietyLabel } from "@/lib/garden";
+import { byId, familyHistory, familyOf, varietyFacts, varietyLabel } from "@/lib/garden";
 
 /**
  * The garden, flattened into the shapes the spatial editor draws (spec §2).
@@ -343,4 +347,73 @@ export function bedRotationWarning(
 ): RotationWarning | undefined {
   if (family === undefined) return undefined;
   return rotationWarning(bedId, family, familyHistory(plantings, varieties, crops, ignoreId), at);
+}
+
+/**
+ * What a bed holds and how it is getting on (spec §5.5): how full it is, the
+ * bad neighbours already in it, and — for a variety somebody is about to
+ * plant — whether it would get on with them and how many would fit.
+ *
+ * One answer for the beds list, the layout's bed rows and the planting form,
+ * so "room for about 6" means the same thing on all three.
+ */
+export interface BedReport {
+  /** 0–1 and beyond; undefined without the bed's size or any counted planting. */
+  readonly fill?: number | undefined;
+  /** Bad pairs already sharing the bed. */
+  readonly clashes: readonly { readonly a: string; readonly b: string; readonly why: string }[];
+  /** For the candidate: its friends and foes among what is there. */
+  readonly friends: readonly string[];
+  readonly foes: readonly string[];
+  /** For the candidate: how many fit in the space left. */
+  readonly roomFor?: number | undefined;
+}
+
+export function bedReport(
+  bed: Bed,
+  plantings: readonly Planting[],
+  varieties: readonly Variety[],
+  crops: readonly Crop[],
+  candidateVarietyId?: Ulid,
+): BedReport {
+  const here = plantings.filter(
+    (planting) =>
+      planting.bedId === bed.id &&
+      planting.status !== "finished" &&
+      planting.status !== "failed" &&
+      planting.status !== "planned",
+  );
+  const cropName = (varietyId: Ulid) => {
+    const variety = varieties.find((held) => held.id === varietyId);
+    return variety === undefined ? undefined : crops.find((held) => held.id === variety.cropId)?.name;
+  };
+  const names = here.map((planting) => cropName(planting.varietyId)).filter((name): name is string => name !== undefined);
+  const fill = bedFill(
+    bed,
+    here.map((planting) => ({
+      quantity: planting.quantity,
+      spacingInches: varietyFacts(planting.varietyId, varieties, crops)?.spacingInches,
+    })),
+  );
+
+  if (candidateVarietyId === undefined) return { fill, clashes: clashesAmong(names), friends: [], foes: [] };
+
+  const mine = cropName(candidateVarietyId);
+  const pairings = mine === undefined ? [] : names.map((name) => companionship(mine, name));
+  const fits = plantsThatFit(bed, varietyFacts(candidateVarietyId, varieties, crops)?.spacingInches);
+  return {
+    fill,
+    clashes: clashesAmong(names),
+    friends: [...new Set(pairings.filter((p) => p?.kind === "good").map((p) => p!.with))],
+    foes: [...new Set(pairings.filter((p) => p?.kind === "bad").map((p) => p!.with))],
+    roomFor: fits === undefined ? undefined : Math.max(0, Math.floor(fits * (1 - Math.min(1, fill ?? 0)))),
+  };
+}
+
+/** "About 60% full", "Full", "Overcrowded" — said only when it is known. */
+export function fillLabel(fill: number | undefined): string | undefined {
+  if (fill === undefined) return undefined;
+  if (fill > 1.1) return "overcrowded";
+  if (fill >= 0.95) return "full";
+  return `about ${Math.round(fill * 10) * 10}% full`;
 }

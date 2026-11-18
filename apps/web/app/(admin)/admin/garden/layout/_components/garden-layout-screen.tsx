@@ -38,7 +38,9 @@ import { familyOf, varietyLabel } from "@/lib/garden";
 import {
   ROTATION_CLEAR,
   bedGeometry,
+  bedReport,
   bedRotationWarning,
+  fillLabel,
   bedShapes,
   gardenGrid,
   gardenOrigin,
@@ -425,9 +427,39 @@ export function GardenLayoutScreen({
                       </span>
                     </>
                   ) : null}
+                  {(() => {
+                    // How full, who is sharing it, and — with a variety in the
+                    // Plant picker — whether it would get on here and fit.
+                    const report = bedReport(
+                      bed,
+                      plantings,
+                      varieties,
+                      crops,
+                      varietyId === "" ? undefined : (varietyId as Ulid),
+                    );
+                    const parts = [
+                      fillLabel(report.fill),
+                      ...report.clashes.map((clash) => `${clash.a} and ${clash.b} clash`),
+                      report.friends.length === 0
+                        ? undefined
+                        : `good beside ${report.friends.join(", ").toLowerCase()}`,
+                      report.foes.length === 0
+                        ? undefined
+                        : `bad beside ${report.foes.join(", ").toLowerCase()}`,
+                      report.roomFor === undefined ? undefined : `room for about ${report.roomFor}`,
+                    ].filter((part): part is string => part !== undefined);
+                    return parts.length === 0 ? null : <>{` · ${parts.join(" · ")}`}</>;
+                  })()}
                 </>
               }
-              chip={isDrawn(bed) ? undefined : { tone: "neutral", label: "Not drawn" }}
+              chip={
+                !isDrawn(bed)
+                  ? { tone: "neutral", label: "Not drawn" }
+                  : varietyId !== "" &&
+                      bedReport(bed, plantings, varieties, crops, varietyId as Ulid).foes.length > 0
+                    ? { tone: "danger", label: "Bad neighbours" }
+                    : undefined
+              }
               quiet={!bed.active}
               // Nothing to draw against until the garden has a corner.
               action={origin === undefined ? undefined : drawAction(bed)}

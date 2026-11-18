@@ -180,6 +180,8 @@ export function PlantingsScreen({
               beds={beds}
               zones={zones}
               plantings={plantings}
+              varieties={varieties}
+              crops={crops}
               care={care}
               loading={bedsLoading}
               propertyId={propertyId}
