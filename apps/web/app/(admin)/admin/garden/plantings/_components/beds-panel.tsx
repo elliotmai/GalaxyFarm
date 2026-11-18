@@ -151,6 +151,7 @@ export function BedsPanel({
   const growingIn = new Map<Ulid, number>();
   for (const planting of plantings) {
     if (planting.status !== "growing" && planting.status !== "harvesting") continue;
+    if (planting.bedId === undefined) continue;
     growingIn.set(planting.bedId, (growingIn.get(planting.bedId) ?? 0) + 1);
   }
 

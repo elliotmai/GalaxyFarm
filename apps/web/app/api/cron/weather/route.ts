@@ -150,7 +150,9 @@ async function runGardenWatch(
 
   const alerts: GardenAlert[] = [
     ...plantingWindowAlerts(planned, varieties, crops, now),
-    ...(forecast === undefined ? [] : frostAlerts(forecast.daily, property.growingZone, settings)),
+    ...(forecast === undefined
+      ? []
+      : frostAlerts(forecast.daily, property.growingZone, settings, property)),
   ];
 
   if (alerts.length === 0) return { written: 0, notified: 0 };

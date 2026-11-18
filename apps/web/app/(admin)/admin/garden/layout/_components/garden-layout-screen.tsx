@@ -184,7 +184,7 @@ export function GardenLayoutScreen({
   const chips = useMemo(() => {
     const here = new Set(inZone.map((bed) => bed.id));
     return plantingChips(
-      plantings.filter((planting) => here.has(planting.bedId)),
+      plantings.filter((planting) => planting.bedId !== undefined && here.has(planting.bedId)),
       varieties,
       crops,
     );

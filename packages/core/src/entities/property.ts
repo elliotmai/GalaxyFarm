@@ -23,6 +23,14 @@ export interface Property extends BaseRecord {
   readonly timezone: string;
   /** USDA hardiness zone. Auto-suggested from ZIP, always editable (§5.1). */
   readonly growingZone?: string | undefined;
+  /**
+   * The farm's own average last spring and first fall frost, "MM-DD".
+   *
+   * The zone gives a regional average; a farm that has kept a thermometer
+   * knows its own, and every planting date in the garden follows from these.
+   */
+  readonly lastFrost?: string | undefined;
+  readonly firstFrost?: string | undefined;
   readonly latitude?: number | undefined;
   readonly longitude?: number | undefined;
   /** R2 key for the cached NAIP aerial used offline and on kiosks (§8). */
@@ -62,6 +70,14 @@ export const propertySchema = baseRecordSchema.extend({
   growingZone: z
     .string()
     .regex(/^\d{1,2}[ab]?$/i, "Growing zone looks like 8b")
+    .optional(),
+  lastFrost: z
+    .string()
+    .regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, "A date like 03-25")
+    .optional(),
+  firstFrost: z
+    .string()
+    .regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, "A date like 11-10")
     .optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),

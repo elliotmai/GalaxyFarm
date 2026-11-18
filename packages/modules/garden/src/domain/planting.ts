@@ -21,9 +21,18 @@ import type { Variety } from "./beds.js";
 export const PLANTING_METHODS = ["direct_sow", "transplant", "indoor_start"] as const;
 export type PlantingMethod = (typeof PLANTING_METHODS)[number];
 
+/**
+ * Where a planting is in its life.
+ *
+ * `started` is seed sown indoors; `hardening` is a seedling going out for a
+ * few hours a day to toughen up before it is planted, which is the step that
+ * gets forgotten and kills a tray of peppers in one windy afternoon. Both are
+ * before the ground, so neither needs a bed yet.
+ */
 export const PLANTING_STATUSES = [
   "planned",
   "started",
+  "hardening",
   "growing",
   "harvesting",
   "finished",
@@ -31,11 +40,25 @@ export const PLANTING_STATUSES = [
 ] as const;
 export type PlantingStatus = (typeof PLANTING_STATUSES)[number];
 
+/** Statuses before anything is in the ground — no bed needed yet. */
+export const NOT_IN_GROUND: ReadonlySet<PlantingStatus> = new Set([
+  "planned",
+  "started",
+  "hardening",
+]);
+
 export interface Planting extends BaseRecord {
-  readonly bedId: Ulid;
+  /**
+   * The bed it grows in. Optional until it goes in the ground: a tray of
+   * tomato seedlings on the windowsill has no bed, and asking for one made
+   * people pick any bed and then move it, which wrote a false rotation history.
+   */
+  readonly bedId?: Ulid | undefined;
   readonly varietyId: Ulid;
   readonly method: PlantingMethod;
   readonly indoorStartedOn?: Date | undefined;
+  /** When it started going out to harden off. */
+  readonly hardenedOffOn?: Date | undefined;
   readonly plantedOn?: Date | undefined;
   readonly status: PlantingStatus;
   readonly quantity?: number | undefined;
@@ -44,10 +67,11 @@ export interface Planting extends BaseRecord {
 
 export const plantingSchema = baseRecordSchema
   .extend({
-    bedId: ulidSchema,
+    bedId: ulidSchema.optional(),
     varietyId: ulidSchema,
     method: z.enum(PLANTING_METHODS),
     indoorStartedOn: z.coerce.date().optional(),
+    hardenedOffOn: z.coerce.date().optional(),
     plantedOn: z.coerce.date().optional(),
     status: z.enum(PLANTING_STATUSES),
     quantity: z.number().positive().optional(),
@@ -59,7 +83,11 @@ export const plantingSchema = baseRecordSchema
       planting.plantedOn === undefined ||
       planting.plantedOn >= planting.indoorStartedOn,
     { message: "Transplanted before it was started", path: ["plantedOn"] },
-  ) as unknown as z.ZodType<Planting>;
+  )
+  .refine((planting) => NOT_IN_GROUND.has(planting.status) || planting.bedId !== undefined, {
+    message: "Choose the bed it is growing in",
+    path: ["bedId"],
+  }) as unknown as z.ZodType<Planting>;
 
 export const GARDEN_CARE_ACTIONS = [
   "fertilize",
@@ -110,7 +138,21 @@ export const harvestLogSchema = baseRecordSchema.extend({
   notes: z.string().max(1000).optional(),
 }) as unknown as z.ZodType<HarvestLog>;
 
-export const PRESERVATION_METHODS = ["canned", "frozen", "dried", "fermented"] as const;
+/**
+ * How a harvest is put by. Pickled is not canned (a fridge pickle never sees a
+ * canner), a root cellar is not freezing, and freeze-drying keeps for years
+ * where drying keeps for months — each answers "how long will this last"
+ * differently.
+ */
+export const PRESERVATION_METHODS = [
+  "canned",
+  "pickled",
+  "frozen",
+  "dried",
+  "freeze_dried",
+  "fermented",
+  "cellared",
+] as const;
 export type PreservationMethod = (typeof PRESERVATION_METHODS)[number];
 
 export interface PreservationLog extends BaseRecord {
@@ -150,12 +192,16 @@ export const preservationLogSchema = baseRecordSchema.extend({
 export function expectedHarvestDate(
   planting: Pick<Planting, "plantedOn" | "method" | "indoorStartedOn">,
   variety: Pick<Variety, "daysToMaturity">,
+  crop?: { readonly daysToMaturity?: number | undefined },
 ): Date | undefined {
-  if (variety.daysToMaturity === undefined) return undefined;
+  // The variety's packet first, then the crop's typical figure — a variety
+  // saved without days still has a tomato's seventy-five.
+  const days = variety.daysToMaturity ?? crop?.daysToMaturity;
+  if (days === undefined) return undefined;
   const from =
     planting.plantedOn ?? (planting.method === "direct_sow" ? planting.indoorStartedOn : undefined);
   if (from === undefined) return undefined;
-  return addDays(from, variety.daysToMaturity);
+  return addDays(from, days);
 }
 
 export const DEFAULT_ROTATION_YEARS = 3;

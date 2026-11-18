@@ -40,13 +40,26 @@ describe("the growing table", () => {
     expect(growingLine({})).toBeUndefined();
   });
 
-  it("reads a crop's own facts, else the table's for its name", () => {
+  it("reads a crop's own facts first, and fills the rest from the table", () => {
     expect(cropGrowing({ name: "Tomato" })).toMatchObject({ daysToMaturity: 75 });
-    expect(cropGrowing({ name: "Tomato", daysToMaturity: 90 })).toEqual({
-      name: "Tomato",
+    // Its own 90 days win; the table still says when to start it inside.
+    expect(cropGrowing({ name: "Tomato", daysToMaturity: 90 })).toMatchObject({
       daysToMaturity: 90,
+      spacingInches: 24,
+      startIndoorsWeeks: 7,
+      frostTolerance: "tender",
     });
+    expect(cropGrowing({ name: "Moonflower", daysToMaturity: 60 })).toEqual({ daysToMaturity: 60 });
     expect(cropGrowing({ name: "Moonflower" })).toBeUndefined();
+  });
+
+  it("knows when every crop it lists goes in", () => {
+    expect(GROWING.get("Pepper")).toMatchObject({ startIndoorsWeeks: 9, plantOutWeeks: 2 });
+    expect(GROWING.get("Pea")).toMatchObject({ frostTolerance: "hardy", plantOutWeeks: -6 });
+    expect(GROWING.get("Garlic")).toMatchObject({ fallPlantWeeks: 4 });
+    for (const [name, facts] of GROWING) {
+      expect(facts.frostTolerance, name).toBeDefined();
+    }
   });
 
   it("knows an empty answer from a partial one", () => {

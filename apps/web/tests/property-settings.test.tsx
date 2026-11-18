@@ -184,12 +184,37 @@ describe("the place", () => {
     const field = screen.getByLabelText(/^Zone/);
     await user.clear(field);
     await user.type(field, "7B");
-    await user.click(screen.getByRole("button", { name: "Save zone" }));
+    await user.click(screen.getByRole("button", { name: "Save growing season" }));
 
     await waitFor(() => expect(written.updated).toHaveLength(1));
     // Lower-cased on the way in, so "7B" and "7b" are not two zones the frost
     // table would answer for differently.
     expect(written.updated[0]?.patch["growingZone"]).toBe("7b");
+  });
+
+  it("saves the farm's own frost dates, which win over the zone's", async () => {
+    const user = userEvent.setup();
+    view();
+
+    const last = screen.getByLabelText(/^Our last spring frost/) as HTMLInputElement;
+    await user.clear(last);
+    await user.type(last, `${new Date().getUTCFullYear()}-04-02`);
+    await user.click(screen.getByRole("button", { name: "Save growing season" }));
+
+    await waitFor(() => expect(written.updated).toHaveLength(1));
+    // Stored without a year: a frost date is the same day every spring.
+    expect(written.updated[0]?.patch["lastFrost"]).toBe("04-02");
+  });
+
+  it("shows the season from the farm's own dates when it has them", () => {
+    stored.current = {
+      properties: [property({ growingZone: "8b", lastFrost: "04-01", firstFrost: "11-01" })],
+      zones: [],
+    };
+    view();
+
+    expect(screen.getByText(/214 days/)).toBeInTheDocument();
+    expect(screen.getByText("Frost dates used")).toBeInTheDocument();
   });
 
   it("shows the season the zone implies, so a typo in it is visible", () => {
@@ -210,7 +235,7 @@ describe("the place", () => {
     view();
 
     await user.clear(screen.getByLabelText(/^Zone/));
-    await user.click(screen.getByRole("button", { name: "Save zone" }));
+    await user.click(screen.getByRole("button", { name: "Save growing season" }));
 
     await waitFor(() => expect(written.updated).toHaveLength(1));
     expect(written.updated[0]?.patch["growingZone"]).toBeUndefined();

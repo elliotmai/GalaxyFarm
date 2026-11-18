@@ -7,6 +7,7 @@ import {
   type GrowingFacts,
   type Lifecycle,
   type Season,
+  type FrostTolerance,
   type SowingMethod,
   type SunNeed,
   type PreservationLog,
@@ -107,7 +108,8 @@ export function familyHistory(
 
   for (const planting of plantings) {
     if (planting.id === ignoreId) continue;
-    if (planting.plantedOn === undefined) continue;
+    // Only what went in the ground counts toward a bed's rotation history.
+    if (planting.plantedOn === undefined || planting.bedId === undefined) continue;
 
     const family = familyOf(planting.varietyId, varieties, crops);
     if (family === undefined) continue;
@@ -231,6 +233,13 @@ export interface GrowingDraft {
   readonly sun: SunNeed | "";
   readonly sowing: SowingMethod | "";
   readonly depthInches: string;
+  readonly frostTolerance: FrostTolerance | "";
+  readonly germinationDays: string;
+  readonly startIndoorsWeeks: string;
+  readonly plantOutWeeks: string;
+  readonly fallPlantWeeks: string;
+  readonly harvestWeeks: string;
+  readonly successionDays: string;
 }
 
 export const BLANK_GROWING: GrowingDraft = {
@@ -241,6 +250,13 @@ export const BLANK_GROWING: GrowingDraft = {
   sun: "",
   sowing: "",
   depthInches: "",
+  frostTolerance: "",
+  germinationDays: "",
+  startIndoorsWeeks: "",
+  plantOutWeeks: "",
+  fallPlantWeeks: "",
+  harvestWeeks: "",
+  successionDays: "",
 };
 
 /** A crop's (or a pick's) facts, ready for the form. */
@@ -254,6 +270,13 @@ export function growingDraft(facts: GrowingFacts | undefined): GrowingDraft {
     sun: facts?.sun ?? "",
     sowing: facts?.sowing ?? "",
     depthInches: number(facts?.depthInches),
+    frostTolerance: facts?.frostTolerance ?? "",
+    germinationDays: number(facts?.germinationDays),
+    startIndoorsWeeks: number(facts?.startIndoorsWeeks),
+    plantOutWeeks: number(facts?.plantOutWeeks),
+    fallPlantWeeks: number(facts?.fallPlantWeeks),
+    harvestWeeks: number(facts?.harvestWeeks),
+    successionDays: number(facts?.successionDays),
   };
 }
 
@@ -271,6 +294,13 @@ export function growingFields(draft: GrowingDraft): GrowingFacts {
     sun: draft.sun === "" ? undefined : draft.sun,
     sowing: draft.sowing === "" ? undefined : draft.sowing,
     depthInches: number(draft.depthInches),
+    frostTolerance: draft.frostTolerance === "" ? undefined : draft.frostTolerance,
+    germinationDays: number(draft.germinationDays),
+    startIndoorsWeeks: number(draft.startIndoorsWeeks),
+    plantOutWeeks: number(draft.plantOutWeeks),
+    fallPlantWeeks: number(draft.fallPlantWeeks),
+    harvestWeeks: number(draft.harvestWeeks),
+    successionDays: number(draft.successionDays),
   };
 }
 

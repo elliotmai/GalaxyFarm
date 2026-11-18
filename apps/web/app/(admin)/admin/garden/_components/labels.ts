@@ -49,6 +49,7 @@ export const METHOD_OPTIONS = PLANTING_METHODS.map((method) => ({
 export const STATUS_LABEL: Readonly<Record<PlantingStatus, string>> = {
   planned: "Planned",
   started: "Started indoors",
+  hardening: "Hardening off",
   growing: "Growing",
   harvesting: "Harvesting",
   finished: "Finished",
@@ -75,9 +76,12 @@ export const CARE_ACTION_OPTIONS = GARDEN_CARE_ACTIONS.map((action) => ({
 
 export const PRESERVATION_LABEL: Readonly<Record<PreservationMethod, string>> = {
   canned: "Canned",
+  pickled: "Pickled",
   frozen: "Frozen",
   dried: "Dried",
+  freeze_dried: "Freeze-dried",
   fermented: "Fermented",
+  cellared: "Root cellar",
 };
 
 export const PRESERVATION_OPTIONS = PRESERVATION_METHODS.map((method) => ({

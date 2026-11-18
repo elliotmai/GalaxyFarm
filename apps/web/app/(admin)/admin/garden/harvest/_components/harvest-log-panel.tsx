@@ -112,7 +112,7 @@ export function HarvestLogPanel({
     const planting = byId(plantings).get(id);
     if (planting === undefined) return "A planting that has been deleted";
     const variety = byId(varieties).get(planting.varietyId);
-    const bed = byId(beds).get(planting.bedId)?.name;
+    const bed = planting.bedId === undefined ? undefined : byId(beds).get(planting.bedId)?.name;
     return `${varietyLabel(variety, crops)}${bed === undefined ? "" : ` · ${bed}`}`;
   };
 

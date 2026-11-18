@@ -154,10 +154,12 @@ export function frostAlerts(
   daily: readonly DailyWeather[],
   growingZone: string | undefined,
   settings: Pick<WatchSettings, "frostF" | "hardFreezeF">,
+  /** The farm's own frost dates, which win over the zone's averages. */
+  own: { readonly lastFrost?: string | undefined; readonly firstFrost?: string | undefined } = {},
 ): GardenAlert[] {
   return frostRisk(daily, { frostF: settings.frostF, hardFreezeF: settings.hardFreezeF })
     .filter((risk) =>
-      isInGrowingSeason(frostDatesFor(growingZone, risk.date.getUTCFullYear()), risk.date),
+      isInGrowingSeason(frostDatesFor(growingZone, risk.date.getUTCFullYear(), own), risk.date),
     )
     .map((risk) => ({
       trigger: "frost_warning" as const,

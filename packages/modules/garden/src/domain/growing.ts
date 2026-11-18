@@ -36,6 +36,25 @@ export type SunNeed = (typeof SUN_NEEDS)[number];
 export const SOWING_METHODS = ["direct", "transplant", "either"] as const;
 export type SowingMethod = (typeof SOWING_METHODS)[number];
 
+/**
+ * How much cold a plant takes — the question every planting date hangs on.
+ *
+ * `tender` dies at a frost and goes out after the last one (tomatoes, beans,
+ * squash). `half_hardy` shrugs off a light frost and goes out a couple of
+ * weeks before it (lettuce, carrots, beets). `hardy` takes a hard frost and
+ * goes out a month or more early (peas, spinach, kale, onions). "Season" was
+ * standing in for this and got it wrong both ways: a lettuce is cool-season
+ * and still cannot take what a kale can.
+ */
+export const FROST_TOLERANCES = ["tender", "half_hardy", "hardy"] as const;
+export type FrostTolerance = (typeof FROST_TOLERANCES)[number];
+
+export const FROST_TOLERANCE_LABELS: Readonly<Record<FrostTolerance, string>> = {
+  tender: "Tender — killed by frost",
+  half_hardy: "Half-hardy — takes a light frost",
+  hardy: "Hardy — takes a hard frost",
+};
+
 export const SEASON_LABELS: Readonly<Record<Season, string>> = {
   cool: "Cool season",
   warm: "Warm season",
@@ -71,6 +90,137 @@ export interface GrowingFacts {
   readonly sowing?: SowingMethod | undefined;
   /** How deep the seed (or set, clove, crown) goes. */
   readonly depthInches?: number | undefined;
+  readonly frostTolerance?: FrostTolerance | undefined;
+  /** Days from sowing to seedlings showing — when to stop worrying. */
+  readonly germinationDays?: number | undefined;
+  /** Weeks before the last spring frost to sow indoors, for a transplant. */
+  readonly startIndoorsWeeks?: number | undefined;
+  /**
+   * When it goes in outside, in weeks from the last spring frost: −4 is a
+   * month before (peas), +2 a fortnight after (tomatoes). Transplanted or
+   * sown, whichever this crop is.
+   */
+  readonly plantOutWeeks?: number | undefined;
+  /**
+   * Weeks before the first fall frost to plant, for a crop that goes in in
+   * the fall to overwinter — garlic. Spring crops leave it out.
+   */
+  readonly fallPlantWeeks?: number | undefined;
+  /** How long there is something to pick once it starts, in weeks. */
+  readonly harvestWeeks?: number | undefined;
+  /** Days between sowings for a steady supply — lettuce, radishes, beans. */
+  readonly successionDays?: number | undefined;
+}
+
+/**
+ * [frost tolerance, germination days, weeks indoors, plant out (weeks from
+ * last frost), harvest weeks, succession days, fall plant weeks]
+ *
+ * Typical figures from US extension planting guides, rounded to what a
+ * gardener plans by. A variety's packet will differ; every one is editable.
+ */
+type TimingRow = readonly [
+  FrostTolerance,
+  number | undefined,
+  number | undefined,
+  number | undefined,
+  number | undefined,
+  number | undefined,
+  number | undefined,
+];
+
+const TIMING: Readonly<Record<string, TimingRow>> = {
+  Tomato: ["tender", 7, 7, 2, 8, undefined, undefined],
+  Pepper: ["tender", 10, 9, 2, 10, undefined, undefined],
+  Potato: ["half_hardy", 14, undefined, -2, 3, undefined, undefined],
+  Eggplant: ["tender", 10, 9, 2, 8, undefined, undefined],
+  Tomatillo: ["tender", 8, 7, 2, 8, undefined, undefined],
+  Cabbage: ["hardy", 6, 6, -4, 3, undefined, undefined],
+  Kale: ["hardy", 6, 6, -4, 10, 21, undefined],
+  Broccoli: ["hardy", 6, 6, -2, 4, undefined, undefined],
+  Cauliflower: ["half_hardy", 6, 6, -2, 2, undefined, undefined],
+  "Brussels sprouts": ["hardy", 6, 6, -2, 6, undefined, undefined],
+  Kohlrabi: ["hardy", 5, undefined, -4, 3, 14, undefined],
+  Turnip: ["hardy", 5, undefined, -3, 4, 14, undefined],
+  Mustard: ["hardy", 5, undefined, -4, 4, 14, undefined],
+  Radish: ["hardy", 4, undefined, -4, 2, 10, undefined],
+  Arugula: ["hardy", 5, undefined, -4, 3, 14, undefined],
+  Rutabaga: ["hardy", 6, undefined, -2, 4, undefined, undefined],
+  Cucumber: ["tender", 7, 3, 2, 6, 21, undefined],
+  Squash: ["tender", 7, 3, 2, 8, undefined, undefined],
+  Melon: ["tender", 7, 4, 2, 4, undefined, undefined],
+  Watermelon: ["tender", 8, 4, 2, 4, undefined, undefined],
+  Gourd: ["tender", 8, undefined, 2, 4, undefined, undefined],
+  Bean: ["tender", 8, undefined, 1, 4, 14, undefined],
+  Pea: ["hardy", 10, undefined, -6, 4, undefined, undefined],
+  "Southern pea": ["tender", 8, undefined, 3, 6, undefined, undefined],
+  "Lima bean": ["tender", 10, undefined, 2, 6, undefined, undefined],
+  "Fava bean": ["hardy", 10, undefined, -6, 4, undefined, undefined],
+  Peanut: ["tender", 10, undefined, 3, 2, undefined, undefined],
+  Soybean: ["tender", 7, undefined, 2, 3, undefined, undefined],
+  Onion: ["hardy", 10, 10, -4, 4, undefined, undefined],
+  Garlic: ["hardy", 14, undefined, undefined, 3, undefined, 4],
+  Leek: ["hardy", 10, 10, -4, 8, undefined, undefined],
+  Chives: ["hardy", 10, 8, -4, 12, undefined, undefined],
+  Carrot: ["half_hardy", 14, undefined, -3, 4, 21, undefined],
+  Parsnip: ["hardy", 18, undefined, -3, 6, undefined, undefined],
+  Celery: ["half_hardy", 14, 10, 1, 6, undefined, undefined],
+  Parsley: ["hardy", 21, 8, -3, 12, undefined, undefined],
+  Dill: ["half_hardy", 14, undefined, 0, 4, 21, undefined],
+  Cilantro: ["hardy", 10, undefined, -2, 3, 21, undefined],
+  Fennel: ["half_hardy", 10, undefined, 0, 4, undefined, undefined],
+  Lettuce: ["half_hardy", 7, 5, -3, 4, 14, undefined],
+  Sunflower: ["tender", 10, undefined, 1, 3, 14, undefined],
+  Artichoke: ["half_hardy", 14, 10, 1, 8, undefined, undefined],
+  Endive: ["half_hardy", 7, 6, -2, 4, undefined, undefined],
+  Zinnia: ["tender", 7, undefined, 1, 12, undefined, undefined],
+  Marigold: ["tender", 7, 6, 1, 12, undefined, undefined],
+  Beet: ["half_hardy", 7, undefined, -3, 4, 21, undefined],
+  "Swiss chard": ["half_hardy", 7, undefined, -2, 12, undefined, undefined],
+  Spinach: ["hardy", 10, undefined, -6, 3, 14, undefined],
+  Amaranth: ["tender", 10, undefined, 2, 6, undefined, undefined],
+  Quinoa: ["half_hardy", 7, undefined, -2, 2, undefined, undefined],
+  Corn: ["tender", 7, undefined, 2, 2, 14, undefined],
+  Sorghum: ["tender", 10, undefined, 3, 2, undefined, undefined],
+  Wheat: ["hardy", 7, undefined, -6, 2, undefined, 6],
+  Okra: ["tender", 10, undefined, 3, 10, undefined, undefined],
+  Cotton: ["tender", 10, undefined, 3, 4, undefined, undefined],
+  Basil: ["tender", 7, 6, 2, 10, 21, undefined],
+  Mint: ["hardy", 14, 8, -2, 16, undefined, undefined],
+  Oregano: ["hardy", 10, 8, 0, 16, undefined, undefined],
+  Thyme: ["hardy", 14, 8, 0, 16, undefined, undefined],
+  Rosemary: ["half_hardy", 21, 10, 1, 20, undefined, undefined],
+  Sage: ["hardy", 14, 8, 0, 16, undefined, undefined],
+  "Sweet potato": ["tender", undefined, 6, 3, 4, undefined, undefined],
+  Strawberry: ["hardy", undefined, undefined, -4, 4, undefined, undefined],
+  Blackberry: ["hardy", undefined, undefined, -4, 4, undefined, undefined],
+  Blueberry: ["hardy", undefined, undefined, -4, 6, undefined, undefined],
+  Asparagus: ["hardy", undefined, undefined, -4, 8, undefined, undefined],
+  Rhubarb: ["hardy", undefined, undefined, -4, 8, undefined, undefined],
+};
+
+function timingFrom(row: TimingRow | undefined): GrowingFacts {
+  if (row === undefined) return {};
+  const [
+    frostTolerance,
+    germinationDays,
+    startIndoorsWeeks,
+    plantOutWeeks,
+    harvestWeeks,
+    successionDays,
+    fallPlantWeeks,
+  ] = row;
+  const defined = <K extends keyof GrowingFacts>(key: K, value: GrowingFacts[K]) =>
+    value === undefined ? {} : { [key]: value };
+  return {
+    frostTolerance,
+    ...defined("germinationDays", germinationDays),
+    ...defined("startIndoorsWeeks", startIndoorsWeeks),
+    ...defined("plantOutWeeks", plantOutWeeks),
+    ...defined("harvestWeeks", harvestWeeks),
+    ...defined("successionDays", successionDays),
+    ...defined("fallPlantWeeks", fallPlantWeeks),
+  };
 }
 
 /** [days, spacing", season, lifecycle, sun, sowing, depth"] — read once into `GROWING`. */
@@ -184,7 +334,10 @@ function factsFrom(row: Row): GrowingFacts {
 
 /** Every row, by the family table's crop name. Exported for the test. */
 export const GROWING: ReadonlyMap<string, GrowingFacts> = new Map(
-  Object.entries(ROWS).map(([name, row]) => [name, factsFrom(row)]),
+  Object.entries(ROWS).map(([name, row]) => [
+    name,
+    { ...factsFrom(row), ...timingFrom(TIMING[name]) },
+  ]),
 );
 
 /**
@@ -204,7 +357,16 @@ const GROWING_KEYS = [
   "sun",
   "sowing",
   "depthInches",
+  "frostTolerance",
+  "germinationDays",
+  "startIndoorsWeeks",
+  "plantOutWeeks",
+  "fallPlantWeeks",
+  "harvestWeeks",
+  "successionDays",
 ] as const satisfies ReadonlyArray<keyof GrowingFacts>;
+
+export { GROWING_KEYS };
 
 /**
  * True when there is nothing in it worth filling a form with. Reads only the
@@ -223,7 +385,15 @@ export function cropGrowing(
   crop: (GrowingFacts & { readonly name: string }) | undefined,
 ): GrowingFacts | undefined {
   if (crop === undefined) return undefined;
-  return isEmptyGrowing(crop) ? growingFor(crop.name) : crop;
+  const table = growingFor(crop.name);
+  if (isEmptyGrowing(crop)) return table;
+  // Field by field: what the crop says wins, and the table fills the rest.
+  // A crop saved before the timing facts existed still gets them, rather than
+  // a crop with its seven old facts and no idea when to sow.
+  const own = Object.fromEntries(
+    GROWING_KEYS.filter((key) => crop[key] !== undefined).map((key) => [key, crop[key]]),
+  ) as GrowingFacts;
+  return { ...(table ?? {}), ...own };
 }
 
 /**

@@ -2,7 +2,14 @@ import { z } from "zod";
 
 import { baseRecordSchema, ulidSchema, type BaseRecord, type Ulid } from "@galaxy-farm/core";
 
-import { LIFECYCLES, SEASONS, SOWING_METHODS, SUN_NEEDS, type GrowingFacts } from "./growing.js";
+import {
+  FROST_TOLERANCES,
+  LIFECYCLES,
+  SEASONS,
+  SOWING_METHODS,
+  SUN_NEEDS,
+  type GrowingFacts,
+} from "./growing.js";
 
 /**
  * Beds, crops and seed (spec §5.5).
@@ -86,6 +93,13 @@ export const cropSchema = baseRecordSchema.extend({
   sun: z.enum(SUN_NEEDS).optional(),
   sowing: z.enum(SOWING_METHODS).optional(),
   depthInches: z.number().positive().max(24).optional(),
+  frostTolerance: z.enum(FROST_TOLERANCES).optional(),
+  germinationDays: z.number().int().positive().max(120).optional(),
+  startIndoorsWeeks: z.number().min(0).max(20).optional(),
+  plantOutWeeks: z.number().min(-16).max(16).optional(),
+  fallPlantWeeks: z.number().min(0).max(20).optional(),
+  harvestWeeks: z.number().positive().max(52).optional(),
+  successionDays: z.number().int().positive().max(90).optional(),
 }) as unknown as z.ZodType<Crop>;
 
 export interface Variety extends BaseRecord {

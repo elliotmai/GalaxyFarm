@@ -250,7 +250,7 @@ export function bedShapes(
   // bed is a scan of the whole history for each rectangle on the plan.
   const growingIn = new Map<Ulid, number>();
   for (const planting of plantings) {
-    if (!LIVE_STATUSES.includes(planting.status)) continue;
+    if (!LIVE_STATUSES.includes(planting.status) || planting.bedId === undefined) continue;
     growingIn.set(planting.bedId, (growingIn.get(planting.bedId) ?? 0) + 1);
   }
 

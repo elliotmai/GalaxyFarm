@@ -73,6 +73,9 @@ export const properties = pgTable(
       north: number;
       east: number;
     }>(),
+    /** The farm's own frost dates, "MM-DD", over the zone's (0043). Last, as added. */
+    lastFrost: text("last_frost"),
+    firstFrost: text("first_frost"),
   },
   baseIndexes("properties"),
 );
@@ -1047,6 +1050,14 @@ export const crops = pgTable(
     sun: text("sun"),
     sowing: text("sowing"),
     depthInches: doublePrecision("depth_inches"),
+    /** When to plant, and how much cold it takes (0043, §5.5). */
+    frostTolerance: text("frost_tolerance"),
+    germinationDays: integer("germination_days"),
+    startIndoorsWeeks: doublePrecision("start_indoors_weeks"),
+    plantOutWeeks: doublePrecision("plant_out_weeks"),
+    fallPlantWeeks: doublePrecision("fall_plant_weeks"),
+    harvestWeeks: doublePrecision("harvest_weeks"),
+    successionDays: integer("succession_days"),
   },
   baseIndexes("crops"),
 );
@@ -1098,10 +1109,12 @@ export const plantings = pgTable(
   "plantings",
   {
     ...baseColumns,
-    bedId: text("bed_id").notNull(),
+    /** Optional until it goes in the ground — a seedling indoors has no bed (0043). */
+    bedId: text("bed_id"),
     varietyId: text("variety_id").notNull(),
     method: text("method").notNull(),
     indoorStartedOn: timestamp("indoor_started_on", { withTimezone: true, mode: "date" }),
+    hardenedOffOn: timestamp("hardened_off_on", { withTimezone: true, mode: "date" }),
     plantedOn: timestamp("planted_on", { withTimezone: true, mode: "date" }),
     status: text("status").notNull(),
     quantity: doublePrecision("quantity"),

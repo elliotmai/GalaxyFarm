@@ -156,11 +156,27 @@ export function plantingToActual(
  */
 export const ZONE_FROST_DATES: Readonly<Record<string, { lastSpring: string; firstFall: string }>> =
   {
+    "3a": { lastSpring: "05-30", firstFall: "09-08" },
+    "3b": { lastSpring: "05-22", firstFall: "09-15" },
+    "4a": { lastSpring: "05-15", firstFall: "09-20" },
+    "4b": { lastSpring: "05-08", firstFall: "09-28" },
+    "5a": { lastSpring: "05-01", firstFall: "10-05" },
+    "5b": { lastSpring: "04-25", firstFall: "10-10" },
+    "6a": { lastSpring: "04-22", firstFall: "10-15" },
+    "6b": { lastSpring: "04-18", firstFall: "10-20" },
     "7a": { lastSpring: "04-15", firstFall: "10-15" },
     "7b": { lastSpring: "04-05", firstFall: "10-25" },
     "8a": { lastSpring: "03-25", firstFall: "11-10" },
     "8b": { lastSpring: "03-15", firstFall: "11-20" },
     "9a": { lastSpring: "02-25", firstFall: "12-05" },
+    "9b": { lastSpring: "02-10", firstFall: "12-15" },
+    "10a": { lastSpring: "01-30", firstFall: "12-20" },
+    "10b": { lastSpring: "01-15", firstFall: "12-28" },
+    // Frost-free on average. Dates at the ends of the year keep every
+    // schedule arithmetic working: "two weeks after the last frost" is the
+    // middle of January, which is when a 11a garden plants tomatoes anyway.
+    "11a": { lastSpring: "01-01", firstFall: "12-31" },
+    "11b": { lastSpring: "01-01", firstFall: "12-31" },
   };
 
 export interface FrostDates {
@@ -169,16 +185,33 @@ export interface FrostDates {
   readonly growingDays: number;
 }
 
-/** The season's shape for a property, from its growing zone. */
+/** A frost date the farm has written for itself, "MM-DD". */
+export const FROST_DAY = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+/**
+ * The season's shape for a property: its own frost dates where it has
+ * written them, else its zone's averages.
+ *
+ * The zone is a winter-minimum band, not a frost calendar, so the averages are
+ * a starting point — a farm that has kept a thermometer for three springs
+ * knows its own last frost, and every planting date follows from it.
+ */
 export function frostDatesFor(
   growingZone: string | undefined,
   year: number,
+  own: { readonly lastFrost?: string | undefined; readonly firstFrost?: string | undefined } = {},
 ): FrostDates | undefined {
-  const dates = ZONE_FROST_DATES[growingZone?.toLowerCase() ?? ""];
-  if (dates === undefined) return undefined;
+  const zone = ZONE_FROST_DATES[growingZone?.toLowerCase() ?? ""];
+  const lastSpring =
+    own.lastFrost !== undefined && FROST_DAY.test(own.lastFrost) ? own.lastFrost : zone?.lastSpring;
+  const firstFall =
+    own.firstFrost !== undefined && FROST_DAY.test(own.firstFrost)
+      ? own.firstFrost
+      : zone?.firstFall;
+  if (lastSpring === undefined || firstFall === undefined) return undefined;
 
-  const lastSpringFrost = new Date(`${year}-${dates.lastSpring}T00:00:00Z`);
-  const firstFallFrost = new Date(`${year}-${dates.firstFall}T00:00:00Z`);
+  const lastSpringFrost = new Date(`${year}-${lastSpring}T00:00:00Z`);
+  const firstFallFrost = new Date(`${year}-${firstFall}T00:00:00Z`);
 
   return {
     lastSpringFrost,

@@ -110,6 +110,10 @@ function GrowingZone({
 }) {
   const { show } = useToast();
   const [zone, setZone] = useState(property.growingZone ?? "");
+  // The farm's own frost dates, typed as dates and stored "MM-DD": the year is
+  // irrelevant, and a date picker is still the easiest way to say "April 2".
+  const [lastFrost, setLastFrost] = useState(property.lastFrost ?? "");
+  const [firstFrost, setFirstFrost] = useState(property.firstFrost ?? "");
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -117,7 +121,13 @@ function GrowingZone({
   // The stored value wins until somebody types, so a zone the address lookup
   // has just written is not overwritten by a stale form nobody touched.
   const shown = dirty ? zone : (property.growingZone ?? "");
-  const dates = frostDatesFor(shown, new Date().getUTCFullYear());
+  const ownLast = dirty ? lastFrost : (property.lastFrost ?? "");
+  const ownFirst = dirty ? firstFrost : (property.firstFrost ?? "");
+  const year = new Date().getUTCFullYear();
+  const dates = frostDatesFor(shown, year, { lastFrost: ownLast, firstFrost: ownFirst });
+  const zoneDates = frostDatesFor(shown, year);
+  const asInput = (monthDay: string) => (monthDay === "" ? "" : `${year}-${monthDay}`);
+  const fromInput = (value: string) => (value === "" ? "" : value.slice(5));
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -127,6 +137,8 @@ function GrowingZone({
     try {
       const result = await api.update(property.id, {
         growingZone: shown.trim() === "" ? undefined : shown.trim().toLowerCase(),
+        lastFrost: ownLast === "" ? undefined : ownLast,
+        firstFrost: ownFirst === "" ? undefined : ownFirst,
       } as Partial<Property>);
 
       if (!result.ok) {
@@ -139,7 +151,7 @@ function GrowingZone({
       }
 
       setDirty(false);
-      show({ message: "Growing zone saved", tone: "success" });
+      show({ message: "Growing season saved", tone: "success" });
     } finally {
       setBusy(false);
     }
@@ -147,8 +159,8 @@ function GrowingZone({
 
   return (
     <Section
-      title="Growing zone"
-      description="USDA hardiness zone — the garden's frost dates and planting windows."
+      title="Growing season"
+      description="The zone and frost dates every planting date in the garden is worked out from."
     >
       <Card>
         <form onSubmit={(event) => void save(event)} className="flex flex-col gap-density">
@@ -164,11 +176,44 @@ function GrowingZone({
               }}
               {...(error === undefined ? {} : { error })}
             />
+            <TextInput
+              label="Our last spring frost"
+              type="date"
+              hint={
+                zoneDates === undefined
+                  ? "Optional. The year does not matter."
+                  : `Optional. The zone says ${formatFrostDate(zoneDates.lastSpringFrost)}.`
+              }
+              value={asInput(ownLast)}
+              onChange={(event) => {
+                setLastFrost(fromInput(event.target.value));
+                setZone(shown);
+                setFirstFrost(ownFirst);
+                setDirty(true);
+              }}
+            />
+            <TextInput
+              label="Our first fall frost"
+              type="date"
+              hint={
+                zoneDates === undefined
+                  ? "Optional. The year does not matter."
+                  : `Optional. The zone says ${formatFrostDate(zoneDates.firstFallFrost)}.`
+              }
+              value={asInput(ownFirst)}
+              onChange={(event) => {
+                setFirstFrost(fromInput(event.target.value));
+                setZone(shown);
+                setLastFrost(ownLast);
+                setDirty(true);
+              }}
+            />
             <DetailList
               columns={1}
               items={[
                 {
-                  label: "Average frost dates",
+                  label:
+                    ownLast !== "" || ownFirst !== "" ? "Frost dates used" : "Average frost dates",
                   value:
                     dates === undefined
                       ? undefined
@@ -181,13 +226,14 @@ function GrowingZone({
 
           {shown.trim() !== "" && dates === undefined ? (
             <p className="text-sm text-muted">
-              No frost dates for that zone — the garden will not guess a season.
+              No frost dates for that zone — put in your own above, or the garden will not guess a
+              season.
             </p>
           ) : null}
 
           <div className="flex flex-wrap gap-2">
             <Button type="submit" busy={busy} disabled={!dirty}>
-              Save zone
+              Save growing season
             </Button>
             {!dirty ? null : (
               <Button

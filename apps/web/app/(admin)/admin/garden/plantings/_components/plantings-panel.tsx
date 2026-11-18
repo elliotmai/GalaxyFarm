@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import {
   Button,
+  Callout,
   EmptyState,
   Modal,
   Select,
@@ -14,8 +15,13 @@ import {
 } from "@galaxy-farm/ui";
 import type { CrudError, Ulid } from "@galaxy-farm/core";
 import {
+  companionship,
+  cropGrowing,
   expectedHarvestDate,
   gardenCareLogSchema,
+  harvestWindow,
+  NOT_IN_GROUND,
+  plantsThatFit,
   harvestLogSchema,
   plantingSchema,
   rotationWarning,
@@ -24,6 +30,7 @@ import {
   type Crop,
   type GardenCareLog,
   type HarvestLog,
+  type Pairing,
   type Planting,
   type PlantingMethod,
   type PlantingStatus,
@@ -79,6 +86,7 @@ interface Draft {
   readonly varietyId: string;
   readonly method: PlantingMethod;
   readonly indoorStartedOn: string;
+  readonly hardenedOffOn: string;
   readonly plantedOn: string;
   readonly status: PlantingStatus;
   readonly quantity: string;
@@ -90,6 +98,7 @@ const BLANK: Draft = {
   varietyId: "",
   method: "transplant",
   indoorStartedOn: "",
+  hardenedOffOn: "",
   plantedOn: "",
   status: "growing",
   quantity: "",
@@ -148,7 +157,8 @@ export function PlantingsPanel({
   /** A chip from the row above the list; "" is everything not finished or failed. */
   const [filter, setFilter] = useState("");
 
-  const bedName = (id: Ulid) => byId(beds).get(id)?.name ?? "Unknown bed";
+  const bedName = (id: Ulid | undefined) =>
+    id === undefined ? "Indoors" : (byId(beds).get(id)?.name ?? "Unknown bed");
   const varietyOf = (id: Ulid) => byId(varieties).get(id);
   const nameOf = (id: Ulid) => varietyLabel(varietyOf(id), crops);
 
@@ -160,8 +170,10 @@ export function PlantingsPanel({
    * and opening one of them must show where it grew rather than quietly
    * offering the first bed on the list.
    */
-  const bedOptions = (current: string) => [
-    { value: "", label: "Pick one" },
+  const bedOptions = (current: string, inGround: boolean) => [
+    // A seedling on the windowsill has no bed yet; asking for one made people
+    // pick any bed and move it later, which wrote a false rotation history.
+    { value: "", label: inGround ? "Pick one" : "Not in the ground yet" },
     ...openBeds.map((bed) => ({ value: bed.id, label: bed.name })),
     ...(current === "" || openBeds.some((bed) => bed.id === current)
       ? []
@@ -223,6 +235,58 @@ export function PlantingsPanel({
     );
   }, [draft, plantings, varieties, crops, editing]);
 
+  /** The crop facts for whatever variety the form names — spacing, timing. */
+  const factsOf = (varietyId: string) => {
+    const variety = byId(varieties).get(varietyId as Ulid);
+    const crop = variety === undefined ? undefined : byId(crops).get(variety.cropId);
+    const facts = cropGrowing(crop);
+    return facts === undefined
+      ? undefined
+      : {
+          ...facts,
+          ...(variety?.daysToMaturity === undefined
+            ? {}
+            : { daysToMaturity: variety.daysToMaturity }),
+          ...(variety?.spacingInches === undefined ? {} : { spacingInches: variety.spacingInches }),
+        };
+  };
+
+  /**
+   * What else is in the chosen bed, and whether this crop gets on with it —
+   * and whether there is room. Both warnings, never blocks: the gardener may
+   * know their soil better than the folklore, and a bed can be crammed on
+   * purpose.
+   */
+  const neighbours = useMemo(() => {
+    if (draft === undefined || draft.bedId === "" || draft.varietyId === "") return undefined;
+    const others = plantings.filter(
+      (planting) =>
+        planting.bedId === draft.bedId &&
+        planting.id !== editing?.id &&
+        planting.status !== "finished" &&
+        planting.status !== "failed",
+    );
+    const name = (varietyId: Ulid) => {
+      const variety = byId(varieties).get(varietyId);
+      return variety === undefined ? undefined : byId(crops).get(variety.cropId)?.name;
+    };
+    const mine = name(draft.varietyId as Ulid);
+    // This crop against each neighbour — not the neighbours against each
+    // other, which is the bed's business and not this form's.
+    const clashes =
+      mine === undefined
+        ? []
+        : others
+            .map((planting) => name(planting.varietyId))
+            .filter((other): other is string => other !== undefined)
+            .map((other) => companionship(mine, other))
+            .filter((pairing): pairing is Pairing => pairing?.kind === "bad");
+    const bed = byId(beds).get(draft.bedId as Ulid);
+    const fits =
+      bed === undefined ? undefined : plantsThatFit(bed, factsOf(draft.varietyId)?.spacingInches);
+    return { clashes, fits, bedName: bed?.name };
+  }, [draft, plantings, varieties, crops, beds, editing]);
+
   function startCreate() {
     setEditing(undefined);
     setDraft({
@@ -236,10 +300,11 @@ export function PlantingsPanel({
   function startEdit(planting: Planting) {
     setEditing(planting);
     setDraft({
-      bedId: planting.bedId,
+      bedId: planting.bedId ?? "",
       varietyId: planting.varietyId,
       method: planting.method,
       indoorStartedOn: dateInputValue(planting.indoorStartedOn),
+      hardenedOffOn: dateInputValue(planting.hardenedOffOn),
       plantedOn: dateInputValue(planting.plantedOn),
       status: planting.status,
       quantity: planting.quantity === undefined ? "" : String(planting.quantity),
@@ -261,10 +326,11 @@ export function PlantingsPanel({
     setErrors({});
 
     const fields = {
-      bedId: draft.bedId as Ulid,
+      bedId: draft.bedId === "" ? undefined : (draft.bedId as Ulid),
       varietyId: draft.varietyId as Ulid,
       method: draft.method,
       indoorStartedOn: dateFromInput(draft.indoorStartedOn),
+      hardenedOffOn: dateFromInput(draft.hardenedOffOn),
       plantedOn: dateFromInput(draft.plantedOn),
       status: draft.status,
       quantity: optionalNumber(draft.quantity),
@@ -413,7 +479,11 @@ export function PlantingsPanel({
   /** The one line: where, how, when it went in, when to expect it, how much came off. */
   function lineFor(planting: Planting): string {
     const variety = varietyOf(planting.varietyId);
-    const expected = variety === undefined ? undefined : expectedHarvestDate(planting, variety);
+    const facts = factsOf(planting.varietyId);
+    const crop = variety === undefined ? undefined : byId(crops).get(variety.cropId);
+    const expected =
+      variety === undefined ? undefined : expectedHarvestDate(planting, variety, facts ?? crop);
+    const window = harvestWindow(expected === undefined ? undefined : planting.plantedOn, facts);
     const harvest = totalHarvest(harvestsOf(planting.id), planting.id);
     return [
       bedName(planting.bedId),
@@ -423,7 +493,11 @@ export function PlantingsPanel({
         : `planted ${formatDate(planting.plantedOn)}`,
       // Only while something is still to come: an expected date on a
       // finished row is a forecast about the past.
-      expected === undefined || closedOf(planting) ? undefined : `expect ${formatDate(expected)}`,
+      expected === undefined || closedOf(planting)
+        ? undefined
+        : window === undefined
+          ? `expect ${formatDate(expected)}`
+          : `pick ${formatDate(window.from)} – ${formatDate(window.to)}`,
       planting.quantity === undefined ? undefined : `${planting.quantity} in`,
       ...[...harvest.entries()].map(([unit, amount]) => `${quantityLabel(amount, unit)} picked`),
     ]
@@ -568,11 +642,27 @@ export function PlantingsPanel({
               </RotationCallout>
             )}
 
+            {neighbours === undefined || neighbours.clashes.length === 0 ? null : (
+              <Callout tone="danger" title="Bad neighbours in this bed">
+                {neighbours.clashes.map((clash) => `${clash.with}: ${clash.why}.`).join(" ")} A
+                warning, not a block.
+              </Callout>
+            )}
+            {neighbours?.fits === undefined ? null : (
+              <p className="text-sm text-muted">
+                About {neighbours.fits} fit in {neighbours.bedName} at this spacing
+                {optionalNumber(draft.quantity) !== undefined &&
+                (optionalNumber(draft.quantity) as number) > neighbours.fits
+                  ? " — more than that is crowding it."
+                  : "."}
+              </p>
+            )}
+
             <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <Select
                 label="Bed"
-                required
-                options={bedOptions(draft.bedId)}
+                required={!NOT_IN_GROUND.has(draft.status)}
+                options={bedOptions(draft.bedId, !NOT_IN_GROUND.has(draft.status))}
                 value={draft.bedId}
                 error={errors["bedId"]}
                 onChange={(event) => setDraft({ ...draft, bedId: event.target.value })}
@@ -611,6 +701,16 @@ export function PlantingsPanel({
                 error={errors["indoorStartedOn"]}
                 onChange={(event) => setDraft({ ...draft, indoorStartedOn: event.target.value })}
               />
+              {draft.method === "indoor_start" || draft.status === "hardening" ? (
+                <TextInput
+                  label="Started hardening off"
+                  type="date"
+                  hint="A week outside for a few hours a day, before it goes in."
+                  value={draft.hardenedOffOn}
+                  error={errors["hardenedOffOn"]}
+                  onChange={(event) => setDraft({ ...draft, hardenedOffOn: event.target.value })}
+                />
+              ) : null}
               <TextInput
                 label="Went in the ground"
                 type="date"

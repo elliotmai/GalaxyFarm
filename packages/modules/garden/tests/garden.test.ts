@@ -324,9 +324,24 @@ describe("frostDatesFor", () => {
     expect(dates?.growingDays).toBe(230);
   });
 
-  it("says nothing for a zone it does not carry", () => {
-    expect(frostDatesFor("3b", 2027)).toBeUndefined();
+  it("carries every zone from 3a to 11b, and says nothing for one it does not", () => {
+    expect(frostDatesFor("3b", 2027)?.lastSpringFrost).toEqual(new Date("2027-05-22T00:00:00Z"));
+    expect(frostDatesFor("10b", 2027)).toBeDefined();
+    expect(frostDatesFor("13a", 2027)).toBeUndefined();
     expect(frostDatesFor(undefined, 2027)).toBeUndefined();
+  });
+
+  it("takes the farm's own frost dates over the zone's", () => {
+    const dates = frostDatesFor("8a", 2027, { lastFrost: "04-02", firstFrost: "11-01" });
+    expect(dates?.lastSpringFrost).toEqual(new Date("2027-04-02T00:00:00Z"));
+    expect(dates?.firstFallFrost).toEqual(new Date("2027-11-01T00:00:00Z"));
+    // Own dates work without a zone, and a malformed one falls back.
+    expect(
+      frostDatesFor(undefined, 2027, { lastFrost: "04-02", firstFrost: "11-01" }),
+    ).toBeDefined();
+    expect(frostDatesFor("8a", 2027, { lastFrost: "April" })?.lastSpringFrost).toEqual(
+      new Date("2027-03-25T00:00:00Z"),
+    );
   });
 
   it("gates frost warnings to the growing season, per §6", () => {
