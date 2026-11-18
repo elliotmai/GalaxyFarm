@@ -185,7 +185,7 @@ export function SeedBoxPanel({
       recordName: `${quantityLabel(entry.quantity, entry.unit, "Some")} of ${label}`,
       entity: "seed entry",
       dependents: [],
-      consequence: "Nothing else points at it — a planting names the variety, not the packet.",
+      consequence: "Nothing else points at it — a planting names the plant, not the packet.",
       action: "Delete",
     });
     if (!confirmed) return;
@@ -241,11 +241,11 @@ export function SeedBoxPanel({
     <div className="flex flex-col gap-density pb-20 sm:pb-0">
       {varieties.length === 0 ? (
         <EmptyState
-          title="No varieties yet"
-          detail="Seed is seed of something. Add the crop and the variety first, then the packet."
+          title="No plants yet"
+          detail="Seed is seed of something. Add the plant first, then the packet."
           action={
             <Button variant="primary" onClick={onNeedsCatalog}>
-              Go to the catalogue
+              Add a plant
             </Button>
           }
         />
@@ -356,7 +356,7 @@ export function SeedBoxPanel({
             )}
             <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <Select
-                label="Variety"
+                label="Plant"
                 required
                 placeholder="Pick one"
                 options={[{ value: "", label: "Pick one" }, ...varietyOptions]}

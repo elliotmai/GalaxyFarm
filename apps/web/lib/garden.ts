@@ -59,9 +59,15 @@ export function varietyLabel(
   variety: Pick<Variety, "name" | "cropId"> | undefined,
   crops: readonly Crop[],
 ): string {
-  if (variety === undefined) return "Unknown variety";
+  if (variety === undefined) return "Unknown plant";
   const crop = byId(crops).get(variety.cropId);
-  return crop === undefined ? variety.name : `${variety.name} · ${crop.name}`;
+  if (crop === undefined) return variety.name;
+  // "Cherokee Purple · Tomato", but never "Jalapeño pepper · Pepper".
+  const name = ` ${variety.name.toLowerCase()} `;
+  return name.includes(` ${crop.name.toLowerCase()} `) ||
+    variety.name.toLowerCase() === crop.name.toLowerCase()
+    ? variety.name
+    : `${variety.name} · ${crop.name}`;
 }
 
 /**

@@ -128,7 +128,7 @@ describe("naming a variety", () => {
   });
 
   it("says so rather than rendering an empty string for a missing variety", () => {
-    expect(varietyLabel(undefined, crops)).toBe("Unknown variety");
+    expect(varietyLabel(undefined, crops)).toBe("Unknown plant");
   });
 });
 

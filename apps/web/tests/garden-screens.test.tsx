@@ -254,7 +254,7 @@ describe("optional amounts", () => {
 
     await user.click(screen.getAllByRole("button", { name: /Add seed/ })[0] as HTMLElement);
     const dialog = within(await screen.findByRole("dialog"));
-    await user.selectOptions(dialog.getByLabelText(/Variety/), CHEROKEE.id);
+    await user.selectOptions(dialog.getByLabelText(/^Plant/), CHEROKEE.id);
     await user.clear(dialog.getByLabelText(/Quantity/));
     await user.click(dialog.getByRole("button", { name: "Add seed" }));
 
@@ -282,7 +282,7 @@ describe("optional amounts", () => {
   });
 });
 
-describe("crops — the family is inferred", () => {
+describe("plants — one list, what it grows like worked out", () => {
   beforeEach(() => {
     // The plant search's server half is not running in a unit test: it fails,
     // and the form must carry on with the built-in table.
@@ -290,34 +290,56 @@ describe("crops — the family is inferred", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
-  it("saves a crop by name alone, and shows the family it worked out", async () => {
+  async function openNewPlant(user: ReturnType<typeof userEvent.setup>) {
+    wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await user.click(screen.getByRole("tab", { name: "Plants" }));
+    await user.click(screen.getAllByRole("button", { name: /Add plant/ })[0] as HTMLElement);
+    return within(await screen.findByRole("dialog"));
+  }
+
+  it("lists plants once, with no separate crops to manage", async () => {
     const user = userEvent.setup();
     wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
-    await user.click(screen.getByRole("tab", { name: /Crops/ }));
-    await user.click(screen.getByRole("button", { name: /Add crop/ }));
+    await user.click(screen.getByRole("tab", { name: "Plants" }));
 
-    const dialog = within(await screen.findByRole("dialog"));
-    // Nothing asks for the family up front.
-    expect(dialog.getByLabelText(/Botanical family/).closest("details")).not.toHaveAttribute(
-      "open",
-    );
-    await user.type(dialog.getByLabelText(/^Name/), "Pepper");
-    expect(dialog.getByText("Solanaceae")).toBeInTheDocument();
-    expect(dialog.getByText("(worked out from the name)")).toBeInTheDocument();
-
-    await user.click(dialog.getByRole("button", { name: "Add crop" }));
-    expect(writes.created[0]).toMatchObject({ store: "crops", name: "Pepper" });
-    // Derived, not stored: the family stays the table's answer.
-    expect(writes.created[0]?.["family"]).toBeUndefined();
+    const list = within(screen.getByRole("list", { name: "Plants" }));
+    expect(list.getByRole("button", { name: "Edit Cherokee Purple" })).toBeInTheDocument();
+    // The crop it is filed under is a word on its row, not a list of its own.
+    expect(screen.queryByRole("button", { name: /Add crop/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Crops" })).not.toBeInTheDocument();
   });
 
-  it("fills the kind, its family and how it grows from a picked match", async () => {
+  it("adds a plant by name alone, filed under the crop it grows like", async () => {
     const user = userEvent.setup();
-    wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
-    await user.click(screen.getByRole("tab", { name: /Crops/ }));
-    await user.click(screen.getByRole("button", { name: /Add crop/ }));
+    const dialog = await openNewPlant(user);
+    await user.type(dialog.getByLabelText(/^Name/), "Early Jalapeño");
+    expect(dialog.getByLabelText(/Grows like/)).toHaveDisplayValue("Pepper (from the name)");
+    await user.click(dialog.getByRole("button", { name: "Add plant" }));
 
-    const dialog = within(await screen.findByRole("dialog"));
+    // No pepper on the list yet: one is made, quietly, then the plant on it.
+    expect(writes.created.map((row) => row["store"])).toEqual(["crops", "varieties"]);
+    expect(writes.created[0]).toMatchObject({ name: "Pepper", season: "warm" });
+    expect(writes.created[0]?.["family"]).toBeUndefined();
+    expect(writes.created[1]).toMatchObject({
+      name: "Early Jalapeño",
+      cropId: "01ARZ3NDEKTSV4RRFFQ69G5GZZ",
+    });
+  });
+
+  it("files a plant under a crop already recorded, without making another", async () => {
+    const user = userEvent.setup();
+    const dialog = await openNewPlant(user);
+    await user.type(dialog.getByLabelText(/^Name/), "Brandywine tomato");
+    expect(dialog.getByLabelText(/Grows like/)).toHaveDisplayValue("Tomato (from the name)");
+    await user.click(dialog.getByRole("button", { name: "Add plant" }));
+
+    expect(writes.created.map((row) => row["store"])).toEqual(["varieties"]);
+    expect(writes.created[0]).toMatchObject({ name: "Brandywine tomato", cropId: TOMATO.id });
+  });
+
+  it("fills the kind's own days and spacing from a picked match", async () => {
+    const user = userEvent.setup();
+    const dialog = await openNewPlant(user);
     await user.type(dialog.getByLabelText(/^Name/), "zucch");
     const matches = within(dialog.getByRole("list", { name: "Plants matching the name" }));
     // Told apart by what it is, not by its Latin name.
@@ -328,87 +350,37 @@ describe("crops — the family is inferred", () => {
 
     expect(dialog.getByLabelText(/^Name/)).toHaveValue("Zucchini");
     expect(dialog.queryByLabelText(/Scientific name/)).not.toBeInTheDocument();
-    // How it grows comes with the pick: a zucchini's figures, not a pumpkin's.
+    // A zucchini's figures, not a pumpkin's.
     expect(dialog.getByLabelText(/Days to maturity/)).toHaveValue(50);
     expect(dialog.getByLabelText(/Spacing/)).toHaveValue(24);
-    expect(dialog.getByLabelText(/^Season/)).toHaveValue("warm");
-    expect(dialog.getByLabelText(/^Sowing/)).toHaveValue("direct");
-    await user.clear(dialog.getByLabelText(/Spacing/));
-    await user.type(dialog.getByLabelText(/Spacing/), "48");
-    await user.click(dialog.getByRole("button", { name: "Add crop" }));
+    await user.click(dialog.getByRole("button", { name: "Add plant" }));
+
     expect(writes.created[0]).toMatchObject({
       store: "crops",
-      name: "Zucchini",
+      name: "Squash",
       // Still kept, quietly: it is how a lookup online matches the species.
       scientificName: "Cucurbita pepo",
-      daysToMaturity: 50,
-      spacingInches: 48,
-      season: "warm",
-      lifecycle: "annual",
-      sun: "full",
-      sowing: "direct",
-      depthInches: 1,
-    });
-  });
-
-  it("lets the family be overridden behind the disclosure", async () => {
-    const user = userEvent.setup();
-    wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
-    await user.click(screen.getByRole("tab", { name: /Crops/ }));
-    await user.click(screen.getByRole("button", { name: /Add crop/ }));
-
-    const dialog = within(await screen.findByRole("dialog"));
-    await user.type(dialog.getByLabelText(/^Name/), "Moonflower");
-    expect(dialog.getByText("not known")).toBeInTheDocument();
-    await user.click(dialog.getByText("Change"));
-    await user.type(dialog.getByLabelText(/Botanical family/), "convolvulaceae");
-    await user.click(dialog.getByRole("button", { name: "Add crop" }));
-
-    expect(writes.created[0]).toMatchObject({ name: "Moonflower", family: "Convolvulaceae" });
-  });
-
-  it("files a found plant under a new crop when the list has none", async () => {
-    const user = userEvent.setup();
-    wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
-    await user.click(screen.getByRole("tab", { name: /Crops/ }));
-    await user.click(screen.getAllByRole("button", { name: /Add variety/ })[0] as HTMLElement);
-
-    const dialog = within(await screen.findByRole("dialog"));
-    await user.type(dialog.getByLabelText(/Find the plant/), "okra");
-    await user.click(dialog.getByRole("button", { name: /^Okra/ }));
-    expect(dialog.getByLabelText(/^Crop/)).toHaveDisplayValue(/Okra — new crop \(Malvaceae\)/);
-    expect(dialog.getByLabelText(/Days to maturity/)).toHaveValue(60);
-    expect(dialog.getByLabelText(/Spacing/)).toHaveValue(12);
-    await user.type(dialog.getByLabelText(/^Name/), "Clemson Spineless");
-    await user.click(dialog.getByRole("button", { name: "Add variety" }));
-
-    expect(writes.created.map((row) => row["store"])).toEqual(["crops", "varieties"]);
-    expect(writes.created[0]).toMatchObject({
-      name: "Okra",
-      scientificName: "Abelmoschus esculentus",
-      season: "warm",
-      daysToMaturity: 60,
     });
     expect(writes.created[1]).toMatchObject({
-      name: "Clemson Spineless",
-      cropId: "01ARZ3NDEKTSV4RRFFQ69G5GZZ",
-      daysToMaturity: 60,
-      spacingInches: 12,
+      name: "Zucchini",
+      daysToMaturity: 50,
+      spacingInches: 24,
     });
   });
 
-  it("picks the existing crop for a plant already on the list", async () => {
+  it("lets what it grows like be changed, and the family overridden behind a disclosure", async () => {
     const user = userEvent.setup();
-    wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
-    await user.click(screen.getByRole("tab", { name: /Crops/ }));
-    await user.click(screen.getAllByRole("button", { name: /Add variety/ })[0] as HTMLElement);
+    const dialog = await openNewPlant(user);
+    await user.type(dialog.getByLabelText(/^Name/), "Moonflower");
+    expect(dialog.getByLabelText(/Grows like/)).toHaveDisplayValue("Moonflower (from the name)");
+    await user.click(dialog.getByText("Change"));
+    await user.type(dialog.getByLabelText(/Plant family/), "convolvulaceae");
+    await user.click(dialog.getByRole("button", { name: "Add plant" }));
 
-    const dialog = within(await screen.findByRole("dialog"));
-    await user.type(dialog.getByLabelText(/Find the plant/), "tomato");
-    await user.click(dialog.getAllByRole("button", { name: /^Tomato/ })[0] as HTMLElement);
-    expect(dialog.getByLabelText(/^Crop/)).toHaveValue(TOMATO.id);
-    // Typical figures fill the blanks; a number off the packet is kept.
-    expect(dialog.getByLabelText(/Days to maturity/)).toHaveValue(75);
-    expect(dialog.getByLabelText(/Spacing/)).toHaveValue(24);
+    expect(writes.created[0]).toMatchObject({
+      store: "crops",
+      name: "Moonflower",
+      family: "Convolvulaceae",
+    });
   });
 });

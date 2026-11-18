@@ -286,7 +286,7 @@ describe("the rotation guard, in the designer", () => {
     // ground is empty, and the palette's word for that is not "resting".
     expect(screen.getByRole("button", { name: "The long bed, fallow" })).toBeInTheDocument();
 
-    await userEvent.selectOptions(screen.getByLabelText("Variety"), CHEROKEE.id);
+    await userEvent.selectOptions(screen.getByLabelText("Plant"), CHEROKEE.id);
 
     expect(
       screen.getByRole("button", { name: /The long bed, Rotation 3 — Same family last season/ }),
@@ -299,7 +299,7 @@ describe("the rotation guard, in the designer", () => {
   it("says why, on the bed, and does not refuse", async () => {
     view();
 
-    await userEvent.selectOptions(screen.getByLabelText("Variety"), CHEROKEE.id);
+    await userEvent.selectOptions(screen.getByLabelText("Plant"), CHEROKEE.id);
     await userEvent.click(
       screen.getByRole("button", { name: /The long bed, Rotation 3 — Same family last season/ }),
     );
@@ -406,7 +406,7 @@ describe("from the drawing to the record", () => {
     ] as Crop[];
     view();
 
-    fireEvent.change(screen.getByLabelText("Variety"), { target: { value: CHEROKEE.id } });
+    fireEvent.change(screen.getByLabelText("Plant"), { target: { value: CHEROKEE.id } });
     expect(screen.getByText(/for Solanaceae/)).toBeInTheDocument();
   });
 });

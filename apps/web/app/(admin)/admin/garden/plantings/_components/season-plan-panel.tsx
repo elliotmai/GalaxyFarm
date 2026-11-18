@@ -869,7 +869,7 @@ export function SeasonPlanPanel({
             })()}
             <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <Select
-                label="Variety"
+                label="Plant"
                 required
                 options={[
                   { value: "", label: "Pick one" },

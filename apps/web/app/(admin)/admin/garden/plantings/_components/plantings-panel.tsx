@@ -701,7 +701,7 @@ export function PlantingsPanel({
                 onChange={(event) => setDraft({ ...draft, bedId: event.target.value })}
               />
               <Select
-                label="Variety"
+                label="Plant"
                 required
                 options={[{ value: "", label: "Pick one" }, ...varietyOptions]}
                 value={draft.varietyId}

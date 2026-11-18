@@ -165,7 +165,7 @@ describe("planting windows", () => {
   });
 
   it("still names the window when the variety has been deleted", () => {
-    // Better an alert that says "Unknown variety" than one that never fires
+    // Better an alert that says "Unknown plant" than one that never fires
     // because a lookup came back empty.
     const alerts = plantingWindowAlerts(
       [plan({ id: id(39), varietyId: id(97) })],
@@ -174,7 +174,7 @@ describe("planting windows", () => {
       on(2026, 2, 3),
     );
 
-    expect(alerts[0]?.subject).toContain("Unknown variety");
+    expect(alerts[0]?.subject).toContain("Unknown plant");
   });
 
   it("keys an alert to the plan, so a second poll updates one row", () => {

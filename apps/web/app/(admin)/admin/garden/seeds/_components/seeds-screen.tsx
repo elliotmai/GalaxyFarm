@@ -13,7 +13,7 @@ import {
   type Variety,
 } from "@galaxy-farm/module-garden";
 
-import { CatalogPanel } from "@/app/(admin)/admin/garden/seeds/_components/catalog-panel";
+import { PlantsPanel } from "@/app/(admin)/admin/garden/seeds/_components/plants-panel";
 import { SeedBoxPanel } from "@/app/(admin)/admin/garden/seeds/_components/seed-box-panel";
 import { StatusLine } from "@/app/(admin)/admin/pastures/_components/land-kit";
 import { useRecords } from "@/lib/local/use-records";
@@ -86,7 +86,7 @@ export function SeedsScreen({
         onTabChange={setTab}
         tabs={[
           { id: "box", label: "Seed box" },
-          { id: "catalog", label: "Crops & varieties" },
+          { id: "catalog", label: "Plants" },
         ]}
       >
         {(active) =>
@@ -101,7 +101,7 @@ export function SeedsScreen({
               onNeedsCatalog={() => setTab("catalog")}
             />
           ) : (
-            <CatalogPanel
+            <PlantsPanel
               crops={crops}
               varieties={varieties}
               seed={seed}

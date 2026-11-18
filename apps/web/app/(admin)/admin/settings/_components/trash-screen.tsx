@@ -53,7 +53,7 @@ const LABELS: Partial<Record<LocalStoreName, string>> = {
   eggDispositions: "Egg dispositions",
   beds: "Beds",
   crops: "Crops",
-  varieties: "Varieties",
+  varieties: "Plants",
   seedInventory: "Seed",
   plantings: "Plantings",
   gardenCareLogs: "Garden care log",

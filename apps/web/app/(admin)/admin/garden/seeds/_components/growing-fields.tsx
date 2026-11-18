@@ -46,48 +46,57 @@ export function GrowingFields({
   onChange,
   errors,
   status,
+  legend = "How it grows",
+  withoutDaysAndSpacing = false,
 }: {
   readonly value: GrowingDraft;
   readonly onChange: (next: GrowingDraft) => void;
   readonly errors: Readonly<Record<string, string>>;
   readonly status?: string | undefined;
+  readonly legend?: string;
+  /** For the plant form, which asks for its own days and spacing above. */
+  readonly withoutDaysAndSpacing?: boolean;
 }) {
   const set = <Key extends keyof GrowingDraft>(key: Key, next: GrowingDraft[Key]) =>
     onChange({ ...value, [key]: next });
 
   return (
     <fieldset className="m-0 flex flex-col gap-density border-0 p-0">
-      <legend className="mb-1 p-0 text-sm font-semibold text-ink">How it grows</legend>
+      <legend className="mb-1 p-0 text-sm font-semibold text-ink">{legend}</legend>
       {status === undefined ? null : (
         <p className="m-0 text-xs text-muted" role="status">
           {status}
         </p>
       )}
       <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
-        <TextInput
-          label="Days to maturity"
-          type="number"
-          inputMode="numeric"
-          min={1}
-          step={1}
-          numeric
-          hint="Typical. Each variety keeps its own."
-          value={value.daysToMaturity}
-          error={errors["daysToMaturity"]}
-          onChange={(event) => set("daysToMaturity", event.target.value)}
-        />
-        <TextInput
-          label="Spacing (inches)"
-          type="number"
-          inputMode="decimal"
-          min={0}
-          step="any"
-          numeric
-          hint="Between plants in the row."
-          value={value.spacingInches}
-          error={errors["spacingInches"]}
-          onChange={(event) => set("spacingInches", event.target.value)}
-        />
+        {withoutDaysAndSpacing ? null : (
+          <>
+            <TextInput
+              label="Days to maturity"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              numeric
+              hint="Typical. Each variety keeps its own."
+              value={value.daysToMaturity}
+              error={errors["daysToMaturity"]}
+              onChange={(event) => set("daysToMaturity", event.target.value)}
+            />
+            <TextInput
+              label="Spacing (inches)"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="any"
+              numeric
+              hint="Between plants in the row."
+              value={value.spacingInches}
+              error={errors["spacingInches"]}
+              onChange={(event) => set("spacingInches", event.target.value)}
+            />
+          </>
+        )}
         <Select
           label="Season"
           options={SEASON_OPTIONS}

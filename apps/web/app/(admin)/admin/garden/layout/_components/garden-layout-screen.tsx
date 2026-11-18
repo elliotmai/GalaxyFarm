@@ -574,14 +574,14 @@ export function GardenLayoutScreen({
           <Section title="Plant">
             {varietyOptions.length === 0 ? (
               <EmptyState
-                title="No varieties yet"
-                detail="Add crops and varieties under Garden → Seeds and the plan colours itself by rotation."
+                title="No plants yet"
+                detail="Add what you grow under Garden → Seeds → Plants, and the plan colours itself by rotation."
               />
             ) : (
               <div className="flex flex-col gap-density">
                 <div className="grid grid-cols-1 gap-density sm:grid-cols-2">
                   <Select
-                    label="Variety"
+                    label="Plant"
                     options={[{ value: "", label: "Nothing chosen" }, ...varietyOptions]}
                     value={varietyId}
                     onChange={(event) => setVarietyId(event.target.value)}
@@ -597,8 +597,8 @@ export function GardenLayoutScreen({
                 {family === undefined ? (
                   <p className="m-0 text-sm text-muted">
                     {varietyId === ""
-                      ? "Choose a variety to colour the beds by rotation."
-                      : "That variety has no crop, so there is no family to check."}
+                      ? "Choose a plant to colour the beds by rotation."
+                      : "Nothing is known about what that plant grows like, so there is no family to check."}
                   </p>
                 ) : (
                   <div className="flex flex-wrap items-center gap-2">
