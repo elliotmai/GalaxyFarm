@@ -246,6 +246,7 @@ export function PlantingsScreen({
               beds={beds}
               varieties={varieties}
               crops={crops}
+              plantings={plantings}
               loading={plansLoading}
               propertyId={propertyId}
               actorId={actorId}

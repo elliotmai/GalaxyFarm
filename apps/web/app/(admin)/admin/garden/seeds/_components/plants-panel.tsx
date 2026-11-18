@@ -123,7 +123,7 @@ const fold = (value: string | undefined) =>
   (value ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 
 /** What a plant grows like: a crop already recorded, or one to create. */
-type GrowsLike =
+export type GrowsLike =
   | { readonly kind: "existing"; readonly crop: Crop }
   | {
       readonly kind: "new";
@@ -200,7 +200,7 @@ function growsLikeName(resolved: GrowsLike | undefined): string | undefined {
   return resolved.kind === "existing" ? resolved.crop.name : resolved.name;
 }
 
-function growsLikeFacts(resolved: GrowsLike | undefined): GrowingFacts | undefined {
+export function growsLikeFacts(resolved: GrowsLike | undefined): GrowingFacts | undefined {
   if (resolved === undefined) return undefined;
   return resolved.kind === "existing" ? cropGrowing(resolved.crop) : resolved.growing;
 }
@@ -216,7 +216,10 @@ function typeLabel(plantName: string, cropName: string | undefined): string | un
 }
 
 /** Days and spacing for a plant: its kind's when it has one ("Habanero"), else its crop's. */
-function figuresFor(name: string, resolved: GrowsLike | undefined): GrowingFacts | undefined {
+export function figuresFor(
+  name: string,
+  resolved: GrowsLike | undefined,
+): GrowingFacts | undefined {
   const entry = gardenEntryFor(name);
   return (entry === undefined ? undefined : GROWING.get(entry.name)) ?? growsLikeFacts(resolved);
 }

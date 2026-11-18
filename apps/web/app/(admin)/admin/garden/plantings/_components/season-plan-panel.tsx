@@ -53,6 +53,7 @@ import {
   RowAction,
   RowList,
 } from "@/app/(admin)/admin/pastures/_components/land-kit";
+import { GardenPlanner } from "@/app/(admin)/admin/garden/plantings/_components/garden-planner";
 import { byId, varietyFacts, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
@@ -101,6 +102,7 @@ export function SeasonPlanPanel({
   beds,
   varieties,
   crops,
+  plantings = [],
   loading,
   propertyId,
   actorId,
@@ -109,6 +111,8 @@ export function SeasonPlanPanel({
 }: {
   readonly plans: readonly SeasonPlan[];
   readonly planned: readonly PlannedPlanting[];
+  /** What has grown where, so the planner can rotate away from it. */
+  readonly plantings?: readonly Planting[];
   readonly beds: readonly Bed[];
   readonly varieties: readonly Variety[];
   readonly crops: readonly Crop[];
@@ -152,6 +156,7 @@ export function SeasonPlanPanel({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [converting, setConverting] = useState<PlannedPlanting | undefined>();
   const [convertBed, setConvertBed] = useState("");
+  const [planning, setPlanning] = useState(false);
 
   const now = new Date();
   const openBeds = beds.filter((bed) => bed.active);
@@ -556,6 +561,33 @@ export function SeasonPlanPanel({
 
   return (
     <div className="flex flex-col gap-density pb-20 sm:pb-0">
+      {/* The way in for most people: say what you want, and let it plan. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-density border border-rule bg-panel p-density">
+        <div className="flex min-w-0 flex-col">
+          <span className="font-medium text-ink">Plan what to grow</span>
+          <span className="text-sm text-muted">
+            Say what you want for the next few seasons — it works out when to start, sow and plant,
+            which bed, and when to pick.
+          </span>
+        </div>
+        <Button variant="primary" onClick={() => setPlanning(true)}>
+          Plan my garden
+        </Button>
+      </div>
+      {planning ? (
+        <GardenPlanner
+          varieties={varieties}
+          crops={crops}
+          beds={beds}
+          plantings={plantings}
+          plans={plans}
+          planned={planned}
+          frostFor={frostFor ?? (() => undefined)}
+          propertyId={propertyId}
+          actorId={actorId}
+          onClose={() => setPlanning(false)}
+        />
+      ) : null}
       {/*
         What the plan says is due inside the lead time. These are the only
         things the garden emails about — the seed catalogue stays quiet — so
@@ -605,12 +637,8 @@ export function SeasonPlanPanel({
         {plans.length === 0 ? (
           <EmptyState
             title="No season plan yet"
-            detail="A plan turns the seed box into a set of dates. It is also the only thing the garden emails about."
-            action={
-              <Button variant="primary" onClick={startCreatePlan}>
-                Start one
-              </Button>
-            }
+            detail="A plan turns what you want to grow into a set of dates. It is also the only thing the garden emails about."
+            action={<Button onClick={startCreatePlan}>Start an empty one</Button>}
           />
         ) : (
           <div className="flex flex-col gap-density">
