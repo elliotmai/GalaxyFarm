@@ -22,7 +22,7 @@ import { repositoryFor, type Database } from "@galaxy-farm/infra-db";
 import type { CareGuide, GuideSection } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
-import type { Planting } from "@galaxy-farm/module-garden";
+import type { Crop, Planting, Variety } from "@galaxy-farm/module-garden";
 import { isPet } from "@galaxy-farm/module-pets";
 
 import { guideForSitter, guideIncludes, visibleToSitter } from "@/lib/care-guide-selection";
@@ -31,6 +31,7 @@ import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { weatherSnapshot } from "@/lib/weather-service";
 import { choreWeatherDay, isWeatherChoreKey, weatherChores, weatherJobs } from "@/lib/weather-jobs";
 import { applyPushAndMark } from "@/lib/change-stamp";
+import { varietyFacts } from "@/lib/garden";
 
 export { guideForSitter, guideIncludes, visibleToSitter };
 
@@ -359,11 +360,13 @@ async function weatherOccurrences(
   db: Database,
   known?: Awaited<ReturnType<typeof weatherSnapshot>>,
 ): Promise<ChoreEntry[]> {
-  const [snapshot, water, zones, plantings] = await Promise.all([
+  const [snapshot, water, zones, plantings, varieties, crops] = await Promise.all([
     known ?? weatherSnapshot(propertyId),
     repositoryFor<WaterSource>(db, "waterSources").list({ propertyId }),
     repositoryFor<Zone>(db, "zones").list({ propertyId }),
     repositoryFor<Planting>(db, "plantings").list({ propertyId }),
+    repositoryFor<Variety>(db, "varieties").list({ propertyId }),
+    repositoryFor<Crop>(db, "crops").list({ propertyId }),
   ]);
 
   const jobs = weatherJobs({
@@ -377,6 +380,8 @@ async function weatherOccurrences(
       active: zone.active,
     })),
     plantings,
+    // The same rule the screens use, so a tick is checked against the same chore.
+    tolerance: (planting) => varietyFacts(planting.varietyId, varieties, crops)?.frostTolerance,
     now: date,
   });
   return weatherChores(jobs, date, at);

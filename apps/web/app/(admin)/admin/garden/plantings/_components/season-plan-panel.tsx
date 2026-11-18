@@ -8,6 +8,7 @@ import {
   Checkbox,
   EmptyState,
   Modal,
+  PlusIcon,
   Section,
   Select,
   TextArea,
@@ -276,7 +277,7 @@ export function SeasonPlanPanel({
     const closed = await entryApi.update(entry.id, {
       planStatus: "realised",
       realisedAs: created.value.id,
-      realisedAt: created.value.plantedOn ?? new Date(),
+      realisedAt: created.value.plantedOn ?? created.value.indoorStartedOn ?? new Date(),
     } as Partial<PlannedPlanting>);
 
     if (!closed.ok) {
@@ -292,7 +293,10 @@ export function SeasonPlanPanel({
     setConverting(undefined);
     setConvertBed("");
     show({
-      message: `${nameOf(entry.varietyId)} planted in ${bedName(draft.draft.bedId) ?? "the bed"}`,
+      message:
+        draft.draft.status === "started"
+          ? `${nameOf(entry.varietyId)} started indoors — its transplant date is on the calendar`
+          : `${nameOf(entry.varietyId)} planted in ${bedName(draft.draft.bedId) ?? "the bed"}`,
       tone: "success",
     });
   }
@@ -530,10 +534,10 @@ export function SeasonPlanPanel({
 
   const plantIt = (entry: PlannedPlanting) => (
     <RowAction
-      label={`Plant ${METHOD_LABEL[entry.method]} ${nameOf(entry.varietyId)}`}
+      label={`${entry.method === "indoor_start" ? "Start" : "Plant"} ${nameOf(entry.varietyId)}`}
       onClick={() => startConvert(entry)}
     >
-      Plant it
+      {entry.method === "indoor_start" ? "Start it" : "Plant it"}
     </RowAction>
   );
 
@@ -626,7 +630,8 @@ export function SeasonPlanPanel({
                               });
                           }}
                         >
-                          + Add
+                          <PlusIcon />
+                          Add
                         </RowAction>
                         <RowAction label={`Edit ${plan.name}`} onClick={() => startEditPlan(plan)}>
                           Edit
@@ -675,24 +680,33 @@ export function SeasonPlanPanel({
 
       {converting === undefined ? null : (
         <Modal
-          title={`Plant ${nameOf(converting.varietyId)}`}
+          title={`${converting.method === "indoor_start" ? "Start" : "Plant"} ${nameOf(converting.varietyId)}`}
           description="Variety, method and quantity come across from the plan."
           onClose={() => setConverting(undefined)}
           footer={
             <>
               <Button
                 variant="primary"
-                disabled={convertBed === ""}
-                onClick={() => void convert(converting, convertBed as Ulid)}
+                // A tray started indoors needs no bed yet.
+                disabled={convertBed === "" && converting.method !== "indoor_start"}
+                onClick={() =>
+                  void convert(converting, convertBed === "" ? undefined : (convertBed as Ulid))
+                }
               >
-                Record it as planted
+                {converting.method === "indoor_start"
+                  ? "Record it as started"
+                  : "Record it as planted"}
               </Button>
               <Button onClick={() => setConverting(undefined)}>Cancel</Button>
             </>
           }
         >
           <div className="flex flex-col gap-density">
-            {openBeds.length === 0 ? (
+            {converting.method === "indoor_start" ? (
+              <p className="text-sm text-muted">
+                It starts on the windowsill — the bed is chosen when it goes out.
+              </p>
+            ) : openBeds.length === 0 ? (
               <Callout tone="danger" title="No beds to plant in">
                 Add a bed first — a planting has to name the ground it is in.
               </Callout>

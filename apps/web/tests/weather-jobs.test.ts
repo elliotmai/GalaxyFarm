@@ -49,8 +49,15 @@ function days(lows: Record<string, number>): DailyWeather[] {
   })) as DailyWeather[];
 }
 
-function jobs(lows: Record<string, number> | undefined, extra: { plantings?: Planting[] } = {}) {
+function jobs(
+  lows: Record<string, number> | undefined,
+  extra: {
+    plantings?: Planting[];
+    tolerance?: (planting: Planting) => "tender" | "half_hardy" | "hardy" | undefined;
+  } = {},
+) {
   return weatherJobs({
+    ...(extra.tolerance === undefined ? {} : { tolerance: extra.tolerance }),
     forecast: lows === undefined ? undefined : { daily: days(lows), hourly: [] },
     settings: SETTINGS,
     water: [tank(NORTH, "North tank"), tank(SOUTH, "South tank", { hasHeater: true })],
@@ -135,6 +142,29 @@ describe("garden frost", () => {
       jobs({ "2026-01-15": 34 }, { plantings: [planting({ status: "finished" })] }).frost,
     ).toBeUndefined();
     expect(jobs({ "2026-01-15": 45 }, { plantings: [planting({})] }).frost).toBeUndefined();
+  });
+
+  it("counts only what the cold would hurt: tender on a frost, half-hardy too on a hard freeze", () => {
+    const kale = planting({ id: "01ARZ3NDEKTSV4RRFFQ69G5P02" as Planting["id"] });
+    const lettuce = planting({ id: "01ARZ3NDEKTSV4RRFFQ69G5P03" as Planting["id"] });
+    const tomato = planting({ id: "01ARZ3NDEKTSV4RRFFQ69G5P04" as Planting["id"] });
+    const by: Record<string, "tender" | "half_hardy" | "hardy"> = {
+      [kale.id]: "hardy",
+      [lettuce.id]: "half_hardy",
+      [tomato.id]: "tender",
+    };
+    const tolerance = (held: Planting) => by[held.id];
+
+    expect(
+      jobs({ "2026-01-15": 34 }, { plantings: [kale, lettuce, tomato], tolerance }).frost
+        ?.plantings,
+    ).toBe(1);
+    expect(
+      jobs({ "2026-01-15": 24 }, { plantings: [kale, lettuce, tomato], tolerance }).frost
+        ?.plantings,
+    ).toBe(2);
+    // Only kale in the ground: a frost night asks for nothing.
+    expect(jobs({ "2026-01-15": 34 }, { plantings: [kale], tolerance }).frost).toBeUndefined();
   });
 });
 

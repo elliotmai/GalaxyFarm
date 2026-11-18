@@ -37,7 +37,7 @@ type Range = "month" | "next" | "year";
 const RANGES: readonly { readonly id: Range; readonly label: string }[] = [
   { id: "month", label: "This month" },
   { id: "next", label: "Next month" },
-  { id: "year", label: "Whole year" },
+  { id: "year", label: "Next 12 months" },
 ];
 
 interface Row {
@@ -52,13 +52,16 @@ function overlaps(milestone: Milestone, from: Date, to: Date): boolean {
 
 export function PlantingCalendarPanel({
   crops,
-  frost,
+  frostFor,
   now = new Date(),
 }: {
   readonly crops: readonly Crop[];
-  readonly frost: FrostDates | undefined;
+  /** The farm's frost dates for a year. */
+  readonly frostFor: (year: number) => FrostDates | undefined;
   readonly now?: Date;
 }) {
+  const frost = frostFor(now.getFullYear());
+  const nextFrost = frostFor(now.getFullYear() + 1);
   const [range, setRange] = useState<Range>("month");
   const [everything, setEverything] = useState(crops.length === 0);
 
@@ -70,14 +73,19 @@ export function PlantingCalendarPanel({
       .map(({ name, facts }) => ({
         name,
         // Harvest is what you get, not what you do; the calendar is for doing.
-        milestones: plantingSchedule(facts, frost).filter((step) => step.kind !== "harvest"),
+        // A rolling year: this season's dates still ahead, then next season's,
+        // so in November the calendar is already about February, not empty.
+        milestones: [...plantingSchedule(facts, frost), ...plantingSchedule(facts, nextFrost)]
+          .filter((step) => step.kind !== "harvest")
+          .filter((step) => step.to >= new Date(now.getFullYear(), now.getMonth(), 1))
+          .filter((step) => step.from <= new Date(now.getTime() + 366 * 86_400_000)),
         tolerance:
           facts?.frostTolerance === undefined
             ? undefined
             : FROST_TOLERANCE_LABELS[facts.frostTolerance].split(" — ")[0],
       }))
       .filter((row) => row.milestones.length > 0);
-  }, [crops, frost, everything]);
+  }, [crops, frost, nextFrost, everything, now]);
 
   if (frost === undefined) {
     return (
@@ -108,8 +116,10 @@ export function PlantingCalendarPanel({
   return (
     <div className="flex flex-col gap-density">
       <p className="text-sm text-muted">
-        Last frost {formatDate(frost.lastSpringFrost)} · first frost{" "}
-        {formatDate(frost.firstFallFrost)}. Change them in Settings → Farm.
+        {now > frost.firstFallFrost && nextFrost !== undefined
+          ? `Next season: last frost ${formatDate(nextFrost.lastSpringFrost)}, first frost ${formatDate(nextFrost.firstFallFrost)}.`
+          : `Last frost ${formatDate(frost.lastSpringFrost)} · first frost ${formatDate(frost.firstFallFrost)}.`}{" "}
+        Change them in Settings → Farm.
       </p>
 
       <div className="flex flex-wrap items-center gap-3">

@@ -21,6 +21,7 @@ import { BedsPanel } from "@/app/(admin)/admin/garden/plantings/_components/beds
 import { CareLogPanel } from "@/app/(admin)/admin/garden/plantings/_components/care-log-panel";
 import { PlantingCalendarPanel } from "@/app/(admin)/admin/garden/plantings/_components/planting-calendar-panel";
 import { PlantingsPanel } from "@/app/(admin)/admin/garden/plantings/_components/plantings-panel";
+import { UpNextPanel } from "@/app/(admin)/admin/garden/plantings/_components/up-next-panel";
 import { SeasonPlanPanel } from "@/app/(admin)/admin/garden/plantings/_components/season-plan-panel";
 import { StatusLine } from "@/app/(admin)/admin/pastures/_components/land-kit";
 import { useRecords } from "@/lib/local/use-records";
@@ -75,7 +76,11 @@ export function PlantingsScreen({
   // Only to say what a planting's deletion would take with it (§4.5 clause 3).
   const { records: harvests } = useRecords<HarvestLog>("harvestLogs", query);
 
-  const [tab, setTab] = useState("plantings");
+  const [tab, setTab] = useState("next");
+  /** Up next asking the plantings tab to open a planting, or start a sowing. */
+  const [handoff, setHandoff] = useState<
+    { readonly openPlantingId: Ulid } | { readonly newVarietyId: Ulid } | undefined
+  >();
   const [focusedBed, setFocusedBed] = useState<Ulid | undefined>();
   /** A bed the address asked to open — the layout's bed rows link here. */
   const [openBed, setOpenBed] = useState<Ulid | undefined>();
@@ -87,6 +92,7 @@ export function PlantingsScreen({
     const params = new URLSearchParams(window.location.search);
     const asked = params.get("tab");
     if (
+      asked === "next" ||
       asked === "plantings" ||
       asked === "beds" ||
       asked === "care" ||
@@ -145,7 +151,8 @@ export function PlantingsScreen({
         activeTab={tab}
         onTabChange={setTab}
         tabs={[
-          { id: "plantings", label: "In the ground" },
+          { id: "next", label: "Up next" },
+          { id: "plantings", label: "Plantings" },
           { id: "beds", label: "Beds" },
           { id: "calendar", label: "When to plant" },
           { id: "care", label: "Care log" },
@@ -157,12 +164,32 @@ export function PlantingsScreen({
         ]}
       >
         {(active) =>
-          active === "plantings" ? (
+          active === "next" ? (
+            <UpNextPanel
+              planned={planned}
+              plantings={plantings}
+              varieties={varieties}
+              crops={crops}
+              frost={frost}
+              propertyId={propertyId}
+              actorId={actorId}
+              onOpenPlan={() => setTab("plan")}
+              onPlantOut={(planting) => {
+                setHandoff({ openPlantingId: planting.id });
+                setTab("plantings");
+              }}
+              onRecordSowing={(varietyId) => {
+                setHandoff({ newVarietyId: varietyId });
+                setTab("plantings");
+              }}
+            />
+          ) : active === "plantings" ? (
             <PlantingsPanel
               // Remounted when a bed row sends us here, so the form opens on
               // the bed whose row was tapped rather than on whatever was
               // chosen last.
-              key={focusedBed ?? "any"}
+              key={`${focusedBed ?? "any"}:${handoff === undefined ? "" : JSON.stringify(handoff)}`}
+              {...(handoff ?? {})}
               plantings={plantings}
               beds={beds}
               varieties={varieties}
@@ -193,7 +220,14 @@ export function PlantingsScreen({
               }}
             />
           ) : active === "calendar" ? (
-            <PlantingCalendarPanel crops={crops} frost={frost} />
+            <PlantingCalendarPanel
+              crops={crops}
+              frostFor={(year) =>
+                property === undefined
+                  ? undefined
+                  : frostDatesFor(property.growingZone, year, property)
+              }
+            />
           ) : active === "care" ? (
             <CareLogPanel
               care={care}

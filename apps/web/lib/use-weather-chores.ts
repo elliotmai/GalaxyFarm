@@ -7,11 +7,12 @@ import {
   type WaterSource,
   type Zone,
 } from "@galaxy-farm/core";
-import type { Planting } from "@galaxy-farm/module-garden";
+import type { Crop, Planting, Variety } from "@galaxy-farm/module-garden";
 
 import { useRecords } from "@/lib/local/use-records";
 import { useForecast } from "@/lib/use-forecast";
 import { choreWeatherDay, weatherChores, weatherJobs, type WeatherJobs } from "@/lib/weather-jobs";
+import { varietyFacts } from "@/lib/garden";
 
 /**
  * The weather's part of a day sheet, for every screen that draws one.
@@ -44,6 +45,8 @@ export function useWeatherChores(propertyId: Ulid, date: Date, now: Date): Weath
   const { records: water } = useRecords<WaterSource>("waterSources", query);
   const { records: zones } = useRecords<Zone>("zones", query);
   const { records: plantings } = useRecords<Planting>("plantings", query);
+  const { records: varieties } = useRecords<Variety>("varieties", query);
+  const { records: crops } = useRecords<Crop>("crops", query);
   const snapshot = useForecast();
 
   const jobs = weatherJobs({
@@ -57,6 +60,7 @@ export function useWeatherChores(propertyId: Ulid, date: Date, now: Date): Weath
       active: zone.active,
     })),
     plantings,
+    tolerance: (planting) => varietyFacts(planting.varietyId, varieties, crops)?.frostTolerance,
     now: date,
   });
 

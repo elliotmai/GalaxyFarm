@@ -116,11 +116,12 @@ export function plantingToActual(
       ok: true;
       draft: {
         propertyId: Ulid;
-        bedId: Ulid;
+        bedId?: Ulid;
         varietyId: Ulid;
         method: PlantingMethod;
-        plantedOn: Date;
-        status: "growing";
+        indoorStartedOn?: Date;
+        plantedOn?: Date;
+        status: "started" | "growing";
         quantity?: number;
       };
     }
@@ -130,6 +131,25 @@ export function plantingToActual(
   }
 
   const bed = bedId ?? planned.bedId;
+
+  // A tray of seed started indoors is a seedling, not a planting in the
+  // ground: it has a start date and no bed yet, and its harden-off and
+  // transplant dates follow from the start.
+  if (planned.method === "indoor_start") {
+    return {
+      ok: true,
+      draft: {
+        propertyId: planned.propertyId,
+        ...(bed === undefined ? {} : { bedId: bed }),
+        varietyId: planned.varietyId,
+        method: planned.method,
+        indoorStartedOn: at,
+        status: "started",
+        ...(planned.quantity === undefined ? {} : { quantity: planned.quantity }),
+      },
+    };
+  }
+
   if (bed === undefined) return { ok: false, reason: "Say which bed it went in" };
 
   return {

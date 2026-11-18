@@ -158,9 +158,19 @@ beforeEach(() => {
 });
 
 describe("plantings", () => {
+  it("opens on what is up next, with the plantings a tab away", async () => {
+    const user = userEvent.setup();
+    wrap(<PlantingsScreen propertyId={PROPERTY} actorId={ACTOR} />);
+
+    expect(screen.getByRole("tab", { name: "Up next" })).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("tab", { name: "Plantings" }));
+    expect(screen.getByRole("list", { name: "Plantings" })).toBeInTheDocument();
+  });
+
   it("leads with facts and the current plantings, finished ones a chip away", async () => {
     const user = userEvent.setup();
     wrap(<PlantingsScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await user.click(screen.getByRole("tab", { name: "Plantings" }));
 
     expect(screen.getByText("1 in the ground · 1 of 1 beds in use")).toBeInTheDocument();
     expect(
@@ -175,6 +185,7 @@ describe("plantings", () => {
   it("opens the editor from the row, with delete behind a confirmation", async () => {
     const user = userEvent.setup();
     wrap(<PlantingsScreen propertyId={PROPERTY} actorId={ACTOR} />);
+    await user.click(screen.getByRole("tab", { name: "Plantings" }));
 
     await user.click(
       screen.getByRole("button", { name: "Edit Cherokee Purple · Tomato in The long bed" }),

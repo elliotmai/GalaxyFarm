@@ -17,7 +17,7 @@ import {
   type WaterSource,
   type ZoneWaterRef,
 } from "@galaxy-farm/core";
-import type { Planting } from "@galaxy-farm/module-garden";
+import type { FrostTolerance, Planting } from "@galaxy-farm/module-garden";
 
 /**
  * The jobs the weather decides, worked out from the actual forecast (spec §6).
@@ -83,6 +83,12 @@ export function weatherJobs(input: {
   readonly water: readonly WaterSource[];
   readonly zones: readonly ZoneWaterRef[];
   readonly plantings: readonly Planting[];
+  /**
+   * How much cold each planting's crop takes. A frost kills only what is
+   * tender; a hard freeze takes the half-hardy too; kale and garlic shrug off
+   * both. Without it every planting counts, which is the safe side.
+   */
+  readonly tolerance?: (planting: Planting) => FrostTolerance | undefined;
   readonly now: Date;
 }): WeatherJobs {
   const { forecast, settings, now } = input;
@@ -127,7 +133,15 @@ export function weatherJobs(input: {
     tonight === undefined
       ? undefined
       : frostRisk([tonight], { frostF: settings.frostF, hardFreezeF: settings.hardFreezeF })[0];
-  const planted = input.plantings.filter(inTheGround).length;
+  const atRisk = (planting: Planting): boolean => {
+    const tolerance = input.tolerance?.(planting);
+    if (tolerance === undefined) return true;
+    if (tolerance === "hardy") return false;
+    return tolerance === "tender" || risk?.hardFreeze === true;
+  };
+  const planted = input.plantings.filter(
+    (planting) => inTheGround(planting) && atRisk(planting),
+  ).length;
   const frost =
     risk === undefined || planted === 0
       ? undefined
@@ -378,7 +392,7 @@ export function weatherChores(jobs: WeatherJobs, date: Date, now: Date): ChoreEn
             jobs.frost.hardFreeze
               ? "Pick what is ready in the garden before the hard freeze"
               : "Cover the tender garden beds",
-            `${jobs.frost.hardFreeze ? "Hard freeze" : "Frost"} tonight, low ${Math.round(jobs.frost.lowF)}° · ${jobs.frost.plantings} planting${jobs.frost.plantings === 1 ? "" : "s"} in the ground`,
+            `${jobs.frost.hardFreeze ? "Hard freeze" : "Frost"} tonight, low ${Math.round(jobs.frost.lowF)}° · ${jobs.frost.plantings} planting${jobs.frost.plantings === 1 ? "" : "s"} it would hurt`,
             "evening",
           ),
         ];

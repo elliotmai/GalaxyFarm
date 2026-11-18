@@ -118,7 +118,10 @@ export function plantingSchedule(
     facts.lifecycle === "annual" &&
     facts.frostTolerance !== undefined &&
     facts.frostTolerance !== "tender" &&
-    facts.season === "cool"
+    facts.season === "cool" &&
+    // A fall sowing is seed in the ground in late summer; a crop that has to
+    // be raised indoors first (celery, onions) is not sown for fall.
+    facts.sowing !== "transplant"
   ) {
     milestones.push({ kind: "fall_sow", from: addDays(fallBy, -21), to: fallBy });
   }

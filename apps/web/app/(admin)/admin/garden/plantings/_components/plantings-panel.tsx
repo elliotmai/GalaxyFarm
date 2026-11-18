@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   Button,
@@ -116,6 +116,8 @@ export function PlantingsPanel({
   propertyId,
   actorId,
   focusedBedId,
+  openPlantingId,
+  newVarietyId,
   onNeedsBeds,
 }: {
   readonly plantings: readonly Planting[];
@@ -128,6 +130,10 @@ export function PlantingsPanel({
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
   readonly focusedBedId?: Ulid;
+  /** Open this planting's editor on arrival — Up next's "Planted" with no bed yet. */
+  readonly openPlantingId?: Ulid;
+  /** Start a new planting of this variety on arrival — Up next's "Sow more". */
+  readonly newVarietyId?: Ulid;
   readonly onNeedsBeds: () => void;
 }) {
   const api = useMutations<Planting>("plantings", "plantings", plantingSchema, propertyId, actorId);
@@ -312,6 +318,33 @@ export function PlantingsPanel({
     });
     setErrors({});
   }
+
+  // Arriving from Up next: open the planting it named, or a new sowing of the
+  // variety it named — once, so closing the form does not reopen it.
+  const arrived = useRef(false);
+  useEffect(() => {
+    if (arrived.current) return;
+    if (openPlantingId !== undefined) {
+      const planting = plantings.find((held) => held.id === openPlantingId);
+      if (planting === undefined) return;
+      arrived.current = true;
+      startEdit({ ...planting, status: "growing" });
+      setDraft((current) =>
+        current === undefined
+          ? current
+          : { ...current, status: "growing", plantedOn: dateInputValue(new Date()) },
+      );
+    } else if (newVarietyId !== undefined) {
+      arrived.current = true;
+      startCreate();
+      setDraft((current) =>
+        current === undefined
+          ? current
+          : { ...current, varietyId: newVarietyId, method: "direct_sow" },
+      );
+    }
+    // Once, on arrival: re-running on every plantings change would reopen it.
+  }, [plantings]);
 
   function reportErrors(error: CrudError) {
     setErrors(

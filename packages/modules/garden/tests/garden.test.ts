@@ -288,7 +288,7 @@ describe("plantingWindows", () => {
 
 describe("plantingToActual", () => {
   it("turns the plan into a planting in one step", () => {
-    const result = plantingToActual(planned(), new Date("2027-03-08"));
+    const result = plantingToActual(planned({ method: "direct_sow" }), new Date("2027-03-08"));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -304,8 +304,24 @@ describe("plantingToActual", () => {
     if (result.ok) expect(result.draft.bedId).toBe(id(7));
   });
 
-  it("refuses a plan with no bed decided", () => {
-    expect(plantingToActual(planned({ bedId: undefined }), AT).ok).toBe(false);
+  it("refuses a plan with no bed decided, for something going in the ground", () => {
+    expect(plantingToActual(planned({ bedId: undefined, method: "transplant" }), AT).ok).toBe(
+      false,
+    );
+  });
+
+  it("starts a tray indoors without a bed, as a seedling rather than a planting", () => {
+    const result = plantingToActual(
+      planned({ bedId: undefined, method: "indoor_start" }),
+      new Date("2027-01-21"),
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.draft.status).toBe("started");
+      expect(result.draft.indoorStartedOn).toEqual(new Date("2027-01-21"));
+      expect(result.draft.plantedOn).toBeUndefined();
+      expect(result.draft.bedId).toBeUndefined();
+    }
   });
 
   it("refuses to realise a plan twice", () => {
