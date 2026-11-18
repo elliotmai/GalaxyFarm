@@ -1,11 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  useId,
-  useMemo,
-  useState,
-} from "react";
+import { useId, useMemo, useState } from "react";
 
 import {
   Button,
@@ -57,12 +53,8 @@ import {
   membersLabel,
   placeLabel,
 } from "@/app/(admin)/_components/feeding-plan-editor";
-import {
-  useMutations,
-} from "@/lib/local/mutations";
-import {
-  useRecords,
-} from "@/lib/local/use-records";
+import { useMutations } from "@/lib/local/mutations";
+import { useRecords } from "@/lib/local/use-records";
 
 /**
  * What the cattle get fed (spec §5.1, §5.3, issue #18).

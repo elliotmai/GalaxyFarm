@@ -1,8 +1,6 @@
 "use client";
 
-import {
-  useState,
-} from "react";
+import { useState } from "react";
 
 import {
   Checkbox,
@@ -36,18 +34,10 @@ import {
   type FeedUnit,
 } from "@galaxy-farm/module-feed";
 
-import {
-  useMutations,
-} from "@/lib/local/mutations";
+import { useMutations } from "@/lib/local/mutations";
 
-import {
-  KitFormPanel as FormPanel,
-} from "../../equipment/_components/kit-controls";
-import {
-  formatDate,
-  qty,
-  unitLabel,
-} from "./feed-format";
+import { KitFormPanel as FormPanel } from "../../equipment/_components/kit-controls";
+import { formatDate, qty, unitLabel } from "./feed-format";
 
 /**
  * The three things the feed screen writes, each in a side panel (spec §5.3).
