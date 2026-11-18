@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 
 import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
-import type { Ulid, Zone } from "@galaxy-farm/core";
+import type { Property, Ulid, Zone } from "@galaxy-farm/core";
 import {
+  frostDatesFor,
   plantingWindows,
   type Bed,
   type Crop,
@@ -18,6 +19,7 @@ import {
 
 import { BedsPanel } from "@/app/(admin)/admin/garden/plantings/_components/beds-panel";
 import { CareLogPanel } from "@/app/(admin)/admin/garden/plantings/_components/care-log-panel";
+import { PlantingCalendarPanel } from "@/app/(admin)/admin/garden/plantings/_components/planting-calendar-panel";
 import { PlantingsPanel } from "@/app/(admin)/admin/garden/plantings/_components/plantings-panel";
 import { SeasonPlanPanel } from "@/app/(admin)/admin/garden/plantings/_components/season-plan-panel";
 import { StatusLine } from "@/app/(admin)/admin/pastures/_components/land-kit";
@@ -64,6 +66,12 @@ export function PlantingsScreen({
   const { records: varieties } = useRecords<Variety>("varieties", query);
   const { records: crops } = useRecords<Crop>("crops", query);
   const { records: zones } = useRecords<Zone>("zones", query);
+  const { records: properties } = useRecords<Property>("properties", query);
+  const property = properties.find((held) => held.id === propertyId) ?? properties[0];
+  const frost =
+    property === undefined
+      ? undefined
+      : frostDatesFor(property.growingZone, new Date().getFullYear(), property);
   // Only to say what a planting's deletion would take with it (§4.5 clause 3).
   const { records: harvests } = useRecords<HarvestLog>("harvestLogs", query);
 
@@ -78,7 +86,13 @@ export function PlantingsScreen({
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const asked = params.get("tab");
-    if (asked === "plantings" || asked === "beds" || asked === "care" || asked === "plan") {
+    if (
+      asked === "plantings" ||
+      asked === "beds" ||
+      asked === "care" ||
+      asked === "plan" ||
+      asked === "calendar"
+    ) {
       setTab(asked);
     }
     const bed = params.get("bed");
@@ -133,6 +147,7 @@ export function PlantingsScreen({
         tabs={[
           { id: "plantings", label: "In the ground" },
           { id: "beds", label: "Beds" },
+          { id: "calendar", label: "When to plant" },
           { id: "care", label: "Care log" },
           {
             id: "plan",
@@ -175,6 +190,8 @@ export function PlantingsScreen({
                 setTab("plantings");
               }}
             />
+          ) : active === "calendar" ? (
+            <PlantingCalendarPanel crops={crops} frost={frost} />
           ) : active === "care" ? (
             <CareLogPanel
               care={care}
@@ -197,6 +214,11 @@ export function PlantingsScreen({
               propertyId={propertyId}
               actorId={actorId}
               leadDays={WINDOW_LEAD_DAYS}
+              frostFor={(year) =>
+                property === undefined
+                  ? undefined
+                  : frostDatesFor(property.growingZone, year, property)
+              }
             />
           )
         }

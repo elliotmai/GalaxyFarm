@@ -123,7 +123,7 @@ export function offlineImageryGap(
     );
   }
   if (property.offlineImageryBounds === undefined) {
-    missing.push("the ground that image covers has not been recorded under Settings → Property");
+    missing.push("the ground that image covers has not been recorded under Settings → Farm");
   }
   if (offlineImageryBase(env) === undefined) {
     missing.push("NEXT_PUBLIC_OFFLINE_IMAGERY_BASE_URL is not set on this server");

@@ -17,7 +17,11 @@ import {
 } from "@galaxy-farm/ui";
 import type { CrudError, Ulid } from "@galaxy-farm/core";
 import {
+  companionsOf,
+  MILESTONE_LABELS,
   plannedPlantingSchema,
+  plantingSchedule,
+  plantingWindow,
   plantingSchema,
   plantingToActual,
   plantingWindows,
@@ -28,6 +32,7 @@ import {
   type Planting,
   type PlantingMethod,
   type SeasonPlan,
+  type FrostDates,
   type Variety,
 } from "@galaxy-farm/module-garden";
 
@@ -46,7 +51,7 @@ import {
   RowAction,
   RowList,
 } from "@/app/(admin)/admin/pastures/_components/land-kit";
-import { byId, varietyLabel } from "@/lib/garden";
+import { byId, varietyFacts, varietyLabel } from "@/lib/garden";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -81,6 +86,11 @@ interface EntryDraft {
   readonly windowTo: string;
   readonly quantity: string;
   readonly notes: string;
+  /**
+   * True while the window is the one worked out from the frost dates. Typing
+   * a date takes it over; changing the variety or method then leaves it be.
+   */
+  readonly windowFromFrost: boolean;
 }
 
 export function SeasonPlanPanel({
@@ -93,6 +103,7 @@ export function SeasonPlanPanel({
   propertyId,
   actorId,
   leadDays,
+  frostFor,
 }: {
   readonly plans: readonly SeasonPlan[];
   readonly planned: readonly PlannedPlanting[];
@@ -103,6 +114,8 @@ export function SeasonPlanPanel({
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
   readonly leadDays: number;
+  /** The farm's frost dates for a plan's year — what windows are worked out from. */
+  readonly frostFor?: (year: number) => FrostDates | undefined;
 }) {
   const planApi = useMutations<SeasonPlan>(
     "seasonPlans",
@@ -423,6 +436,7 @@ export function SeasonPlanPanel({
       windowTo: "",
       quantity: "",
       notes: "",
+      windowFromFrost: true,
     });
     setErrors({});
   }
@@ -438,8 +452,68 @@ export function SeasonPlanPanel({
       windowTo: dateInputValue(row.windowTo),
       quantity: row.quantity === undefined ? "" : String(row.quantity),
       notes: row.notes ?? "",
+      // An existing entry keeps the window it was saved with until somebody
+      // changes the variety or method on purpose.
+      windowFromFrost: false,
     });
     setErrors({});
+  }
+
+  /** The plan's year, for the entry being written. */
+  const entryYear = (seasonPlanId: string) =>
+    plans.find((plan) => plan.id === seasonPlanId)?.year ?? new Date().getFullYear();
+
+  /**
+   * The draft with its window worked out from the frost dates, when it is
+   * still the frost's to set. Called on every variety or method change.
+   */
+  function withFrostWindow(draft: EntryDraft): EntryDraft {
+    if (!draft.windowFromFrost || draft.varietyId === "") return draft;
+    const window = plantingWindow(
+      varietyFacts(draft.varietyId as Ulid, varieties, crops),
+      frostFor?.(entryYear(draft.seasonPlanId)),
+      draft.method,
+    );
+    if (window === undefined) return draft;
+    return {
+      ...draft,
+      windowFrom: dateInputValue(window.from),
+      windowTo: dateInputValue(window.to),
+    };
+  }
+
+  /** The whole year for the variety in the form: what it needs, when, and who with. */
+  function scheduleFor(draft: EntryDraft): { line?: string; neighbours?: string } {
+    if (draft.varietyId === "") return {};
+    const facts = varietyFacts(draft.varietyId as Ulid, varieties, crops);
+    const frost = frostFor?.(entryYear(draft.seasonPlanId));
+    const steps = plantingSchedule(facts, frost, draft.method)
+      .filter((step) => step.kind !== "fall_sow" || draft.method === "direct_sow")
+      .map((step) =>
+        step.from.getTime() === step.to.getTime()
+          ? `${MILESTONE_LABELS[step.kind]} ${formatDate(step.from)}`
+          : `${MILESTONE_LABELS[step.kind]} ${formatDate(step.from)} – ${formatDate(step.to)}`,
+      );
+    const variety = byId(varieties).get(draft.varietyId as Ulid);
+    const crop = variety === undefined ? undefined : byId(crops).get(variety.cropId);
+    const pairs = crop === undefined ? undefined : companionsOf(crop.name);
+    const neighbours =
+      pairs === undefined || pairs.good.length + pairs.bad.length === 0
+        ? undefined
+        : [
+            pairs.good.length === 0
+              ? undefined
+              : `Good beside ${pairs.good.map((pairing) => pairing.with.toLowerCase()).join(", ")}`,
+            pairs.bad.length === 0
+              ? undefined
+              : `keep away from ${pairs.bad.map((pairing) => pairing.with.toLowerCase()).join(", ")}`,
+          ]
+            .filter(Boolean)
+            .join("; ");
+    return {
+      ...(steps.length === 0 ? {} : { line: steps.join(" · ") }),
+      ...(neighbours === undefined ? {} : { neighbours: `${neighbours}.` }),
+    };
   }
 
   function startConvert(entry: PlannedPlanting) {
@@ -756,6 +830,16 @@ export function SeasonPlanPanel({
           }
         >
           <div className="flex flex-col gap-density">
+            {(() => {
+              const { line, neighbours } = scheduleFor(entryDraft);
+              if (line === undefined && neighbours === undefined) return null;
+              return (
+                <div className="flex flex-col gap-1 rounded-density bg-raised px-3 py-2 text-sm">
+                  {line === undefined ? null : <p className="text-ink">{line}</p>}
+                  {neighbours === undefined ? null : <p className="text-muted">{neighbours}</p>}
+                </div>
+              );
+            })()}
             <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
               <Select
                 label="Variety"
@@ -772,7 +856,13 @@ export function SeasonPlanPanel({
                 value={entryDraft.varietyId}
                 error={errors["varietyId"]}
                 onChange={(event) =>
-                  setEntryDraft({ ...entryDraft, varietyId: event.target.value })
+                  setEntryDraft(
+                    withFrostWindow({
+                      ...entryDraft,
+                      varietyId: event.target.value,
+                      windowFromFrost: entryDraft.windowFromFrost || editingEntry === undefined,
+                    }),
+                  )
                 }
               />
               <Select
@@ -781,17 +871,32 @@ export function SeasonPlanPanel({
                 value={entryDraft.method}
                 error={errors["method"]}
                 onChange={(event) =>
-                  setEntryDraft({ ...entryDraft, method: event.target.value as PlantingMethod })
+                  setEntryDraft(
+                    withFrostWindow({
+                      ...entryDraft,
+                      method: event.target.value as PlantingMethod,
+                      windowFromFrost: true,
+                    }),
+                  )
                 }
               />
               <TextInput
                 label="Window opens"
                 type="date"
                 required
+                hint={
+                  entryDraft.windowFromFrost && scheduleFor(entryDraft).line !== undefined
+                    ? "Worked out from your frost dates."
+                    : undefined
+                }
                 value={entryDraft.windowFrom}
                 error={errors["windowFrom"]}
                 onChange={(event) =>
-                  setEntryDraft({ ...entryDraft, windowFrom: event.target.value })
+                  setEntryDraft({
+                    ...entryDraft,
+                    windowFrom: event.target.value,
+                    windowFromFrost: false,
+                  })
                 }
               />
               <TextInput
@@ -800,7 +905,13 @@ export function SeasonPlanPanel({
                 required
                 value={entryDraft.windowTo}
                 error={errors["windowTo"]}
-                onChange={(event) => setEntryDraft({ ...entryDraft, windowTo: event.target.value })}
+                onChange={(event) =>
+                  setEntryDraft({
+                    ...entryDraft,
+                    windowTo: event.target.value,
+                    windowFromFrost: false,
+                  })
+                }
               />
               <Select
                 label="Bed"

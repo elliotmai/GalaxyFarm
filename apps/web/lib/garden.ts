@@ -1,5 +1,6 @@
 import type { Ulid } from "@galaxy-farm/core";
 import {
+  cropGrowing,
   cropFamily,
   inferFamily,
   normaliseFamily,
@@ -318,5 +319,26 @@ export function varietyDefaults(
   return {
     daysToMaturity: fill(current.daysToMaturity, facts?.daysToMaturity),
     spacingInches: fill(current.spacingInches, facts?.spacingInches),
+  };
+}
+
+/**
+ * How a variety grows: its crop's facts (own, else the table's) with the
+ * variety's own days and spacing over them — the packet beats the typical.
+ * What every schedule, capacity and harvest window in the garden reads.
+ */
+export function varietyFacts(
+  varietyId: Ulid,
+  varieties: readonly Variety[],
+  crops: readonly Crop[],
+): GrowingFacts | undefined {
+  const variety = varieties.find((held) => held.id === varietyId);
+  const crop = variety === undefined ? undefined : crops.find((held) => held.id === variety.cropId);
+  const facts = cropGrowing(crop);
+  if (facts === undefined && variety?.daysToMaturity === undefined) return undefined;
+  return {
+    ...(facts ?? {}),
+    ...(variety?.daysToMaturity === undefined ? {} : { daysToMaturity: variety.daysToMaturity }),
+    ...(variety?.spacingInches === undefined ? {} : { spacingInches: variety.spacingInches }),
   };
 }

@@ -85,3 +85,79 @@ describe("gardenCalendarEntries", () => {
     expect(april).toHaveLength(1);
   });
 });
+
+describe("what the plantings put on the calendar", () => {
+  const VARIETY = "01ARZ3NDEKTSV4RRFFQ69G5FV9" as Ulid;
+  const base = {
+    propertyId: "01ARZ3NDEKTSV4RRFFQ69G5FP1" as Ulid,
+    createdAt: new Date("2027-01-01T00:00:00Z"),
+    updatedAt: new Date("2027-01-01T00:00:00Z"),
+    varietyId: VARIETY,
+  };
+  const facts = { daysToMaturity: 70, startIndoorsWeeks: 10, harvestWeeks: 4 };
+  const names = new Map([[VARIETY, "California Wonder pepper"]]);
+
+  it("gives a tray started indoors its harden-off week and transplant day", () => {
+    const entries = gardenCalendarEntries({
+      plantings: [
+        {
+          ...base,
+          id: "01ARZ3NDEKTSV4RRFFQ69G5FQ1" as Ulid,
+          method: "indoor_start",
+          status: "started",
+          indoorStartedOn: new Date("2027-01-21T00:00:00Z"),
+        },
+      ],
+      varietyNames: names,
+      factsFor: () => facts,
+    });
+
+    expect(entries.map((entry) => entry.title)).toEqual([
+      "Harden off California Wonder pepper",
+      "Transplant California Wonder pepper",
+    ]);
+    expect(entries[1]?.at).toEqual(new Date("2027-04-01T00:00:00Z"));
+  });
+
+  it("gives something in the ground its harvest window", () => {
+    const [entry] = gardenCalendarEntries({
+      plantings: [
+        {
+          ...base,
+          id: "01ARZ3NDEKTSV4RRFFQ69G5FQ2" as Ulid,
+          method: "transplant",
+          status: "growing",
+          bedId: "01ARZ3NDEKTSV4RRFFQ69G5FB1" as Ulid,
+          plantedOn: new Date("2027-04-08T00:00:00Z"),
+        },
+      ],
+      varietyNames: names,
+      factsFor: () => facts,
+    });
+
+    expect(entry).toMatchObject({
+      kind: "harvest_window",
+      title: "Pick California Wonder pepper",
+      at: new Date("2027-06-17T00:00:00Z"),
+      endAt: new Date("2027-07-15T00:00:00Z"),
+    });
+  });
+
+  it("puts nothing up for a finished planting", () => {
+    expect(
+      gardenCalendarEntries({
+        plantings: [
+          {
+            ...base,
+            id: "01ARZ3NDEKTSV4RRFFQ69G5FQ3" as Ulid,
+            method: "direct_sow",
+            status: "finished",
+            bedId: "01ARZ3NDEKTSV4RRFFQ69G5FB1" as Ulid,
+            plantedOn: new Date("2027-04-08T00:00:00Z"),
+          },
+        ],
+        factsFor: () => facts,
+      }),
+    ).toEqual([]);
+  });
+});

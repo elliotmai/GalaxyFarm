@@ -451,12 +451,12 @@ export function GardenLayoutScreen({
       {places.length === 0 ? (
         <EmptyState
           title="No garden zone yet"
-          detail="Beds sit inside a garden zone. Add one under Settings → Property, record the beds under Plantings → Beds, then draw them here."
+          detail="Beds sit inside a garden zone. Add one under Settings → Farm, record the beds under Plantings → Beds, then draw them here."
         />
       ) : origin === undefined ? (
         <Callout tone="action" title="The garden has nowhere to hang">
           Trace {zone?.name ?? "the garden"} on the property map, or set the property&rsquo;s
-          coordinates under Settings → Property, so the beds have a corner to measure from.
+          coordinates under Settings → Farm, so the beds have a corner to measure from.
         </Callout>
       ) : null}
 

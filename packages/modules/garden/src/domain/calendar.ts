@@ -1,5 +1,8 @@
 import { projectedId, type CalendarEntry, type Ulid } from "@galaxy-farm/core";
 
+import type { GrowingFacts } from "./growing.js";
+import type { Planting } from "./planting.js";
+import { harvestWindow, transplantDue } from "./schedule.js";
 import type { PlannedPlanting } from "./season-plan.js";
 
 /**
@@ -16,11 +19,21 @@ import type { PlannedPlanting } from "./season-plan.js";
  */
 
 const PLANNED_PLANTINGS = "plannedPlantings";
+const PLANTINGS = "plantings";
 
 export interface GardenCalendarInput {
   readonly planned?: readonly PlannedPlanting[];
   /** Variety names, keyed by id; the row falls back to the method without them. */
   readonly varietyNames?: ReadonlyMap<Ulid, string>;
+  /**
+   * Plantings, for the dates that follow from what has actually happened: a
+   * tray started indoors is due out on a date, and something in the ground
+   * has a harvest window. Real dates, not the catalogue's — the same
+   * restraint as the plan.
+   */
+  readonly plantings?: readonly Planting[];
+  /** A variety's growing facts (its own days, else its crop's). */
+  readonly factsFor?: (varietyId: Ulid) => GrowingFacts | undefined;
 }
 
 const METHOD_LABELS: Readonly<Record<string, string>> = {
@@ -37,6 +50,66 @@ const METHOD_LABELS: Readonly<Record<string, string>> = {
  * would still be sitting on the calendar in June asking to be done.
  */
 export function gardenCalendarEntries(input: GardenCalendarInput): CalendarEntry[] {
+  return [...plannedEntries(input), ...plantingEntries(input)];
+}
+
+/**
+ * What the plantings themselves put on the calendar: a seedling's harden-off
+ * week and transplant day, and the harvest window of anything in the ground.
+ */
+function plantingEntries(input: GardenCalendarInput): CalendarEntry[] {
+  const entries: CalendarEntry[] = [];
+  for (const planting of input.plantings ?? []) {
+    const facts = input.factsFor?.(planting.varietyId);
+    const name = input.varietyNames?.get(planting.varietyId) ?? "seedlings";
+
+    if (planting.status === "started" || planting.status === "hardening") {
+      const due = transplantDue(planting.indoorStartedOn, facts);
+      if (due !== undefined) {
+        if (planting.status === "started") {
+          entries.push({
+            id: `${projectedId("planting_window", PLANTINGS, planting.id)}:harden`,
+            kind: "planting_window",
+            module: "garden",
+            title: `Harden off ${name}`,
+            at: due.hardenFrom,
+            endAt: due.plantOut,
+            allDay: true,
+            source: { entity: PLANTINGS, id: planting.id },
+          });
+        }
+        entries.push({
+          id: `${projectedId("planting_window", PLANTINGS, planting.id)}:out`,
+          kind: "planting_window",
+          module: "garden",
+          title: `Transplant ${name}`,
+          at: due.plantOut,
+          allDay: true,
+          source: { entity: PLANTINGS, id: planting.id },
+        });
+      }
+    }
+
+    if (planting.status === "growing" || planting.status === "harvesting") {
+      const window = harvestWindow(planting.plantedOn, facts);
+      if (window !== undefined) {
+        entries.push({
+          id: projectedId("harvest_window", PLANTINGS, planting.id),
+          kind: "harvest_window",
+          module: "garden",
+          title: `Pick ${name}`,
+          at: window.from,
+          endAt: window.to,
+          allDay: true,
+          source: { entity: PLANTINGS, id: planting.id },
+        });
+      }
+    }
+  }
+  return entries;
+}
+
+function plannedEntries(input: GardenCalendarInput): CalendarEntry[] {
   return (input.planned ?? [])
     .filter((planned) => planned.planStatus === "open")
     .map((planned) => {

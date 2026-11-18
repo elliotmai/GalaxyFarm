@@ -297,7 +297,7 @@ export function BedsPanel({
     <div className="flex flex-col gap-density pb-20 sm:pb-0">
       {places.length === 0 ? (
         <StatusLine tone="action">
-          A bed sits inside a zone. Add a garden area under Settings → Property first.
+          A bed sits inside a zone. Add a garden area under Settings → Farm first.
         </StatusLine>
       ) : null}
 

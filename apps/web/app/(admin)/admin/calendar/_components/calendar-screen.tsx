@@ -45,6 +45,7 @@ import type {
   MeterReading,
 } from "@galaxy-farm/module-equipment";
 import type { FeedConsumption, FeedPurchase, FeedType } from "@galaxy-farm/module-feed";
+import type { Crop, PlannedPlanting, Planting, Variety } from "@galaxy-farm/module-garden";
 
 import { CalendarGrid } from "@/app/(admin)/admin/calendar/_components/calendar-grid";
 import { EntryList } from "@/app/(admin)/admin/calendar/_components/entry-list";
@@ -137,6 +138,10 @@ export function CalendarScreen({
   const { records: meterReadings } = useRecords<MeterReading>("meterReadings", query);
   const { records: tasks } = useRecords<Task>("tasks", query);
   const { records: choreTemplates } = useRecords<ChoreTemplate>("choreTemplates", query);
+  const { records: plannedPlantings } = useRecords<PlannedPlanting>("plannedPlantings", query);
+  const { records: plantings } = useRecords<Planting>("plantings", query);
+  const { records: varieties } = useRecords<Variety>("varieties", query);
+  const { records: crops } = useRecords<Crop>("crops", query);
 
   const calendarEvents = useMutations<CalendarEvent>(
     "calendarEvents",
@@ -190,6 +195,10 @@ export function CalendarScreen({
           meterReadings,
           tasks,
           choreTemplates,
+          plannedPlantings,
+          plantings,
+          varieties,
+          crops,
         },
         { from: period.from, days: period.days, now },
       ),
@@ -213,6 +222,10 @@ export function CalendarScreen({
       meterReadings,
       tasks,
       choreTemplates,
+      plannedPlantings,
+      plantings,
+      varieties,
+      crops,
       period,
       now,
     ],

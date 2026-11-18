@@ -61,7 +61,7 @@ describe("offlineImageryGap", () => {
     const gap = offlineImageryGap({}, {});
 
     expect(gap).toContain("USDA NAIP");
-    expect(gap).toContain("Settings → Property");
+    expect(gap).toContain("Settings → Farm");
     expect(gap).toContain("NEXT_PUBLIC_OFFLINE_IMAGERY_BASE_URL");
   });
 

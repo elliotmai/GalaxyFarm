@@ -33,6 +33,15 @@ import {
   type FeedPurchase,
   type FeedType,
 } from "@galaxy-farm/module-feed";
+import {
+  gardenCalendarEntries,
+  type Crop,
+  type PlannedPlanting,
+  type Planting,
+  type Variety,
+} from "@galaxy-farm/module-garden";
+
+import { varietyFacts, varietyLabel } from "@/lib/garden";
 
 /**
  * The projected half of the unified calendar, assembled (spec §6, §4.1).
@@ -49,12 +58,10 @@ import {
  * in step — correcting the breeding record moves its calving window the next
  * time this runs, which on a live query is immediately.
  *
- * **Two modules are missing on purpose.** Garden and business project their
- * own rows too — `gardenCalendarEntries` and `businessCalendarEntries`, both
- * tested — but the season plans and program enrollments they read are not yet
- * among the entities a device holds (`LOCAL_STORES`), and they arrive with
- * §5.5's and §5.7's own phases. They light up here the day their stores do,
- * which is one import each.
+ * The garden adds its planned windows, a seedling's harden-off and transplant
+ * dates and each planting's harvest window — read from the device's own
+ * stores, so they show without the server's cron having run. Business still
+ * projects nothing here: program enrollments are not yet a local store.
  */
 
 export interface CalendarSources {
@@ -78,6 +85,11 @@ export interface CalendarSources {
   readonly meterReadings: readonly MeterReading[];
   readonly tasks: readonly Task[];
   readonly choreTemplates: readonly ChoreTemplate[];
+  /** The garden's, optional: a surface that has not loaded them shows none. */
+  readonly plannedPlantings?: readonly PlannedPlanting[];
+  readonly plantings?: readonly Planting[];
+  readonly varieties?: readonly Variety[];
+  readonly crops?: readonly Crop[];
 }
 
 export interface CalendarHorizon {
@@ -130,7 +142,22 @@ export function projectedCalendarEntries(
       horizon.days,
       horizon.now,
     ),
+    ...gardenEntries(sources),
   ];
+}
+
+function gardenEntries(sources: CalendarSources) {
+  const varieties = sources.varieties ?? [];
+  const crops = sources.crops ?? [];
+  const varietyNames = new Map(
+    varieties.map((variety) => [variety.id, varietyLabel(variety, crops)]),
+  );
+  return gardenCalendarEntries({
+    planned: sources.plannedPlantings ?? [],
+    plantings: sources.plantings ?? [],
+    varietyNames,
+    factsFor: (varietyId) => varietyFacts(varietyId, varieties, crops),
+  });
 }
 
 /**
