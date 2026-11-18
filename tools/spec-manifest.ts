@@ -408,6 +408,23 @@ export const SPEC_COVERAGE: Readonly<Record<string, SpecCoverageEntry>> = {
     phase: "Phase 3",
     status: "built",
   },
+  "When things go in (decision 50)": {
+    section: "5.5",
+    kind: "derivation",
+    declares: [
+      "plantingSchedule",
+      "latestSowing",
+      "harvestWindow",
+      "transplantDue",
+      "companionship",
+      "clashesAmong",
+      "plantsThatFit",
+      "bedFill",
+      "gardenJobs",
+    ],
+    phase: "Phase 3",
+    status: "built",
+  },
   "SeasonPlan → planting notifications": {
     section: "5.5",
     kind: "entity",

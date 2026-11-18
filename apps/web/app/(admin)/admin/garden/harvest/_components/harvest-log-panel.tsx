@@ -14,14 +14,15 @@ import {
 } from "@galaxy-farm/ui";
 import type { CrudError, Ulid } from "@galaxy-farm/core";
 import {
-  harvestLogSchema,
-  preservationLogSchema,
-  totalHarvest,
   type Bed,
   type Crop,
   type HarvestLog,
+  harvestLogSchema,
   type Planting,
+  plantingSchema,
   type PreservationLog,
+  preservationLogSchema,
+  totalHarvest,
   type Variety,
 } from "@galaxy-farm/module-garden";
 
@@ -84,6 +85,13 @@ export function HarvestLogPanel({
   /** Off to the pantry — with this picking chosen as the source, when there is one. */
   readonly onPreserve: (from?: HarvestLog) => void;
 }) {
+  const plantingApi = useMutations<Planting>(
+    "plantings",
+    "plantings",
+    plantingSchema,
+    propertyId,
+    actorId,
+  );
   const api = useMutations<HarvestLog>(
     "harvestLogs",
     "harvestLogs",
@@ -203,6 +211,13 @@ export function HarvestLogPanel({
     if (!result.ok) {
       reportErrors(result.error);
       return;
+    }
+
+    // The first picking moves a growing planting on to harvesting, so its
+    // status stays true without a second trip to another screen.
+    const picked = byId(plantings).get(fields.plantingId);
+    if (editing === undefined && picked?.status === "growing") {
+      await plantingApi.update(picked.id, { status: "harvesting" } as Partial<Planting>);
     }
 
     show({

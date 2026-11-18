@@ -18,6 +18,7 @@ import {
 } from "@galaxy-farm/ui";
 import type { CrudError, Ulid } from "@galaxy-farm/core";
 import {
+  areaNeeded,
   companionsOf,
   MILESTONE_LABELS,
   plannedPlantingSchema,
@@ -514,9 +515,21 @@ export function SeasonPlanPanel({
           ]
             .filter(Boolean)
             .join("; ");
+    // How much bed it needs, for a count somebody has typed.
+    const count = optionalNumber(draft.quantity);
+    const space =
+      count === undefined || facts?.spacingInches === undefined
+        ? undefined
+        : `${count} at ${facts.spacingInches}" apart need about ${Math.ceil(areaNeeded(count, facts.spacingInches))} sq ft.`;
     return {
       ...(steps.length === 0 ? {} : { line: steps.join(" · ") }),
-      ...(neighbours === undefined ? {} : { neighbours: `${neighbours}.` }),
+      ...(neighbours === undefined && space === undefined
+        ? {}
+        : {
+            neighbours: [neighbours === undefined ? undefined : `${neighbours}.`, space]
+              .filter(Boolean)
+              .join(" "),
+          }),
     };
   }
 
