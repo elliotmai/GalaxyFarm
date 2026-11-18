@@ -84,11 +84,12 @@ export const NAV: readonly NavDestination[] = [
       // `owns`: a flock's own page (`/admin/chickens/flock/<name>`) sits in
       // Chickens, and as a record page draws no strips (see `SectionStrip`).
       { href: "/admin/chickens/flock", label: "Chickens", owns: ["/admin/chickens/flock/"] },
-      // Dogs owns the pets' own pages (`/admin/pets/<name>`), cats included:
+      // Dogs owns the pets' own pages (`/admin/pets/<name>`), cats and reptiles included:
       // they share one address space, and a record page draws no strip, so
       // which of the two lights is the only difference it makes.
       { href: "/admin/pets/dogs", label: "Dogs", owns: ["/admin/pets/"] },
       { href: "/admin/pets/cats", label: "Cats" },
+      { href: "/admin/pets/reptiles", label: "Reptiles" },
     ],
   },
   {
@@ -235,6 +236,10 @@ export const SUB_SECTIONS: Readonly<Record<string, readonly NavItem[]>> = {
   "/admin/pets/cats": [
     { href: "/admin/pets/cats", label: "Cats" },
     { href: "/admin/pets/cats/care", label: "Cat care" },
+  ],
+  "/admin/pets/reptiles": [
+    { href: "/admin/pets/reptiles", label: "Reptiles" },
+    { href: "/admin/pets/reptiles/care", label: "Reptile care" },
   ],
   "/admin/settings": [
     { href: "/admin/settings", label: "Settings" },

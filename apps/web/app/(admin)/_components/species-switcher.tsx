@@ -35,6 +35,7 @@ interface Counts {
   readonly flocks: number;
   readonly dogs: number;
   readonly cats: number;
+  readonly reptiles: number;
 }
 
 const CHOICES: readonly Choice[] = [
@@ -43,10 +44,11 @@ const CHOICES: readonly Choice[] = [
   { home: "/admin/chickens/flock", label: "Chickens", count: (c) => c.flocks + c.birds },
   { home: "/admin/pets/dogs", label: "Dogs", count: (c) => c.dogs },
   { home: "/admin/pets/cats", label: "Cats", count: (c) => c.cats },
+  { home: "/admin/pets/reptiles", label: "Reptiles", count: (c) => c.reptiles },
   {
     home: "/admin/animals",
     label: "Every animal",
-    count: (c) => c.cattle + c.horses + c.flocks + c.birds + c.dogs + c.cats,
+    count: (c) => c.cattle + c.horses + c.flocks + c.birds + c.dogs + c.cats + c.reptiles,
   },
 ];
 
@@ -97,6 +99,7 @@ export function SpeciesSwitcher({
     flocks: flocks.filter((flock) => flock.active).length,
     dogs: of("dog"),
     cats: of("cat"),
+    reptiles: of("reptile"),
   };
   const chosen = CHOICES.find((choice) => choice.home === current) ?? CHOICES[CHOICES.length - 1];
 

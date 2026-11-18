@@ -25,6 +25,7 @@ import {
   animalSchema,
   displayName,
   isOnFarm,
+  kindsOf,
 } from "../src/entities/animal.js";
 import {
   currentAssignment,
@@ -277,6 +278,20 @@ describe("Animal", () => {
 
     expect(animalSchema.safeParse(noIdentity).success).toBe(false);
     expect(animalSchema.safeParse({ ...noIdentity, name: "Dolly" }).success).toBe(true);
+  });
+
+  it("makes a reptile say which kind it is, and nothing else carry a kind", () => {
+    const gecko = { ...valid, species: "reptile" as const, name: "Mango" };
+
+    // A reptile with no kind, or a kind its species does not have, is refused.
+    expect(animalSchema.safeParse(gecko).success).toBe(false);
+    expect(animalSchema.safeParse({ ...gecko, kind: "dragon" }).success).toBe(false);
+    expect(animalSchema.safeParse({ ...gecko, kind: "gecko" }).success).toBe(true);
+
+    // A cow has no kinds, so "gecko" left on one by a changed form is refused.
+    expect(animalSchema.safeParse({ ...valid, kind: "gecko" }).success).toBe(false);
+    expect(kindsOf("reptile")).toContain("gecko");
+    expect(kindsOf("cattle")).toEqual([]);
   });
 
   it("insists a client animal names its owner", () => {

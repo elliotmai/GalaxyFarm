@@ -13,11 +13,11 @@ import {
 } from "@galaxy-farm/core";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
-import { outstandingPetCare, petsOnFarm } from "@galaxy-farm/module-pets";
+import { outstandingPetCare, petsOnFarm, type PetSpecies } from "@galaxy-farm/module-pets";
 
 import { PetFeedingPanel } from "@/app/(admin)/admin/pets/_components/pet-feeding-panel";
 import { PetHealthPanel } from "@/app/(admin)/admin/pets/_components/pet-health-panel";
-import { PetPanel } from "@/app/(admin)/admin/pets/_components/pet-panel";
+import { PET_SPECIES_LABELS, PetPanel } from "@/app/(admin)/admin/pets/_components/pet-panel";
 import { nameList } from "@/lib/feed-lines";
 import { careRecordsFor } from "@/lib/pet-care";
 import { useRecords } from "@/lib/local/use-records";
@@ -51,7 +51,7 @@ export function PetsScreen({
    * One species' care — Dog care, Cat care — each in its own species' strip,
    * so the way to the cats' vet visits never shows the dogs beside it.
    */
-  readonly species?: "dog" | "cat";
+  readonly species?: PetSpecies;
 }) {
   // `?tab=health` or `?tab=feeding` opens on that tab — the Medicine and
   // Rations buttons on the Dogs and Cats pages land here. Read off `window`
@@ -100,7 +100,7 @@ export function PetsScreen({
     <PageBody>
       <PageHeader
         eyebrow="Animals"
-        title={species === "dog" ? "Dog care" : species === "cat" ? "Cat care" : "Pet care"}
+        title={`${species === undefined ? "Pet" : PET_SPECIES_LABELS[species]} care`}
         subtitle={[
           `${pets.length} ${species ?? "pet"}${pets.length === 1 ? "" : "s"}`,
           due.length === 0 ? undefined : `${due.length} care due`,

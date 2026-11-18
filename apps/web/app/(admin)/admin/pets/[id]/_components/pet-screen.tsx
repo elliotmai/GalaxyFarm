@@ -58,6 +58,7 @@ import {
   PetEditor,
   petAgeLabel,
   petSpeciesLabel,
+  petSpeciesOf,
 } from "@/app/(admin)/admin/pets/_components/pet-panel";
 import { PhotoPanel } from "@/app/_components/photo-panel";
 import { PET_SECTION_SEGMENTS, petHref, petSlug, resolveAnimalSlug } from "@/lib/animal-slug";
@@ -504,9 +505,7 @@ export function PetScreen({
           actorId={actorId}
           onClose={() => setPanel(undefined)}
           // Gone from the household, so back to the list it was opened from.
-          onDeleted={() =>
-            router.push(pet.species === "cat" ? "/admin/pets/cats" : "/admin/pets/dogs")
-          }
+          onDeleted={() => router.push(`/admin/pets/${petSpeciesOf(pet)}s`)}
         />
       ) : null}
     </PageBody>

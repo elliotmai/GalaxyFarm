@@ -2,6 +2,7 @@ import {
   animalsWithoutOutside,
   endOfDay,
   isOnFarm,
+  KIND_LABELS,
   startOfDay,
   type Animal,
   type Ulid,
@@ -42,7 +43,7 @@ import { careRecordsFor } from "@/lib/pet-care";
  * rendering a list.
  */
 
-export const GROUPS = ["cattle", "horses", "chickens", "dogs", "cats"] as const;
+export const GROUPS = ["cattle", "horses", "chickens", "dogs", "cats", "reptiles"] as const;
 export type AnimalGroup = (typeof GROUPS)[number];
 
 export const GROUP_LABELS: Readonly<Record<AnimalGroup, string>> = {
@@ -51,6 +52,7 @@ export const GROUP_LABELS: Readonly<Record<AnimalGroup, string>> = {
   chickens: "Chickens",
   dogs: "Dogs",
   cats: "Cats",
+  reptiles: "Reptiles",
 };
 
 /** Each species' own page — what its chip on the Animals list opens. */
@@ -60,7 +62,11 @@ export const GROUP_HOMES: Readonly<Record<AnimalGroup, string>> = {
   chickens: "/admin/chickens/flock",
   dogs: "/admin/pets/dogs",
   cats: "/admin/pets/cats",
+  reptiles: "/admin/pets/reptiles",
 };
+
+/** The groups that are pets — the household, not the operation. */
+export const PET_GROUPS: ReadonlySet<AnimalGroup> = new Set(["dogs", "cats", "reptiles"]);
 
 export interface AnimalEntry {
   /** The record's id — an animal's, or a flock's for a flock row. */
@@ -121,6 +127,7 @@ function groupOf(animal: Animal): AnimalGroup {
   if (animal.species === "horse") return "horses";
   if (animal.species === "dog") return "dogs";
   if (animal.species === "cat") return "cats";
+  if (animal.species === "reptile") return "reptiles";
   // A bird kept as its own record is still part of the flock people look for.
   return "chickens";
 }
@@ -129,7 +136,7 @@ function groupOf(animal: Animal): AnimalGroup {
 function hrefOf(animal: Animal, group: AnimalGroup, input: EntryInputs): string {
   if (group === "cattle") return animalHref(animal);
   if (group === "horses") return horseHref(animal);
-  if (group === "dogs" || group === "cats") return petHref(animal);
+  if (PET_GROUPS.has(group)) return petHref(animal);
   return birdHref(animal, input.flocks, input.assignments);
 }
 
@@ -137,6 +144,7 @@ const SPECIES_WORD: Readonly<Record<string, string>> = {
   horse: "Horse",
   dog: "Dog",
   cat: "Cat",
+  reptile: "Reptile",
   chicken: "Chicken",
   quail: "Quail",
 };
@@ -177,9 +185,7 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
 
   // A pet whose shots have lapsed — the pets screen's red line, as a chip.
   const petIds = new Set(
-    animals
-      .filter((animal) => groupOf(animal) === "dogs" || groupOf(animal) === "cats")
-      .map((animal) => animal.id),
+    animals.filter((animal) => PET_GROUPS.has(groupOf(animal))).map((animal) => animal.id),
   );
   const petNeeds = outstandingPetCare(
     careRecordsFor(input.health.filter((record) => petIds.has(record.animalId))),
@@ -220,18 +226,20 @@ export function animalEntries(input: EntryInputs): AnimalEntry[] {
           ? animal.sex === "female"
             ? "Mare"
             : "Horse"
-          : (SPECIES_WORD[animal.species] ?? capitalise(animal.species));
+          : // A reptile is called by its kind: "Gecko" is what it is.
+            animal.kind !== undefined
+            ? (KIND_LABELS[animal.kind] ?? capitalise(animal.kind))
+            : (SPECIES_WORD[animal.species] ?? capitalise(animal.species));
     // What each species' row adds after where it stands (decision 45): a pet's
     // next shot or medicine, a horse that needs care to handle.
     const need = nextNeed.get(animal.id);
-    const extra =
-      group === "dogs" || group === "cats"
-        ? need === undefined
-          ? undefined
-          : `${need.label} ${need.status === "overdue" ? "overdue" : `due ${shortDay(need.dueOn)}`}`
-        : group === "horses" && animal.safetyLevel >= 4
-          ? "handle with care"
-          : undefined;
+    const extra = PET_GROUPS.has(group)
+      ? need === undefined
+        ? undefined
+        : `${need.label} ${need.status === "overdue" ? "overdue" : `due ${shortDay(need.dueOn)}`}`
+      : group === "horses" && animal.safetyLevel >= 4
+        ? "handle with care"
+        : undefined;
     const line = [
       what,
       ageLabel(animal, now),

@@ -35,7 +35,7 @@ import {
  * `module-cattle` where a dog's rabies shot has no business importing from.
  */
 
-export const PET_SPECIES = ["dog", "cat"] as const;
+export const PET_SPECIES = ["dog", "cat", "reptile"] as const;
 export type PetSpecies = (typeof PET_SPECIES)[number];
 
 export function isPet(animal: Pick<Animal, "species">): boolean {

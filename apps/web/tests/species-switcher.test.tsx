@@ -52,6 +52,7 @@ describe("the species switcher", () => {
       "Chickens1",
       "Dogs1",
       "Cats0",
+      "Reptiles0",
       "Every animal4",
     ]);
     expect(items[0]?.getAttribute("aria-current")).toBe("page");

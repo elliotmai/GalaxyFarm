@@ -42,9 +42,10 @@ const animal = (overrides: Partial<Animal> & Pick<Animal, "id">): Animal =>
   }) as Animal;
 
 describe("what counts as a pet", () => {
-  it("is a dog or a cat, and nothing else", () => {
-    expect(PET_SPECIES).toEqual(["dog", "cat"]);
+  it("is a dog, a cat or a reptile, and nothing else", () => {
+    expect(PET_SPECIES).toEqual(["dog", "cat", "reptile"]);
     expect(isPet({ species: "cat" })).toBe(true);
+    expect(isPet({ species: "reptile" })).toBe(true);
     expect(isPet({ species: "cattle" })).toBe(false);
   });
 

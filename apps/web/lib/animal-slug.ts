@@ -165,7 +165,7 @@ export const HORSE_SECTION_SEGMENTS: ReadonlySet<string> = new Set([
 ]);
 
 /** The species pages under `/admin/pets/` — a dog called "Cats" steps around one. */
-export const PET_SECTION_SEGMENTS: ReadonlySet<string> = new Set(["cats", "dogs"]);
+export const PET_SECTION_SEGMENTS: ReadonlySet<string> = new Set(["cats", "dogs", "reptiles"]);
 
 /** A pet's address segment — the same preference order, minus its section's words. */
 export function petSlug(animal: Sluggable): string {

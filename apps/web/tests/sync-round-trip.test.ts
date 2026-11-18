@@ -397,7 +397,7 @@ describe("a server whose migrations have not been run", () => {
     // the two reasons differ, which is the whole diagnosis.
     const reasons = left.map((entry) => entry.lastError ?? "").join(" ");
     expect(reasons).toMatch(/breeding_records/);
-    expect(reasons).toMatch(/died_on|cause_of_death/);
+    expect(reasons).toMatch(/kind|died_on|cause_of_death/);
   }, 60_000);
 
   it("sends the held-back entries once the migration is applied", async () => {

@@ -14,6 +14,7 @@ import {
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
+import { isPet } from "@galaxy-farm/module-pets";
 import type { CareGuide, GuideSection, Trip } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
@@ -168,9 +169,7 @@ export function HousesitterScreen({
                 chores: templates.filter((template) => template.active).length,
                 emergency_contacts: emergency.length,
                 vet: contacts.filter((contact) => contact.tags.includes("vet")).length,
-                pets: animals.filter(
-                  (animal) => animal.species === "dog" || animal.species === "cat",
-                ).length,
+                pets: animals.filter(isPet).length,
                 equipment_quirks: 0,
                 custom: mine.length,
               }}

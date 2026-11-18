@@ -167,6 +167,8 @@ export const animals = pgTable(
   {
     ...baseColumns,
     species: text("species").notNull(),
+    /** Which kind within the species — a gecko, for a reptile (0041). */
+    kind: text("kind"),
     name: text("name"),
     tagNumber: text("tag_number"),
     sex: text("sex").notNull(),

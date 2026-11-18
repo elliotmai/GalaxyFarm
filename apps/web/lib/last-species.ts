@@ -21,6 +21,7 @@ export const ANIMAL_HOMES = [
   "/admin/chickens/flock",
   "/admin/pets/dogs",
   "/admin/pets/cats",
+  "/admin/pets/reptiles",
 ] as const;
 export type AnimalHome = (typeof ANIMAL_HOMES)[number];
 

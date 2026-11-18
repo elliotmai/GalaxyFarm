@@ -15,6 +15,7 @@ import type { ReactNode } from "react";
 
 import { Modal } from "@galaxy-farm/ui";
 import type { Animal, BaseRecord, Ulid } from "@galaxy-farm/core";
+import { isPet } from "@galaxy-farm/module-pets";
 import type { Flock } from "@galaxy-farm/module-poultry";
 
 import { NAV, SUB_SECTIONS, UTILITY } from "@/app/(admin)/_components/nav-groups";
@@ -148,7 +149,7 @@ function useHits<T extends BaseRecord>(
 function animalPage(animal: Animal): string {
   if (animal.species === "cattle") return animalHref(animal);
   if (animal.species === "horse") return horseHref(animal);
-  if (animal.species === "dog" || animal.species === "cat") return petHref(animal);
+  if (isPet(animal)) return petHref(animal);
   return "/admin/chickens/flock";
 }
 

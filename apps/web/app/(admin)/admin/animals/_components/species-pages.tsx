@@ -1,8 +1,10 @@
 "use client";
 
 import type { Ulid, Zone } from "@galaxy-farm/core";
+import type { PetSpecies } from "@galaxy-farm/module-pets";
 import type { EggLog, FlockAdjustment } from "@galaxy-farm/module-poultry";
 
+import type { AnimalGroup } from "@/app/(admin)/admin/animals/_components/animal-entries";
 import { AnimalsScreen } from "@/app/(admin)/admin/animals/_components/animals-screen";
 import {
   CHICKEN_ACTIONS,
@@ -65,20 +67,30 @@ export function CatsPage({ propertyId, actorId }: PageProps) {
   return <PetsPage propertyId={propertyId} actorId={actorId} species="cat" />;
 }
 
-function PetsPage({
-  propertyId,
-  actorId,
-  species,
-}: PageProps & { readonly species: "dog" | "cat" }) {
+export function ReptilesPage({ propertyId, actorId }: PageProps) {
+  return <PetsPage propertyId={propertyId} actorId={actorId} species="reptile" />;
+}
+
+/** Each pet species' group, page and add label, in one place. */
+const PET_PAGES: Readonly<
+  Record<PetSpecies, { readonly group: AnimalGroup; readonly path: string; readonly add: string }>
+> = {
+  dog: { group: "dogs", path: "/admin/pets/dogs", add: "Add dog" },
+  cat: { group: "cats", path: "/admin/pets/cats", add: "Add cat" },
+  reptile: { group: "reptiles", path: "/admin/pets/reptiles", add: "Add reptile" },
+};
+
+function PetsPage({ propertyId, actorId, species }: PageProps & { readonly species: PetSpecies }) {
+  const page = PET_PAGES[species];
   return (
     <AnimalsScreen
       propertyId={propertyId}
-      species={species === "dog" ? "dogs" : "cats"}
-      basePath={species === "dog" ? "/admin/pets/dogs" : "/admin/pets/cats"}
+      species={page.group}
+      basePath={page.path}
       glance={<PetsGlance propertyId={propertyId} species={species} />}
       actions={petActions(species)}
       add={{
-        label: species === "dog" ? "Add dog" : "Add cat",
+        label: page.add,
         render: (close) => (
           <PetEditor
             pet={undefined}

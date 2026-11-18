@@ -24,6 +24,8 @@ import {
   ageInMonths,
   animalSchema,
   displayName,
+  KIND_LABELS,
+  kindsOf,
   type Animal,
   type CrudError,
   type FeedingPlan,
@@ -60,11 +62,26 @@ import { useMutations } from "@/lib/local/mutations";
  * same form, schema and delete confirmation as this list.
  */
 
-export const PET_SPECIES_LABELS: Readonly<Record<PetSpecies, string>> = { dog: "Dog", cat: "Cat" };
+export const PET_SPECIES_LABELS: Readonly<Record<PetSpecies, string>> = {
+  dog: "Dog",
+  cat: "Cat",
+  reptile: "Reptile",
+};
 
-/** "Dog" or "Cat", for a pet whose species the type system only knows as a string. */
-export function petSpeciesLabel(pet: Pick<Animal, "species">): string {
-  return PET_SPECIES_LABELS[pet.species === "cat" ? "cat" : "dog"];
+/** The species as a pet — narrowed, since the type system only knows a string. */
+export function petSpeciesOf(pet: Pick<Animal, "species">): PetSpecies {
+  return (PET_SPECIES as readonly string[]).includes(pet.species)
+    ? (pet.species as PetSpecies)
+    : "dog";
+}
+
+/**
+ * "Dog", "Cat", or the reptile's own kind — "Gecko" says more than "Reptile",
+ * and is what anybody looking after it would call it.
+ */
+export function petSpeciesLabel(pet: Pick<Animal, "species" | "kind">): string {
+  if (pet.kind !== undefined) return KIND_LABELS[pet.kind] ?? pet.kind;
+  return PET_SPECIES_LABELS[petSpeciesOf(pet)];
 }
 
 const SAFETY_OPTIONS = Object.values(SAFETY_LEVEL_DEFAULTS).map((level) => ({
@@ -75,6 +92,8 @@ const SAFETY_OPTIONS = Object.values(SAFETY_LEVEL_DEFAULTS).map((level) => ({
 interface Draft {
   readonly name: string;
   readonly species: PetSpecies;
+  /** Which kind, for a species that has kinds; "" until chosen. */
+  readonly kind: string;
   readonly sex: Sex;
   readonly dob: string;
   readonly dobIsEstimate: boolean;
@@ -87,6 +106,7 @@ interface Draft {
 const BLANK: Draft = {
   name: "",
   species: "dog",
+  kind: "",
   sex: "female",
   dob: "",
   dobIsEstimate: true,
@@ -211,10 +231,15 @@ export function PetPanel({
 }
 
 function draftOf(pet: Animal | undefined, species?: PetSpecies): Draft {
-  if (pet === undefined) return species === undefined ? BLANK : { ...BLANK, species };
+  if (pet === undefined) {
+    if (species === undefined) return BLANK;
+    const kinds = kindsOf(species);
+    return { ...BLANK, species, kind: kinds.length === 1 ? (kinds[0] ?? "") : "" };
+  }
   return {
     name: pet.name ?? "",
-    species: (pet.species === "cat" ? "cat" : "dog") as PetSpecies,
+    species: petSpeciesOf(pet),
+    kind: pet.kind ?? "",
     sex: pet.sex,
     dob: pet.dob === undefined ? "" : pet.dob.toISOString().slice(0, 10),
     dobIsEstimate: pet.dobIsEstimate,
@@ -284,6 +309,9 @@ export function PetEditor({
 
     return {
       species: source.species,
+      // Only a species with kinds carries one; switching a draft from Reptile
+      // back to Cat must not leave "gecko" behind on a cat.
+      kind: kindsOf(source.species).length === 0 ? undefined : text(source.kind),
       name: text(source.name),
       sex: source.sex,
       dob: source.dob === "" ? undefined : new Date(`${source.dob}T12:00:00`),
@@ -419,8 +447,29 @@ export function PetEditor({
               value: species,
               label: PET_SPECIES_LABELS[species],
             }))}
-            onChange={(event) => setDraft({ ...draft, species: event.target.value as PetSpecies })}
+            onChange={(event) => {
+              const species = event.target.value as PetSpecies;
+              const kinds = kindsOf(species);
+              // One kind to choose from is no choice: fill it in.
+              setDraft({ ...draft, species, kind: kinds.length === 1 ? (kinds[0] ?? "") : "" });
+            }}
           />
+          {kindsOf(draft.species).length === 0 ? null : (
+            <Select
+              label="Kind"
+              required
+              value={draft.kind}
+              error={errors["kind"]}
+              options={[
+                { value: "", label: "Choose…" },
+                ...kindsOf(draft.species).map((kind) => ({
+                  value: kind,
+                  label: KIND_LABELS[kind] ?? kind,
+                })),
+              ]}
+              onChange={(event) => setDraft({ ...draft, kind: event.target.value })}
+            />
+          )}
           <Select
             label="Sex"
             value={draft.sex}

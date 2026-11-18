@@ -15,7 +15,7 @@ import {
 } from "@galaxy-farm/core";
 import { animalsUnderWithdrawal, type HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedingPlan } from "@galaxy-farm/core";
-import { outstandingPetCare } from "@galaxy-farm/module-pets";
+import { outstandingPetCare, type PetSpecies } from "@galaxy-farm/module-pets";
 import {
   layRate,
   lossesIn,
@@ -244,10 +244,17 @@ export function ChickensGlance({ propertyId }: { readonly propertyId: Ulid }) {
   );
 }
 
-// ── Dogs and cats ───────────────────────────────────────────────────────────
+// ── Pets: dogs, cats, reptiles ───────────────────────────────────────────────
 
-export function petActions(species: "dog" | "cat"): readonly QuickAction[] {
-  const from = species === "dog" ? "/admin/pets/dogs" : "/admin/pets/cats";
+/** Each pet species' plural word — its page's slug and the glance's noun. */
+const PET_PLURAL: Readonly<Record<PetSpecies, string>> = {
+  dog: "dogs",
+  cat: "cats",
+  reptile: "reptiles",
+};
+
+export function petActions(species: PetSpecies): readonly QuickAction[] {
+  const from = `/admin/pets/${PET_PLURAL[species]}`;
   return [
     { label: "Medicine", glyph: "✚", href: `${from}/care?tab=health` },
     { label: "Feeding", glyph: "●", href: logHref({ kind: "feeding", from }) },
@@ -261,7 +268,7 @@ export function PetsGlance({
   species,
 }: {
   readonly propertyId: Ulid;
-  readonly species: "dog" | "cat";
+  readonly species: PetSpecies;
 }) {
   const query = { propertyId };
   const { records: animals } = useRecords<Animal>("animals", query);
@@ -282,15 +289,15 @@ export function PetsGlance({
       .flatMap((plan) => [plan.targetId, ...(plan.alsoFeeds ?? [])])
       .filter((id): id is Ulid => id !== undefined && ids.has(id as Ulid)),
   ).size;
-  const word = species === "dog" ? "dog" : "cat";
-  const care = `/admin/pets/${word}s/care`;
+  const plural = PET_PLURAL[species];
+  const care = `/admin/pets/${plural}/care`;
 
   return (
-    <Glance label={`${species === "dog" ? "Dogs" : "Cats"} at a glance`}>
-      <Fact value={pets.length} label={pets.length === 1 ? `${word} here` : `${word}s here`} />
+    <Glance label={`${plural.charAt(0).toUpperCase()}${plural.slice(1)} at a glance`}>
+      <Fact value={pets.length} label={pets.length === 1 ? `${species} here` : `${plural} here`} />
       <Fact
         value={overdue}
-        label="shots or medicine overdue"
+        label={species === "reptile" ? "medicine overdue" : "shots or medicine overdue"}
         href={`${care}?tab=health`}
         tone={overdue > 0 ? "attention" : "neutral"}
       />

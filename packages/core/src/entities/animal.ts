@@ -13,8 +13,34 @@ import { baseRecordSchema, type BaseRecord } from "./record.js";
  * client calf and an own calf run through the identical program pipeline.
  */
 
-export const SPECIES = ["cattle", "chicken", "quail", "horse", "dog", "cat"] as const;
+export const SPECIES = ["cattle", "chicken", "quail", "horse", "dog", "cat", "reptile"] as const;
 export type Species = (typeof SPECIES)[number];
+
+/**
+ * The kind within a species, for the species broad enough to need one.
+ *
+ * "Reptile" covers a leopard gecko and a ball python, which share a heat lamp
+ * and a feeder-insect order and almost nothing else, so a reptile always says
+ * which it is. One list per species rather than a species per animal: a snake
+ * becomes one more word here, not a new species with its own pages, nav entry
+ * and routes. Species without a list carry no kind at all — a cow is a cow,
+ * and breed lives on its registration papers.
+ */
+export const REPTILE_KINDS = ["gecko"] as const;
+export type ReptileKind = (typeof REPTILE_KINDS)[number];
+
+export const SPECIES_KINDS: Readonly<Partial<Record<Species, readonly string[]>>> = {
+  reptile: REPTILE_KINDS,
+};
+
+export const KIND_LABELS: Readonly<Record<string, string>> = {
+  gecko: "Gecko",
+};
+
+/** The kinds a species can be, or an empty list when it has none. */
+export function kindsOf(species: Species): readonly string[] {
+  return SPECIES_KINDS[species] ?? [];
+}
 
 export const SEXES = ["male", "female", "steer", "unknown"] as const;
 export type Sex = (typeof SEXES)[number];
@@ -38,6 +64,8 @@ export type Ownership = (typeof OWNERSHIP)[number];
 
 export interface Animal extends BaseRecord {
   readonly species: Species;
+  /** Which kind of reptile (or of any species in `SPECIES_KINDS`). */
+  readonly kind?: string | undefined;
   readonly name?: string | undefined;
   readonly tagNumber?: string | undefined;
   readonly sex: Sex;
@@ -67,6 +95,7 @@ export interface Animal extends BaseRecord {
 export const animalSchema = baseRecordSchema
   .extend({
     species: z.enum(SPECIES),
+    kind: z.string().max(40).optional(),
     name: z.string().max(80).optional(),
     tagNumber: z.string().max(40).optional(),
     sex: z.enum(SEXES),
@@ -83,6 +112,20 @@ export const animalSchema = baseRecordSchema
     causeOfDeath: z.string().max(500).optional(),
     notes: z.string().max(5000).optional(),
   })
+  .refine(
+    (animal) => {
+      const kinds = kindsOf(animal.species);
+      return kinds.length === 0
+        ? animal.kind === undefined
+        : animal.kind !== undefined && kinds.includes(animal.kind);
+    },
+    {
+      // A gecko and a python are fed and housed nothing alike, so a reptile
+      // with no kind is a record nobody can look after from.
+      message: "Choose which kind",
+      path: ["kind"],
+    },
+  )
   .refine((animal) => animal.ownership !== "client" || animal.ownerId !== undefined, {
     message: "A client animal must name its owner",
     path: ["ownerId"],
