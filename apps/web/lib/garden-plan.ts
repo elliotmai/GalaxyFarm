@@ -385,9 +385,13 @@ export function bedReport(
   );
   const cropName = (varietyId: Ulid) => {
     const variety = varieties.find((held) => held.id === varietyId);
-    return variety === undefined ? undefined : crops.find((held) => held.id === variety.cropId)?.name;
+    return variety === undefined
+      ? undefined
+      : crops.find((held) => held.id === variety.cropId)?.name;
   };
-  const names = here.map((planting) => cropName(planting.varietyId)).filter((name): name is string => name !== undefined);
+  const names = here
+    .map((planting) => cropName(planting.varietyId))
+    .filter((name): name is string => name !== undefined);
   const fill = bedFill(
     bed,
     here.map((planting) => ({
@@ -396,17 +400,22 @@ export function bedReport(
     })),
   );
 
-  if (candidateVarietyId === undefined) return { fill, clashes: clashesAmong(names), friends: [], foes: [] };
+  if (candidateVarietyId === undefined)
+    return { fill, clashes: clashesAmong(names), friends: [], foes: [] };
 
   const mine = cropName(candidateVarietyId);
   const pairings = mine === undefined ? [] : names.map((name) => companionship(mine, name));
-  const fits = plantsThatFit(bed, varietyFacts(candidateVarietyId, varieties, crops)?.spacingInches);
+  const fits = plantsThatFit(
+    bed,
+    varietyFacts(candidateVarietyId, varieties, crops)?.spacingInches,
+  );
   return {
     fill,
     clashes: clashesAmong(names),
     friends: [...new Set(pairings.filter((p) => p?.kind === "good").map((p) => p!.with))],
     foes: [...new Set(pairings.filter((p) => p?.kind === "bad").map((p) => p!.with))],
-    roomFor: fits === undefined ? undefined : Math.max(0, Math.floor(fits * (1 - Math.min(1, fill ?? 0)))),
+    roomFor:
+      fits === undefined ? undefined : Math.max(0, Math.floor(fits * (1 - Math.min(1, fill ?? 0)))),
   };
 }
 
