@@ -114,7 +114,7 @@ export function PageHeader({ title, subtitle, eyebrow, actions, meta }: PageHead
           {/* Not on a phone, where the tab strips right above already say
               "Cattle" — the same word twice in a 390px column is a row lost. */}
           {eyebrow === undefined ? null : (
-            <p className="hidden text-xs font-medium text-muted md:block">{eyebrow}</p>
+            <p className="gf-eyebrow hidden text-xs font-medium text-muted md:block">{eyebrow}</p>
           )}
           <div className="flex items-center gap-2">
             <h1 className="text-ink">{title}</h1>

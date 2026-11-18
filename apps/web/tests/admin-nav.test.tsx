@@ -202,6 +202,25 @@ describe("SectionStrip", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("draws one level of navigation one way, wherever it appears", () => {
+    // Cattle's groups and Farm's sections are the same level — the parts of a
+    // destination — so they wear the same underline. They used to differ, and
+    // Cattle's top row looked like the in-page tabs further down the screen.
+    at("/admin/cattle/breeding");
+    const cattle = render(<SectionStrip />);
+    const groups = screen.getByRole("navigation", { name: "Cattle views" }).className;
+    const views = screen.getByRole("navigation", { name: "Breeding views" }).className;
+    cattle.unmount();
+
+    at("/admin/feed");
+    render(<SectionStrip />);
+    const sections = screen.getByRole("navigation", { name: "Farm sections" }).className;
+
+    expect(groups).toBe(sections);
+    // The level below is pills, never a second underline.
+    expect(views).not.toBe(sections);
+  });
+
   it("shows nothing where there is no choice to make", () => {
     // A destination with one section and no sub-views has no strip to draw;
     // a single tab is chrome pretending to be navigation.

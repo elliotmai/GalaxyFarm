@@ -335,6 +335,16 @@
   }
 }
 
+/*
+ * A page header's eyebrow says which part of the farm the page belongs to.
+ * Under a section strip the strip has just said it, one row up, so the
+ * eyebrow stands down. On a record page, which draws no strip, it stays and
+ * carries the trail.
+ */
+[data-section-strip] ~ * .gf-eyebrow {
+  display: none;
+}
+
 .gf-numeric {
   font-family: var(--gf-font-numeric);
   font-variant-numeric: tabular-nums;

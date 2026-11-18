@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useMemo, useState } from "react";
 
 import { Fab, PageBody, Tabs, useToast } from "@galaxy-farm/ui";
 import {
@@ -281,9 +281,7 @@ export function FeedScreen({
     low.length > 0 && `${low.length} low`,
   );
 
-  /* ---------------------------------------------------- segmented control */
-
-  const segmentRefs = useRef(new Map<FeedView, HTMLButtonElement>());
+  /* ------------------------------------------------------------ views */
 
   function choose(next: FeedView) {
     setView(next);
@@ -298,17 +296,6 @@ export function FeedScreen({
     }
   }
 
-  function onSegmentKey(event: KeyboardEvent<HTMLDivElement>) {
-    const index = VIEWS.findIndex((entry) => entry.id === view);
-    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (step === 0) return;
-    event.preventDefault();
-    const next = VIEWS[(index + step + VIEWS.length) % VIEWS.length];
-    if (next === undefined) return;
-    choose(next.id);
-    segmentRefs.current.get(next.id)?.focus();
-  }
-
   const editingPlan =
     panel?.kind === "plan" && panel.planId !== "new"
       ? plans.find((plan) => plan.id === panel.planId)
@@ -320,163 +307,132 @@ export function FeedScreen({
       <div className="flex flex-col gap-density pb-20 sm:pb-0">
         <KitHeader title="Feed" facts={loading ? undefined : facts} />
 
-        <div
-          role="tablist"
-          aria-label="Feed"
-          onKeyDown={onSegmentKey}
-          className="flex gap-0.5 rounded-density bg-raised p-1 sm:max-w-md"
+        {/* The shared Tabs, not a hand-built copy: same segmented look, same
+            keyboard pattern, as every other page that swaps panels in place. */}
+        <Tabs
+          tabs={VIEWS}
+          activeTab={view}
+          onTabChange={(id) => choose(id as FeedView)}
+          label="Feed"
         >
-          {VIEWS.map((entry) => {
-            const selected = entry.id === view;
-            return (
-              <button
-                key={entry.id}
-                ref={(node) => {
-                  // crud-guard: allow-unconfirmed — a ref map of DOM nodes, nothing persisted
-                  if (node === null) segmentRefs.current.delete(entry.id);
-                  else segmentRefs.current.set(entry.id, node);
-                }}
-                type="button"
-                role="tab"
-                id={`feed-segment-${entry.id}`}
-                aria-selected={selected}
-                aria-controls="feed-segment-panel"
-                tabIndex={selected ? 0 : -1}
-                onClick={() => choose(entry.id)}
-                className={[
-                  "min-h-target flex-1 rounded-density text-density",
-                  "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-action",
-                  selected
-                    ? "bg-panel font-semibold text-ink shadow-card"
-                    : "font-medium text-muted hover:text-ink",
-                ].join(" ")}
-              >
-                {entry.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div
-          role="tabpanel"
-          id="feed-segment-panel"
-          aria-labelledby={`feed-segment-${view}`}
-          className="flex flex-col gap-density"
-        >
-          {view === "today" ? (
-            <>
-              <TodayView
-                entries={feedings}
-                actorId={actorId}
-                busy={ticking}
-                onTick={(entry) => void tick(entry)}
-              />
-              {feedings.length === 0 ? null : (
-                <p className="text-sm text-muted">The same ticks as the barn kiosk.</p>
-              )}
-            </>
-          ) : view === "plan" ? (
-            <PlanView
-              plans={plans}
-              feeds={feeds}
-              animals={animals}
-              zones={zones}
-              scopes={animalScopes}
-              loading={plansLoading}
-              onAdd={addPlan}
-              onAdjust={(plan) => setPanel({ kind: "plan", planId: plan.id })}
-            />
-          ) : (
-            <>
-              {/*
+          {() => (
+            <div className="flex flex-col gap-density">
+              {view === "today" ? (
+                <>
+                  <TodayView
+                    entries={feedings}
+                    actorId={actorId}
+                    busy={ticking}
+                    onTick={(entry) => void tick(entry)}
+                  />
+                  {feedings.length === 0 ? null : (
+                    <p className="text-sm text-muted">The same ticks as the barn kiosk.</p>
+                  )}
+                </>
+              ) : view === "plan" ? (
+                <PlanView
+                  plans={plans}
+                  feeds={feeds}
+                  animals={animals}
+                  zones={zones}
+                  scopes={animalScopes}
+                  loading={plansLoading}
+                  onAdd={addPlan}
+                  onAdjust={(plan) => setPanel({ kind: "plan", planId: plan.id })}
+                />
+              ) : (
+                <>
+                  {/*
                 Worth interrupting for: a plan written in one unit for a feed
                 counted in another, with nothing saying what one weighs. Left
                 out of the run-out date rather than counted wrongly; the fix is
                 the feed's "lb each", which the feed's own panel holds.
               */}
-              {demand.unconvertible.length === 0 ? null : (
-                <p className="text-sm text-danger">
-                  Not counted against the shed:{" "}
-                  {demand.unconvertible.map((feedTypeId, index) => {
-                    const feed = feeds.find((candidate) => candidate.id === feedTypeId);
-                    return (
-                      <span key={feedTypeId}>
-                        {index === 0 ? "" : ", "}
-                        {feed === undefined ? (
-                          "a feed"
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setPanel({ kind: "type", feed })}
-                            className="inline-flex min-h-target items-center font-semibold underline underline-offset-2"
-                          >
-                            {feed.name}
-                          </button>
-                        )}
-                      </span>
-                    );
-                  })}
-                  . Give {demand.unconvertible.length === 1 ? "it" : "each"} its lb each.
-                </p>
-              )}
-              <ShedView
-                rows={shed}
-                now={now}
-                loading={loading}
-                onRestock={restock}
-                onAddFeed={() => setPanel({ kind: "type" })}
-                onCount={(feed) =>
-                  setPanel({
-                    kind: "use",
-                    start: {
-                      kind: "correction",
-                      ...(feed === undefined ? {} : { feedTypeId: feed.id }),
-                    },
-                  })
-                }
-                history={
-                  <Tabs tabs={HISTORY_TABS} label="Feed history">
-                    {(active) =>
-                      active === "purchases" ? (
-                        <PurchasesTab
-                          feeds={feeds}
-                          purchases={purchases}
-                          onAdd={() => restock()}
-                          onEdit={(purchase) => setPanel({ kind: "purchase", purchase })}
-                        />
-                      ) : active === "used" ? (
-                        <UsedTab
-                          feeds={feeds}
-                          consumption={consumption}
-                          animals={animals}
-                          zones={zones}
-                          onAdd={() => setPanel({ kind: "use" })}
-                          onEdit={(entry) => setPanel({ kind: "use", entry })}
-                        />
-                      ) : active === "types" ? (
-                        <TypesTab
-                          feeds={feeds}
-                          usage={usage}
-                          onAdd={() => setPanel({ kind: "type" })}
-                          onEdit={(feed) => setPanel({ kind: "type", feed })}
-                        />
-                      ) : (
-                        <CostPerHeadTab
-                          feeds={feeds}
-                          plans={activePlans}
-                          purchases={purchases}
-                          animals={liveAnimals}
-                          scopes={animalScopes}
-                          propertyId={propertyId}
-                        />
-                      )
+                  {demand.unconvertible.length === 0 ? null : (
+                    <p className="text-sm text-danger">
+                      Not counted against the shed:{" "}
+                      {demand.unconvertible.map((feedTypeId, index) => {
+                        const feed = feeds.find((candidate) => candidate.id === feedTypeId);
+                        return (
+                          <span key={feedTypeId}>
+                            {index === 0 ? "" : ", "}
+                            {feed === undefined ? (
+                              "a feed"
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setPanel({ kind: "type", feed })}
+                                className="inline-flex min-h-target items-center font-semibold underline underline-offset-2"
+                              >
+                                {feed.name}
+                              </button>
+                            )}
+                          </span>
+                        );
+                      })}
+                      . Give {demand.unconvertible.length === 1 ? "it" : "each"} its lb each.
+                    </p>
+                  )}
+                  <ShedView
+                    rows={shed}
+                    now={now}
+                    loading={loading}
+                    onRestock={restock}
+                    onAddFeed={() => setPanel({ kind: "type" })}
+                    onCount={(feed) =>
+                      setPanel({
+                        kind: "use",
+                        start: {
+                          kind: "correction",
+                          ...(feed === undefined ? {} : { feedTypeId: feed.id }),
+                        },
+                      })
                     }
-                  </Tabs>
-                }
-              />
-            </>
+                    history={
+                      <Tabs tabs={HISTORY_TABS} label="Feed history">
+                        {(active) =>
+                          active === "purchases" ? (
+                            <PurchasesTab
+                              feeds={feeds}
+                              purchases={purchases}
+                              onAdd={() => restock()}
+                              onEdit={(purchase) => setPanel({ kind: "purchase", purchase })}
+                            />
+                          ) : active === "used" ? (
+                            <UsedTab
+                              feeds={feeds}
+                              consumption={consumption}
+                              animals={animals}
+                              zones={zones}
+                              onAdd={() => setPanel({ kind: "use" })}
+                              onEdit={(entry) => setPanel({ kind: "use", entry })}
+                            />
+                          ) : active === "types" ? (
+                            <TypesTab
+                              feeds={feeds}
+                              usage={usage}
+                              onAdd={() => setPanel({ kind: "type" })}
+                              onEdit={(feed) => setPanel({ kind: "type", feed })}
+                            />
+                          ) : (
+                            <CostPerHeadTab
+                              feeds={feeds}
+                              plans={activePlans}
+                              purchases={purchases}
+                              animals={liveAnimals}
+                              scopes={animalScopes}
+                              propertyId={propertyId}
+                            />
+                          )
+                        }
+                      </Tabs>
+                    }
+                  />
+                </>
+              )}
+            </div>
           )}
-        </div>
+        </Tabs>
 
         {view === "plan" ? (
           <Fab onClick={addPlan}>Add plan</Fab>

@@ -26,6 +26,18 @@ import type { NavItem } from "@/app/(admin)/_components/nav-groups";
  *
  * It scrolls sideways rather than wrapping. A strip that wraps to three rows
  * changes the height of every screen under it, and thirteen tabs would.
+ *
+ * One look per level, and never the same look for two levels:
+ *
+ *   underline   a destination's sections   Farm › Feed, Pastures, Map…
+ *                                          Cattle › Herd, Breeding, Health, Sales
+ *   pills       a section's own views      Breeding › Calving, Ancestors…
+ *   segmented   a page's own panels        (the `Tabs` primitive, not here)
+ *
+ * Cattle's groups used to be a segmented control while every other
+ * destination's sections were underlined, so the top row of Cattle looked
+ * like the in-page tabs further down it, and the top row of Farm did not.
+ * They are the same level, so they are the same underline.
  */
 
 function Strip({
@@ -33,7 +45,6 @@ function Strip({
   current,
   label,
   quiet = false,
-  segmented = false,
 }: {
   readonly items: readonly NavItem[];
   /**
@@ -48,9 +59,8 @@ function Strip({
    */
   readonly current: string | undefined;
   readonly label: string;
+  /** The second level: pills under the underline, never a second underline. */
   readonly quiet?: boolean;
-  /** A segmented control: a few big choices rather than a run of tabs. */
-  readonly segmented?: boolean;
 }) {
   return (
     <div
@@ -59,11 +69,7 @@ function Strip({
       // behaviour they do not have.
       aria-label={label}
       className={`flex gap-1 overflow-x-auto ${
-        segmented
-          ? "rounded-density bg-raised p-1 sm:self-start"
-          : quiet
-            ? ""
-            : "border-b border-rule"
+        quiet ? "" : "border-b border-rule"
       } [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
       role="navigation"
     >
@@ -84,21 +90,15 @@ function Strip({
             prefetch
             aria-current={here ? "page" : undefined}
             className={
-              segmented
-                ? `flex min-h-target flex-1 shrink-0 items-center justify-center rounded-density px-4 text-sm sm:flex-none ${
-                    here
-                      ? "bg-panel font-semibold text-ink shadow-card"
-                      : "text-muted hover:text-ink"
+              quiet
+                ? `flex min-h-target shrink-0 items-center rounded-full px-3 text-sm ${
+                    here ? "bg-action/10 font-semibold text-action" : "text-muted hover:text-ink"
                   }`
-                : quiet
-                  ? `flex min-h-target shrink-0 items-center rounded-full px-3 text-sm ${
-                      here ? "bg-action/10 font-semibold text-action" : "text-muted hover:text-ink"
-                    }`
-                  : `flex min-h-target shrink-0 items-center border-b-2 px-3 text-density ${
-                      here
-                        ? "border-action font-semibold text-ink"
-                        : "border-transparent text-muted hover:text-ink"
-                    }`
+                : `flex min-h-target shrink-0 items-center border-b-2 px-3 text-density ${
+                    here
+                      ? "border-action font-semibold text-ink"
+                      : "border-transparent text-muted hover:text-ink"
+                  }`
             }
           >
             {item.label}
@@ -145,13 +145,16 @@ export function SectionStrip() {
   // sitting inside Cattle.
   const view = subs?.find((sub) => sub.href === pathname);
 
-  // Grouped views: the groups as a segmented control, then the chosen group's
+  // Grouped views: the groups as the underline, then the chosen group's
   // own views. A detail page sits in no group, so nothing is lit and no second
   // row is drawn — the same rule the flat strip keeps for it.
   const group = groups?.find((candidate) => candidate.views.some((v) => v.href === pathname));
 
   return (
-    <div className="mb-density flex flex-col gap-2">
+    // `data-section-strip` lets the page header below drop its eyebrow: the
+    // strip already says "Cattle" or "Farm", and saying it twice in a row was
+    // one more line between the person and the page.
+    <div data-section-strip className="mb-density flex flex-col gap-2">
       {showPrimary ? (
         <Strip
           items={destination.sections}
@@ -168,7 +171,6 @@ export function SectionStrip() {
             }))}
             current={group?.views[0]?.href}
             label={`${section?.label ?? ""} views`}
-            segmented
           />
           {group === undefined || group.views.length < 2 ? null : (
             <Strip items={group.views} current={view?.href} label={`${group.label} views`} quiet />

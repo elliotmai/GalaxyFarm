@@ -80,3 +80,29 @@ export function tickBoxClass(on: boolean): string {
     on ? "border-action bg-action text-action-ink" : "border-edge bg-panel",
   ].join(" ");
 }
+
+/*
+ * The segmented control: a sunken track with the chosen option lifted out
+ * of it.
+ *
+ * It means one thing everywhere: *switch what this page shows, in place* —
+ * a page's own tabs, the appearance setting. It is never used for going to
+ * another page; route navigation is the underlined section strip and the
+ * pills under it. Those three looks used to be handed out per screen, so the
+ * same underline meant "another page" on Farm and "another panel" on Supplies,
+ * and Breeding stacked all three with nothing to say which was which.
+ */
+export const SEGMENT_TRACK_CLASS =
+  "flex max-w-full gap-1 overflow-x-auto rounded-density bg-raised p-1 sm:w-fit " +
+  "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+
+export function segmentClass(selected: boolean): string {
+  return [
+    "inline-flex min-h-target flex-1 shrink-0 items-center justify-center gap-2 whitespace-nowrap",
+    "rounded-density px-3 text-sm sm:flex-none",
+    "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-action",
+    selected
+      ? "bg-panel font-semibold text-ink shadow-card"
+      : "font-medium text-muted hover:text-ink",
+  ].join(" ");
+}

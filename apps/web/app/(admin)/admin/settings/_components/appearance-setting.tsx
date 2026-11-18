@@ -1,5 +1,6 @@
 "use client";
 
+import { SEGMENT_TRACK_CLASS, segmentClass } from "@galaxy-farm/ui";
 import { type Appearance, useAppearance } from "@/lib/appearance";
 
 const CHOICES: readonly { readonly value: Appearance; readonly label: string }[] = [
@@ -26,11 +27,7 @@ export function AppearanceSetting() {
         </span>
         <span className="text-sm text-muted">On this device</span>
       </div>
-      <div
-        role="radiogroup"
-        aria-labelledby="appearance-label"
-        className="flex gap-1 rounded-density bg-raised p-1"
-      >
+      <div role="radiogroup" aria-labelledby="appearance-label" className={SEGMENT_TRACK_CLASS}>
         {CHOICES.map((choice) => {
           const on = appearance === choice.value;
           return (
@@ -40,9 +37,7 @@ export function AppearanceSetting() {
               role="radio"
               aria-checked={on}
               onClick={() => setAppearance(choice.value)}
-              className={`min-h-target rounded-density px-3 text-sm ${
-                on ? "bg-panel font-semibold text-ink shadow-card" : "text-muted hover:text-ink"
-              }`}
+              className={segmentClass(on)}
             >
               {choice.label}
             </button>

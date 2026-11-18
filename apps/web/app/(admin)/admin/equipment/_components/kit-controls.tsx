@@ -252,7 +252,9 @@ export function KitHeader({
   return (
     <header className="flex items-center justify-between gap-density">
       <div className="flex min-w-0 flex-col gap-0.5">
-        {eyebrow === undefined ? null : <span className="text-xs text-muted">{eyebrow}</span>}
+        {eyebrow === undefined ? null : (
+          <span className="gf-eyebrow text-xs text-muted">{eyebrow}</span>
+        )}
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5">
           <h1 className="text-ink">{title}</h1>
           {facts === undefined || facts === "" ? null : (

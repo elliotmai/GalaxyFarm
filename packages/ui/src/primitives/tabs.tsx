@@ -3,6 +3,8 @@
 import { useCallback, useId, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 
+import { SEGMENT_TRACK_CLASS, segmentClass } from "./button-styles.js";
+
 /**
  * Tabs (spec §8).
  *
@@ -10,6 +12,11 @@ import type { KeyboardEvent, ReactNode } from "react";
  * order for the whole strip, arrows to move between tabs, Home and End to
  * jump. Tabs that are each individually tabbable turn an eleven-tab animal
  * profile into eleven presses to reach the panel.
+ *
+ * Drawn as a segmented control, not an underline. These swap a panel in
+ * place, and the underline belongs to the section strip, which goes to
+ * another page; with both underlined, a page like Supplies had two identical
+ * rows that did different things. See `SEGMENT_TRACK_CLASS`.
  */
 
 export interface TabDefinition {
@@ -76,12 +83,7 @@ export function Tabs({ tabs, children, defaultTab, activeTab, onTabChange, label
 
   return (
     <div>
-      <div
-        role="tablist"
-        aria-label={label}
-        onKeyDown={onKeyDown}
-        className="flex gap-1 overflow-x-auto border-b border-edge"
-      >
+      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className={SEGMENT_TRACK_CLASS}>
         {tabs.map((tab) => {
           const selected = tab.id === active;
           return (
@@ -101,21 +103,15 @@ export function Tabs({ tabs, children, defaultTab, activeTab, onTabChange, label
               // the tab order, and the arrows do the rest.
               tabIndex={selected ? 0 : -1}
               onClick={() => select(tab.id)}
-              className={[
-                "inline-flex min-h-target items-center gap-2 whitespace-nowrap px-3 text-density",
-                "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-action",
-                selected
-                  ? "border-b-2 border-action font-semibold text-ink"
-                  : "border-b-2 border-transparent text-muted hover:text-ink",
-              ].join(" ")}
+              className={segmentClass(selected)}
             >
               {tab.label}
               {tab.adornment === undefined ? null : (
                 <span
                   className={[
                     "gf-numeric inline-flex min-w-[1.5em] items-center justify-center",
-                    "rounded-full border px-1.5 text-xs leading-5",
-                    selected ? "border-action text-action" : "border-edge text-muted",
+                    "rounded-full px-1.5 text-xs leading-5",
+                    selected ? "bg-action/10 text-action" : "bg-panel text-muted",
                   ].join(" ")}
                 >
                   {tab.adornment}
