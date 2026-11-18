@@ -126,7 +126,12 @@ test.describe("kiosk surface", () => {
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
       .toBe(true);
 
-    await page.keyboard.press("Tab");
+    // The masthead (home, then the board switcher) comes first in tab order;
+    // what matters is that the keyboard reaches the board, ring and all.
+    for (let step = 0; step < 15; step += 1) {
+      await page.keyboard.press("Tab");
+      if (await penBoard.evaluate((element) => element === document.activeElement)) break;
+    }
     await expect(penBoard).toBeFocused();
     expect(await penBoard.evaluate((element) => getComputedStyle(element).outlineWidth)).not.toBe(
       "0px",
