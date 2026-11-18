@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import {
   GROWING,
+  growingLine,
   isEmptyGrowing,
   searchGardenCrops,
   type GrowingFacts,
@@ -13,9 +14,10 @@ import {
  * Matches for whatever is typed into a plant name (spec §5.5).
  *
  * Sits under the field it serves rather than being a field of its own, so the
- * name box *is* the search: type "tomato", tap *Tomato · Solanum lycopersicum
- * · Solanaceae*, and the name, the scientific name and the family are filled
- * in. Ignoring the list and typing a name by hand is always fine — the family
+ * name box *is* the search: type "jalapeño", tap *Jalapeño pepper · Hot ·
+ * medium heat*, and the name, the family and how it grows are filled in. The
+ * line under a name is how somebody tells two apart — the kind's note, or how
+ * the crop grows — never its Latin name. Ignoring the list and typing a name by hand is always fine — the family
  * is inferred from the name anyway.
  *
  * A pick also brings how the plant is grown — days, spacing, season, sun,
@@ -33,7 +35,16 @@ export interface PlantPick {
   readonly scientificName: string;
   readonly family?: string | undefined;
   readonly source: "built-in" | "gbif";
+  readonly kindOf?: string | undefined;
+  readonly note?: string | undefined;
   readonly growing?: GrowingFacts | undefined;
+}
+
+/** The line under a match's name. */
+function matchLine(match: PlantPick): string {
+  if (match.note !== undefined) return match.note;
+  if (match.source === "gbif") return "Not in the built-in list · looked up online";
+  return growingLine(match.growing) ?? "";
 }
 
 /**
@@ -60,11 +71,13 @@ const DEBOUNCE_MS = 300;
 const MIN_QUERY = 2;
 
 function localMatches(query: string): PlantPick[] {
-  return searchGardenCrops(query, 6).map((crop) => ({
+  return searchGardenCrops(query, 10).map((crop) => ({
     commonName: crop.name,
     scientificName: crop.scientificName,
     family: crop.family,
     source: "built-in" as const,
+    kindOf: crop.kindOf,
+    note: crop.note,
     growing: GROWING.get(crop.name),
   }));
 }
@@ -131,10 +144,7 @@ export function PlantSuggestions({
                 <span className="max-w-full truncate text-sm font-medium text-ink">
                   {match.commonName}
                 </span>
-                <span className="max-w-full truncate text-xs text-muted">
-                  <i>{match.scientificName}</i>
-                  {match.family === undefined ? null : ` · ${match.family}`}
-                </span>
+                <span className="max-w-full truncate text-xs text-muted">{matchLine(match)}</span>
               </button>
             </li>
           ))}

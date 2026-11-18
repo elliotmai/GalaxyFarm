@@ -48,9 +48,10 @@ describe("parseGbif", () => {
     expect(wild?.commonName).toBe("Wild okra");
   });
 
-  it("falls back to the scientific name when there is no English one", () => {
-    const hairy = parseGbif(OKRA, "okra").find((m) => m.scientificName === "Abelmoschus crinitus");
-    expect(hairy?.commonName).toBe("Abelmoschus crinitus");
+  it("leaves out a plant with no English name rather than list it in Latin", () => {
+    const matches = parseGbif(OKRA, "okra");
+    expect(matches.some((m) => m.scientificName === "Abelmoschus crinitus")).toBe(false);
+    expect(matches.every((m) => m.commonName !== m.scientificName)).toBe(true);
   });
 
   it("tolerates a body that is not a search answer", () => {

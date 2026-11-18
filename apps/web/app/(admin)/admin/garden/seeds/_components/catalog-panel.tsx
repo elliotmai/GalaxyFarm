@@ -484,13 +484,6 @@ function Crops({
                   error={errors["family"]}
                   onChange={(event) => setDraft({ ...draft, family: event.target.value })}
                 />
-                <TextInput
-                  label="Scientific name"
-                  placeholder="Solanum lycopersicum"
-                  value={draft.scientificName}
-                  error={errors["scientificName"]}
-                  onChange={(event) => setDraft({ ...draft, scientificName: event.target.value })}
-                />
                 <datalist id="garden-families">
                   {COMMON_FAMILIES.map((family) => (
                     <option key={family} value={family} />

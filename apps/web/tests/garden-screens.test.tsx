@@ -311,7 +311,7 @@ describe("crops — the family is inferred", () => {
     expect(writes.created[0]?.["family"]).toBeUndefined();
   });
 
-  it("fills name, scientific name and family from a picked match", async () => {
+  it("fills the kind, its family and how it grows from a picked match", async () => {
     const user = userEvent.setup();
     wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
     await user.click(screen.getByRole("tab", { name: /Crops/ }));
@@ -320,13 +320,17 @@ describe("crops — the family is inferred", () => {
     const dialog = within(await screen.findByRole("dialog"));
     await user.type(dialog.getByLabelText(/^Name/), "zucch");
     const matches = within(dialog.getByRole("list", { name: "Plants matching the name" }));
-    await user.click(matches.getByRole("button", { name: /^Squash/ }));
+    // Told apart by what it is, not by its Latin name.
+    const zucchini = matches.getByRole("button", { name: /^Zucchini/ });
+    expect(zucchini).toHaveTextContent(/Summer squash/);
+    expect(zucchini).not.toHaveTextContent(/Cucurbita/);
+    await user.click(zucchini);
 
-    expect(dialog.getByLabelText(/^Name/)).toHaveValue("Squash");
-    expect(dialog.getByLabelText(/Scientific name/)).toHaveValue("Cucurbita pepo");
-    // How it grows comes with the pick, from the built-in list.
-    expect(dialog.getByLabelText(/Days to maturity/)).toHaveValue(60);
-    expect(dialog.getByLabelText(/Spacing/)).toHaveValue(36);
+    expect(dialog.getByLabelText(/^Name/)).toHaveValue("Zucchini");
+    expect(dialog.queryByLabelText(/Scientific name/)).not.toBeInTheDocument();
+    // How it grows comes with the pick: a zucchini's figures, not a pumpkin's.
+    expect(dialog.getByLabelText(/Days to maturity/)).toHaveValue(50);
+    expect(dialog.getByLabelText(/Spacing/)).toHaveValue(24);
     expect(dialog.getByLabelText(/^Season/)).toHaveValue("warm");
     expect(dialog.getByLabelText(/^Sowing/)).toHaveValue("direct");
     await user.clear(dialog.getByLabelText(/Spacing/));
@@ -334,9 +338,10 @@ describe("crops — the family is inferred", () => {
     await user.click(dialog.getByRole("button", { name: "Add crop" }));
     expect(writes.created[0]).toMatchObject({
       store: "crops",
-      name: "Squash",
+      name: "Zucchini",
+      // Still kept, quietly: it is how a lookup online matches the species.
       scientificName: "Cucurbita pepo",
-      daysToMaturity: 60,
+      daysToMaturity: 50,
       spacingInches: 48,
       season: "warm",
       lifecycle: "annual",

@@ -1,4 +1,5 @@
 import type { Crop } from "./beds.js";
+import { GARDEN_KINDS } from "./kinds.js";
 
 /**
  * Which botanical family a crop belongs to, without asking (spec §5.5).
@@ -31,6 +32,10 @@ export interface GardenCrop {
   readonly family: string;
   /** Other names it goes by, plurals that are not just "+s", and close kin. */
   readonly aliases?: readonly string[];
+  /** For a kind ("Jalapeño pepper"): the crop it is a kind of ("Pepper"). */
+  readonly kindOf?: string;
+  /** For a kind: how it differs, in a gardener's words ("Hot"). */
+  readonly note?: string;
 }
 
 export const GARDEN_CROPS: readonly GardenCrop[] = [
@@ -39,13 +44,13 @@ export const GARDEN_CROPS: readonly GardenCrop[] = [
     name: "Tomato",
     scientificName: "Solanum lycopersicum",
     family: "Solanaceae",
-    aliases: ["tomatoes", "cherry tomato"],
+    aliases: ["tomatoes"],
   },
   {
     name: "Pepper",
     scientificName: "Capsicum annuum",
     family: "Solanaceae",
-    aliases: ["bell pepper", "chili", "chile", "chilli", "jalapeno", "jalapeño", "capsicum"],
+    aliases: ["peppers", "chili", "chile", "chilli", "hot pepper", "chili pepper", "capsicum"],
   },
   {
     name: "Potato",
@@ -71,7 +76,7 @@ export const GARDEN_CROPS: readonly GardenCrop[] = [
     name: "Kale",
     scientificName: "Brassica oleracea",
     family: "Brassicaceae",
-    aliases: ["collards", "collard greens", "collard"],
+    aliases: ["kales"],
   },
   { name: "Broccoli", scientificName: "Brassica oleracea", family: "Brassicaceae" },
   { name: "Cauliflower", scientificName: "Brassica oleracea", family: "Brassicaceae" },
@@ -86,7 +91,7 @@ export const GARDEN_CROPS: readonly GardenCrop[] = [
     name: "Turnip",
     scientificName: "Brassica rapa",
     family: "Brassicaceae",
-    aliases: ["bok choy", "pak choi", "napa cabbage", "chinese cabbage"],
+    aliases: ["turnips", "turnip greens"],
   },
   {
     name: "Mustard",
@@ -98,7 +103,7 @@ export const GARDEN_CROPS: readonly GardenCrop[] = [
     name: "Radish",
     scientificName: "Raphanus sativus",
     family: "Brassicaceae",
-    aliases: ["radishes", "daikon"],
+    aliases: ["radishes"],
   },
   {
     name: "Arugula",
@@ -117,27 +122,19 @@ export const GARDEN_CROPS: readonly GardenCrop[] = [
     name: "Cucumber",
     scientificName: "Cucumis sativus",
     family: "Cucurbitaceae",
-    aliases: ["pickling cucumber"],
+    aliases: ["cucumbers", "cuke"],
   },
   {
     name: "Squash",
     scientificName: "Cucurbita pepo",
     family: "Cucurbitaceae",
-    aliases: [
-      "summer squash",
-      "winter squash",
-      "zucchini",
-      "courgette",
-      "butternut",
-      "pumpkin",
-      "pumpkins",
-    ],
+    aliases: ["squashes"],
   },
   {
     name: "Melon",
     scientificName: "Cucumis melo",
     family: "Cucurbitaceae",
-    aliases: ["cantaloupe", "muskmelon", "honeydew"],
+    aliases: ["melons"],
   },
   { name: "Watermelon", scientificName: "Citrullus lanatus", family: "Cucurbitaceae" },
   {
@@ -151,13 +148,13 @@ export const GARDEN_CROPS: readonly GardenCrop[] = [
     name: "Bean",
     scientificName: "Phaseolus vulgaris",
     family: "Fabaceae",
-    aliases: ["green bean", "bush bean", "pole bean", "snap bean", "dry bean"],
+    aliases: ["beans"],
   },
   {
     name: "Pea",
     scientificName: "Pisum sativum",
     family: "Fabaceae",
-    aliases: ["snap pea", "snow pea", "sugar snap"],
+    aliases: ["peas"],
   },
   {
     name: "Southern pea",
@@ -179,7 +176,7 @@ export const GARDEN_CROPS: readonly GardenCrop[] = [
     name: "Onion",
     scientificName: "Allium cepa",
     family: "Amaryllidaceae",
-    aliases: ["shallot", "scallion", "green onion"],
+    aliases: ["onions"],
   },
   { name: "Garlic", scientificName: "Allium sativum", family: "Amaryllidaceae" },
   { name: "Leek", scientificName: "Allium ampeloprasum", family: "Amaryllidaceae" },
@@ -203,7 +200,12 @@ export const GARDEN_CROPS: readonly GardenCrop[] = [
   },
   { name: "Fennel", scientificName: "Foeniculum vulgare", family: "Apiaceae" },
   // Daisies
-  { name: "Lettuce", scientificName: "Lactuca sativa", family: "Asteraceae", aliases: ["romaine"] },
+  {
+    name: "Lettuce",
+    scientificName: "Lactuca sativa",
+    family: "Asteraceae",
+    aliases: ["lettuces"],
+  },
   { name: "Sunflower", scientificName: "Helianthus annuus", family: "Asteraceae" },
   { name: "Artichoke", scientificName: "Cynara cardunculus", family: "Asteraceae" },
   {
@@ -235,7 +237,7 @@ export const GARDEN_CROPS: readonly GardenCrop[] = [
     name: "Corn",
     scientificName: "Zea mays",
     family: "Poaceae",
-    aliases: ["sweet corn", "maize", "popcorn"],
+    aliases: ["maize"],
   },
   { name: "Sorghum", scientificName: "Sorghum bicolor", family: "Poaceae" },
   { name: "Wheat", scientificName: "Triticum aestivum", family: "Poaceae" },
@@ -329,8 +331,38 @@ function singular(word: string): string {
   return word;
 }
 
-/** Every name the table answers to, folded and singular, longest first. */
-const BY_NAME: ReadonlyArray<readonly [string, GardenCrop]> = GARDEN_CROPS.flatMap((crop) =>
+const CROP_BY_NAME: ReadonlyMap<string, GardenCrop> = new Map(
+  GARDEN_CROPS.map((crop) => [crop.name, crop]),
+);
+
+/**
+ * The kinds (`kinds.ts`) as entries of the same shape, carrying their crop's
+ * family and scientific name — so the rotation guard and the companion table
+ * read a jalapeño as the pepper it is.
+ */
+export const GARDEN_KIND_ENTRIES: readonly GardenCrop[] = GARDEN_KINDS.flatMap((kind) => {
+  const crop = CROP_BY_NAME.get(kind.crop);
+  if (crop === undefined) return [];
+  return [
+    {
+      name: kind.name,
+      scientificName: crop.scientificName,
+      family: crop.family,
+      ...(kind.aliases === undefined ? {} : { aliases: kind.aliases }),
+      kindOf: crop.name,
+      note: kind.note,
+    },
+  ];
+});
+
+/** Crops and kinds — everything the table answers to. */
+const ENTRIES: readonly GardenCrop[] = [...GARDEN_CROPS, ...GARDEN_KIND_ENTRIES];
+
+/**
+ * Every name the table answers to, folded and singular, longest first — so
+ * "bell pepper" is found before "pepper", and "jalapeño" is a jalapeño.
+ */
+const BY_NAME: ReadonlyArray<readonly [string, GardenCrop]> = ENTRIES.flatMap((crop) =>
   [crop.name, ...(crop.aliases ?? [])].map(
     (name) => [fold(name).split(" ").map(singular).join(" "), crop] as const,
   ),
@@ -349,6 +381,16 @@ const BY_GENUS: ReadonlyMap<string, string> = new Map(
  * than nothing). Whole words only, so "peanut" is not a pea.
  */
 export function gardenCropFor(name: string | undefined): GardenCrop | undefined {
+  const entry = gardenEntryFor(name);
+  return entry?.kindOf === undefined ? entry : CROP_BY_NAME.get(entry.kindOf);
+}
+
+/**
+ * The most specific entry for a name: the kind when there is one ("Early
+ * Jalapeño" → Jalapeño pepper), else the crop. What growing facts are read
+ * from; `gardenCropFor` is what family and companions are read from.
+ */
+export function gardenEntryFor(name: string | undefined): GardenCrop | undefined {
   const folded = fold(name ?? "")
     .split(" ")
     .map(singular)
@@ -398,13 +440,17 @@ export function searchGardenCrops(query: string, limit = 8): GardenCrop[] {
   const words = q.split(" ").map(singular);
 
   const scored: Array<{ crop: GardenCrop; score: number }> = [];
-  for (const crop of GARDEN_CROPS) {
-    const names = [crop.name, ...(crop.aliases ?? []), crop.scientificName].map(fold);
+  for (const crop of ENTRIES) {
+    // Never the scientific name: nobody searches a seed list in Latin, and
+    // matching it made every Capsicum answer every pepper.
+    const names = [crop.name, ...(crop.aliases ?? [])].map(fold);
     let best = 0;
     names.forEach((name, index) => {
       const weight = index === 0 ? 3 : 1;
       const singularName = name.split(" ").map(singular).join(" ");
-      if (name === q || singularName === words.join(" ")) best = Math.max(best, 100 * weight);
+      // Any exact name beats any prefix: "roma" is the paste tomato, not
+      // the start of "romaine".
+      if (name === q || singularName === words.join(" ")) best = Math.max(best, 200 + 100 * weight);
       else if (name.startsWith(q)) best = Math.max(best, 50 * weight);
       else if (words.some((word) => word.length >= 3 && ` ${singularName} `.includes(` ${word} `)))
         best = Math.max(best, 20 * weight);

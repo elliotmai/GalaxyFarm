@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GARDEN_CROPS } from "../src/domain/families.js";
+import { GARDEN_CROPS, GARDEN_KIND_ENTRIES } from "../src/domain/families.js";
 import {
   cropGrowing,
   GROWING,
@@ -12,8 +12,26 @@ import {
 /** How a crop is grown (§5.5): the built-in half of what a plant pick fills in. */
 
 describe("the growing table", () => {
-  it("has a row for every crop the family table knows, and nothing else", () => {
-    expect([...GROWING.keys()].sort()).toEqual(GARDEN_CROPS.map((crop) => crop.name).sort());
+  it("has a row for every crop and every kind the table knows, and nothing else", () => {
+    expect([...GROWING.keys()].sort()).toEqual(
+      [...GARDEN_CROPS, ...GARDEN_KIND_ENTRIES].map((crop) => crop.name).sort(),
+    );
+  });
+
+  it("knows a jalapeño from a bell pepper, and a zucchini from a butternut", () => {
+    expect(growingFor("Jalapeño")).toMatchObject({ daysToMaturity: 70, spacingInches: 15 });
+    expect(growingFor("bell pepper")).toMatchObject({ daysToMaturity: 75, spacingInches: 18 });
+    expect(growingFor("Habanero")).toMatchObject({ daysToMaturity: 95, startIndoorsWeeks: 10 });
+    // A variety's name finds its kind before its crop.
+    expect(growingFor("Early Jalapeño")?.daysToMaturity).toBe(70);
+    expect(growingFor("Black Beauty zucchini")?.daysToMaturity).toBe(50);
+    expect(growingFor("Waltham butternut")?.daysToMaturity).toBe(100);
+    // What a kind does not override is its crop's.
+    expect(growingFor("Jalapeño pepper")).toMatchObject({
+      frostTolerance: "tender",
+      sowing: "transplant",
+      season: "warm",
+    });
   });
 
   it("finds a crop through its aliases and inside a variety's name", () => {

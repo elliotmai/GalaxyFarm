@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { GARDEN_KINDS } from "../src/domain/kinds.js";
+
 import {
   GARDEN_CROPS,
+  GARDEN_KIND_ENTRIES,
   cropFamily,
   gardenCropFor,
+  gardenEntryFor,
   inferFamily,
   normaliseFamily,
   searchGardenCrops,
@@ -87,9 +91,43 @@ describe("searchGardenCrops", () => {
     expect(searchGardenCrops("Brandywine tomato")[0]?.name).toBe("Tomato");
   });
 
-  it("matches aliases and scientific names", () => {
-    expect(searchGardenCrops("zucchini")[0]?.name).toBe("Squash");
-    expect(searchGardenCrops("Abelmoschus")[0]?.name).toBe("Okra");
+  it("matches the kind somebody means, by any name it goes by", () => {
+    expect(searchGardenCrops("zucchini")[0]?.name).toBe("Zucchini");
+    expect(searchGardenCrops("jalapeno")[0]).toMatchObject({
+      name: "Jalapeño pepper",
+      kindOf: "Pepper",
+      note: expect.stringMatching(/^Hot/),
+    });
+    expect(searchGardenCrops("roma")[0]?.name).toBe("Paste tomato");
+    expect(searchGardenCrops("scallions")[0]?.name).toBe("Green onion");
+  });
+
+  it("puts the crop first and its kinds after it", () => {
+    const names = searchGardenCrops("pepper", 20).map((crop) => crop.name);
+    expect(names[0]).toBe("Pepper");
+    expect(names).toEqual(expect.arrayContaining(["Bell pepper", "Jalapeño pepper"]));
+  });
+
+  it("never matches on a scientific name", () => {
+    expect(searchGardenCrops("Abelmoschus")).toEqual([]);
+  });
+
+  it("reads a kind as its crop for family, rotation and companions", () => {
+    expect(gardenCropFor("Jalapeño pepper")?.name).toBe("Pepper");
+    expect(gardenCropFor("Butternut squash")?.name).toBe("Squash");
+    expect(inferFamily("Habanero")).toBe("Solanaceae");
+    expect(inferFamily("Bok choy")).toBe("Brassicaceae");
+    expect(gardenEntryFor("Early Jalapeño")?.name).toBe("Jalapeño pepper");
+  });
+
+  it("gives every kind a crop the table knows", () => {
+    for (const kind of GARDEN_KINDS) {
+      expect(
+        GARDEN_CROPS.some((crop) => crop.name === kind.crop),
+        kind.name,
+      ).toBe(true);
+    }
+    expect(GARDEN_KIND_ENTRIES).toHaveLength(GARDEN_KINDS.length);
   });
 
   it("answers nothing to nothing", () => {

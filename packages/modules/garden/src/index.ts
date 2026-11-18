@@ -13,6 +13,7 @@ export * from "./domain/companions.js";
 export * from "./domain/families.js";
 export * from "./domain/growing.js";
 export * from "./domain/jobs.js";
+export * from "./domain/kinds.js";
 export * from "./domain/planting.js";
 export * from "./domain/schedule.js";
 export * from "./domain/season-plan.js";

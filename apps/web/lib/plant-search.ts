@@ -34,6 +34,10 @@ export interface PlantMatch {
   readonly scientificName: string;
   readonly family?: string;
   readonly source: "built-in" | "gbif";
+  /** For a kind ("Jalapeño pepper"): the crop it is a kind of. */
+  readonly kindOf?: string;
+  /** For a kind: how it differs ("Hot · medium heat"). Shown instead of Latin. */
+  readonly note?: string;
   /** GBIF's species key, for a match that came from there. */
   readonly key?: number;
   /**
@@ -109,6 +113,9 @@ export function parseGbif(body: unknown, query: string): PlantMatch[] {
     const prefix = english.find((name) => fold(name).startsWith(q));
     const containing = english.find((name) => fold(name).includes(q));
     const commonName = exact ?? prefix ?? containing ?? english[0];
+    // A plant with no English name would be listed under its Latin one, and
+    // nobody picks a seed off a list in Latin.
+    if (commonName === undefined) return;
 
     const score =
       exact !== undefined || fold(scientificName) === q
@@ -122,7 +129,7 @@ export function parseGbif(body: unknown, query: string): PlantMatch[] {
     const family = normaliseFamily(result.family);
     scored.push({
       match: {
-        commonName: sentenceCase(commonName ?? scientificName),
+        commonName: sentenceCase(commonName),
         scientificName,
         ...(family === undefined ? {} : { family }),
         source: "gbif",
@@ -141,13 +148,15 @@ export function parseGbif(body: unknown, query: string): PlantMatch[] {
 
 /** The table's answers, in the same shape. */
 export function builtInMatches(query: string): PlantMatch[] {
-  return searchGardenCrops(query).map((crop) => {
+  return searchGardenCrops(query, MAX_RESULTS).map((crop) => {
     const growing = GROWING.get(crop.name);
     return {
       commonName: crop.name,
       scientificName: crop.scientificName,
       family: crop.family,
       source: "built-in" as const,
+      ...(crop.kindOf === undefined ? {} : { kindOf: crop.kindOf }),
+      ...(crop.note === undefined ? {} : { note: crop.note }),
       ...(growing === undefined ? {} : { growing }),
     };
   });

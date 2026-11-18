@@ -1,4 +1,5 @@
-import { gardenCropFor } from "./families.js";
+import { gardenEntryFor } from "./families.js";
+import { GARDEN_KINDS } from "./kinds.js";
 
 /**
  * How a crop is grown, filled in for the gardener (spec §5.5).
@@ -332,8 +333,7 @@ function factsFrom(row: Row): GrowingFacts {
   };
 }
 
-/** Every row, by the family table's crop name. Exported for the test. */
-export const GROWING: ReadonlyMap<string, GrowingFacts> = new Map(
+const CROP_GROWING: ReadonlyMap<string, GrowingFacts> = new Map(
   Object.entries(ROWS).map(([name, row]) => [
     name,
     { ...factsFrom(row), ...timingFrom(TIMING[name]) },
@@ -341,11 +341,23 @@ export const GROWING: ReadonlyMap<string, GrowingFacts> = new Map(
 );
 
 /**
+ * Every row by the table's name — crops, and each kind as its crop's facts
+ * with its own figures on top. Exported for the test.
+ */
+export const GROWING: ReadonlyMap<string, GrowingFacts> = new Map([
+  ...CROP_GROWING,
+  ...GARDEN_KINDS.flatMap((kind): Array<[string, GrowingFacts]> => {
+    const crop = CROP_GROWING.get(kind.crop);
+    return crop === undefined ? [] : [[kind.name, { ...crop, ...(kind.growing ?? {}) }]];
+  }),
+]);
+
+/**
  * The table's growing facts for a crop name ("Cherokee Purple tomato" finds
  * the tomato's), or undefined for a plant it does not know.
  */
 export function growingFor(name: string | undefined): GrowingFacts | undefined {
-  const crop = gardenCropFor(name);
+  const crop = gardenEntryFor(name);
   return crop === undefined ? undefined : GROWING.get(crop.name);
 }
 
