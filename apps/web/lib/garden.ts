@@ -1,5 +1,8 @@
 import type { Ulid } from "@galaxy-farm/core";
 import {
+  GROWING,
+  gardenCropFor,
+  gardenEntryFor,
   cropGrowing,
   cropFamily,
   inferFamily,
@@ -335,9 +338,19 @@ export function varietyFacts(
   const variety = varieties.find((held) => held.id === varietyId);
   const crop = variety === undefined ? undefined : crops.find((held) => held.id === variety.cropId);
   const facts = cropGrowing(crop);
-  if (facts === undefined && variety?.daysToMaturity === undefined) return undefined;
+  // A variety named for a kind of its crop — "Jalapeño" under Pepper — grows
+  // like that kind, not like the crop's generic figures.
+  const entry = gardenEntryFor(variety?.name);
+  const kind =
+    entry?.kindOf !== undefined && entry.kindOf === gardenCropFor(crop?.name)?.name
+      ? GROWING.get(entry.name)
+      : undefined;
+  if (facts === undefined && kind === undefined && variety?.daysToMaturity === undefined) {
+    return undefined;
+  }
   return {
     ...(facts ?? {}),
+    ...(kind ?? {}),
     ...(variety?.daysToMaturity === undefined ? {} : { daysToMaturity: variety.daysToMaturity }),
     ...(variety?.spacingInches === undefined ? {} : { spacingInches: variety.spacingInches }),
   };
