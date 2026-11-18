@@ -6,7 +6,15 @@ import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { feedingChoreId } from "@galaxy-farm/core";
-import type { Animal, ChoreTemplate, Contact, FeedingPlan, Task, Ulid } from "@galaxy-farm/core";
+import type {
+  Animal,
+  ChoreTemplate,
+  Contact,
+  FeedingPlan,
+  Property,
+  Task,
+  Ulid,
+} from "@galaxy-farm/core";
 import { repositoryFor, type Database } from "@galaxy-farm/infra-db";
 import type { CareGuide, GuideSection } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
@@ -18,6 +26,7 @@ import {
   tickChore,
   visibleToSitter,
 } from "../lib/sitter-store.js";
+import { zonedNoon } from "../lib/farm-time.js";
 
 /**
  * What a housesitter's browser is given, and what it is not (spec §4.3, §5.10).
@@ -73,7 +82,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await client.exec(
-    "truncate table care_guides, guide_sections, zones, animals, zone_assignments, contacts, chore_templates, tasks, feeding_plans, feed_types, health_records, sync_field_meta, sync_audit",
+    "truncate table properties, care_guides, guide_sections, zones, animals, zone_assignments, contacts, chore_templates, tasks, feeding_plans, feed_types, health_records, sync_field_meta, sync_audit",
   );
 });
 
@@ -464,6 +473,81 @@ describe("ticking a chore", () => {
     );
 
     expect(again).toEqual({ ok: true, taskId: first.taskId });
+  });
+});
+
+describe("ticking a chore on a server in another timezone", () => {
+  // Netlify runs in UTC; the farm is in Texas. An evening chore is due at 8 pm
+  // on the farm's clock, and must still be an evening chore once ticked.
+  const realTz = process.env["TZ"];
+
+  beforeEach(async () => {
+    process.env["TZ"] = "UTC";
+    await repositoryFor<Property>(db, "properties").save({
+      id: PROPERTY,
+      propertyId: PROPERTY,
+      createdAt: NOW,
+      updatedAt: NOW,
+      name: "Home place",
+      timezone: "America/Chicago",
+    } as Property);
+  });
+
+  afterAll(() => {
+    if (realTz === undefined) delete process.env["TZ"];
+    else process.env["TZ"] = realTz;
+  });
+
+  it("stores an evening chore's 8 pm deadline on the farm's clock, not the server's", async () => {
+    await saveTemplate({ timeOfDay: "evening" });
+    const day = zonedNoon("2026-06-15", "America/Chicago"); // what a kiosk sends
+
+    const result = await tickChore(
+      {
+        propertyId: PROPERTY,
+        actorId: SITTER,
+        templateId: TEMPLATE,
+        date: day,
+        at: day,
+        done: true,
+      },
+      db,
+    );
+
+    expect(result.ok).toBe(true);
+    const [saved] = await repositoryFor<Task>(db, "tasks").list({ propertyId: PROPERTY });
+    // The 8 pm deadline, read on the farm's clock. Before the fix it was 8 pm
+    // UTC — 3 pm in Texas, which every screen showed as Midday.
+    const onFarm = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      hourCycle: "h23",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(saved?.dueAt);
+    expect(onFarm).toBe("06/15, 20:00");
+  });
+
+  it("checks the day the rule fires on the farm's calendar", async () => {
+    // A Monday-only chore, ticked late on Monday evening in Texas — already
+    // Tuesday in UTC. It is still Monday's chore.
+    await saveTemplate({ recurrence: "weekly", recurrenceDays: [1] });
+    const lateMonday = new Date("2026-06-16T03:30:00Z"); // 10:30 pm CDT, Mon 15 June
+
+    const result = await tickChore(
+      {
+        propertyId: PROPERTY,
+        actorId: SITTER,
+        templateId: TEMPLATE,
+        date: lateMonday,
+        at: lateMonday,
+        done: true,
+      },
+      db,
+    );
+
+    expect(result.ok).toBe(true);
   });
 });
 

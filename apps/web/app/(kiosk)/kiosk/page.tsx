@@ -68,5 +68,11 @@ export default async function KioskPage() {
     },
   );
 
-  return <KioskHome {...(deviceName === undefined ? {} : { deviceName })} pinSet={pinSet} />;
+  return (
+    <KioskHome
+      {...(deviceName === undefined ? {} : { deviceName })}
+      pinSet={pinSet}
+      propertyId={actor.propertyId}
+    />
+  );
 }

@@ -7,6 +7,7 @@ import type { NotificationSetting, Ulid } from "@galaxy-farm/core";
 
 import { AppearanceSetting } from "@/app/(admin)/admin/settings/_components/appearance-setting";
 import { BrandingScreen } from "@/app/(admin)/admin/settings/_components/branding-screen";
+import { ConnectedAppsScreen } from "@/app/(admin)/admin/settings/_components/connected-apps-screen";
 import { DevicesScreen } from "@/app/(admin)/admin/settings/_components/devices-screen";
 import { NotificationsScreen } from "@/app/(admin)/admin/settings/_components/notifications-screen";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@/app/(admin)/admin/settings/_components/people-screen";
 import { PropertyScreen } from "@/app/(admin)/admin/settings/_components/property-screen";
 import { WatchSettingsScreen } from "@/app/(admin)/admin/settings/_components/watch-settings-screen";
+import type { ApiToken } from "@/lib/api-token-store";
 import type { KioskDevice } from "@/lib/device-store";
 import type { PushDevice } from "@/lib/push-store";
 
@@ -47,6 +49,9 @@ export function SettingsScreen({
   devices,
   deletedDevices,
   pinSet,
+  mayManageApps = false,
+  apiTokens = [],
+  appsUnavailable,
   pushDevices,
   notificationSettings,
   vapidPublicKey,
@@ -68,6 +73,11 @@ export function SettingsScreen({
   /** Tombstoned screens, for the §4.5 clause 4 restore path. */
   readonly deletedDevices: readonly KioskDevice[];
   readonly pinSet: boolean;
+  /** `integrations.manage` — owners only. Connected apps hold standing tokens. */
+  readonly mayManageApps?: boolean;
+  readonly apiTokens?: readonly ApiToken[];
+  /** Why the connected-apps list is missing, when it is. */
+  readonly appsUnavailable?: string | undefined;
   /** This person's own subscribed browsers, and their §6 preferences. */
   readonly pushDevices: readonly PushDevice[];
   readonly notificationSettings: readonly NotificationSetting[];
@@ -103,6 +113,18 @@ export function SettingsScreen({
             id: "devices",
             label: "Kiosk devices",
             adornment: devicesUnavailable === undefined ? devices.length : "!",
+          },
+        ]
+      : []),
+    ...(mayManageApps
+      ? [
+          {
+            id: "apps",
+            label: "Connected apps",
+            adornment:
+              appsUnavailable === undefined
+                ? apiTokens.filter((token) => token.revokedAt === undefined).length
+                : "!",
           },
         ]
       : []),
@@ -162,6 +184,11 @@ export function SettingsScreen({
                 deleted={deletedDevices}
                 pinSet={pinSet}
                 {...(devicesUnavailable === undefined ? {} : { unavailable: devicesUnavailable })}
+              />
+            ) : active === "apps" && mayManageApps ? (
+              <ConnectedAppsScreen
+                tokens={apiTokens}
+                {...(appsUnavailable === undefined ? {} : { unavailable: appsUnavailable })}
               />
             ) : active === "notifications" ? (
               notificationsUnavailable === undefined ? (

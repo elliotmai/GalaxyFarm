@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import { PageBody } from "@galaxy-farm/ui";
 import {
+  addCalendarDays,
   dayKey,
   groupByDay,
   projectEvents,
@@ -32,9 +33,10 @@ import type {
 } from "@galaxy-farm/module-equipment";
 import type { FeedConsumption, FeedPurchase, FeedType } from "@galaxy-farm/module-feed";
 
-import { KioskHeader, KioskQuiet } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
+import { KioskHeader } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { projectedCalendarEntries } from "@/lib/calendar";
+import { dayLabel } from "@/lib/chores";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
@@ -78,57 +80,62 @@ export function CalendarBoardScreen({ propertyId }: { readonly propertyId: Ulid 
   const byDay = useMemo(() => groupByDay(entries), [entries]);
 
   const todayKey = dayKey(from);
+  // Every day of the window gets a row, so a quiet Wednesday reads as quiet
+  // rather than as a day the board forgot.
+  const days = useMemo(
+    () => Array.from({ length: WINDOW_DAYS }, (_, index) => addCalendarDays(from, index)),
+    [from],
+  );
 
   return (
     <PageBody>
-      <KioskHeader title="Calendar" fact={`Next ${WINDOW_DAYS} days`} />
+      <KioskHeader back={false} title="Calendar" fact={`The next ${WINDOW_DAYS} days.`} />
 
       {loading ? (
-        <KioskQuiet>Loading…</KioskQuiet>
-      ) : byDay.size === 0 ? (
-        <KioskQuiet>Nothing in the next {WINDOW_DAYS} days.</KioskQuiet>
+        <p className="text-muted">Loading…</p>
       ) : (
-        <div className="grid grid-cols-1 items-start gap-density lg:grid-cols-2">
-          {[...byDay.entries()].map(([day, dayEntries]) => (
-            <section key={day} aria-label={dayLabel(day)} className="flex min-w-0 flex-col gap-2">
-              <h2 className="text-xl tracking-wide text-ink">
-                {day === todayKey ? "Today" : dayLabel(day)}
-              </h2>
-              <ul className="flex flex-col divide-y divide-rule overflow-hidden rounded-density border border-rule bg-panel">
-                {dayEntries.map((entry) => (
-                  <li
-                    key={entry.id}
-                    className="flex min-h-target items-center gap-4 px-4 py-2 text-density text-ink"
-                  >
-                    <span className="w-24 shrink-0 text-base text-muted [font-variant-numeric:tabular-nums]">
-                      {entry.allDay
-                        ? "All day"
-                        : entry.at.toLocaleTimeString(undefined, {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
-                    </span>
-                    <span className="min-w-0 flex-1">{entry.title}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
+        <ol className="gf-kiosk-days">
+          {days.map((date) => {
+            const key = dayKey(date);
+            const dayEntries = byDay.get(key) ?? [];
+            const isToday = key === todayKey;
+            if (dayEntries.length === 0 && !isToday) return null;
+
+            return (
+              <li key={key} className="gf-kiosk-day" data-today={isToday ? "" : undefined}>
+                <h2 className="gf-kiosk-day__date">
+                  <span className="gf-kiosk-day__name">{dayLabel(date, from)}</span>
+                  <span className="gf-kiosk-day__sub">
+                    {date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  </span>
+                </h2>
+                {dayEntries.length === 0 ? (
+                  <p className="text-muted">Nothing scheduled.</p>
+                ) : (
+                  <ul className="gf-kiosk-day__list">
+                    {dayEntries.map((entry) => (
+                      <li key={entry.id}>
+                        <span className="gf-kiosk-day__time">
+                          {entry.allDay
+                            ? "All day"
+                            : entry.at.toLocaleTimeString(undefined, {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                        </span>
+                        <span className="text-ink">{entry.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ol>
       )}
     </PageBody>
   );
 }
-
-/** "Thursday 29 October" — read across the barn, so the day spelled out. */
-function dayLabel(day: string): string {
-  return new Date(`${day}T12:00:00`).toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-}
-
 /**
  * Both halves of the calendar, from this device's own store.
  *

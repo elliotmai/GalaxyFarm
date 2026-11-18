@@ -1,77 +1,95 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 
-import { Button, Modal, PageBody, TextInput, useConfirmDelete, useToast } from "@galaxy-farm/ui";
+import {
+  Button,
+  Card,
+  Modal,
+  PageBody,
+  TextInput,
+  useConfirmDelete,
+  useToast,
+} from "@galaxy-farm/ui";
 
-import { checkKioskPin, unpairThisDevice } from "@/app/(kiosk)/kiosk/_actions";
+import { choreProgress, dayKey, type Ulid } from "@galaxy-farm/core";
+import type { EggLog } from "@galaxy-farm/module-poultry";
+
 import { KioskHeader } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
-import { KIOSK_BOARDS } from "@/lib/kiosk-boards";
-
-/** Chores first, then the spec's order — a stable sort keeps the rest as they are. */
-const BOARDS = [...KIOSK_BOARDS].sort(
-  (a, b) => Number(b.slug === "chores") - Number(a.slug === "chores"),
-);
+import { checkKioskPin, unpairThisDevice } from "@/app/(kiosk)/kiosk/_actions";
+import { useTodayChores } from "@/app/(kiosk)/kiosk/_components/use-today-chores";
+import { useRecords } from "@/lib/local/use-records";
+import { KIOSK_BOARDS, type KioskBoardSlug } from "@/lib/kiosk-boards";
 
 /**
  * The board picker (spec §4.4).
  *
- * What a screen shows when it is not locked to one board — six large tiles,
- * nothing to read past arm's length. Today's Chores is the board somebody
- * comes to this screen for most days, so it leads and is the only filled
- * tile; the rest follow in the order the spec names them, as equals.
- *
- * Locking a screen to one board is done from Settings → Kiosk devices, and
- * that is not repeated here: the people who set it up know, and a sentence on
- * a barn screen is a sentence everybody else skims past every morning.
+ * What a screen shows when it is not locked to one board — six large tiles in
+ * the spec's order, each carrying the one fact worth knowing before opening it.
  */
 export function KioskHome({
   deviceName,
   pinSet,
+  propertyId,
 }: {
   /** Set only for a paired barn screen — absent for an owner or member browsing `/kiosk` as themselves. */
   readonly deviceName?: string;
   readonly pinSet: boolean;
+  readonly propertyId: Ulid;
 }) {
+  const status = useBoardStatus(propertyId);
+  const today = useMemo(() => new Date(), []);
+
   return (
     <PageBody>
-      <KioskHeader back={false} title="Boards" fact={deviceName} />
+      <KioskHeader
+        back={false}
+        title={today.toLocaleDateString(undefined, {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+        })}
+        fact={deviceName === undefined ? "Pick a board." : `${deviceName} — pick a board.`}
+      />
 
-      <ul className="grid grid-cols-1 gap-density sm:grid-cols-2 lg:grid-cols-3">
+      <div className="gf-kiosk-board-picker grid grid-cols-2 gap-density md:grid-cols-3">
         {/* `prefetch` fetches each board whole rather than as far as its
             loading boundary — see `next.config.ts`. Six tiles on a screen that
             is powered on and then left alone, and the barn is the place most
             likely to be out of signal by the time one of them is pressed. */}
-        {BOARDS.map((board) => {
-          const lead = board.slug === "chores";
+        {KIOSK_BOARDS.map((board) => {
+          const line = status[board.slug];
+
           return (
-            <li key={board.slug}>
-              <Link
-                href={board.route}
-                prefetch
-                className={[
-                  "flex min-h-[7.5rem] items-center justify-between gap-4 rounded-density border px-6 py-5",
-                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action",
-                  lead
-                    ? "border-action bg-action text-action-ink"
-                    : "border-rule bg-panel text-ink hover:bg-raised",
-                ].join(" ")}
-              >
-                <h2 className="text-[1.6em]">{board.label}</h2>
-                <svg aria-hidden width="32" height="32" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M9 6l6 6-6 6"
-                    stroke="currentColor"
-                    strokeWidth="2.4"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </Link>
-            </li>
+            <Link
+              key={board.slug}
+              href={board.route}
+              prefetch
+              className="gf-kiosk-board-link block"
+              data-board={board.slug}
+            >
+              <Card className="gf-kiosk-board-tile">
+                <span className="gf-kiosk-board-glyph" aria-hidden="true">
+                  <BoardGlyph slug={board.slug} />
+                </span>
+                <span className="flex min-w-0 flex-col gap-1">
+                  <h2>{board.label}</h2>
+                  {line === undefined ? null : (
+                    <span
+                      className="gf-kiosk-board-status"
+                      data-tone={line.urgent ? "danger" : undefined}
+                    >
+                      {line.text}
+                    </span>
+                  )}
+                </span>
+              </Card>
+            </Link>
           );
         })}
-      </ul>
+      </div>
 
       {deviceName === undefined ? null : (
         <div className="flex justify-center pt-density">
@@ -79,6 +97,82 @@ export function KioskHome({
         </div>
       )}
     </PageBody>
+  );
+}
+
+interface BoardStatus {
+  readonly text: string;
+  readonly urgent: boolean;
+}
+
+/**
+ * One live line per board that has something to say, from this device's own
+ * store — so the picker answers "is there anything to do?" before a tap.
+ */
+function useBoardStatus(propertyId: Ulid): Partial<Record<KioskBoardSlug, BoardStatus>> {
+  const { entries, loading } = useTodayChores(propertyId);
+  const query = useMemo(() => ({ propertyId }), [propertyId]);
+  const { records: eggLogs, loading: eggsLoading } = useRecords<EggLog>("eggLogs", query);
+
+  return useMemo(() => {
+    const status: Partial<Record<KioskBoardSlug, BoardStatus>> = {};
+
+    if (!loading && entries.length > 0) {
+      const progress = choreProgress(entries);
+      status.chores =
+        progress.open === 0
+          ? { text: "All done today", urgent: false }
+          : {
+              text:
+                progress.overdue > 0
+                  ? `${progress.open} to do · ${progress.overdue} late`
+                  : `${progress.open} to do`,
+              urgent: progress.overdue > 0,
+            };
+    }
+
+    if (!eggsLoading) {
+      const key = dayKey(new Date());
+      const total = eggLogs
+        .filter((log) => dayKey(log.collectedOn) === key)
+        .reduce((sum, log) => sum + log.total, 0);
+      status.eggs = { text: `${total} ${total === 1 ? "egg" : "eggs"} today`, urgent: false };
+    }
+
+    return status;
+  }, [entries, loading, eggLogs, eggsLoading]);
+}
+const BOARD_GLYPHS: Readonly<Record<KioskBoardSlug, ReactNode>> = {
+  "pen-board": <path d="M4 8h24M7 8v17m9-17v17m9-17v17M4 25h24M4 15h24" />,
+  calendar: (
+    <>
+      <path d="M7 4v5m18-5v5M5 8h22v20H5zM5 14h22" />
+      <path d="M11 19h3m5 0h3m-11 5h3m5 0h3" />
+    </>
+  ),
+  chores: (
+    <>
+      <path d="M12 7h15M12 16h15M12 25h15" />
+      <path d="m4 7 2 2 4-4m-6 11 2 2 4-4m-6 11 2 2 4-4" />
+    </>
+  ),
+  eggs: <path d="M16 3c-6 0-10 9-10 16a10 10 0 0 0 20 0c0-7-4-16-10-16Z" />,
+  "program-day": (
+    <>
+      <path d="M6 5v22m10-22v22m10-22v22M3 10h6m4 6h6m4 6h6" />
+      <circle cx="6" cy="10" r="2" />
+      <circle cx="16" cy="16" r="2" />
+      <circle cx="26" cy="22" r="2" />
+    </>
+  ),
+  housesitter: <path d="m3 14 13-10 13 10M7 12v16h18V12M13 28v-9h6v9" />,
+};
+
+function BoardGlyph({ slug }: { readonly slug: KioskBoardSlug }) {
+  return (
+    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      {BOARD_GLYPHS[slug]}
+    </svg>
   );
 }
 

@@ -24,14 +24,14 @@ import {
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 
+import { KioskHeader } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { ChoreBoard } from "@/app/(kiosk)/kiosk/_components/chore-board";
-import { KioskHeader, KioskQuiet, kioskDate } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { HousesitterGuide } from "@/app/(kiosk)/kiosk/housesitter/housesitter-guide";
 import { useSyncEngine } from "@/app/_components/sync-provider";
+import type { PeopleNames } from "@/lib/people-names";
 import { guideForSitter } from "@/lib/care-guide-selection";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
-import type { PeopleNames } from "@/lib/people-names";
 
 /**
  * Housesitter Mode (spec §4.4, §5.10).
@@ -61,7 +61,6 @@ export function HousesitterBoardScreen({
   names,
 }: {
   readonly propertyId: Ulid;
-  /** Who ticked what, resolved on the server; never rejects. */
   readonly names?: Promise<PeopleNames> | undefined;
 }) {
   const { store, loading } = useHousesitterData(propertyId);
@@ -85,10 +84,14 @@ export function HousesitterBoardScreen({
 
   return (
     <PageBody>
-      <KioskHeader title="Housesitter Mode" fact={kioskDate(now)} />
+      <KioskHeader
+        back={false}
+        title="Housesitter Mode"
+        fact="Everything a helper needs, read live from the farm's own records."
+      />
 
       {loading ? (
-        <KioskQuiet>Loading…</KioskQuiet>
+        <p className="text-muted">Loading…</p>
       ) : (
         <HousesitterGuide
           guide={guide}

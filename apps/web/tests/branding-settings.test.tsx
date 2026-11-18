@@ -80,6 +80,12 @@ vi.mock("@/app/(admin)/admin/settings/_components/device-actions", () => ({
   clearKioskPinAction: async () => ({ ok: true, message: "" }),
 }));
 
+// The Connected apps tab, too: its actions reach `api_tokens` on the server.
+vi.mock("@/app/(admin)/admin/settings/_components/api-token-actions", () => ({
+  addApiToken: async () => ({ ok: true, message: "" }),
+  revokeApiTokenAction: async () => ({ ok: true, message: "" }),
+}));
+
 // And the Notifications tab, for the third time: its actions reach
 // `push_subscriptions` and `notification_settings` through the server.
 vi.mock("@/app/(admin)/admin/settings/_components/notification-actions", () => ({

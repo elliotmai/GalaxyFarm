@@ -73,7 +73,7 @@ galaxy-farm/
 │       │   ├── (account)/account/  customer portal (scaffold)
 │       │   ├── (sitter)/sitter/    housesitter limited view
 │       │   ├── (kiosk)/kiosk/      barn touch screens
-│       │   └── api/                sync push/pull, auth, storage presign, weather cron
+│       │   └── api/                sync push/pull, auth, storage presign, weather cron, board API
 │       └── e2e/                    Playwright smoke tests
 ├── packages/
 │   ├── core/                       shared kernel: base Animal, Zone, Task, value objects,
@@ -279,6 +279,17 @@ build command so a deploy cannot publish without it.
 ### Environment
 
 Copy `.env.example` to `.env.local` and fill it in. It covers `DATABASE_URL` (Neon), the Auth.js secret, Cloudflare R2 credentials, the Resend API key and sender, the VAPID keypair web push is signed with, the Google Maps browser key, and the `NEXT_PUBLIC_FARM_NAME` / business-name branding fallbacks. `.env.local` is gitignored and must stay that way — no real value belongs in `.env.example`.
+
+### Connected apps (board API)
+
+Another app — the kitchen's Fridge Board — reads the farm server-to-server with a bearer token (spec §4.3 "Connected apps"):
+
+- `GET /api/board/v1` — the property's name, coordinates and timezone, today's date there, today's chores exactly as the kiosk's Today's Chores board shows them (`slot`: `owed | morning | midday | evening | night`), and the housesitter guide as Housesitter Mode shows it: `contacts` and the flat `notes` list, plus `intro`, `doNotHandle`, and `care` — the "The animals" tab's sections (pens with their effective safety level, pets, rations, routine) and then the written guide sections, each as `{ title, items: [{ name, detail, safety, safetyLabel }] }` with `detail` one plain-text line. Sections follow the guide's own includes; empty ones are left out.
+- `POST /api/board/v1/chores/{id}` with `{ "done": true | false }` → `{ "ok": true, "done": … }`. `id` is a chore id from the GET. It goes through the kiosk's own tick (`tickChore`), so it is in the sync audit as device `app:<token id>` and every screen picks it up on its next pull.
+
+Both answer `401 { "error": "unauthorized" }` without `Authorization: Bearer <token>`, and the tick answers `404 { "error": "not_found" }` for a chore not on today's sheet. `lib/board-api.ts` is the mapping, `lib/board-store.ts` the reads and the write.
+
+**Minting a token.** `/admin/settings` → **Connected apps** (owners only) → **Mint a token**, name it after the app, and copy the token from the dialog — it is shown once and only its SHA-256 hash is kept, in `api_tokens`. Paste it into the other app as its secret. **Revoking** is the **Revoke** button on the same row; the app is refused from its next request. A lost token is never recovered: mint a new one and revoke the old. Each token reaches the one property it was minted on.
 
 ### Email
 

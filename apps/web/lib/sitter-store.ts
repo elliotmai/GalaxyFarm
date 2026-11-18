@@ -31,7 +31,9 @@ import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { weatherSnapshot } from "@/lib/weather-service";
 import { choreWeatherDay, isWeatherChoreKey, weatherChores, weatherJobs } from "@/lib/weather-jobs";
 import { applyPushAndMark } from "@/lib/change-stamp";
+import { fromWallClock, isTimeZone, wallClock } from "@/lib/farm-time";
 import { varietyFacts } from "@/lib/garden";
+import { propertyFor } from "@/lib/weather-service";
 
 export { guideForSitter, guideIncludes, visibleToSitter };
 
@@ -191,6 +193,34 @@ export type TickOutcome =
  * Everything an admin device would do afterwards happens by itself: the row is
  * in Postgres, so the next pull carries it to every screen on the farm.
  */
+/**
+ * The farm's timezone, or undefined when the property has none this runtime
+ * can use — in which case the tick keeps the process's local time, as before.
+ */
+async function farmTimeZone(db: Database, propertyId: Ulid): Promise<string | undefined> {
+  const property = await propertyFor(propertyId, db);
+  return isTimeZone(property?.timezone) ? property.timezone : undefined;
+}
+
+/**
+ * `date` and `at` as the farm's clock reads them, plus the way back.
+ *
+ * Due times are worked out by the kernel's local-time arithmetic. On the farm's
+ * own screens local is the farm; here it is the server's zone (UTC on Netlify),
+ * where an evening chore's 8 pm deadline is 2 pm in Texas — so a ticked evening
+ * chore came back on every screen as a midday one. Days and deadlines are
+ * therefore worked out on the farm's wall clock and brought back to a real
+ * instant before they are stored.
+ */
+function onFarmClock(timeZone: string | undefined, date: Date, at: Date) {
+  if (timeZone === undefined) return { day: date, now: at, store: (d: Date) => d };
+  return {
+    day: wallClock(date, timeZone),
+    now: wallClock(at, timeZone),
+    store: (d: Date) => fromWallClock(d, timeZone),
+  };
+}
+
 export async function tickChore(input: TickInput, db: Database = database()): Promise<TickOutcome> {
   const { propertyId, actorId, date, at, done } = input;
 
@@ -222,20 +252,23 @@ export async function tickChore(input: TickInput, db: Database = database()): Pr
     if (template === undefined || template.propertyId !== propertyId) {
       return { ok: false, reason: "That chore is not on this property." };
     }
+    const farm = onFarmClock(await farmTimeZone(db, propertyId), date, at);
     // The template has to actually fire on the day being ticked. Without this
     // the day is whatever the request said it was, and a chore could be
     // written onto a date the rule never produced.
-    if (!occursOn(template, date)) {
+    if (!occursOn(template, farm.day)) {
       return { ok: false, reason: "That chore is not on that day's list." };
     }
 
     const now = at;
+    const fields = taskFromTemplate(template, farm.day);
     const record: Task = {
       id: encodeUlid(now.getTime()),
       propertyId,
       createdAt: now,
       updatedAt: now,
-      ...taskFromTemplate(template, date),
+      ...fields,
+      dueAt: farm.store(fields.dueAt),
       completedAt: now,
       completedBy: actorId,
     };
@@ -420,13 +453,15 @@ async function tickFeedingOccurrence(
     return { ok: false, reason: "That chore had not been ticked." };
   }
 
-  const entry = isWeatherChoreKey(sourceKey)
-    ? (await weatherOccurrences(propertyId, date, at, db)).find(
-        (occurrence) => occurrence.id === sourceKey,
-      )
-    : (await feedingOccurrences(propertyId, date, at, db)).find(
-        (occurrence) => occurrence.id === sourceKey,
-      );
+  // Rebuilt on the farm's own clock (a tick from the barn at 11pm is that
+  // day's), then matched by id: a weather chore against the weather's
+  // occurrences, a feeding trip against the plans'.
+  const farm = onFarmClock(await farmTimeZone(db, propertyId), date, at);
+  const entry = (
+    isWeatherChoreKey(sourceKey)
+      ? await weatherOccurrences(propertyId, farm.day, farm.now, db)
+      : await feedingOccurrences(propertyId, farm.day, farm.now, db)
+  ).find((occurrence) => occurrence.id === sourceKey);
   if (entry === undefined) {
     return { ok: false, reason: "That chore is not on that day's list." };
   }
@@ -439,7 +474,7 @@ async function tickFeedingOccurrence(
     sourceKey: entry.id,
     title: entry.title,
     ...(entry.detail === undefined ? {} : { detail: entry.detail }),
-    dueAt: entry.dueAt,
+    dueAt: farm.store(entry.dueAt),
     ...(entry.zoneId === undefined ? {} : { zoneId: entry.zoneId }),
     ...(entry.animalId === undefined ? {} : { animalId: entry.animalId }),
     completedAt: at,

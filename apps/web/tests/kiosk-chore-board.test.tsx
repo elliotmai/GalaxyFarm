@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -158,30 +158,43 @@ describe("Today's Chores on a kiosk", () => {
   it("counts the day in one line instead of spending a row on a meter", () => {
     view();
 
+    expect(screen.getByText("2 to go")).toBeInTheDocument();
     expect(screen.getByText(/1 of 3 done/)).toBeInTheDocument();
     expect(screen.getByText(/1 late/)).toBeInTheDocument();
   });
 
-  it("sinks a finished chore to the bottom of its own part of the day", () => {
+  it("folds finished chores away until somebody asks for them", async () => {
     view();
 
-    const morning = section("Morning")
-      .getAllByRole("button")
-      .map((button) => button.textContent ?? "");
+    // What is left is what is on screen; the ticked one is a count, not a row.
+    expect(screen.queryByRole("button", { name: /Scratch grain/ })).not.toBeInTheDocument();
+    expect(section("Morning").getByText("1 finished")).toBeInTheDocument();
 
-    expect(morning[0]).toMatch(/Break ice/);
-    expect(morning[1]).toMatch(/Scratch grain/);
+    await userEvent.click(section("Morning").getByRole("button", { name: /1 finished/ }));
+
+    expect(screen.getByRole("button", { name: /Scratch grain/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
-
   it("moves the row on the tap rather than after the round trip", async () => {
     view();
 
     const row = screen.getByRole("button", { name: /Break ice on the north tank/ });
+    const column = within(row.closest("section") as HTMLElement);
     await userEvent.click(row);
 
-    // Ticked here, with the server action still unanswered.
+    // Ticked here, with the server action still unanswered: the row has
+    // already folded into its section's finished count, and shows as done there.
     expect(action.resolve).toBeDefined();
-    expect(row).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.queryByRole("button", { name: /Break ice on the north tank/ }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(column.getByRole("button", { name: /finished/ }));
+    expect(screen.getByRole("button", { name: /Break ice on the north tank/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(action.calls).toEqual([
       { taskId: ICE.id, day: new Date(2026, 10, 12, 12, 0, 0).toISOString(), done: true },
     ]);
@@ -192,7 +205,10 @@ describe("Today's Chores on a kiosk", () => {
 
     const row = screen.getByRole("button", { name: /Break ice on the north tank/ });
     await userEvent.click(row);
-    expect(row).toHaveAttribute("aria-pressed", "true");
+    // Ticked at once: folded away out of the open list.
+    expect(
+      screen.queryByRole("button", { name: /Break ice on the north tank/ }),
+    ).not.toBeInTheDocument();
 
     action.resolve?.({ ok: false, error: "This screen has been unpaired." });
 
@@ -223,14 +239,18 @@ describe("Today's Chores on a kiosk", () => {
       view(names);
       await names;
     });
+    // Finished work is folded into its part of the day; open it to read it.
+    await userEvent.click(section("Morning").getByRole("button", { name: /1 finished/ }));
 
+    // The row mounts on the unfold, so its name settles a tick later.
     const row = screen.getByRole("button", { name: /Scratch grain to the hens/ });
     expect(row).toHaveAttribute("aria-pressed", "true");
-    expect(row).toHaveTextContent(/Done by Sam · 8:40/);
+    await waitFor(() => expect(row).toHaveTextContent(/Done by Sam · 8:40/));
   });
 
-  it("still says when a chore was done while the names are unavailable", () => {
+  it("still says when a chore was done while the names are unavailable", async () => {
     view();
+    await userEvent.click(section("Morning").getByRole("button", { name: /1 finished/ }));
 
     expect(screen.getByRole("button", { name: /Scratch grain to the hens/ })).toHaveTextContent(
       /Done · 8:40/,
@@ -245,13 +265,12 @@ describe("Today's Chores on a kiosk", () => {
     };
     view();
 
-    expect(screen.getByText("All done for today")).toBeInTheDocument();
+    expect(screen.getByText("All done")).toBeInTheDocument();
     // Status by exception: nothing left means no rows in the way of the news.
     expect(screen.queryByRole("button", { name: /Break ice/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
 
     // Who did what is still there for whoever wants it.
-    await userEvent.click(section("Morning").getByRole("button", { name: "Show 2" }));
+    await userEvent.click(section("Morning").getByRole("button", { name: /2 finished/ }));
     expect(screen.getByRole("button", { name: /Break ice/ })).toHaveAttribute(
       "aria-pressed",
       "true",

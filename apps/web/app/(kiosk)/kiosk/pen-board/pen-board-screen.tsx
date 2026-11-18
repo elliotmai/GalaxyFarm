@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 
-import { Button, Modal, PageBody, SafetyBadge, useToast } from "@galaxy-farm/ui";
+import { Button, Card, Modal, PageBody, SafetyBadge, useToast } from "@galaxy-farm/ui";
 import {
   effectiveSafetyLevel,
   isOnFarm,
@@ -15,8 +15,8 @@ import {
 
 import { penAssignments } from "@galaxy-farm/module-pets";
 
+import { KioskHeader } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { moveKioskAnimal } from "@/app/(kiosk)/kiosk/_actions";
-import { KioskHeader, KioskQuiet } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -30,10 +30,6 @@ import { useRecords } from "@/lib/local/use-records";
  * `animals.move` action; nothing here reaches the property map itself, which
  * is a Phase 1 screen with an editor a barn touchscreen has no business
  * running.
- *
- * Each pen is one panel: its name and level on a line, and its occupants as
- * big name buttons under it — the button is the move, so there is nothing to
- * explain on screen. An empty pen says so in a word.
  */
 export function PenBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
   const { store, syncNow } = useSyncEngine();
@@ -86,23 +82,18 @@ export function PenBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
     });
   }
 
-  const head = activeZones.reduce((sum, zone) => sum + occupantsFor(zone).length, 0);
-
   return (
     <PageBody>
       <KioskHeader
+        back={false}
         title="Pen Board"
-        fact={
-          zonesLoading || store === undefined
-            ? undefined
-            : `${activeZones.length} pens · ${head} head`
-        }
+        fact="Tap an animal, then tap where it is going."
       />
 
       {zonesLoading || store === undefined ? (
-        <KioskQuiet>Loading…</KioskQuiet>
+        <p className="text-muted">Loading…</p>
       ) : (
-        <ul className="grid grid-cols-1 items-start gap-density md:grid-cols-2 lg:grid-cols-3">
+        <div className="gf-kiosk-zone-grid grid grid-cols-1 gap-density md:grid-cols-2 lg:grid-cols-3">
           {activeZones.map((zone) => {
             const occupants = occupantsFor(zone);
             const level = effectiveSafetyLevel(
@@ -114,29 +105,25 @@ export function PenBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
             );
 
             return (
-              <li
-                key={zone.id}
-                className="flex flex-col gap-3 rounded-density border border-rule bg-panel p-4"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="min-w-0 text-ink">{zone.name}</h2>
+              <Card key={zone.id} className="gf-kiosk-zone flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h2>{zone.name}</h2>
                   <SafetyBadge
                     level={level}
                     {...(raisedBy?.name === undefined ? {} : { raisedBy: raisedBy.name })}
                   />
                 </div>
                 {occupants.length === 0 ? (
-                  <p className="text-base text-muted">Empty</p>
+                  <p className="text-muted">Empty</p>
                 ) : (
-                  <ul className="flex flex-wrap gap-2">
+                  <ul className="flex flex-col gap-1">
                     {occupants.map((animal) => (
-                      <li key={animal.id} className="min-w-0">
+                      <li key={animal.id}>
                         <button
                           type="button"
                           disabled={pending}
                           onClick={() => setMoving(animal)}
-                          aria-label={`Move ${animal.name ?? animal.tagNumber ?? "this animal"}`}
-                          className="min-h-target max-w-full truncate rounded-density border border-edge bg-panel px-4 text-density font-semibold text-ink hover:bg-raised disabled:opacity-60"
+                          className="min-h-target w-full rounded-density border border-edge px-3 text-left text-density text-ink hover:border-action"
                         >
                           {animal.name ?? animal.tagNumber ?? "Unnamed"}
                         </button>
@@ -144,15 +131,15 @@ export function PenBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
                     ))}
                   </ul>
                 )}
-              </li>
+              </Card>
             );
           })}
-        </ul>
+        </div>
       )}
 
       {moving === undefined ? null : (
         <Modal
-          title={`Move ${moving.name ?? moving.tagNumber ?? "this animal"} to`}
+          title={`Move ${moving.name ?? moving.tagNumber ?? "this animal"}`}
           onClose={() => setMoving(undefined)}
         >
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
