@@ -1,7 +1,9 @@
 import {
   feedingsPerDay,
   type FeedingFrequency,
+  RECEPTACLE_INFO,
   type FeedingPlanLine,
+  type Receptacle,
   type Unit,
 } from "@galaxy-farm/core";
 import {
@@ -86,8 +88,33 @@ const FREQUENCY_WORDS: Readonly<Record<FeedingPlanLine["frequency"], string>> = 
   twice_daily: "twice a day",
   three_times_daily: "three times a day",
   every_other_day: "every other day",
+  twice_weekly: "twice a week",
   weekly: "once a week",
 };
+
+/**
+ * "6 crickets", "2 cups", "1 round bale" — the amount as it is said.
+ *
+ * `each` is a count of the thing itself, so it has no unit word: six crickets
+ * are not "6 eaches of crickets".
+ */
+export function amountWords(amount: number, unit: Unit): string {
+  if (unit === "each") return String(amount);
+  const word = unit.replace(/_/g, " ");
+  // Abbreviations do not take an s: "40 lb", not "40 lbs".
+  if (unit === "lb" || unit === "oz") return `${amount} ${word}`;
+  // "0.5 round bale", "1 cup", "2 cups": only more than one takes an s.
+  return `${amount} ${amount > 1 ? `${word}s` : word}`;
+}
+
+/** ", in the bunk", ", by hand" — what it goes in, read after the amount. */
+export function receptacleWords(receptacle: Receptacle | undefined): string {
+  if (receptacle === undefined) return "";
+  if (receptacle === "by_hand") return ", by hand";
+  if (receptacle === "ground") return ", on the ground";
+  if (receptacle === "tongs") return ", with tongs";
+  return `, in the ${RECEPTACLE_INFO[receptacle].label.toLowerCase()}`;
+}
 
 /** "Smokey and Boots"; "Smokey, Boots and Tig". */
 export function nameList(names: readonly string[]): string {
@@ -114,11 +141,11 @@ export function describePlanLine(
   sharedBetween: readonly string[] = [],
 ): string {
   const feed = feeds.find((held) => held.id === line.feedTypeId)?.name ?? "feed";
-  const unit = line.amount.unit.replace(/_/g, " ");
-  const plural = line.amount.amount === 1 ? unit : `${unit}s`;
+  const amount = amountWords(line.amount.amount, line.amount.unit);
+  const of = line.amount.unit === "each" ? " " : " of ";
   const between = sharedBetween.length > 1 ? ` between ${nameList(sharedBetween)}` : "";
 
-  return `${line.amount.amount} ${plural} of ${feed}${between}, ${FREQUENCY_WORDS[line.frequency]}, ${line.timeOfDay}${
+  return `${amount}${of}${feed}${between}${receptacleWords(line.receptacle)}, ${FREQUENCY_WORDS[line.frequency]}, ${line.timeOfDay}${
     line.notes === undefined ? "" : ` — ${line.notes}`
   }`;
 }

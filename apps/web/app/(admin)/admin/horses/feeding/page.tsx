@@ -12,7 +12,7 @@ export default async function AdminHorsesFeedingPage() {
   return (
     <HorseShell
       title={"Feeding"}
-      holds={"Rations in the units they are fed in, and what a horse costs to keep."}
+      holds={"Feeding plans in the units they are fed in, and what a horse costs to keep."}
     />
   );
 }

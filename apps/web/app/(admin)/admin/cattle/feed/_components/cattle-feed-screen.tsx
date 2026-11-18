@@ -1,49 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useMemo, useState } from "react";
+import {
+  useId,
+  useMemo,
+  useState,
+} from "react";
 
 import {
   Button,
-  Checkbox,
   EmptyState,
   Fab,
   Modal,
-  optionLabel,
   PageBody,
   Pill,
   PlusIcon,
   Section,
   Select,
   TextInput,
-  toOptions,
-  useConfirmDelete,
   useToast,
 } from "@galaxy-farm/ui";
 import {
-  displayName,
-  isShared,
-  openAssignments,
-  portionOf,
-  FEEDING_FREQUENCIES,
-  feedingPlanSchema,
-  TIMES_OF_DAY,
+  isOnFarm,
+  isTotal,
   type Animal,
-  type FeedingFrequency,
   type FeedingPlan,
-  type FeedingPlanLine,
-  type Portion,
-  type TimeOfDay,
   type Ulid,
-  type Unit,
   type Zone,
-  type ZoneAssignment,
+  SPECIES_LABELS,
 } from "@galaxy-farm/core";
-import { penAssignments } from "@galaxy-farm/module-pets";
+
 import {
   describeGrain,
   herdDemand,
-  FEED_CATEGORIES,
+  categoryOptions,
   FEED_UNITS,
   feedTypeSchema,
   isGrainMeasure,
@@ -62,10 +52,17 @@ import {
   Rows,
   ScreenHeader,
 } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
-import { animalHref } from "@/lib/animal-slug";
-import { describeLine, mixedUnitFeed } from "@/lib/feed-lines";
-import { useMutations } from "@/lib/local/mutations";
-import { useRecords } from "@/lib/local/use-records";
+import {
+  FeedingPlanEditor,
+  membersLabel,
+  placeLabel,
+} from "@/app/(admin)/_components/feeding-plan-editor";
+import {
+  useMutations,
+} from "@/lib/local/mutations";
+import {
+  useRecords,
+} from "@/lib/local/use-records";
 
 /**
  * What the cattle get fed (spec §5.1, §5.3, issue #18).
@@ -81,58 +78,6 @@ import { useRecords } from "@/lib/local/use-records";
  * and is not.
  */
 
-/**
- * The plan writes and the two that need saying out loud — switching a plan
- * off, and deleting one behind its confirmation.
- *
- * A hook so Farm › Feed › Plan opens the same editor against the same write
- * path rather than a second copy of the delete rule.
- */
-export function usePlanActions(propertyId: Ulid, actorId: Ulid) {
-  const api = useMutations<FeedingPlan>(
-    "feedingPlans",
-    "feedingPlans",
-    feedingPlanSchema,
-    propertyId,
-    actorId,
-  );
-  const confirmDelete = useConfirmDelete();
-  const { show } = useToast();
-
-  async function toggle(plan: FeedingPlan) {
-    await api.update(plan.id, { active: !plan.active } as Partial<FeedingPlan>);
-    show({
-      message: plan.active ? `${plan.name} switched off` : `${plan.name} switched on`,
-      tone: plan.active ? "warning" : "success",
-    });
-  }
-
-  async function remove(plan: FeedingPlan) {
-    const confirmed = await confirmDelete({
-      tier: "standard",
-      recordName: plan.name,
-      entity: "feeding plan",
-      dependents: [
-        {
-          entity: "Daily demand",
-          label: "for the feed it names",
-          effect: "deleted" as const,
-        },
-      ],
-      // Switching off is nearly always what somebody means out of season, and
-      // it keeps the plan for next year.
-      consequence: "To stop feeding it for a season, switch it off instead — that keeps the plan.",
-      action: "Delete",
-    });
-    if (!confirmed) return;
-
-    await api.remove(plan.id, "Removed from the feeding plans");
-    show({ message: "Plan deleted", tone: "danger" });
-  }
-
-  return { api, toggle, remove };
-}
-
 export function CattleFeedScreen({
   propertyId,
   actorId,
@@ -144,10 +89,9 @@ export function CattleFeedScreen({
   const { records: animals } = useRecords<Animal>("animals", query);
   const { records: zones } = useRecords<Zone>("zones", query);
   const { records: feeds } = useRecords<FeedType>("feedTypes", query);
-  const { records: plans, loading } = useRecords<FeedingPlan>("feedingPlans", query);
-  const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
-
-  const { api: plansApi, toggle, remove } = usePlanActions(propertyId, actorId);
+  const { records: allPlans, loading } = useRecords<FeedingPlan>("feedingPlans", query);
+  // The cattle's plans. Every other species' are on Farm › Feed.
+  const plans = useMemo(() => allPlans.filter((plan) => plan.species === "cattle"), [allPlans]);
 
   /**
    * Held by id rather than as the record itself.
@@ -165,8 +109,6 @@ export function CattleFeedScreen({
   const [view, setView] = useState<"plans" | "demand" | "catalog">("plans");
 
   const feedById = useMemo(() => new Map(feeds.map((feed) => [feed.id, feed])), [feeds]);
-  const animalById = useMemo(() => new Map(animals.map((a) => [a.id, a])), [animals]);
-  const zoneById = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
 
   /**
    * Daily demand across the herd, per feed type.
@@ -181,28 +123,14 @@ export function CattleFeedScreen({
    * rather than one, and it restates each ration in the unit its feed is
    * counted in, so a plan written in scoops does not read as bags.
    */
-  const animalScopes = useMemo(() => {
-    // Pets bring no pens (§5.8), so a placement naming one — the property map
-    // used to let somebody drag the dog onto a pasture — cannot put him on
-    // that pen's ration and add a dog's worth of cubes to the herd's demand.
-    const placements = penAssignments(assignments, animals);
-    return animals
-      .filter((animal) => animal.status === "active")
-      .map((animal) => ({
-        id: animal.id,
-        zoneIds: openAssignments(placements, animal.id).map((entry) => entry.zoneId),
-      }));
-  }, [animals, assignments]);
+  const animalScopes = useMemo(
+    () => animals.filter(isOnFarm).map((animal) => ({ id: animal.id })),
+    [animals],
+  );
 
   const herd = useMemo(
-    () =>
-      herdDemand({
-        plans: plans.filter((plan) => plan.active),
-        feeds,
-        animals: animalScopes,
-        propertyId,
-      }),
-    [plans, feeds, animalScopes, propertyId],
+    () => herdDemand({ plans: plans.filter((plan) => plan.active), feeds, animals: animalScopes }),
+    [plans, feeds, animalScopes],
   );
 
   const demand = useMemo(
@@ -212,17 +140,6 @@ export function CattleFeedScreen({
         .filter((entry): entry is { feed: FeedType; amount: number } => entry.feed !== undefined),
     [herd, feedById],
   );
-
-  function describeTarget(plan: FeedingPlan): string {
-    if (plan.target === "animal") {
-      const animal = animalById.get(plan.targetId);
-      return animal === undefined ? "an animal" : displayName(animal);
-    }
-    if (plan.target === "zone") {
-      return zoneById.get(plan.targetId)?.name ?? "a zone";
-    }
-    return "the group";
-  }
 
   const active = plans.filter((plan) => plan.active);
   const nameOfFeed = (id: Ulid) => feedById.get(id)?.name ?? "feed";
@@ -315,7 +232,7 @@ export function CattleFeedScreen({
           ) : plans.length === 0 ? (
             <EmptyState
               title="Nothing planned"
-              detail="A group plan covers the herd; an animal plan overrides it for one cow."
+              detail="A plan names the cattle it feeds, where, and what each feed goes in."
               action={
                 <Button variant="primary" onClick={() => setEditing("new")}>
                   Add plan
@@ -331,8 +248,11 @@ export function CattleFeedScreen({
                   onSelect={() => setEditing(plan.id)}
                   selectLabel={`Edit ${plan.name}`}
                   line={facts(
-                    describeTarget(plan),
-                    isShared(plan) && "shared, not per head",
+                    membersLabel(plan, animals),
+                    placeLabel(plan, zones) === undefined
+                      ? undefined
+                      : `at ${placeLabel(plan, zones)}`,
+                    isTotal(plan) && "for all of them together",
                     plan.specialNotes,
                   )}
                   notes={plan.lines
@@ -444,22 +364,17 @@ export function CattleFeedScreen({
         {editing === undefined || (editing !== "new" && editingPlan === undefined) ? null : (
           // Keyed on the plan, so opening a different one starts from its own
           // values rather than from whichever was opened first.
-          <PlanForm
+          <FeedingPlanEditor
             key={editingPlan?.id ?? "new"}
             plan={editingPlan}
+            species="cattle"
+            lockSpecies
             animals={animals}
             zones={zones}
             feeds={feeds}
-            api={plansApi}
             propertyId={propertyId}
+            actorId={actorId}
             onClose={() => setEditing(undefined)}
-            onToggle={(plan) => void toggle(plan)}
-            onDelete={(plan) => {
-              // The panel closes first, so the confirmation is the only dialog
-              // on screen rather than a second one stacked on this.
-              setEditing(undefined);
-              void remove(plan);
-            }}
           />
         )}
       </div>
@@ -558,7 +473,7 @@ export function FeedTypeForm({
           label="Category"
           value={category}
           onChange={(event) => setCategory(event.target.value as FeedCategory)}
-          options={toOptions(FEED_CATEGORIES)}
+          options={categoryOptions((species) => SPECIES_LABELS[species].toLowerCase())}
         />
         <Select
           label="Sold by the"
@@ -581,452 +496,6 @@ export function FeedTypeForm({
           value={weight}
           onChange={(event) => setWeight(event.target.value)}
         />
-      </form>
-    </Modal>
-  );
-}
-
-/**
- * One line of a plan, as the form holds it.
- *
- * The unit is on the line rather than taken from the feed, because they are
- * genuinely different questions. Cubes are *bought* by the bag and *fed* by
- * the scoop, and a form that reads the unit off the catalog makes somebody
- * write "0.15 bags" twice a day.
- */
-interface LineDraft {
-  readonly key: string;
-  readonly feedId: string;
-  readonly amount: string;
-  readonly unit: Unit;
-  readonly frequency: FeedingFrequency;
-  readonly timeOfDay: TimeOfDay;
-}
-
-let lineSequence = 0;
-const blankLine = (): LineDraft => ({
-  key: `line-${lineSequence++}`,
-  feedId: "",
-  amount: "",
-  unit: "lb",
-  frequency: "twice_daily",
-  timeOfDay: "morning",
-});
-
-const draftFrom = (plan: FeedingPlan): LineDraft[] =>
-  plan.lines.map((line) => ({
-    key: `line-${lineSequence++}`,
-    feedId: line.feedTypeId,
-    amount: String(line.amount.amount),
-    unit: line.amount.unit,
-    frequency: line.frequency,
-    timeOfDay: line.timeOfDay,
-  }));
-
-/**
- * Write a plan, or change one that exists.
- *
- * One form for both, because a plan that can only be created is a plan that
- * gets deleted and retyped the first time a ration changes — and the deletion
- * takes the history of what was being fed with it. §4.5 clause 1 asks for the
- * full four operations on everything, and this is the U.
- */
-export function PlanForm({
-  plan,
-  animals,
-  zones,
-  feeds,
-  api,
-  propertyId,
-  onClose,
-  onToggle,
-  onDelete,
-  anySpecies = false,
-}: {
-  readonly plan?: FeedingPlan | undefined;
-  readonly animals: readonly Animal[];
-  readonly zones: readonly Zone[];
-  readonly feeds: readonly FeedType[];
-  readonly api: ReturnType<typeof useMutations<FeedingPlan>>;
-  /** What a "whole group" plan targets — the group every animal here is in. */
-  readonly propertyId: Ulid;
-  readonly onClose: () => void;
-  /** Switching a plan off for the season, which keeps it for next year. */
-  readonly onToggle: (plan: FeedingPlan) => void;
-  readonly onDelete: (plan: FeedingPlan) => void;
-  /** Offer every species as a target — Farm › Feed rations the whole place. */
-  readonly anySpecies?: boolean;
-}) {
-  const { show } = useToast();
-  const editing = plan !== undefined;
-  const formId = useId();
-
-  const [name, setName] = useState(plan?.name ?? "");
-  const [target, setTarget] = useState<"animal" | "zone" | "group">(plan?.target ?? "group");
-  const [targetId, setTargetId] = useState<string>(
-    plan === undefined || plan.target === "group" ? "" : plan.targetId,
-  );
-  /**
-   * Everybody else an animal plan feeds — the bowl two cats share, or one
-   * ration written once for three show calves.
-   *
-   * Carried from the plan rather than reset. This editor used to write `[]`
-   * here on every save, which quietly took the second cat off a shared bowl
-   * the first time anybody adjusted its amount.
-   */
-  const [alsoFeeds, setAlsoFeeds] = useState<readonly string[]>(plan?.alsoFeeds ?? []);
-  const [lines, setLines] = useState<LineDraft[]>(
-    plan === undefined ? [blankLine()] : draftFrom(plan),
-  );
-  const [portion, setPortion] = useState<Portion>(
-    plan === undefined ? "per_head" : portionOf(plan),
-  );
-  const [notes, setNotes] = useState(plan?.specialNotes ?? "");
-  const [error, setError] = useState<string | undefined>();
-  const [busy, setBusy] = useState(false);
-
-  /**
-   * What the target picker offers.
-   *
-   * Cattle only. A feeding plan is species-agnostic and the pets screen writes
-   * to the same table, so an unfiltered list puts the dogs in the dropdown on
-   * the screen that rations the herd. The plan being edited keeps its own
-   * target whatever species it is — otherwise opening a plan written on
-   * another screen would blank the field it came in with, and saving would
-   * quietly move the plan onto somebody else. Farm › Feed, which rations
-   * every species, lifts the filter with `anySpecies`.
-   */
-  const targets =
-    target === "animal"
-      ? animals.filter(
-          (entry) =>
-            anySpecies ||
-            entry.species === "cattle" ||
-            entry.id === plan?.targetId ||
-            (plan?.alsoFeeds ?? []).includes(entry.id),
-        )
-      : target === "zone"
-        ? zones
-        : [];
-  const feedById = new Map<string, FeedType>(feeds.map((feed) => [feed.id, feed]));
-  /** Offered as company for the chosen animal: anywhere every species is, or already on it. */
-  const offerCompany = target === "animal" && (anySpecies || alsoFeeds.length > 0);
-  const company = target === "animal" ? alsoFeeds.filter((id) => id !== targetId) : [];
-
-  const editLine = (key: string, patch: Partial<LineDraft>): void =>
-    setLines(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
-
-  const dropLine = (key: string): void =>
-    // crud-guard: allow-unconfirmed — taking a line out of a form that has not been saved
-    setLines(lines.filter((line) => line.key !== key));
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(undefined);
-
-    if (lines.length === 0) {
-      setError("A plan needs at least one thing in it");
-      return;
-    }
-    if (lines.some((line) => line.feedId === "")) {
-      setError("Choose what each line feeds");
-      return;
-    }
-    if (target !== "group" && targetId === "") {
-      setError(target === "animal" ? "Choose the animal" : "Choose the zone");
-      return;
-    }
-    // `dailyDemandOf` throws on a plan that feeds one feed in two units, which
-    // is a plan with no meaningful total. Caught here so it is a sentence
-    // rather than a crash on the screen that reads the plan back.
-    const mixed = mixedUnitFeed(lines);
-    if (mixed !== undefined) {
-      setError(
-        `Two lines feed ${feedById.get(mixed)?.name ?? "the same feed"} in different units. Put both in the same one.`,
-      );
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const written: FeedingPlanLine[] = lines.map((line) => ({
-        feedTypeId: line.feedId as Ulid,
-        amount: { amount: Number(line.amount || "0"), unit: line.unit },
-        frequency: line.frequency,
-        timeOfDay: line.timeOfDay,
-      }));
-
-      const fields = {
-        name: name.trim(),
-        target,
-        // A group plan still needs a target id; the herd is the property.
-        // A group plan targets the property: it is the group every animal on
-        // the place belongs to, and `herdDemand` resolves it that way.
-        targetId: (target === "group" ? propertyId : targetId) as Ulid,
-        // The other animals on an animal plan. Only an animal plan names
-        // animals; a pen or group plan finds its animals through the pen.
-        alsoFeeds: company as Ulid[],
-        // A plan for one animal has nobody to share with, whatever the control
-        // last said.
-        portion: target === "animal" && company.length === 0 ? ("per_head" as const) : portion,
-        lines: written,
-        ...(notes.trim() === "" ? {} : { specialNotes: notes.trim() }),
-      };
-
-      const result = editing
-        ? await api.update(plan.id, fields as Partial<FeedingPlan>)
-        : await api.create({ ...fields, active: true } as never);
-
-      if (!result.ok) {
-        setError(
-          result.error.kind === "validation"
-            ? (result.error.issues[0]?.message ?? "That is not valid")
-            : "Could not save that",
-        );
-        return;
-      }
-
-      show({ message: editing ? "Plan updated" : "Plan added", tone: "success" });
-      onClose();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const targetAnimal =
-    plan?.target === "animal" ? animals.find((entry) => entry.id === plan.targetId) : undefined;
-
-  return (
-    <Modal
-      placement="side"
-      title={editing ? `Edit ${plan.name}` : "Add plan"}
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="primary" type="submit" form={formId} busy={busy}>
-            {editing ? "Save changes" : "Add plan"}
-          </Button>
-          {editing ? (
-            <Button
-              onClick={() => {
-                onToggle(plan);
-                onClose();
-              }}
-            >
-              {plan.active ? "Switch off" : "Switch on"}
-            </Button>
-          ) : (
-            <Button onClick={onClose}>Cancel</Button>
-          )}
-          {editing ? (
-            <Button variant="danger" className="ml-auto" onClick={() => onDelete(plan)}>
-              Delete
-            </Button>
-          ) : null}
-        </>
-      }
-    >
-      <form
-        id={formId}
-        onSubmit={(event) => void submit(event)}
-        className="flex flex-col gap-density"
-      >
-        <TextInput
-          label="Plan name"
-          hint="&ldquo;Show calves, morning&rdquo;"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          required
-        />
-        <Select
-          label="Feeds"
-          value={target}
-          onChange={(event) => {
-            setTarget(event.target.value as "animal" | "zone" | "group");
-            setTargetId("");
-          }}
-          options={[
-            { value: "group", label: "The whole group" },
-            { value: "zone", label: "A pen or pasture" },
-            { value: "animal", label: "One animal" },
-          ]}
-        />
-        {target === "group" ? null : (
-          <Select
-            label={target === "animal" ? "Animal" : "Zone"}
-            value={targetId}
-            onChange={(event) => setTargetId(event.target.value)}
-            placeholder="Choose"
-            options={targets.map((entry) => ({
-              value: entry.id,
-              label:
-                "name" in entry && typeof entry.name === "string" && entry.name !== ""
-                  ? entry.name
-                  : displayName(entry as Animal),
-            }))}
-            required
-          />
-        )}
-
-        {offerCompany ? (
-          <fieldset className="flex flex-col gap-2">
-            <legend className="text-sm font-medium text-ink">Also feeds</legend>
-            <p className="text-sm text-muted">
-              One ration for several animals, so a change to it changes it for all of them.
-            </p>
-            <div className="grid max-h-60 grid-cols-1 gap-x-density overflow-y-auto min-[400px]:grid-cols-2">
-              {targets
-                // The living, and anybody already on it — a plan still naming a
-                // sold calf has to be able to let go of him.
-                .filter(
-                  (entry) =>
-                    entry.id !== targetId &&
-                    ((entry as Animal).status === "active" || alsoFeeds.includes(entry.id)),
-                )
-                .map((entry) => (
-                  <Checkbox
-                    key={entry.id}
-                    label={displayName(entry as Animal)}
-                    checked={alsoFeeds.includes(entry.id)}
-                    onChange={() =>
-                      setAlsoFeeds(
-                        alsoFeeds.includes(entry.id)
-                          ? alsoFeeds.filter((id) => id !== entry.id)
-                          : [...alsoFeeds, entry.id],
-                      )
-                    }
-                  />
-                ))}
-            </div>
-          </fieldset>
-        ) : null}
-
-        {target === "animal" && company.length === 0 ? null : (
-          <Select
-            label="The amounts below are"
-            hint={
-              target === "zone"
-                ? "Per head: 40 lb on a pen of four is 160 lb. Shared: one mineral tub, however many are in."
-                : target === "animal"
-                  ? "Per head: each of them gets this. Shared: one bowl between them."
-                  : "Shared is for what the whole place works through at a fixed rate."
-            }
-            value={portion}
-            onChange={(event) => setPortion(event.target.value as Portion)}
-            options={[
-              { value: "per_head", label: "What each animal gets" },
-              {
-                value: "shared",
-                label:
-                  target === "zone"
-                    ? "Shared by the zone"
-                    : target === "animal"
-                      ? "Shared between them"
-                      : "Shared by the whole group",
-              },
-            ]}
-          />
-        )}
-
-        {lines.map((line, index) => (
-          <fieldset
-            key={line.key}
-            className="grid grid-cols-2 gap-density rounded-density border border-rule p-3"
-          >
-            <legend className="px-1 text-sm font-medium text-muted">Feed {index + 1}</legend>
-            <div className="col-span-2">
-              <Select
-                label="Feed"
-                value={line.feedId}
-                onChange={(event) => {
-                  const feed = feedById.get(event.target.value);
-                  // The catalog's unit is the sensible starting point, and
-                  // nothing more than that — it stays changeable, because a bag
-                  // of cubes is fed by the scoop.
-                  editLine(line.key, {
-                    feedId: event.target.value,
-                    ...(feed === undefined ? {} : { unit: feed.unit }),
-                  });
-                }}
-                placeholder="Choose a feed"
-                options={feeds.map((feed) => ({ value: feed.id, label: feed.name }))}
-                required
-              />
-            </div>
-            <TextInput
-              label="Amount"
-              type="number"
-              inputMode="decimal"
-              step="any"
-              value={line.amount}
-              onChange={(event) => editLine(line.key, { amount: event.target.value })}
-              required
-            />
-            <Select
-              label="Measured in"
-              value={line.unit}
-              onChange={(event) => editLine(line.key, { unit: event.target.value as Unit })}
-              options={FEED_UNITS.map((value) => ({ value, label: value.replace(/_/g, " ") }))}
-            />
-            <Select
-              label="How often"
-              value={line.frequency}
-              onChange={(event) =>
-                editLine(line.key, { frequency: event.target.value as FeedingFrequency })
-              }
-              options={FEEDING_FREQUENCIES.map((value) => ({
-                value,
-                label: optionLabel(value),
-              }))}
-            />
-            <Select
-              label="When"
-              value={line.timeOfDay}
-              onChange={(event) =>
-                editLine(line.key, { timeOfDay: event.target.value as TimeOfDay })
-              }
-              options={toOptions(TIMES_OF_DAY)}
-            />
-
-            <div className="col-span-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-muted">{describeLine(line, feedById.get(line.feedId))}</p>
-              {lines.length === 1 ? null : (
-                <Button variant="ghost" type="button" onClick={() => dropLine(line.key)}>
-                  Remove
-                </Button>
-              )}
-            </div>
-          </fieldset>
-        ))}
-
-        <div>
-          <Button variant="ghost" type="button" onClick={() => setLines([...lines, blankLine()])}>
-            <PlusIcon />
-            Add another feed
-          </Button>
-        </div>
-
-        <TextInput
-          label="Notes"
-          hint="Anything the person feeding needs to know."
-          value={notes}
-          onChange={(event) => setNotes(event.target.value)}
-        />
-
-        {error === undefined ? null : (
-          <p role="alert" className="text-sm text-danger">
-            {error}
-          </p>
-        )}
-
-        {targetAnimal === undefined ? null : (
-          <Link
-            href={animalHref(targetAnimal)}
-            className="inline-flex min-h-target items-center text-sm text-action underline-offset-2 hover:underline"
-          >
-            Open {displayName(targetAnimal)}&rsquo;s page
-          </Link>
-        )}
       </form>
     </Modal>
   );

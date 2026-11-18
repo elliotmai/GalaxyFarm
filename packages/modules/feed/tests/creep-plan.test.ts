@@ -46,8 +46,8 @@ describe("creepPlanSuggestion", () => {
   it("targets the calf itself, not its pen", () => {
     const suggestion = creepPlanSuggestion(birth, [feed()]);
 
-    expect(suggestion?.plan.target).toBe("animal");
-    expect(suggestion?.plan.targetId).toBe(id(9));
+    expect(suggestion?.plan.species).toBe("cattle");
+    expect(suggestion?.plan.animalIds).toEqual([id(9)]);
   });
 
   it("offers the plan switched off", () => {

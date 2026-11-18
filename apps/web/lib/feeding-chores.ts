@@ -1,15 +1,17 @@
 import {
   feedingOccurrences,
-  isShared,
+  isTotal,
+  type Animal,
   type ChoreEntry,
   type FeedingPlan,
   type FeedingPlanLine,
   type FeedingChoreText,
-  type FeedingTarget,
   type Ulid,
   type Zone,
 } from "@galaxy-farm/core";
 import type { FeedType } from "@galaxy-farm/module-feed";
+
+import { amountWords, nameList, receptacleWords } from "@/lib/feed-lines";
 
 /**
  * Wording a feeding trip (spec §4.1, §5.3).
@@ -34,6 +36,7 @@ const FREQUENCY_SUFFIX: Readonly<Record<string, string>> = {
   twice_daily: " (twice a day)",
   three_times_daily: " (three times a day)",
   every_other_day: " (every other day)",
+  twice_weekly: " (twice a week)",
   weekly: " (weekly)",
 };
 
@@ -45,42 +48,52 @@ const FREQUENCY_SUFFIX: Readonly<Record<string, string>> = {
  * them is something a person can carry — the plan was written in the vessel
  * somebody actually uses, so the chore repeats it rather than converting.
  */
-function amountOf(line: FeedingPlanLine): string {
-  const unit = line.amount.unit.replace(/_/g, " ");
-  return `${line.amount.amount} ${unit}`;
-}
 
 export function feedingChoreText({
   zones,
   feeds,
-  propertyId,
+  animals = [],
 }: {
   readonly zones: readonly Zone[];
   readonly feeds: readonly FeedType[];
-  readonly propertyId: Ulid;
+  /** For naming who a line is for when a trip feeds more than one plan. */
+  readonly animals?: readonly Pick<Animal, "id" | "name" | "tagNumber">[];
+  /** Accepted and ignored: a plan names its animals, not the place. */
+  readonly propertyId?: Ulid;
 }): FeedingChoreText {
   const zoneById = new Map(zones.map((zone) => [zone.id, zone]));
   const feedById = new Map(feeds.map((feed) => [feed.id, feed]));
+  const nameOf = new Map(
+    animals.map((animal) => [animal.id, animal.name ?? animal.tagNumber ?? "one"]),
+  );
 
   return {
-    target: (target: Exclude<FeedingTarget, "animal">, targetId: Ulid) => {
-      if (target === "zone") return zoneById.get(targetId)?.name ?? "a pen";
-      // The group plan targets the property, which is the group every animal
-      // on the place belongs to — the same resolution `herdDemand` makes.
-      return targetId === propertyId ? "everybody" : "the group";
-    },
+    zone: (zoneId: Ulid) => zoneById.get(zoneId)?.name ?? "a pen",
     line: (line: FeedingPlanLine, plan: FeedingPlan) => {
       const feed = feedById.get(line.feedTypeId)?.name ?? "feed";
-      // Said out loud only when it is the unusual reading. A shared amount on
-      // a pen of four is one tub between them, and putting four out is the
-      // mistake this word prevents.
-      const shared = isShared(plan) ? ", shared" : "";
-      return `${amountOf(line)} ${feed}${FREQUENCY_SUFFIX[line.frequency] ?? ""}${shared}`;
+      const amount = amountWords(line.amount.amount, line.amount.unit);
+      // Who it is for, when that is a short list: "for Max", "for Tabby and
+      // Tom, together". A herd's line is just the amount — the heading names
+      // the pen, and a list of thirty names is not an instruction.
+      const ids = plan.animalIds ?? [];
+      const names = ids.length > 0 && ids.length <= 3 ? ids.map((id) => nameOf.get(id)) : [];
+      const who =
+        names.every((name) => name !== undefined) && names.length > 0
+          ? ` for ${nameList(names as string[])}`
+          : "";
+      const together =
+        isTotal(plan) && ids.length + (plan.flockIds ?? []).length > 1
+          ? ", together"
+          : ids.length > 1 || (plan.flockIds ?? []).length > 0
+            ? " each"
+            : "";
+      return `${amount} ${feed}${who}${together}${receptacleWords(line.receptacle)}${
+        FREQUENCY_SUFFIX[line.frequency] ?? ""
+      }`;
     },
   };
 }
 
-/** A day's feeding chores, worded — ready to merge into the sheet. */
 export function feedingChoresFor(
   plans: readonly FeedingPlan[],
   text: FeedingChoreText,

@@ -226,14 +226,17 @@ describe("Cattle · Health", () => {
 });
 
 describe("Cattle · Feed plans", () => {
-  it("offers only cattle once the plan feeds one animal", async () => {
-    const user = userEvent.setup();
+  it("writes cattle plans, offering only the cattle to tick", async () => {
     view(<CattleFeedScreen propertyId={PROPERTY} actorId={ACTOR} />);
     await openPanel(/Add plan/);
 
-    await user.selectOptions(screen.getByLabelText("Feeds"), "animal");
-
-    expectHerdOnly(optionsOf("Animal"), HERD);
+    const panel = screen.getByRole("dialog", { name: "Add feeding plan" });
+    // The species is held at cattle here; Farm › Feed writes the others.
+    expect(within(panel).queryByLabelText(/^Feeds/)).toBeNull();
+    const ticks = within(panel)
+      .getAllByRole("checkbox")
+      .map((box) => box.closest("label")?.textContent ?? "");
+    expectHerdOnly(ticks, HERD);
   });
 });
 

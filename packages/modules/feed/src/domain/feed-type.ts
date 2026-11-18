@@ -3,7 +3,9 @@ import { z } from "zod";
 import {
   baseRecordSchema,
   moneySchema,
+  SPECIES,
   unitSchema,
+  type Species,
   type BaseRecord,
   type Money,
   type Unit,
@@ -20,13 +22,121 @@ import { measureToPounds } from "./grain-measures.js";
  */
 
 /**
- * `pet` earns its place for the same reason the module is cross-species: a bag
- * of kibble is bought, run down, and reordered exactly like a bag of creep,
- * and §5.8 has pets carry a real FeedingPlan rather than a note. Filing dog
- * food under `supplement` would have put it in the cattle ration's totals.
+ * What kind of feed it is, and so who eats it.
+ *
+ * The category is what makes the app know a feed: kibble is for dogs and cats,
+ * crickets are for the gecko, layer pellets are for the hens, and a mineral
+ * tub is for cattle and horses. A plan only offers the feeds whose category
+ * suits its species, so a ration for the dogs never lists hay. Each one also
+ * says whether it is a feed, a supplement or a treat, because a supplement is
+ * a different line in a sitter's instructions ("dust the crickets") and a
+ * different question when the bag runs out.
+ *
+ * `supplement` suits everybody: vitamins and joint powders exist for every
+ * species, and a cross-species catch-all is better than a supplement nobody
+ * can put on a plan.
  */
-export const FEED_CATEGORIES = ["hay", "grain", "mineral", "creep", "supplement", "pet"] as const;
+export const FEED_CATEGORIES = [
+  "hay",
+  "haylage",
+  "grain",
+  "pellets",
+  "creep",
+  "mineral",
+  "lick",
+  "layer_feed",
+  "starter_feed",
+  "scratch",
+  "grit",
+  "oyster_shell",
+  "dry_food",
+  "wet_food",
+  "raw_food",
+  "live_insects",
+  "frozen_prey",
+  "calcium_dust",
+  "treat",
+  "supplement",
+] as const;
 export type FeedCategory = (typeof FEED_CATEGORIES)[number];
+
+export const FEED_ROLES = ["feed", "supplement", "treat"] as const;
+export type FeedRole = (typeof FEED_ROLES)[number];
+
+const LARGE: readonly Species[] = ["cattle", "horse"];
+const POULTRY: readonly Species[] = ["chicken", "quail"];
+const DOGS_AND_CATS: readonly Species[] = ["dog", "cat"];
+
+export const FEED_CATEGORY_INFO: Readonly<
+  Record<
+    FeedCategory,
+    { readonly label: string; readonly role: FeedRole; readonly species: readonly Species[] }
+  >
+> = {
+  hay: { label: "Hay", role: "feed", species: LARGE },
+  haylage: { label: "Haylage or silage", role: "feed", species: LARGE },
+  grain: { label: "Grain", role: "feed", species: LARGE },
+  pellets: { label: "Pellets or complete feed", role: "feed", species: LARGE },
+  creep: { label: "Creep feed", role: "feed", species: ["cattle"] },
+  mineral: { label: "Mineral", role: "supplement", species: LARGE },
+  lick: { label: "Protein tub or lick", role: "supplement", species: LARGE },
+  layer_feed: { label: "Layer feed", role: "feed", species: POULTRY },
+  starter_feed: { label: "Starter or grower", role: "feed", species: POULTRY },
+  scratch: { label: "Scratch", role: "treat", species: POULTRY },
+  grit: { label: "Grit", role: "supplement", species: POULTRY },
+  oyster_shell: { label: "Oyster shell", role: "supplement", species: POULTRY },
+  dry_food: { label: "Dry food (kibble)", role: "feed", species: DOGS_AND_CATS },
+  wet_food: { label: "Wet food", role: "feed", species: DOGS_AND_CATS },
+  raw_food: { label: "Raw food", role: "feed", species: DOGS_AND_CATS },
+  live_insects: { label: "Live insects", role: "feed", species: ["reptile"] },
+  frozen_prey: { label: "Frozen prey", role: "feed", species: ["reptile"] },
+  calcium_dust: { label: "Calcium or vitamin dust", role: "supplement", species: ["reptile"] },
+  treat: { label: "Treats", role: "treat", species: [...DOGS_AND_CATS, "horse", ...POULTRY] },
+  supplement: { label: "Supplement", role: "supplement", species: SPECIES },
+};
+
+/** Does a feed of this category suit that species? */
+export function suits(category: FeedCategory, species: Species): boolean {
+  return FEED_CATEGORY_INFO[category]?.species.includes(species) ?? false;
+}
+
+/** The categories a species eats, in catalogue order. */
+export function categoriesFor(species: Species): FeedCategory[] {
+  return FEED_CATEGORIES.filter((category) => suits(category, species));
+}
+
+/**
+ * The category picker's options: "Live insects — reptiles", "Hay — cattle and
+ * horses". Saying who eats it is what lets somebody pick the right one for a
+ * feed they have never filed before, and the plan editor offers by it.
+ */
+export function categoryOptions(
+  speciesWord: (species: Species) => string,
+): { readonly value: FeedCategory; readonly label: string }[] {
+  return FEED_CATEGORIES.map((category) => {
+    const info = FEED_CATEGORY_INFO[category];
+    const who =
+      info.species.length === SPECIES.length
+        ? "any animal"
+        : info.species
+            .map(speciesWord)
+            .reduce(
+              (text, word, index, all) =>
+                index === 0
+                  ? word
+                  : index === all.length - 1
+                    ? `${text} and ${word}`
+                    : `${text}, ${word}`,
+              "",
+            );
+    return { value: category, label: `${info.label} — ${who}` };
+  });
+}
+
+/** A feed's role — feed, supplement or treat — from its category. */
+export function roleOf(feed: Pick<FeedType, "category">): FeedRole {
+  return FEED_CATEGORY_INFO[feed.category]?.role ?? "feed";
+}
 
 /**
  * The units feed is bought and fed in.
@@ -44,6 +154,10 @@ export const FEED_UNITS = [
   "block",
   "lb",
   "ton",
+  "oz",
+  "cup",
+  "can",
+  "each",
 ] as const;
 export type FeedUnit = (typeof FEED_UNITS)[number];
 

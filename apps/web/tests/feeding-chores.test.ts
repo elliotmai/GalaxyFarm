@@ -44,7 +44,7 @@ const FEEDS = [
 const TEXT = feedingChoreText({
   zones: ZONES,
   feeds: FEEDS,
-  propertyId: PROPERTY,
+  animals: [{ id: COMET, name: "Comet" }],
 });
 
 let counter = 0;
@@ -56,10 +56,11 @@ function plan(fields: Partial<FeedingPlan> & { lines: readonly FeedingPlanLine[]
     createdAt: DATE,
     updatedAt: DATE,
     name: `Plan ${counter}`,
-    target: "zone",
-    targetId: NORTH,
-    alsoFeeds: [],
-    portion: "per_head",
+    species: "cattle",
+    animalIds: [],
+    flockIds: [],
+    placeZoneId: NORTH,
+    portion: "each",
     active: true,
     ...fields,
   } as FeedingPlan;
@@ -87,18 +88,19 @@ describe("wording a trip", () => {
     );
 
     expect(entry?.title).toBe("Morning feed · North Trap");
-    expect(entry?.detail).toBe("40 lb Coastal hay · 3 scoop Senior pellets");
+    expect(entry?.detail).toBe("40 lb Coastal hay · 3 scoops Senior pellets");
   });
 
-  it("names an animal trip by its ration, whatever species eats it", () => {
-    // Not the animal's name: one plan can feed several animals sharing a bowl
-    // (`alsoFeeds`), and "Morning feed · Comet" would read as feeding only
-    // Comet. The ration's name covers everybody on it.
+  it("names a trip with no place by its plan, whatever species eats it", () => {
+    // Not the animal's name: one plan can feed several animals, and "Morning
+    // feed · Comet" would read as feeding only Comet. The plan's name covers
+    // everybody on it.
     const [entry] = feedingChoresFor(
       [
         plan({
-          target: "animal",
-          targetId: COMET,
+          species: "horse",
+          placeZoneId: undefined,
+          animalIds: [COMET],
           name: "Senior horse ration",
           lines: [line()],
         }),
@@ -111,17 +113,43 @@ describe("wording a trip", () => {
     expect(entry?.title).toBe("Morning feed · Senior horse ration");
   });
 
-  it("says so when an amount is shared rather than per head", () => {
+  it("says so when an amount is for all of them together rather than each", () => {
     // One tub in the pen, not one each. Reading it per-head is what puts four
     // tubs out and empties the shed in a quarter of the time.
+    const herd = Array.from({ length: 5 }, (_, n) => `01ARZ3NDEKTSV4RRFFQ69G5FC${n}` as Ulid);
+    const [together] = feedingChoresFor(
+      [
+        plan({
+          portion: "total",
+          animalIds: herd,
+          lines: [line({ amount: { amount: 1, unit: "block" } })],
+        }),
+      ],
+      TEXT,
+      DATE,
+      NOW,
+    );
+    const [each] = feedingChoresFor([plan({ animalIds: herd, lines: [line()] })], TEXT, DATE, NOW);
+
+    expect(together?.detail).toBe("1 block Coastal hay, together");
+    expect(each?.detail).toBe("40 lb Coastal hay each");
+  });
+
+  it("names who a short list is for, and what it goes in", () => {
     const [entry] = feedingChoresFor(
-      [plan({ portion: "shared", lines: [line({ amount: { amount: 1, unit: "block" } })] })],
+      [
+        plan({
+          species: "horse",
+          animalIds: [COMET],
+          lines: [line({ receptacle: "hay_net" })],
+        }),
+      ],
       TEXT,
       DATE,
       NOW,
     );
 
-    expect(entry?.detail).toBe("1 block Coastal hay, shared");
+    expect(entry?.detail).toBe("40 lb Coastal hay for Comet, in the hay net");
   });
 
   it("spells out a frequency that is not simply once", () => {
@@ -135,15 +163,15 @@ describe("wording a trip", () => {
     expect(entry?.detail).toBe("40 lb Coastal hay (twice a day)");
   });
 
-  it("calls a group plan what it is", () => {
+  it("calls a place in words what it is called", () => {
     const [entry] = feedingChoresFor(
-      [plan({ target: "group", targetId: PROPERTY, lines: [line()] })],
+      [plan({ placeZoneId: undefined, placeLabel: "Back porch", lines: [line()] })],
       TEXT,
       DATE,
       NOW,
     );
 
-    expect(entry?.title).toBe("Morning feed · everybody");
+    expect(entry?.title).toBe("Morning feed · Back porch");
   });
 
   it("says something rather than crashing on a feed nobody named", () => {

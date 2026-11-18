@@ -41,10 +41,11 @@ function plan(fields: Partial<FeedingPlan> & { lines: readonly FeedingPlanLine[]
     createdAt: DATE,
     updatedAt: DATE,
     name: `Plan ${counter}`,
-    target: "zone",
-    targetId: NORTH,
-    alsoFeeds: [],
-    portion: "per_head",
+    species: "cattle",
+    animalIds: [],
+    flockIds: [],
+    placeZoneId: NORTH,
+    portion: "each",
     active: true,
     ...fields,
   } as FeedingPlan;
@@ -59,8 +60,7 @@ const line = (fields: Partial<FeedingPlanLine> = {}): FeedingPlanLine => ({
 });
 
 const NAMES: FeedingChoreText = {
-  target: (target, targetId) =>
-    target === "group" ? "everybody" : targetId === NORTH ? "North Trap" : String(targetId),
+  zone: (zoneId) => (zoneId === NORTH ? "North Trap" : String(zoneId)),
   line: (entry) =>
     `${entry.amount.amount} ${entry.amount.unit} ${entry.feedTypeId === HAY ? "hay" : "grain"}`,
 };
@@ -96,9 +96,9 @@ describe("one chore per trip", () => {
     expect(trips.map((trip) => trip.timeOfDay)).toEqual(["morning", "evening"]);
   });
 
-  it("splits by target, because that is a different pen", () => {
+  it("splits by place, because that is a different pen", () => {
     const trips = feedingTripsForDay(
-      [plan({ lines: [line()] }), plan({ targetId: SOUTH, lines: [line()] })],
+      [plan({ lines: [line()] }), plan({ placeZoneId: SOUTH, lines: [line()] })],
       DATE,
     );
 
@@ -141,6 +141,13 @@ describe("which days a line lands on", () => {
     expect(lineOccursOn("every_other_day", anchor, new Date("2026-09-04T00:00:00"))).toBe(true);
   });
 
+  it("puts a twice-weekly line out on the plan's weekday and half a week on", () => {
+    // Wednesday and Saturday.
+    expect(lineOccursOn("twice_weekly", anchor, new Date("2026-09-05T00:00:00"))).toBe(true);
+    expect(lineOccursOn("twice_weekly", anchor, new Date("2026-09-09T00:00:00"))).toBe(true);
+    expect(lineOccursOn("twice_weekly", anchor, new Date("2026-09-06T00:00:00"))).toBe(false);
+  });
+
   it("puts a weekly line out on the weekday the plan was written", () => {
     // The anchor is a Wednesday, and a feeding line carries no day-of-week.
     expect(lineOccursOn("weekly", anchor, new Date("2026-09-09T00:00:00"))).toBe(true);
@@ -168,15 +175,14 @@ describe("the entry it becomes", () => {
     expect(entry?.animalId).toBeUndefined();
   });
 
-  it("titles an animal trip by its ration, never by one animal's name", () => {
-    // One plan can feed several animals eating from the same bowl
-    // (`alsoFeeds`), so a title carrying one animal's name would read as
-    // feeding only that one. The ration's name covers everybody on it.
+  it("titles a trip with no place by its plan, never by one animal's name", () => {
+    // A plan can feed several animals, so a title carrying one animal's name
+    // would read as feeding only that one. The plan's name covers everybody.
     const [entry] = feedingOccurrences(
       [
         plan({
-          target: "animal",
-          targetId: ANDROMEDA,
+          placeZoneId: undefined,
+          animalIds: [ANDROMEDA],
           name: "Show calf mix",
           lines: [line()],
         }),
@@ -189,19 +195,19 @@ describe("the entry it becomes", () => {
     expect(entry?.title).toBe("Morning feed · Show calf mix");
   });
 
-  it("names every ration on the trip, and each of them once", () => {
-    const [entry] = feedingOccurrences(
+  it("keeps two plans with no place as two trips, each titled by its plan", () => {
+    const entries = feedingOccurrences(
       [
         plan({
-          target: "animal",
-          targetId: ANDROMEDA,
+          placeZoneId: undefined,
+          animalIds: [ANDROMEDA],
           name: "Show calf mix",
-          // Two lines of one plan are one ration, said once.
+          // Two lines of one plan are one trip.
           lines: [line(), line({ feedTypeId: GRAIN, amount: { amount: 12, unit: "lb" } })],
         }),
         plan({
-          target: "animal",
-          targetId: ANDROMEDA,
+          placeZoneId: undefined,
+          animalIds: [ANDROMEDA],
           name: "Joint supplement",
           lines: [line()],
         }),
@@ -211,12 +217,39 @@ describe("the entry it becomes", () => {
       NOW,
     );
 
-    expect(entry?.title).toBe("Morning feed · Show calf mix · Joint supplement");
+    expect(entries.map((entry) => entry.title).sort()).toEqual([
+      "Morning feed · Joint supplement",
+      "Morning feed · Show calf mix",
+    ]);
   });
 
-  it("carries the animal instead, on a plan aimed at one", () => {
+  it("merges plans fed in the same room into one stop, whatever the case of its name", () => {
+    // The dog and both cats are fed in the kitchen at night: one trip.
+    const trips = feedingTripsForDay(
+      [
+        plan({
+          placeZoneId: undefined,
+          placeLabel: "Kitchen",
+          species: "dog",
+          lines: [line({ timeOfDay: "night" })],
+        }),
+        plan({
+          placeZoneId: undefined,
+          placeLabel: "kitchen ",
+          species: "cat",
+          lines: [line({ timeOfDay: "night" })],
+        }),
+      ],
+      DATE,
+    );
+
+    expect(trips).toHaveLength(1);
+    expect(trips[0]?.place).toEqual({ kind: "place", label: "Kitchen" });
+  });
+
+  it("carries the animal instead, on a plan for one animal with no place", () => {
     const [entry] = feedingOccurrences(
-      [plan({ target: "animal", targetId: ANDROMEDA, lines: [line()] })],
+      [plan({ placeZoneId: undefined, animalIds: [ANDROMEDA], lines: [line()] })],
       NAMES,
       DATE,
       NOW,
@@ -269,10 +302,13 @@ describe("the entry it becomes", () => {
     expect(wednesday[0]?.id).not.toBe(thursday[0]?.id);
   });
 
-  it("builds its id from the trip rather than the plan", () => {
-    expect(feedingChoreId({ target: "zone", targetId: NORTH, timeOfDay: "morning" }, DATE)).toBe(
-      `feeding:zone:${NORTH}:morning:2026-09-02`,
-    );
+  it("builds its id from the place rather than the plan", () => {
+    expect(
+      feedingChoreId({ place: { kind: "zone", zoneId: NORTH }, timeOfDay: "morning" }, DATE),
+    ).toBe(`feeding:zone:${NORTH}:morning:2026-09-02`);
+    expect(
+      feedingChoreId({ place: { kind: "place", label: "Back Porch" }, timeOfDay: "evening" }, DATE),
+    ).toBe("feeding:place:back-porch:evening:2026-09-02");
   });
 });
 

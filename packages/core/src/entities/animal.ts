@@ -17,6 +17,40 @@ export const SPECIES = ["cattle", "chicken", "quail", "horse", "dog", "cat", "re
 export type Species = (typeof SPECIES)[number];
 
 /**
+ * Pet or livestock — the household or the operation.
+ *
+ * It decides what a species is fed and from what (a bowl, not a bunk), where
+ * (the kitchen, not a pen), and which pages and sitter-guide sections it
+ * belongs to. Declared per species so a new one has to say which it is.
+ */
+export const AUDIENCES = ["livestock", "pet"] as const;
+export type Audience = (typeof AUDIENCES)[number];
+
+export const SPECIES_AUDIENCE: Readonly<Record<Species, Audience>> = {
+  cattle: "livestock",
+  chicken: "livestock",
+  quail: "livestock",
+  horse: "livestock",
+  dog: "pet",
+  cat: "pet",
+  reptile: "pet",
+};
+
+export function audienceOf(species: Species): Audience {
+  return SPECIES_AUDIENCE[species];
+}
+
+export const SPECIES_LABELS: Readonly<Record<Species, string>> = {
+  cattle: "Cattle",
+  chicken: "Chickens",
+  quail: "Quail",
+  horse: "Horses",
+  dog: "Dogs",
+  cat: "Cats",
+  reptile: "Reptiles",
+};
+
+/**
  * The kind within a species, for the species broad enough to need one.
  *
  * "Reptile" covers a leopard gecko and a ball python, which share a heat lamp

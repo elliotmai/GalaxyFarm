@@ -1,11 +1,14 @@
 import {
   ancestorsOf,
-  animalsFedBy,
+  animalsOf,
+  audienceOf,
   displayName,
   emergencyContacts,
+  flocksOf,
   isOnFarm,
-  isShared,
+  isTotal,
   occupantsOf,
+  SPECIES_LABELS,
   primaryPhone,
   type Animal,
   type ChoreTemplate,
@@ -17,7 +20,7 @@ import {
 } from "@galaxy-farm/core";
 import type { GuideZone } from "@galaxy-farm/module-housesitting";
 import type { FeedType } from "@galaxy-farm/module-feed";
-import { isPet, penAssignments } from "@galaxy-farm/module-pets";
+import { penAssignments } from "@galaxy-farm/module-pets";
 
 import { describeRecurrence, GENERATING_RECURRENCES } from "@/lib/chores";
 import { describePlanLine, nameList } from "@/lib/feed-lines";
@@ -87,8 +90,10 @@ export function guideZonesFrom(
 export interface GuideFeedingPlan {
   readonly id: Ulid;
   readonly name: string;
-  /** "The whole herd", "West Pen — 4 head", "Dolly and Rosie". */
+  /** "Dolly and Rosie", "12 cattle", "Layers — 14 birds". */
   readonly who: string;
+  /** Where they are fed: "West Pen", "the barn aisle". */
+  readonly where?: string | undefined;
   /** Whether the amounts are each animal's or the lot's, said in words. */
   readonly portion?: string | undefined;
   readonly lines: readonly string[];
@@ -96,109 +101,85 @@ export interface GuideFeedingPlan {
 }
 
 /**
- * The rations, as their own section of the guide (§5.10's `cattle_feeding`).
+ * The livestock rations, as their own section of the guide (§5.10).
  *
- * Separate from the pens because a plan and a pen are not the same shape: a
- * group plan feeds the whole place, a zone plan feeds a pen, and an animal
- * plan follows one cow between pens. Printed under whichever pen she is
- * standing in this week, that last one moves every time she is shifted — and
- * the group plan would print on every pen or on none.
+ * A plan names its animals and where they are fed, so the guide can say
+ * exactly that: who, where, how much, in what. Pets keep their own section,
+ * so a pet plan is the one thing filtered out — a cat fed twice because two
+ * sections both named her is the error in the other direction.
  *
- * Everything not aimed at a dog or a cat lands here. Sorting by species would
- * read better on a farm that only runs cattle and would silently drop a
- * horse's grain on one that does not, and a ration nobody puts out is the
- * failure this section exists to prevent. The pets keep their own section, so
- * their bowls are the one thing filtered out: a cat fed twice because two
- * sections both named her is the same error in the other direction.
- *
- * Plans switched off are left out entirely. Out of season is not "feed this",
- * and a helper reading a retired ration has no way to know it is retired.
+ * Plans switched off are left out entirely, and so are plans with nobody left
+ * on them: a guide is not where somebody should find out an animal has gone,
+ * and putting feed out for her is worse.
  */
 export function guideFeedingPlans(
   plans: readonly FeedingPlan[],
   feeds: readonly FeedType[],
   animals: readonly Animal[],
   zones: readonly Zone[],
-  assignments: readonly ZoneAssignment[],
-  now: Date,
+  // Kept for callers: flock headcounts come in through `flocks` below.
+  _assignments: readonly ZoneAssignment[],
+  _now: Date,
+  flocks: readonly { readonly id: Ulid; readonly name: string; readonly heads: number }[] = [],
 ): GuideFeedingPlan[] {
   const byId = new Map(animals.map((animal) => [animal.id, animal]));
-  const fedBy = (plan: FeedingPlan): Animal[] =>
-    animalsFedBy(plan)
-      .map((animalId) => byId.get(animalId))
-      .filter((animal): animal is Animal => animal !== undefined && isOnFarm(animal));
+  const flockById = new Map(flocks.map((flock) => [flock.id, flock]));
 
-  // Not the dog. He has no pen (§5.8), so counting him against one turns
-  // "West Pen — 3 head" into a line somebody puts out four cows' worth of hay
-  // for. His own bowl is an animal plan, and the pets' own section has it.
-  const placements = penAssignments(assignments, animals);
+  return plans
+    .filter((plan) => plan.active && audienceOf(plan.species) === "livestock")
+    .map((plan) => {
+      const fed = animalsOf(plan)
+        .map((animalId) => byId.get(animalId))
+        .filter((animal): animal is Animal => animal !== undefined && isOnFarm(animal));
+      const birds = flocksOf(plan)
+        .map((flockId) => flockById.get(flockId))
+        .filter((flock): flock is NonNullable<typeof flock> => flock !== undefined);
+      // A caller that has not loaded the flocks still gets the plan: the coop
+      // is fed whether or not this page knows how many hens are in it.
+      const flockUnknown = flocksOf(plan).length > 0 && birds.length === 0;
+      const heads = fed.length + birds.reduce((sum, flock) => sum + flock.heads, 0);
+      if (heads === 0 && !flockUnknown) return undefined;
 
-  const rank: Record<FeedingPlan["target"], number> = { group: 0, zone: 1, animal: 2 };
+      // Named when there are few enough to read; counted when it is a herd.
+      const who = flockUnknown
+        ? `The ${SPECIES_LABELS[plan.species].toLowerCase()}`
+        : birds.length > 0
+          ? nameList(birds.map((flock) => `${flock.name} — ${flock.heads} birds`))
+          : fed.length <= 4
+            ? nameList(fed.map(displayName))
+            : `${fed.length} ${SPECIES_LABELS[plan.species].toLowerCase()}`;
 
-  return (
-    plans
-      .filter((plan) => plan.active)
-      .filter((plan) => {
-        if (plan.target !== "animal") return true;
-        const fed = fedBy(plan);
-        // Sold, dead or unknown: a guide is not where somebody should find out
-        // an animal has gone, and putting feed out for her is worse still.
-        if (fed.length === 0) return false;
-        return !fed.every(isPet);
-      })
-      .map((plan) => {
-        const fed = plan.target === "animal" ? fedBy(plan) : [];
-        const heads =
-          plan.target === "zone"
-            ? occupantsOf(placements, plan.targetId, now).filter((animalId) => {
-                const animal = byId.get(animalId);
-                return animal !== undefined && isOnFarm(animal);
-              }).length
-            : fed.length;
+      const zone = zones.find((candidate) => candidate.id === plan.placeZoneId)?.name;
+      const label = plan.placeLabel?.trim();
+      const where = [zone, label === "" ? undefined : label].filter(Boolean).join(", ");
 
-        const who =
-          plan.target === "group"
-            ? "The whole herd"
-            : plan.target === "zone"
-              ? `${zones.find((zone) => zone.id === plan.targetId)?.name ?? "A pen"} — ${
-                  heads === 0 ? "empty at the moment" : `${heads} head`
-                }`
-              : nameList(fed.map(displayName));
+      /**
+       * Said only where it changes what goes in the bunk. One animal needs no
+       * gloss; a pen of four does, and both ways round are a real error —
+       * four times the hay, or a quarter of it.
+       */
+      const portion =
+        heads <= 1 && !flockUnknown
+          ? undefined
+          : isTotal(plan)
+            ? "The amounts below are for all of them together, not each."
+            : "The amounts below are what each one gets.";
 
-        /**
-         * Said only where it changes what goes in the bunk. One animal on a
-         * per-head plan needs no gloss; a pen of four does, and both ways round
-         * are a real error — four times the hay, or a quarter of it.
-         */
-        const portion = isShared(plan)
-          ? "The amounts below are for all of them between them, not each."
-          : plan.target === "group" || heads > 1
-            ? "The amounts below are what each one gets."
-            : undefined;
-
-        return {
-          target: plan.target,
-          composed: {
-            id: plan.id,
-            name: plan.name,
-            who,
-            portion,
-            // Not passed the animals sharing it: `who` has already named them,
-            // and repeating them on every line is a sentence nobody finishes.
-            lines: plan.lines.map((line) => describePlanLine(line, feeds)),
-            notes: plan.specialNotes,
-          },
-        };
-      })
-      // Widest first: the load that goes out to everything, then the pens, then
-      // the one cow on her own ration — which is the order somebody walks it.
-      .sort(
-        (left, right) =>
-          rank[left.target] - rank[right.target] ||
-          left.composed.who.localeCompare(right.composed.who),
-      )
-      .map((entry) => entry.composed)
-  );
+      return {
+        id: plan.id,
+        name: plan.name,
+        who,
+        ...(where === "" ? {} : { where }),
+        portion,
+        lines: plan.lines.map((line) => describePlanLine(line, feeds)),
+        notes: plan.specialNotes,
+      } satisfies GuideFeedingPlan;
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== undefined)
+    .sort(
+      (left, right) =>
+        (left.where ?? "").localeCompare(right.where ?? "") || left.who.localeCompare(right.who),
+    );
 }
 
 export interface GuideChore {

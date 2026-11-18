@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useState,
+} from "react";
 
 import {
   Checkbox,
@@ -17,10 +19,11 @@ import {
   type Contact,
   type Ulid,
   type Zone,
+  SPECIES_LABELS,
 } from "@galaxy-farm/core";
 import {
   CONSUMPTION_KINDS,
-  FEED_CATEGORIES,
+  categoryOptions,
   FEED_UNITS,
   feedConsumptionSchema,
   feedPurchaseSchema,
@@ -33,10 +36,18 @@ import {
   type FeedUnit,
 } from "@galaxy-farm/module-feed";
 
-import { useMutations } from "@/lib/local/mutations";
+import {
+  useMutations,
+} from "@/lib/local/mutations";
 
-import { KitFormPanel as FormPanel } from "../../equipment/_components/kit-controls";
-import { formatDate, qty, unitLabel } from "./feed-format";
+import {
+  KitFormPanel as FormPanel,
+} from "../../equipment/_components/kit-controls";
+import {
+  formatDate,
+  qty,
+  unitLabel,
+} from "./feed-format";
 
 /**
  * The three things the feed screen writes, each in a side panel (spec §5.3).
@@ -505,7 +516,7 @@ export function TypeForm({
       <Select
         label="Category"
         value={draft.category}
-        options={toOptions(FEED_CATEGORIES)}
+        options={categoryOptions((species) => SPECIES_LABELS[species].toLowerCase())}
         onChange={(event) => setDraft({ ...draft, category: event.target.value as FeedCategory })}
       />
       <Select

@@ -105,15 +105,15 @@ const soon = new Date(Date.now() + 20 * 86_400_000);
 beforeEach(() => {
   stored.current = {
     animals: [DOG],
-    feedTypes: [{ id: FEED, name: "Kibble", category: "pet", active: true }],
+    feedTypes: [{ id: FEED, name: "Kibble", category: "dry_food", active: true }],
     feedingPlans: [
       {
         id: PLAN,
         name: "Biscuit's ration",
-        target: "animal",
-        targetId: DOG.id,
-        alsoFeeds: [],
-        portion: "per_head",
+        species: "dog",
+        animalIds: [DOG.id],
+        flockIds: [],
+        portion: "each",
         active: true,
         createdAt: new Date("2026-06-01"),
         lines: [
@@ -188,7 +188,7 @@ describe("the pet page", () => {
     });
   });
 
-  it("merges the vet, the ration and the Log's notes into one History, newest first", () => {
+  it("merges the vet, the feeding plan and the Log's notes into one History, newest first", () => {
     view();
 
     const list = screen.getByRole("list", { name: "History for Biscuit" });
@@ -198,7 +198,7 @@ describe("the pet page", () => {
     expect(titles).toEqual([
       "Limping on the left fore",
       "Apoquel",
-      "Ration written: Biscuit's ration",
+      "Feeding plan written: Biscuit's ration",
     ]);
 
     // The next dose the vet gave is what is coming up.
@@ -210,13 +210,13 @@ describe("the pet page", () => {
     const user = userEvent.setup();
     view();
 
-    const more = screen.getByRole("button", { name: "Rations, vet and details" });
+    const more = screen.getByRole("button", { name: "Feeding, vet and details" });
     expect(more.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByText("Rescued from the county shelter.")).toBeNull();
 
     await user.click(more);
     expect(screen.getByText("Rescued from the county shelter.")).toBeTruthy();
-    expect(screen.getByRole("list", { name: "Biscuit's rations" })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Biscuit's feeding plans" })).toBeTruthy();
   });
 
   it("moves an old address to the current one, and refuses a cow", () => {

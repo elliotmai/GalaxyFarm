@@ -4,7 +4,6 @@ import {
   type FeedingFrequency,
   type FeedingPlan,
   type FeedingPlanLine,
-  type FeedingTarget,
   type TimeOfDay,
 } from "./feeding-plan.js";
 import { TIME_OF_DAY_LABELS, timeOfDayDeadline, type ChoreEntry } from "./task.js";
@@ -31,10 +30,10 @@ import { TIME_OF_DAY_LABELS, timeOfDayDeadline, type ChoreEntry } from "./task.j
  * trip is *where you go and when*, and every line from every active plan that
  * lands there merges into it.
  *
- * Every species. A zone plan feeds whatever is standing in the zone, an animal
- * plan feeds that animal whatever it is, and a group plan feeds the place —
- * so nothing here filters on species, deliberately. The flock and the barn
- * cats are fed by somebody walking out of the house in the morning too.
+ * A trip is keyed by the plan's place: its zone, or its place in words, so the
+ * dog and both cats fed in the kitchen at night are one stop. A plan that says
+ * nowhere is its own trip, titled by its name. Every species, deliberately —
+ * the flock and the gecko are fed by somebody walking round in the morning too.
  */
 
 /** The order somebody works through a day, which is not alphabetical. */
@@ -62,6 +61,12 @@ export function lineOccursOn(frequency: FeedingFrequency, anchor: Date, date: Da
       return true;
     case "every_other_day":
       return daysBetween(startOfDay(anchor), startOfDay(date)) % 2 === 0;
+    case "twice_weekly": {
+      // The anchor's weekday and the one half a week on from it.
+      const day = startOfDay(date).getDay();
+      const first = startOfDay(anchor).getDay();
+      return day === first || day === (first + 3) % 7;
+    }
     case "weekly":
       return startOfDay(anchor).getDay() === startOfDay(date).getDay();
   }
@@ -73,45 +78,59 @@ export interface TripLine {
   readonly line: FeedingPlanLine;
 }
 
-/** Somewhere to go, once, carrying everything that goes there. */
+/** Where a trip goes: a zone, a place in words, or one plan with no place. */
+export type TripPlace =
+  | { readonly kind: "zone"; readonly zoneId: Ulid }
+  | { readonly kind: "place"; readonly label: string }
+  | { readonly kind: "plan"; readonly planId: Ulid };
+
 export interface FeedingTrip {
-  readonly target: FeedingTarget;
-  readonly targetId: Ulid;
+  readonly place: TripPlace;
   readonly timeOfDay: TimeOfDay;
   readonly lines: readonly TripLine[];
 }
 
-/**
- * The id an occurrence keeps across recomputation.
- *
- * Derived from what the trip *is* rather than from the plans behind it, so
- * adding a second feed to a pen's morning does not renumber the chore somebody
- * is looking at — or worse, orphan the row they already ticked.
- */
-export function feedingChoreId(trip: Omit<FeedingTrip, "lines">, date: Date): string {
-  return `feeding:${trip.target}:${trip.targetId}:${trip.timeOfDay}:${dayKey(date)}`;
+export function placeOf(plan: Pick<FeedingPlan, "id" | "placeZoneId" | "placeLabel">): TripPlace {
+  if (plan.placeZoneId !== undefined) return { kind: "zone", zoneId: plan.placeZoneId };
+  const label = plan.placeLabel?.trim();
+  if (label !== undefined && label !== "") return { kind: "place", label };
+  return { kind: "plan", planId: plan.id };
 }
 
-/** Every trip a day's active plans add up to, in the order they are walked. */
+/** "Kitchen" and "kitchen " are one room, so the key folds case and spaces. */
+function placeKey(place: TripPlace): string {
+  if (place.kind === "zone") return `zone:${place.zoneId}`;
+  if (place.kind === "plan") return `plan:${place.planId}`;
+  return `place:${place.label.toLowerCase().replace(/\s+/g, "-")}`;
+}
+
+/**
+ * The id a ticked trip is stored under (`Task.sourceKey`).
+ *
+ * `feeding:<zone|place|plan>:<ref>:<time>:<day>`. Renaming a place in words
+ * changes the key, so a row ticked under the old name stays ticked in the
+ * history and today's trip starts unticked — which is honest: it is, in the
+ * words on the screen, a different place.
+ */
+export function feedingChoreId(trip: Omit<FeedingTrip, "lines">, date: Date): string {
+  return `feeding:${placeKey(trip.place)}:${trip.timeOfDay}:${dayKey(date)}`;
+}
+
 export function feedingTripsForDay(plans: readonly FeedingPlan[], date: Date): FeedingTrip[] {
   const trips = new Map<string, FeedingTrip & { lines: TripLine[] }>();
 
   for (const plan of plans) {
     if (!plan.active) continue;
+    const place = placeOf(plan);
 
     for (const line of plan.lines) {
       if (!lineOccursOn(line.frequency, plan.createdAt, date)) continue;
 
-      const key = `${plan.target}:${plan.targetId}:${line.timeOfDay}`;
+      const key = `${placeKey(place)}:${line.timeOfDay}`;
       const existing = trips.get(key);
 
       if (existing === undefined) {
-        trips.set(key, {
-          target: plan.target,
-          targetId: plan.targetId,
-          timeOfDay: line.timeOfDay,
-          lines: [{ plan, line }],
-        });
+        trips.set(key, { place, timeOfDay: line.timeOfDay, lines: [{ plan, line }] });
         continue;
       }
       existing.lines.push({ plan, line });
@@ -121,40 +140,22 @@ export function feedingTripsForDay(plans: readonly FeedingPlan[], date: Date): F
   return [...trips.values()].sort(
     (left, right) =>
       FEEDING_TIME_ORDER[left.timeOfDay] - FEEDING_TIME_ORDER[right.timeOfDay] ||
-      left.targetId.localeCompare(right.targetId),
+      placeKey(left.place).localeCompare(placeKey(right.place)),
   );
 }
 
-/**
- * How to say what a trip is and what it carries.
- *
- * Injected rather than worked out here. A zone's name and a feed's name live
- * in other entities — one in another module — and §4.1 has the composition
- * root join them. The kernel groups and schedules; the app words it.
- *
- * An animal trip is the exception, named here rather than injected: it is
- * titled by its *ration* — the plan's own name, which the kernel already
- * holds. One plan can feed several animals eating from the same bowl
- * (`alsoFeeds`), and a title carrying one animal's name would read as feeding
- * only that one. The ration's name covers everybody it feeds, so `target` is
- * only ever asked about a zone or the group.
- */
+/** How the app words a trip — kept out of the kernel, which has no names. */
 export interface FeedingChoreText {
-  readonly target: (target: Exclude<FeedingTarget, "animal">, targetId: Ulid) => string;
+  /** A zone's name. */
+  readonly zone: (zoneId: Ulid) => string;
+  /** One line, as somebody would read it at the bunk. */
   readonly line: (line: FeedingPlanLine, plan: FeedingPlan) => string;
 }
 
-/**
- * What an animal trip is called: the rations it carries.
- *
- * Deduplicated because two lines of one plan are one ration, and joined
- * because two plans landing on one animal's morning are still one walk.
- */
-function rationNames(trip: Pick<FeedingTrip, "lines">): string {
+function planNames(trip: Pick<FeedingTrip, "lines">): string {
   return [...new Set(trip.lines.map(({ plan }) => plan.name))].join(" · ");
 }
 
-/** A day's feeding, as chore entries the sheet can merge with everything else. */
 export function feedingOccurrences(
   plans: readonly FeedingPlan[],
   text: FeedingChoreText,
@@ -165,15 +166,24 @@ export function feedingOccurrences(
     const dueAt = timeOfDayDeadline(date, trip.timeOfDay);
     const detail = trip.lines.map(({ line, plan }) => text.line(line, plan)).join(" · ");
     const where =
-      trip.target === "animal" ? rationNames(trip) : text.target(trip.target, trip.targetId);
+      trip.place.kind === "zone"
+        ? text.zone(trip.place.zoneId)
+        : trip.place.kind === "place"
+          ? trip.place.label
+          : planNames(trip);
+    // A trip that feeds exactly one animal points at it, so the row can open
+    // its page; a trip for several, or for a flock, points at nobody.
+    const fed = new Set(trip.lines.flatMap(({ plan }) => [...(plan.animalIds ?? [])]));
+    const flocks = trip.lines.some(({ plan }) => (plan.flockIds ?? []).length > 0);
+    const only = fed.size === 1 && !flocks ? [...fed][0] : undefined;
 
     return {
       id: feedingChoreId(trip, date),
       title: `${TIME_OF_DAY_LABELS[trip.timeOfDay]} feed · ${where}`,
       ...(detail === "" ? {} : { detail }),
       dueAt,
-      ...(trip.target === "zone" ? { zoneId: trip.targetId } : {}),
-      ...(trip.target === "animal" ? { animalId: trip.targetId } : {}),
+      ...(trip.place.kind === "zone" ? { zoneId: trip.place.zoneId } : {}),
+      ...(only === undefined ? {} : { animalId: only }),
       carriedOver: false,
       overdue: dueAt < now,
     };

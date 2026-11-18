@@ -1,7 +1,8 @@
 import {
-  animalsFedBy,
+  animalsOf,
   displayName,
-  isShared,
+  feedsAnimal,
+  isTotal,
   type Animal,
   type FeedingPlan,
   type Ulid,
@@ -41,7 +42,7 @@ export function careRecordsFor(records: readonly HealthRecord[]): PetCareRecord[
 
 /** The plans feeding one pet — including any bowl it shares with another. */
 export function plansFeeding(petId: Ulid, plans: readonly FeedingPlan[]): FeedingPlan[] {
-  return plans.filter((plan) => plan.target === "animal" && animalsFedBy(plan).includes(petId));
+  return plans.filter((plan) => feedsAnimal(plan, petId));
 }
 
 /**
@@ -60,8 +61,8 @@ export function feedingLinesFor(
   return plansFeeding(petId, plans)
     .filter((plan) => plan.active)
     .flatMap((plan) => {
-      const between = isShared(plan)
-        ? animalsFedBy(plan)
+      const between = isTotal(plan)
+        ? animalsOf(plan)
             .map((id) => animals.find((animal) => animal.id === id))
             .filter(
               (animal): animal is Pick<Animal, "id" | "name" | "tagNumber"> => animal !== undefined,
@@ -69,7 +70,12 @@ export function feedingLinesFor(
             .map(displayName)
         : [];
 
-      return plan.lines.map((line) => describePlanLine(line, feeds, between));
+      // Where, once, after the first line: "… — in the Kitchen".
+      const place = plan.placeLabel?.trim();
+      return plan.lines.map((line, index) => {
+        const text = describePlanLine(line, feeds, between);
+        return index === 0 && place !== undefined && place !== "" ? `${text} (${place})` : text;
+      });
     });
 }
 

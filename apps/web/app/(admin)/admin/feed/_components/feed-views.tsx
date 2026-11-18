@@ -252,20 +252,20 @@ export function CostPerHeadTab({
   purchases,
   animals,
   scopes,
-  propertyId,
 }: {
   readonly feeds: readonly FeedType[];
   readonly plans: readonly FeedingPlan[];
   readonly purchases: readonly FeedPurchase[];
   readonly animals: readonly Animal[];
-  readonly scopes: readonly { id: Ulid; zoneIds: readonly Ulid[] }[];
-  readonly propertyId: Ulid;
+  readonly scopes: readonly { id: Ulid }[];
+  /** Accepted for callers that still pass it. */
+  readonly propertyId?: Ulid;
 }) {
   const [days, setDays] = useState(30);
 
   const allocations = useMemo(
-    () => allocateFeedCost({ plans, purchases, feeds, animals: scopes, propertyId, days }),
-    [plans, purchases, feeds, scopes, propertyId, days],
+    () => allocateFeedCost({ plans, purchases, feeds, animals: scopes, days }),
+    [plans, purchases, feeds, scopes, days],
   );
 
   const byId = useMemo(() => new Map(animals.map((animal) => [animal.id, animal])), [animals]);

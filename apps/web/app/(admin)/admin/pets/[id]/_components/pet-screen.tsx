@@ -48,7 +48,7 @@ import {
 import { formatDate } from "@/app/(admin)/admin/cattle/[id]/_components/animal-history";
 import { facts } from "@/app/(admin)/admin/cattle/[id]/_components/record-rows";
 import { logHref } from "@/app/(admin)/admin/log/_components/log-kinds";
-import { RationEditor, RationRows } from "@/app/(admin)/admin/pets/_components/pet-feeding-panel";
+import { FeedingPlanEditor, PlanRows } from "@/app/(admin)/_components/feeding-plan-editor";
 import {
   EditVisit,
   PET_HEALTH_LABELS,
@@ -190,7 +190,7 @@ export function PetScreen({
   ) : overdue ? (
     <Pill tone="danger">Care overdue</Pill>
   ) : briefing.feeding.length === 0 ? (
-    <Pill tone="action">No ration</Pill>
+    <Pill tone="action">No feeding plan</Pill>
   ) : briefing.medicines.length > 0 ? (
     <Pill tone="neutral">On medication</Pill>
   ) : undefined;
@@ -254,7 +254,7 @@ export function PetScreen({
     ...rations.map((plan): TimelineRow => ({
       key: `ration:${plan.id}`,
       date: plan.createdAt,
-      title: `Ration written: ${plan.name}`,
+      title: `Feeding plan written: ${plan.name}`,
       line: facts(formatDate(plan.createdAt), plan.active ? undefined : "paused"),
       onSelect: () => setPanel({ kind: "ration", plan }),
       selectLabel: `Edit ${plan.name}`,
@@ -362,7 +362,7 @@ export function PetScreen({
           Vet visit
         </ActionButton>
         <ActionButton icon="food" onClick={() => setPanel({ kind: "ration", plan: onlyRation })}>
-          Ration
+          Feeding
         </ActionButton>
         <ActionLink icon="move" href={logHref({ kind: "move", animals: [pet.id], from: pathname })}>
           Move
@@ -388,9 +388,9 @@ export function PetScreen({
         recordName={name}
       />
 
-      <MoreDisclosure label="Rations, vet and details">
+      <MoreDisclosure label="Feeding, vet and details">
         <Section
-          title="Rations"
+          title="Feeding"
           actions={
             <Button
               variant="ghost"
@@ -398,21 +398,18 @@ export function PetScreen({
               onClick={() => setPanel({ kind: "ration", plan: undefined })}
             >
               <PlusIcon />
-              Ration
+              Feeding plan
             </Button>
           }
         >
           {rations.length === 0 ? (
             <p className="text-sm text-action">Nothing written down.</p>
           ) : (
-            <RationRows
-              label={`${name}'s rations`}
+            <PlanRows
+              label={`${name}'s feeding plans`}
               plans={rations}
               feeds={feeds}
-              petName={(id) => {
-                const held = animals.find((entry) => entry.id === id);
-                return held === undefined ? "a pet" : displayName(held);
-              }}
+              animals={bowlmates}
               onOpen={(plan) => setPanel({ kind: "ration", plan })}
             />
           )}
@@ -484,12 +481,14 @@ export function PetScreen({
         />
       ) : null}
       {panel?.kind === "ration" ? (
-        <RationEditor
+        <FeedingPlanEditor
           key={panel.plan?.id ?? "new"}
-          pets={bowlmates}
-          feeds={feeds}
           plan={panel.plan}
-          forPet={pet.id}
+          species={pet.species}
+          startWith={[pet.id]}
+          lockSpecies
+          animals={bowlmates}
+          feeds={feeds}
           propertyId={propertyId}
           actorId={actorId}
           onClose={() => setPanel(undefined)}

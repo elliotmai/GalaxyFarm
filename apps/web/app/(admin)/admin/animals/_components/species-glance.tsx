@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import {
+  animalsOf,
   addCalendarDays,
   endOfDay,
   isOnFarm,
@@ -259,7 +260,7 @@ export function petActions(species: PetSpecies): readonly QuickAction[] {
     { label: "Medicine", glyph: "✚", href: `${from}/care?tab=health` },
     { label: "Feeding", glyph: "●", href: logHref({ kind: "feeding", from }) },
     { label: "Note", glyph: "✎", href: logHref({ kind: "note", from }) },
-    { label: "Rations", glyph: "▤", href: `${from}/care?tab=feeding` },
+    { label: "Feeding plans", glyph: "▤", href: `${from}/care?tab=feeding` },
   ];
 }
 
@@ -286,8 +287,8 @@ export function PetsGlance({
   const fed = new Set(
     plans
       .filter((plan) => plan.active)
-      .flatMap((plan) => [plan.targetId, ...(plan.alsoFeeds ?? [])])
-      .filter((id): id is Ulid => id !== undefined && ids.has(id as Ulid)),
+      .flatMap((plan) => [...animalsOf(plan)])
+      .filter((id) => ids.has(id)),
   ).size;
   const plural = PET_PLURAL[species];
   const care = `/admin/pets/${plural}/care`;
@@ -304,7 +305,7 @@ export function PetsGlance({
       <Fact value={soon} label="due in two weeks" href={`${care}?tab=health`} />
       <Fact
         value={pets.length - fed}
-        label="with no ration written"
+        label="with no feeding plan"
         href={`${care}?tab=feeding`}
         tone={pets.length - fed > 0 ? "attention" : "neutral"}
       />

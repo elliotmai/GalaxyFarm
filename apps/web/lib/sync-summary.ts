@@ -38,7 +38,7 @@ const WORDS: Readonly<Record<string, string>> = {
   choreTemplates: "Chore template",
   zoneAssignments: "Move",
   attachments: "Photo record",
-  feedingPlans: "Ration",
+  feedingPlans: "Feeding plan",
   supplyItems: "Supply",
   equipment: "Equipment",
   contacts: "Contact",

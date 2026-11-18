@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import { Fab, PageBody, Tabs, useToast } from "@galaxy-farm/ui";
 import {
   choreDaySheet,
-  openAssignments,
   startOfDay,
   taskSchema,
   type Animal,
@@ -15,9 +14,8 @@ import {
   type Task,
   type Ulid,
   type Zone,
-  type ZoneAssignment,
 } from "@galaxy-farm/core";
-import { penAssignments } from "@galaxy-farm/module-pets";
+
 import {
   herdDemand,
   projectFeed,
@@ -27,10 +25,7 @@ import {
   type FeedType,
 } from "@galaxy-farm/module-feed";
 
-import {
-  PlanForm,
-  usePlanActions,
-} from "@/app/(admin)/admin/cattle/feed/_components/cattle-feed-screen";
+import { FeedingPlanEditor, usePlanFlocks } from "@/app/(admin)/_components/feeding-plan-editor";
 import { toggleChore } from "@/lib/chores";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { useMutations } from "@/lib/local/mutations";
@@ -115,7 +110,6 @@ export function FeedScreen({
   const { records: plans, loading: plansLoading } = useRecords<FeedingPlan>("feedingPlans", query);
   const { records: animals } = useRecords<Animal>("animals", query);
   const { records: zones } = useRecords<Zone>("zones", query);
-  const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
   const { records: tasks } = useRecords<Task>("tasks", query);
   const { records: contacts } = useRecords<Contact>("contacts", query);
 
@@ -138,33 +132,24 @@ export function FeedScreen({
     [animals],
   );
 
-  /**
-   * Each animal with the pens it is standing in — both slots, outside and in.
-   *
-   * Pets bring none (§5.8): a dog has no pen, so a placement naming one — the
-   * property map used to let somebody drag him onto a pasture — would put him
-   * on that pen's ration and add a dog's worth of range cubes to what the herd
-   * is projected to eat. His own bowl is an animal-target plan and is unaffected.
-   */
-  const animalScopes = useMemo(() => {
-    const placements = penAssignments(assignments, liveAnimals);
-    return liveAnimals.map((animal) => ({
-      id: animal.id,
-      zoneIds: openAssignments(placements, animal.id).map((entry) => entry.zoneId),
-    }));
-  }, [liveAnimals, assignments]);
+  /** The animals on the place — the only ones a plan's feed is drawn for. */
+  const animalScopes = useMemo(
+    () => liveAnimals.map((animal) => ({ id: animal.id })),
+    [liveAnimals],
+  );
+  /** Flocks and today's headcounts, for the hens' and quail's plans. */
+  const flocks = usePlanFlocks(propertyId);
 
   /**
-   * Daily demand per feed type, summed over the herd (§5.3).
+   * Daily demand per feed type, summed over every plan (§5.3).
    *
-   * Derived, never entered. Each animal resolves its own plans — animal over
-   * zone over group — and the herd's demand is the sum of what each one is
-   * actually on. Two cows on the same pen plan contribute twice, which is what
-   * makes a pen of forty run the shed down forty times as fast.
+   * Derived, never entered: each active plan's lines × how often × its heads
+   * on the place (for an "each" amount). A plan of forty runs the shed down
+   * forty times as fast; a tub shared between them does not.
    */
   const demand = useMemo(
-    () => herdDemand({ plans: activePlans, feeds, animals: animalScopes, propertyId }),
-    [animalScopes, activePlans, feeds, propertyId],
+    () => herdDemand({ plans: activePlans, feeds, animals: animalScopes, flocks }),
+    [animalScopes, activePlans, feeds, flocks],
   );
 
   // Memoised to the minute (see `minute`), so a re-render that changed none of
@@ -203,12 +188,7 @@ export function FeedScreen({
   const feedings = useMemo(() => {
     const at = new Date(minute * 60_000);
     const day = startOfDay(at);
-    const derived = feedingChoresFor(
-      plans,
-      feedingChoreText({ zones, feeds, propertyId }),
-      day,
-      at,
-    );
+    const derived = feedingChoresFor(plans, feedingChoreText({ zones, feeds, animals }), day, at);
     // Only the feeding rows go in. The sheet otherwise carries every chore
     // still owed from any day before, to be thrown away by the filter after.
     const feedingTasks = tasks.filter((task) => task.sourceKey?.startsWith("feeding:"));
@@ -250,7 +230,6 @@ export function FeedScreen({
     propertyId,
     actorId,
   });
-  const planActions = usePlanActions(propertyId, actorId);
 
   const close = () => setPanel(undefined);
 
@@ -335,7 +314,7 @@ export function FeedScreen({
                   feeds={feeds}
                   animals={animals}
                   zones={zones}
-                  scopes={animalScopes}
+                  flocks={flocks}
                   loading={plansLoading}
                   onAdd={addPlan}
                   onAdjust={(plan) => setPanel({ kind: "plan", planId: plan.id })}
@@ -477,22 +456,16 @@ export function FeedScreen({
         />
       ) : panel?.kind === "plan" && (panel.planId === "new" || editingPlan !== undefined) ? (
         // The editor Cattle › Feed plans opens, against every species here.
-        <PlanForm
+        <FeedingPlanEditor
           key={editingPlan?.id ?? "new"}
           plan={editingPlan}
           animals={animals}
+          flocks={flocks}
           zones={zones}
           feeds={feeds}
-          api={planActions.api}
           propertyId={propertyId}
-          anySpecies
+          actorId={actorId}
           onClose={close}
-          onToggle={(plan) => void planActions.toggle(plan)}
-          onDelete={(plan) => {
-            // The panel closes first, so the confirmation is the only dialog.
-            close();
-            void planActions.remove(plan);
-          }}
         />
       ) : null}
     </PageBody>

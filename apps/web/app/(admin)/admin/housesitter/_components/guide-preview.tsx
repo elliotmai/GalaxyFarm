@@ -371,6 +371,9 @@ export function GuidePreview({
                                 · {plan.name}
                               </span>
                             </h4>
+                            {plan.where === undefined ? null : (
+                              <p className="text-sm text-muted">Fed at {plan.where}</p>
+                            )}
                             {plan.portion === undefined ? null : (
                               <p className="text-sm text-muted">{plan.portion}</p>
                             )}

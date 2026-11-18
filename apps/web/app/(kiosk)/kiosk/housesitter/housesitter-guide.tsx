@@ -62,7 +62,7 @@ import { currentMedicinesFor, feedingLinesFor } from "@/lib/pet-care";
 
 const includes = (guide: CareGuide, kind: GuideSectionKind) => guide.includes.includes(kind);
 
-/** A group label inside a panel — "In the pens", "The rations". */
+/** A group label inside a panel — "In the pens", "Feeding". */
 const GROUP = "text-lg text-muted";
 
 /** Rows on one panel, the same shape the admin lists use. */
@@ -263,7 +263,9 @@ export function HousesitterGuide({
                               <p className="whitespace-pre-wrap">{pet.instructions}</p>
                             )}
                             {pet.feeding.length === 0 ? (
-                              <p className="text-danger">No ration written down — ask first.</p>
+                              <p className="text-danger">
+                                No feeding plan written down — ask first.
+                              </p>
                             ) : (
                               <ul className="flex list-disc flex-col gap-0.5 pl-5 text-base">
                                 {pet.feeding.map((line) => (
@@ -285,7 +287,7 @@ export function HousesitterGuide({
                   <div className="flex min-w-0 flex-col gap-2">
                     {feeding.length === 0 ? null : (
                       <>
-                        <h3 className={GROUP}>The rations</h3>
+                        <h3 className={GROUP}>Feeding</h3>
                         <ul className={LIST}>
                           {feeding.map((plan) => (
                             <li key={plan.id} className="flex flex-col gap-1 px-4 py-3">
@@ -293,6 +295,9 @@ export function HousesitterGuide({
                                 {plan.who}
                                 <span className="font-normal text-muted"> · {plan.name}</span>
                               </p>
+                              {plan.where === undefined ? null : (
+                                <p className="text-base text-muted">Fed at {plan.where}</p>
+                              )}
                               {plan.portion === undefined ? null : (
                                 <p className="text-base text-muted">{plan.portion}</p>
                               )}

@@ -65,6 +65,7 @@ export function creepPlanSuggestion(
     amount: { amount: 5, unit: "lb" },
     frequency: "once_daily",
     timeOfDay: "morning",
+    receptacle: "creep_feeder",
     notes: "Free choice — adjust once you see what is actually going.",
   };
 
@@ -73,13 +74,13 @@ export function creepPlanSuggestion(
     startOn,
     plan: {
       name: `${feed.name} — creep`,
-      target: "animal",
-      targetId: birth.animalId,
       // A creep ration belongs to the calf it is suggested for. Nothing else
       // is eating out of that creep feeder as far as this record knows.
-      alsoFeeds: [],
+      species: "cattle",
+      animalIds: [birth.animalId],
+      flockIds: [],
       lines: [line],
-      portion: "per_head",
+      portion: "each",
       // Off until the start date arrives, so §5.3 does not count feed against
       // a calf that is still entirely on its dam.
       active: false,

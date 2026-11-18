@@ -40,6 +40,10 @@ export const POUNDS_PER_MEASURE: Readonly<Partial<Record<Unit, number>>> = {
   scoop: POUNDS_PER_SCOOP,
   lb: 1,
   ton: 2000,
+  oz: 1 / 16,
+  // An eight-ounce measuring cup of kibble weighs about a quarter of a pound.
+  // A rough figure, as a scoop's is; a feed's own weight per unit wins.
+  cup: 0.25,
 };
 
 /** The vessels, largest first — which is the order a breakdown is read in. */

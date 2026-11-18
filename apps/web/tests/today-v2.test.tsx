@@ -99,9 +99,10 @@ function plan(n: number, name: string): FeedingPlan {
   return {
     ...base(n),
     name,
-    target: "animal",
-    targetId: base(n + 50).id,
-    alsoFeeds: [],
+    species: "cattle",
+    animalIds: [base(n + 50).id],
+    flockIds: [],
+    portion: "each",
     lines: [
       {
         feedTypeId: base(899).id,
@@ -110,7 +111,6 @@ function plan(n: number, name: string): FeedingPlan {
         timeOfDay: "morning",
       },
     ],
-    portion: "per_head",
     active: true,
   } as FeedingPlan;
 }
@@ -158,7 +158,7 @@ beforeEach(() => {
       task(30, {
         title: "Senior ration",
         sourceKey: feedingChoreId(
-          { target: "animal", targetId: SENIOR.targetId, timeOfDay: "morning" },
+          { place: { kind: "plan", planId: SENIOR.id }, timeOfDay: "morning" },
           NOW,
         ),
         dueAt: at(11, 0),

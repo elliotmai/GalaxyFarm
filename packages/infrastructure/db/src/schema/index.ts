@@ -647,16 +647,17 @@ export const feedingPlans = pgTable(
   {
     ...baseColumns,
     name: text("name").notNull(),
-    target: text("target").notNull(),
-    targetId: text("target_id").notNull(),
-    /** Others eating out of the same bowl — animal-targeted plans only (§5.1). */
-    alsoFeeds: text("also_feeds").array().notNull().default([]),
-    /**
-     * `per_head | shared`. Defaulted, and the default is load-bearing: every
-     * plan written before this column meant per-head, and a NULL read as
-     * "shared" would divide a pen's hay by its headcount.
-     */
-    portion: text("portion").notNull().default("per_head"),
+    /** One species per plan (0042, decision 49). */
+    species: text("species").notNull(),
+    /** The animals the plan feeds — all of `species`. */
+    animalIds: text("animal_ids").array().notNull().default([]),
+    /** Flocks it feeds — poultry only. */
+    flockIds: text("flock_ids").array().notNull().default([]),
+    /** `each | total`: what one animal gets, or what they all get together. */
+    portion: text("portion").notNull().default("each"),
+    /** Where they are fed: a zone, or words for somewhere that is not one. */
+    placeZoneId: text("place_zone_id"),
+    placeLabel: text("place_label"),
     lines: jsonb("lines")
       .$type<
         {
@@ -664,6 +665,7 @@ export const feedingPlans = pgTable(
           amount: { amount: number; unit: string };
           frequency: string;
           timeOfDay: string;
+          receptacle?: string;
           notes?: string;
         }[]
       >()

@@ -198,7 +198,7 @@ export function PetPanel({
                   briefing.handleWithCare ? (
                     <SafetyBadge level={pet.safetyLevel} size="compact" />
                   ) : briefing.feeding.length === 0 ? (
-                    <Pill tone="action">No ration</Pill>
+                    <Pill tone="action">No feeding plan</Pill>
                   ) : briefing.medicines.length > 0 ? (
                     <Pill tone="neutral">On medication</Pill>
                   ) : undefined
@@ -379,7 +379,7 @@ export function PetEditor({
           : [
               {
                 entity: "Feeding plan",
-                label: `${rations} ration${rations === 1 ? "" : "s"}`,
+                label: `${rations} feeding plan${rations === 1 ? "" : "s"}`,
                 effect: "detached" as const,
               },
             ]),

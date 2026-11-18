@@ -1,10 +1,10 @@
 import {
   dailyDemandOf,
-  isShared,
+  headsOf,
+  isTotal,
   plansForAnimal,
   type FeedingPlan,
   type Money,
-  type Quantity,
   type Ulid,
 } from "@galaxy-farm/core";
 
@@ -14,11 +14,10 @@ import { feedCost, type FeedCost, type FeedPurchase } from "./inventory.js";
 /**
  * Who the feed bill belongs to (spec §5.3, "cost per head").
  *
- * "Consumption valued at purchase cost, allocated to animals directly (animal
- * plans) or split by headcount (group/zone plans)." The split by headcount is
- * the part worth being careful about: a zone plan feeding four head puts a
- * quarter of the bill on each, and if the pen's population changed mid-month
- * the honest answer is per-day rather than a single division.
+ * "Consumption valued at purchase cost": an "each" amount is that animal's
+ * own, and a "total" amount is split between the plan's animals still on the
+ * place. An animal on two plans — a base ration and a supplement — carries
+ * both, because a plan owns its animals rather than ranking against others.
  *
  * The output feeds two things that must agree: per-animal P&L (§5.2) and,
  * later, a client calf's boarding invoice (§5.7). "Owner pays feed and
@@ -29,196 +28,84 @@ import { feedCost, type FeedCost, type FeedPurchase } from "./inventory.js";
 export interface AllocationInput {
   readonly plans: readonly FeedingPlan[];
   readonly purchases: readonly FeedPurchase[];
-  /**
-   * The catalogue, so a ration can be restated in what the feed is bought by.
-   *
-   * A unit cost is per purchase unit — per bag — and a ration written in
-   * scoops multiplied by that price is a feed bill eighteen times too large.
-   * Optional only so an existing caller keeps working; without it a ration in
-   * another unit is charged at face value, which is exactly the mistake.
-   */
+  /** For converting a ration written in scoops into the bags it is bought in. */
   readonly feeds?: readonly Pick<FeedType, "id" | "unit" | "estWeightLbPerUnit">[] | undefined;
-  /** Animals in scope, with the zones and groups each currently belongs to. */
+  /** The animals on the place, who are the ones a plan's feed is shared by. */
   readonly animals: readonly DemandScope[];
-  /** The group a "whole group" plan targets. Without it, group plans bill nobody. */
-  readonly propertyId?: Ulid | undefined;
+  /** Each flock's headcount, for poultry plans. */
+  readonly flocks?: readonly FlockScope[] | undefined;
   readonly days: number;
 }
 
 export interface AnimalAllocation {
   readonly animalId: Ulid;
-  /** What that animal ate, per feed type, over the period. */
+  /** Feed type → quantity over the period, in the feed's own unit. */
   readonly quantityByFeedType: ReadonlyMap<Ulid, number>;
   readonly cost: Money;
-  /**
-   * False when a feed type in the plan has no priced purchase behind it — none
-   * bought, or a load bought with no price entered.
-   *
-   * Feed with no price is valued at nothing, which understates the animal.
-   * §5.2's P&L carries the same distinction for the same reason.
-   */
+  /** False when some feed had no priced purchase or could not be converted. */
   readonly costComplete: boolean;
 }
 
 /**
- * Daily demand per feed type for one animal, resolving plan precedence.
+ * An animal on the place.
  *
- * §5.1: an animal-targeted plan "overrides/extends the group plan". Extends
- * for feed types the specific plan does not mention, overrides for the ones it
- * does — a per-cow grain ration replaces the pen's grain and leaves the pen's
- * mineral alone.
- *
- * The unit travels with the amount and is not dropped. A ration is written in
- * what it is fed in — scoops — and stock is counted in what it is bought in —
- * bags, and a bare number that means one on one screen and the other on the
- * next is a fault nothing downstream can detect. `herdDemand` is what turns
- * these into the feed's own unit.
+ * Only the id matters now that a plan names its animals. `zoneIds` survives
+ * on the type so callers that still pass it compile; nothing reads it.
  */
-export function resolvedDemandFor(
-  plans: readonly FeedingPlan[],
-  animalId: Ulid,
-  zoneIds: readonly Ulid[],
-  groupIds: readonly Ulid[] = [],
-): Map<Ulid, Quantity> {
-  return new Map(
-    [...resolvedRationFor(plans, animalId, zoneIds, groupIds)].map(([feedTypeId, ration]) => [
-      feedTypeId,
-      ration.quantity,
-    ]),
-  );
-}
-
-export interface ResolvedRation {
-  readonly quantity: Quantity;
-  /** The plan that won this feed type for this animal. */
-  readonly planId: Ulid;
-  /**
-   * True when the quantity is the total across everybody the plan covers
-   * rather than what this animal gets.
-   *
-   * Carried out of the resolution rather than looked up again later, because
-   * by the time a caller has a bare quantity the plan it came from is gone —
-   * and that is precisely the fact that decides whether it multiplies by
-   * headcount or divides by it.
-   */
-  readonly shared: boolean;
-}
-
-/**
- * The same resolution, with the plan each ration came from still attached.
- *
- * `resolvedDemandFor` throws that away, which was fine while every plan meant
- * "each animal gets this". A shared bowl is the case it cannot express: two
- * cats on one plan resolve to the same quantity, and summing them counts the
- * bowl twice.
- */
-export function resolvedRationFor(
-  plans: readonly FeedingPlan[],
-  animalId: Ulid,
-  zoneIds: readonly Ulid[],
-  groupIds: readonly Ulid[] = [],
-): Map<Ulid, ResolvedRation> {
-  const resolved = new Map<Ulid, ResolvedRation>();
-
-  // `plansForAnimal` returns group, then zone, then animal — least specific
-  // first — so a later plan overwriting an earlier one is precedence working.
-  for (const plan of plansForAnimal(plans, animalId, zoneIds, groupIds)) {
-    const shared = isShared(plan);
-    for (const [feedTypeId, quantity] of dailyDemandOf(plan)) {
-      resolved.set(feedTypeId, { quantity, planId: plan.id, shared });
-    }
-  }
-
-  return resolved;
-}
-
-/** One bowl, one feed. The key a shared ration is counted and split under. */
-const sharedKey = (planId: Ulid, feedTypeId: Ulid) => `${planId}:${feedTypeId}`;
-
-/** An animal, and everything a plan could be targeting it through. */
 export interface DemandScope {
   readonly id: Ulid;
-  readonly zoneIds: readonly Ulid[];
-  readonly groupIds?: readonly Ulid[] | undefined;
+  readonly zoneIds?: readonly Ulid[] | undefined;
+}
+
+/** A flock and how many birds are in it today. */
+export interface FlockScope {
+  readonly id: Ulid;
+  readonly heads: number;
 }
 
 export interface HerdDemand {
-  /** Per feed type, per day, in the unit that feed is bought and counted in. */
+  /** Feed type → per-day amount, in that feed type's own unit. */
   readonly perDay: ReadonlyMap<Ulid, number>;
   /**
-   * Feeds whose ration cannot be restated in the unit they are counted in.
-   *
-   * Named rather than silently dropped or silently passed through raw. A feed
-   * missing from a run-out projection is a barn that empties without warning,
-   * and a scoop counted as a bag is the same thing eighteen times faster —
-   * both look completely ordinary on screen, so the only safe answer is to say
-   * which feed could not be worked out.
+   * Feed types a plan feeds in a measure that cannot become the unit the feed
+   * is bought in — a scoop of a feed bought by the bale with no weight on it.
+   * Reported rather than guessed, so the shed can say why it has no date.
    */
   readonly unconvertible: readonly Ulid[];
 }
 
+function context(animals: readonly DemandScope[], flocks: readonly FlockScope[] = []) {
+  return {
+    onFarm: new Set(animals.map((animal) => animal.id)),
+    flockHeads: new Map(flocks.map((flock) => [flock.id, flock.heads])),
+  };
+}
+
 /**
- * What the whole herd eats in a day, per feed type (spec §5.3).
+ * What the place uses in a day, per feed type, in each feed's own unit.
  *
- * The one place this is worked out, because two screens ask it and they have
- * to agree. Three things it gets right that summing plans does not:
- *
- * **It counts heads.** Each animal resolves its own plans and contributes its
- * own ration, so a pen of forty runs the barn down forty times as fast. A sum
- * over plans counts a group plan once, which is not what anybody is carrying
- * to the trough.
- *
- * **It converts.** A ration in scoops against stock counted in bags is an
- * eighteen-fold error, in the direction that empties a barn without warning.
- *
- * **It knows what a group plan is.** A plan targeting the whole group names
- * the property, and every animal on the property belongs to it — which is not
- * something `plansForAnimal` can know, since it is handed group ids and the
- * property is not one of them. Passing `propertyId` here is what makes the
- * commonest kind of plan visible to the run-out projection at all.
+ * Σ over active plans of amount × feedings a day × (heads, for an "each"
+ * amount). The run-out projection, the reorder date and the calendar all read
+ * this, so a plan written in cups of a feed bought by the bag is converted
+ * here, once.
  */
 export function herdDemand(input: {
   readonly plans: readonly FeedingPlan[];
   readonly feeds: readonly Pick<FeedType, "id" | "unit" | "estWeightLbPerUnit">[];
   readonly animals: readonly DemandScope[];
-  /** The group a "whole group" plan targets. */
+  readonly flocks?: readonly FlockScope[] | undefined;
+  /** Accepted and ignored: a plan names its animals, not the place. */
   readonly propertyId?: Ulid | undefined;
 }): HerdDemand {
   const feedById = new Map(input.feeds.map((feed) => [feed.id, feed]));
+  const { onFarm, flockHeads } = context(input.animals, input.flocks);
   const perDay = new Map<Ulid, number>();
   const unconvertible = new Set<Ulid>();
-  /**
-   * Shared bowls already counted.
-   *
-   * The counterweight to "it counts heads": a shared ration is one amount for
-   * everybody on it, so the second cat must not put another cup a day on the
-   * barn. Counted once, on whichever animal reaches it first.
-   */
-  const countedShared = new Set<string>();
 
-  for (const animal of input.animals) {
-    const groups =
-      input.propertyId === undefined
-        ? (animal.groupIds ?? [])
-        : [input.propertyId, ...(animal.groupIds ?? [])];
-
-    for (const [feedTypeId, ration] of resolvedRationFor(
-      input.plans,
-      animal.id,
-      animal.zoneIds,
-      groups,
-    )) {
-      const { quantity } = ration;
-      if (ration.shared) {
-        const key = sharedKey(ration.planId, feedTypeId);
-        if (countedShared.has(key)) continue;
-        countedShared.add(key);
-      }
-
+  for (const plan of input.plans) {
+    const heads = headsOf(plan, onFarm, flockHeads);
+    for (const [feedTypeId, quantity] of dailyDemandOf(plan, heads)) {
       const feed = feedById.get(feedTypeId);
-      // A ration for a feed no longer in the catalogue is taken at face value:
-      // there is nothing to convert to, and dropping it would understate a
-      // barn that is genuinely being emptied.
       const counted =
         feed === undefined ? quantity.amount : inFeedUnit(feed, quantity.amount, quantity.unit);
 
@@ -234,17 +121,10 @@ export function herdDemand(input: {
 }
 
 /**
- * Split the feed bill across the animals it fed.
+ * Each animal's share of the feed bill over `days`.
  *
- * A per-head ration needs no division: four head on one zone plan each resolve
- * to the same per-head quantity, and each is charged for what it ate.
- *
- * A shared ration is the case that does. One bowl between two cats is one
- * amount, and each cat carries half of it — so the shares add back up to the
- * bowl rather than to twice the bowl. The divisor is how many of the animals
- * *in scope* actually resolve that plan, not how many the plan names: sell one
- * cat and the survivor picks up the whole bowl, which is what is really
- * happening in the barn.
+ * Flocks are fed but not allocated: a hen has no P&L of her own, and the
+ * flock's eggs are where its feed is accounted for.
  */
 export function allocateFeedCost(input: AllocationInput): AnimalAllocation[] {
   const costCache = new Map<Ulid, FeedCost>();
@@ -258,61 +138,36 @@ export function allocateFeedCost(input: AllocationInput): AnimalAllocation[] {
   };
 
   const feedById = new Map((input.feeds ?? []).map((feed) => [feed.id, feed]));
+  const { onFarm, flockHeads } = context(input.animals, input.flocks);
 
-  const groupsOf = (animal: DemandScope) =>
-    input.propertyId === undefined
-      ? (animal.groupIds ?? [])
-      : [input.propertyId, ...(animal.groupIds ?? [])];
-
-  // Resolved once, up front, because the divisor for a shared bowl is a fact
-  // about the whole set: how many of these animals are eating out of it.
-  const resolved = input.animals.map((animal) => ({
-    animal,
-    rations: resolvedRationFor(input.plans, animal.id, animal.zoneIds, groupsOf(animal)),
-  }));
-
-  const heads = new Map<string, number>();
-  for (const { rations } of resolved) {
-    for (const [feedTypeId, ration] of rations) {
-      if (!ration.shared) continue;
-      const key = sharedKey(ration.planId, feedTypeId);
-      heads.set(key, (heads.get(key) ?? 0) + 1);
-    }
-  }
-
-  return resolved.map(({ animal, rations }) => {
+  return input.animals.map((animal) => {
     const quantityByFeedType = new Map<Ulid, number>();
     let cents = 0;
     let complete = true;
 
-    for (const [feedTypeId, resolvedRation] of rations) {
-      const { quantity: ration } = resolvedRation;
-      const feed = feedById.get(feedTypeId);
-      // Priced per purchase unit, so the ration has to be in purchase units
-      // before it is multiplied by anything.
-      const whole =
-        feed === undefined ? ration.amount : inFeedUnit(feed, ration.amount, ration.unit);
-      // Never zero — this animal is one of the heads that was counted.
-      const share = resolvedRation.shared
-        ? (heads.get(sharedKey(resolvedRation.planId, feedTypeId)) ?? 1)
-        : 1;
-      const daily = whole === undefined ? undefined : whole / share;
-      if (daily === undefined) {
-        // No honest quantity means no honest cost, and a bill that quietly
-        // leaves an animal's grain out is one somebody gets invoiced under.
-        complete = false;
-        continue;
+    for (const plan of plansForAnimal(input.plans, animal.id)) {
+      const heads = headsOf(plan, onFarm, flockHeads);
+      if (heads === 0) continue;
+      // One head's worth: the plan's demand for one animal, or the total
+      // divided by everybody sharing it.
+      for (const [feedTypeId, ration] of dailyDemandOf(plan, 1)) {
+        const feed = feedById.get(feedTypeId);
+        const whole =
+          feed === undefined ? ration.amount : inFeedUnit(feed, ration.amount, ration.unit);
+        if (whole === undefined) {
+          complete = false;
+          continue;
+        }
+
+        const daily = isTotal(plan) ? whole / heads : whole;
+        const quantity = daily * input.days;
+        quantityByFeedType.set(feedTypeId, (quantityByFeedType.get(feedTypeId) ?? 0) + quantity);
+
+        const { average, complete: priced } = costOf(feedTypeId);
+        if (!priced) complete = false;
+        if (average === undefined) continue;
+        cents += average.cents * quantity;
       }
-
-      const quantity = daily * input.days;
-      quantityByFeedType.set(feedTypeId, quantity);
-
-      // A load with no price leaves the figure incomplete but not empty: the
-      // loads that were priced still say what this feed costs.
-      const { average, complete: priced } = costOf(feedTypeId);
-      if (!priced) complete = false;
-      if (average === undefined) continue;
-      cents += average.cents * quantity;
     }
 
     return {
@@ -324,14 +179,13 @@ export function allocateFeedCost(input: AllocationInput): AnimalAllocation[] {
   });
 }
 
-/** The herd's feed bill averaged over the head it fed — §6's "cost per head". */
+/** Average cost per animal across an allocation. */
 export function costPerHead(allocations: readonly AnimalAllocation[]): Money {
   if (allocations.length === 0) return { cents: 0 };
   const total = allocations.reduce((sum, allocation) => sum + allocation.cost.cents, 0);
   return { cents: Math.round(total / allocations.length) };
 }
 
-/** One animal's share, for the P&L that asks for it by id. */
 export function allocationFor(
   allocations: readonly AnimalAllocation[],
   animalId: Ulid,

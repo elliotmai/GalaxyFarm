@@ -58,10 +58,10 @@ const plan = (overrides: Partial<FeedingPlan>): FeedingPlan =>
     createdAt: on(1),
     updatedAt: on(1),
     name: "Rusty's ration",
-    target: "animal",
-    targetId: RUSTY,
-    alsoFeeds: [],
-    portion: "per_head",
+    species: "dog",
+    animalIds: [RUSTY],
+    flockIds: [],
+    portion: "each",
     lines: [line({})],
     active: true,
     ...overrides,
@@ -94,7 +94,7 @@ describe("feedingLinesFor", () => {
       RUSTY,
       [
         plan({ lines: [line({}), line({ timeOfDay: "evening" })] }),
-        plan({ id: id(31), targetId: BISCUIT }),
+        plan({ id: id(31), animalIds: [BISCUIT] }),
       ],
       feeds,
     );
@@ -107,8 +107,19 @@ describe("feedingLinesFor", () => {
     expect(feedingLinesFor(RUSTY, [plan({ active: false })], feeds)).toEqual([]);
   });
 
-  it("leaves out a plan aimed at a zone, which is not this pet's", () => {
-    expect(feedingLinesFor(RUSTY, [plan({ target: "zone", targetId: RUSTY })], feeds)).toEqual([]);
+  it("leaves out a plan that does not name this pet", () => {
+    expect(feedingLinesFor(RUSTY, [plan({ animalIds: [BISCUIT] })], feeds)).toEqual([]);
+  });
+
+  it("says where the pet is fed, once", () => {
+    const lines = feedingLinesFor(
+      RUSTY,
+      [plan({ placeLabel: "Kitchen", lines: [line({}), line({ timeOfDay: "evening" })] })],
+      feeds,
+    );
+
+    expect(lines[0]).toMatch(/\(Kitchen\)$/);
+    expect(lines[1]).not.toContain("Kitchen");
   });
 });
 
@@ -193,12 +204,11 @@ describe("a bowl two pets share", () => {
   const bowl = plan({
     id: id(32),
     name: "The barn cats",
-    targetId: RUSTY,
-    alsoFeeds: [BISCUIT],
-    portion: "shared",
+    animalIds: [RUSTY, BISCUIT],
+    portion: "total",
   });
 
-  it("shows on both their cards, not just the one it is filed under", () => {
+  it("shows on both their cards", () => {
     expect(plansFeeding(RUSTY, [bowl])).toHaveLength(1);
     expect(plansFeeding(BISCUIT, [bowl])).toHaveLength(1);
     expect(plansFeeding(id(9), [bowl])).toEqual([]);
@@ -216,7 +226,7 @@ describe("a bowl two pets share", () => {
   });
 
   it("says nothing about sharing when the amount is each", () => {
-    const each = plan({ id: id(33), alsoFeeds: [BISCUIT], portion: "per_head" });
+    const each = plan({ id: id(33), animalIds: [RUSTY, BISCUIT], portion: "each" });
 
     expect(feedingLinesFor(RUSTY, [each], feeds, pets)[0]).not.toContain("between");
   });
@@ -228,12 +238,12 @@ describe("a bowl two pets share", () => {
     );
   });
 
-  it("reads a plan written before the fields existed", () => {
-    const old = { ...plan({}) };
-    delete (old as { alsoFeeds?: unknown }).alsoFeeds;
-    delete (old as { portion?: unknown }).portion;
+  it("reads a record from before plans owned their animals as feeding nobody", () => {
+    // A device that has not pulled since the change holds the old shape for a
+    // moment; it must read as nothing rather than take the page down.
+    const old = { ...plan({}) } as Record<string, unknown>;
+    delete old["animalIds"];
 
-    expect(plansFeeding(RUSTY, [old])).toHaveLength(1);
-    expect(feedingLinesFor(RUSTY, [old], feeds, pets)[0]).not.toContain("between");
+    expect(plansFeeding(RUSTY, [old as unknown as FeedingPlan])).toEqual([]);
   });
 });

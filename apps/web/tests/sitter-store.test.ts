@@ -474,9 +474,9 @@ describe("ticking a feeding trip", () => {
     repositoryFor<FeedingPlan>(db, "feedingPlans").save({
       ...base(id(60)),
       name: "Senior ration",
-      target: "animal",
-      targetId: FED,
-      alsoFeeds: [],
+      species: "cattle",
+      animalIds: [FED],
+      flockIds: [],
       lines: [
         {
           feedTypeId: id(62),
@@ -485,12 +485,13 @@ describe("ticking a feeding trip", () => {
           timeOfDay: "morning",
         },
       ],
-      portion: "per_head",
+      portion: "each",
       active: true,
       ...overrides,
     } as FeedingPlan);
 
-  const KEY = () => feedingChoreId({ target: "animal", targetId: FED, timeOfDay: "morning" }, NOW);
+  const KEY = () =>
+    feedingChoreId({ place: { kind: "plan", planId: id(60) }, timeOfDay: "morning" }, NOW);
 
   it("writes the row already complete, carrying the occurrence's own key", async () => {
     // The key is what keeps the occurrence from reappearing beside the row it

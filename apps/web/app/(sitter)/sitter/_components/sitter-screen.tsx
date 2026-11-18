@@ -397,6 +397,9 @@ export function SitterScreen({
                     {plan.who}
                     <span className="font-body text-sm font-normal text-muted"> · {plan.name}</span>
                   </h3>
+                  {plan.where === undefined ? null : (
+                    <p className="text-sm text-muted">Fed at {plan.where}</p>
+                  )}
                   {plan.portion === undefined ? null : (
                     <p className="text-sm text-muted">{plan.portion}</p>
                   )}
@@ -429,7 +432,7 @@ export function SitterScreen({
                     <p className="whitespace-pre-wrap text-sm text-ink">{pet.instructions}</p>
                   )}
                   {pet.feeding.length === 0 ? (
-                    <p className="text-sm text-danger">No ration written down — ask first.</p>
+                    <p className="text-sm text-danger">No feeding plan written down — ask first.</p>
                   ) : (
                     <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink">
                       {pet.feeding.map((line) => (
