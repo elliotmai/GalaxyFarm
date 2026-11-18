@@ -32,7 +32,10 @@ import { TIME_OF_DAY_LABELS, timeOfDayDeadline, type ChoreEntry } from "./task.j
  *
  * A trip is keyed by the plan's place: its zone, or its place in words, so the
  * dog and both cats fed in the kitchen at night are one stop. A plan that says
- * nowhere is its own trip, titled by its name. Every species, deliberately —
+ * nowhere is its own trip. Every trip is titled by its plans' names — what
+ * somebody called the ration is how they look for it on the list — and the
+ * place rides along as the row's pen, or at the head of the detail. Every
+ * species, deliberately —
  * the flock and the gecko are fed by somebody walking round in the morning too.
  */
 
@@ -164,13 +167,12 @@ export function feedingOccurrences(
 ): ChoreEntry[] {
   return feedingTripsForDay(plans, date).map((trip): ChoreEntry => {
     const dueAt = timeOfDayDeadline(date, trip.timeOfDay);
-    const detail = trip.lines.map(({ line, plan }) => text.line(line, plan)).join(" · ");
-    const where =
-      trip.place.kind === "zone"
-        ? text.zone(trip.place.zoneId)
-        : trip.place.kind === "place"
-          ? trip.place.label
-          : planNames(trip);
+    // A zone shows in the row's own "where"; a place in words has no column,
+    // so it leads the detail instead.
+    const detail = [
+      ...(trip.place.kind === "place" ? [trip.place.label] : []),
+      ...trip.lines.map(({ line, plan }) => text.line(line, plan)),
+    ].join(" · ");
     // A trip that feeds exactly one animal points at it, so the row can open
     // its page; a trip for several, or for a flock, points at nobody.
     const fed = new Set(trip.lines.flatMap(({ plan }) => [...(plan.animalIds ?? [])]));
@@ -179,7 +181,7 @@ export function feedingOccurrences(
 
     return {
       id: feedingChoreId(trip, date),
-      title: `${TIME_OF_DAY_LABELS[trip.timeOfDay]} feed · ${where}`,
+      title: `${TIME_OF_DAY_LABELS[trip.timeOfDay]} feed · ${planNames(trip)}`,
       ...(detail === "" ? {} : { detail }),
       dueAt,
       ...(trip.place.kind === "zone" ? { zoneId: trip.place.zoneId } : {}),

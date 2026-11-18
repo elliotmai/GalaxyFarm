@@ -200,7 +200,7 @@ describe("today's chores", () => {
       },
       {
         id: `feeding:zone:${NORTH}:morning:2026-11-16`,
-        title: "Morning feed · North Trap",
+        title: "Morning feed · North ration",
         detail: "40 lb Coastal hay",
         slot: "morning",
         done: false,
@@ -240,7 +240,7 @@ describe("resolving a chore id", () => {
     completedAt: new Date("2026-11-16T15:00:00Z"),
   });
   const fedRow = task("01ARZ3NDEKTSV4RRFFQ69G5FK8", {
-    title: "Morning feed · North Trap",
+    title: "Morning feed · North ration",
     sourceKey: `feeding:zone:${NORTH}:morning:2026-11-16`,
     dueAt: new Date("2026-11-16T17:00:59Z"),
     completedAt: new Date("2026-11-16T15:00:00Z"),

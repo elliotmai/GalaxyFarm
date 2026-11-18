@@ -75,10 +75,11 @@ const line = (fields: Partial<FeedingPlanLine> = {}): FeedingPlanLine => ({
 });
 
 describe("wording a trip", () => {
-  it("names the pen and everything that goes to it", () => {
+  it("names the ration, and everything that goes to the pen", () => {
     const [entry] = feedingChoresFor(
       [
         plan({
+          name: "Herd ration",
           lines: [line(), line({ feedTypeId: PELLETS, amount: { amount: 3, unit: "scoop" } })],
         }),
       ],
@@ -87,7 +88,8 @@ describe("wording a trip", () => {
       NOW,
     );
 
-    expect(entry?.title).toBe("Morning feed · North Trap");
+    expect(entry?.title).toBe("Morning feed · Herd ration");
+    expect(entry?.zoneId).toBe(NORTH);
     expect(entry?.detail).toBe("40 lb Coastal hay · 3 scoops Senior pellets");
   });
 
@@ -163,15 +165,23 @@ describe("wording a trip", () => {
     expect(entry?.detail).toBe("40 lb Coastal hay (twice a day)");
   });
 
-  it("calls a place in words what it is called", () => {
+  it("leads the detail with a place in words, since it has no pen to show", () => {
     const [entry] = feedingChoresFor(
-      [plan({ placeZoneId: undefined, placeLabel: "Back porch", lines: [line()] })],
+      [
+        plan({
+          name: "Dog food",
+          placeZoneId: undefined,
+          placeLabel: "Back porch",
+          lines: [line()],
+        }),
+      ],
       TEXT,
       DATE,
       NOW,
     );
 
-    expect(entry?.title).toBe("Morning feed · Back porch");
+    expect(entry?.title).toBe("Morning feed · Dog food");
+    expect(entry?.detail).toMatch(/^Back porch · /);
   });
 
   it("says something rather than crashing on a feed nobody named", () => {
@@ -203,7 +213,12 @@ describe("ticking one", () => {
   }
 
   const occurrence = (): ChoreEntry =>
-    feedingChoresFor([plan({ lines: [line()] })], TEXT, DATE, NOW)[0] as ChoreEntry;
+    feedingChoresFor(
+      [plan({ name: "Herd ration", lines: [line()] })],
+      TEXT,
+      DATE,
+      NOW,
+    )[0] as ChoreEntry;
 
   it("writes a real row, already complete", () => {
     // One patch rather than two: an empty row followed by an update leaves a
@@ -216,7 +231,7 @@ describe("ticking one", () => {
       expect(created).toHaveLength(1);
       expect(created[0]).toMatchObject({
         sourceKey: entry.id,
-        title: "Morning feed · North Trap",
+        title: "Morning feed · Herd ration",
         detail: "40 lb Coastal hay",
         zoneId: NORTH,
         completedAt: NOW,

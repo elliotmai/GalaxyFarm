@@ -24,6 +24,12 @@ import {
  * make somebody scroll to find, so it now covers the page, traps its own
  * scroll, and sits above everything else.
  *
+ * "Above everything" means the platform top layer, through `showModal()`. It
+ * was a div at `z-index: 50`, and an editor is a `<dialog>` in the top layer —
+ * which no z-index reaches — so a delete asked from inside an editor opened
+ * behind it, on a page the editor had made inert. Two modal dialogs stack in
+ * the order they were opened, so this one now lands on top of whatever asked.
+ *
  * The panel is bottom-anchored on a phone and centred on a laptop. A dialog in
  * the middle of a tall phone screen puts its buttons where a thumb has to
  * stretch, and the buttons here are the whole point of it.
@@ -43,15 +49,30 @@ export function ConfirmDialog({ request, onConfirm, onCancel }: ConfirmDialogPro
   const [typed, setTyped] = useState("");
   const [pinEntry, setPinEntry] = useState("");
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
 
-  // Focus lands on Cancel, not Confirm. A stray Enter should do nothing.
   useEffect(() => {
+    const element = dialog.current;
+    if (element !== null && !element.open) element.showModal();
+    // Focus lands on Cancel, not Confirm. A stray Enter should do nothing.
     cancelRef.current?.focus();
   }, []);
+
+  // Escape fires `cancel` on the dialog; the default would close it without
+  // telling the caller. Stopped here so an editor underneath stays open.
+  const handleCancel = useCallback(
+    (event: React.SyntheticEvent<HTMLDialogElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onCancel();
+    },
+    [onCancel],
+  );
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       if (event.key === "Escape") {
+        event.preventDefault();
         event.stopPropagation();
         onCancel();
       }
@@ -69,18 +90,17 @@ export function ConfirmDialog({ request, onConfirm, onCancel }: ConfirmDialogPro
   const summary = dependentSummary(request.dependents);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto overscroll-contain bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-density"
+    <dialog
+      ref={dialog}
+      onCancel={handleCancel}
       onKeyDown={handleKeyDown}
+      aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+      data-tier={request.tier}
+      className="m-0 h-dvh max-h-none w-full max-w-none items-end justify-center overflow-y-auto overscroll-contain border-0 bg-transparent p-0 open:flex backdrop:bg-black/60 backdrop:backdrop-blur-sm sm:items-center sm:p-density"
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-        data-tier={request.tier}
-        className="flex max-h-[90dvh] w-full max-w-lg flex-col gap-density overflow-y-auto rounded-t-density border border-edge bg-panel p-density text-ink shadow-overlay sm:rounded-density"
-      >
+      <div className="flex max-h-[90dvh] w-full max-w-lg flex-col gap-density overflow-y-auto rounded-t-density border border-edge bg-panel p-density text-ink shadow-overlay sm:rounded-density">
         <h2 id={titleId}>{confirmTitle(request)}</h2>
 
         <div id={descriptionId} className="flex flex-col gap-3 text-density">
@@ -171,6 +191,6 @@ export function ConfirmDialog({ request, onConfirm, onCancel }: ConfirmDialogPro
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

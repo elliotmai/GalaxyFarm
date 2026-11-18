@@ -156,15 +156,22 @@ describe("which days a line lands on", () => {
 });
 
 describe("the entry it becomes", () => {
-  it("says when and where in the title, and what to carry in the detail", () => {
+  it("says when and which ration in the title, and what to carry in the detail", () => {
     const [entry] = feedingOccurrences(
-      [plan({ lines: [line(), line({ feedTypeId: GRAIN, amount: { amount: 12, unit: "lb" } })] })],
+      [
+        plan({
+          name: "Herd ration",
+          lines: [line(), line({ feedTypeId: GRAIN, amount: { amount: 12, unit: "lb" } })],
+        }),
+      ],
       NAMES,
       DATE,
       NOW,
     );
 
-    expect(entry?.title).toBe("Morning feed · North Trap");
+    // Named for the plan, not the pen: the pen is the row's zone.
+    expect(entry?.title).toBe("Morning feed · Herd ration");
+    expect(entry?.zoneId).toBe(NORTH);
     expect(entry?.detail).toBe("40 lb hay · 12 lb grain");
   });
 
@@ -319,16 +326,21 @@ describe("merging into the day sheet", () => {
       propertyId: PROPERTY,
       createdAt: DATE,
       updatedAt: DATE,
-      title: "Morning feed · North Trap",
+      title: "Morning feed · Herd ration",
       dueAt: new Date("2026-09-02T11:00:59.999"),
       ...fields,
     }) as Task;
 
   it("shows a feeding chore beside the written-down ones", () => {
-    const derived = feedingOccurrences([plan({ lines: [line()] })], NAMES, DATE, NOW);
+    const derived = feedingOccurrences(
+      [plan({ name: "Herd ration", lines: [line()] })],
+      NAMES,
+      DATE,
+      NOW,
+    );
     const sheet = choreDaySheet({ tasks: [], templates: [], derived }, DATE, NOW);
 
-    expect(sheet.map((entry) => entry.title)).toContain("Morning feed · North Trap");
+    expect(sheet.map((entry) => entry.title)).toContain("Morning feed · Herd ration");
   });
 
   it("drops the occurrence once somebody has ticked it", () => {
