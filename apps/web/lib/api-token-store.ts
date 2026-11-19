@@ -24,6 +24,12 @@ export interface ApiToken {
   readonly createdBy: Ulid;
   readonly lastUsedAt?: Date | undefined;
   readonly revokedAt?: Date | undefined;
+  /**
+   * Set when the caller is a person signed in to Hive rather than a minted
+   * token (see \`lib/hive-pass.ts\`): then \`id\` and \`createdBy\` are that
+   * person's user id, and there is no \`api_tokens\` row behind it.
+   */
+  readonly via?: "hive" | undefined;
 }
 
 function tokenFromRow(row: typeof apiTokens.$inferSelect): ApiToken {
@@ -45,8 +51,8 @@ function tokenFromRow(row: typeof apiTokens.$inferSelect): ApiToken {
  * audit names the app — and the row behind the id names it in words — rather
  * than borrowing the owner who minted the token.
  */
-export function apiTokenDeviceId(token: Pick<ApiToken, "id">): string {
-  return `app:${token.id}`;
+export function apiTokenDeviceId(token: Pick<ApiToken, "id" | "via">): string {
+  return token.via === "hive" ? `hive:${token.id}` : `app:${token.id}`;
 }
 
 export async function listApiTokens(

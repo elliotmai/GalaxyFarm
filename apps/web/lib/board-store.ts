@@ -1,6 +1,8 @@
-import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
+import { and, eq, isNull } from "drizzle-orm";
+
+import { canSignIn, FALLBACK_FARM_NAME, type Ulid } from "@galaxy-farm/core";
 import { bearerToken } from "@galaxy-farm/infra-auth";
-import type { Database } from "@galaxy-farm/infra-db";
+import { users, type Database } from "@galaxy-farm/infra-db";
 
 import { apiTokenDeviceId, authenticateApiToken, type ApiToken } from "@/lib/api-token-store";
 import {
@@ -15,6 +17,7 @@ import {
   type BoardResponse,
 } from "@/lib/board-api";
 import { database } from "@/lib/credential-store";
+import { verifyHivePass } from "@/lib/hive-pass";
 import { sitterView, tickChore } from "@/lib/sitter-store";
 import { propertyFor } from "@/lib/weather-service";
 
@@ -31,17 +34,78 @@ import { propertyFor } from "@/lib/weather-service";
  * change stamp every device's next pull checks.
  */
 
+/** Who a Hive pass may act as: just what the board needs to know. */
+export interface HiveBoardUser {
+  readonly id: string;
+  readonly propertyId: string;
+  readonly role: string;
+  readonly active: boolean;
+  readonly hasPassword: boolean;
+  readonly accessFrom?: Date | undefined;
+  readonly accessTo?: Date | undefined;
+}
+
+/** The account with this email, if any — tombstones excluded. */
+export async function hiveBoardUser(email: string, db: Database = database()): Promise<HiveBoardUser | undefined> {
+  const [row] = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.email, email.trim().toLowerCase()), isNull(users.deletedAt)))
+    .limit(1);
+  if (row === undefined) return undefined;
+  return {
+    id: row.id,
+    propertyId: row.propertyId,
+    role: row.role,
+    active: row.active,
+    hasPassword: row.passwordHash !== null && row.passwordHash !== "",
+    ...(row.accessFrom === null ? {} : { accessFrom: row.accessFrom }),
+    ...(row.accessTo === null ? {} : { accessTo: row.accessTo }),
+  };
+}
+
 /**
- * The live token a request carries, or undefined.
+ * May this person read the board and tick chores? Anyone who could sign in
+ * and would see the kiosk's chores: owners and members, and a housesitter
+ * inside their access window. Customers and kiosk accounts may not.
+ */
+export function hiveUserMayUseBoard(user: HiveBoardUser, now: Date): boolean {
+  if (!canSignIn({ active: user.active, hasPassword: user.hasPassword }, now)) return false;
+  if (user.role === "owner" || user.role === "member") return true;
+  if (user.role !== "housesitter") return false;
+  return (user.accessFrom === undefined || user.accessFrom <= now) && (user.accessTo === undefined || now <= user.accessTo);
+}
+
+/**
+ * The caller a request carries, or undefined.
  *
- * `lookup` is injectable so the check itself is testable without Postgres;
- * in the app it is `authenticateApiToken`.
+ *   `Authorization: Bearer <token>`  a connected-app token (`lookup`)
+ *   `Authorization: Hive <pass>`     a person signed in to Hive, found by the
+ *                                    confirmed email on the pass (`findUser`)
+ *
+ * Both are injectable so the check itself is testable without Postgres.
  */
 export async function authorizeBoardRequest(
   header: string | null,
   now: Date,
   lookup: (token: string, now: Date) => Promise<ApiToken | undefined> = authenticateApiToken,
+  findUser: (email: string) => Promise<HiveBoardUser | undefined> = hiveBoardUser,
 ): Promise<ApiToken | undefined> {
+  const hive = /^Hive\s+(\S+)$/i.exec(header ?? "");
+  if (hive !== null) {
+    const claims = verifyHivePass(hive[1] ?? "", now);
+    if (claims === undefined || claims.email === null || !claims.email_verified) return undefined;
+    const user = await findUser(claims.email);
+    if (user === undefined || !hiveUserMayUseBoard(user, now)) return undefined;
+    return {
+      id: user.id as Ulid,
+      propertyId: user.propertyId as Ulid,
+      label: "Hive",
+      createdAt: now,
+      createdBy: user.id as Ulid,
+      via: "hive",
+    };
+  }
   const token = bearerToken(header);
   if (token === undefined) return undefined;
   return lookup(token, now);
