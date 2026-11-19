@@ -11,6 +11,7 @@ import { ThemeSync } from "@/app/(admin)/_components/theme-sync";
 import { APPEARANCE_BOOT_SCRIPT } from "@/lib/appearance";
 import { Refreshable } from "@/app/(admin)/_components/refreshable";
 import { SectionStrip } from "@/app/(admin)/_components/section-strip";
+import { OpenInAppHint } from "@/app/_components/open-in-app-hint";
 import { PwaShell } from "@/app/_components/pwa-shell";
 import { SyncProvider } from "@/app/_components/sync-provider";
 import { currentActor } from "@/lib/auth";
@@ -90,6 +91,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                   add button above it and the home-indicator inset, so the last
                   row of a list scrolls clear of both rather than under them. */}
                   <main className="min-w-0 flex-1 px-3 pb-[calc(9rem+env(safe-area-inset-bottom))] pt-density md:p-density md:pb-density">
+                    <OpenInAppHint />
                     <Refreshable>
                       {/*
                     In the layout rather than in each screen, so a page cannot

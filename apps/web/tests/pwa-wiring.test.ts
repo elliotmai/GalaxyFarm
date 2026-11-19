@@ -126,6 +126,29 @@ describe("the web app manifest still describes something installable", () => {
       }
     }
   });
+
+  it("claims its own links, so a shared one opens the installed app where the phone allows", () => {
+    const manifest = JSON.parse(readText("apps/web/public/manifest.json")) as {
+      id: string;
+      scope: string;
+      start_url: string;
+      handle_links: string;
+      launch_handler: { client_mode: string[] };
+    };
+    // The id is the start URL Chrome already derived, so no install becomes
+    // a second app.
+    expect(manifest.id).toBe(manifest.start_url);
+    expect(manifest.scope).toBe("/");
+    expect(manifest.handle_links).toBe("preferred");
+    // Into the window already open, not a stack of them.
+    expect(manifest.launch_handler.client_mode[0]).toBe("navigate-existing");
+  });
+
+  it("carries a signed-out visitor's tabs through sign-in, not just the page", () => {
+    expect(readText("apps/web/middleware.ts")).toContain(
+      "`${request.nextUrl.pathname}${request.nextUrl.search}`",
+    );
+  });
 });
 
 describe("the worker can receive a notification (§6, issue #41)", () => {

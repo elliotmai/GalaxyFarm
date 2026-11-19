@@ -1,10 +1,15 @@
 {
+  "id": "/admin",
   "name": "Flying Double M",
   "short_name": "Flying Double M",
   "description": "Local-first herd, homestead, and show-program management.",
   "start_url": "/admin",
   "scope": "/",
   "display": "standalone",
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  },
+  "handle_links": "preferred",
   "orientation": "portrait-primary",
   "background_color": "#F5F6F8",
   "theme_color": "#F5F6F8",

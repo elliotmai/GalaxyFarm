@@ -4,6 +4,7 @@ import { AuthShell } from "@/app/(public)/_components/public-shell";
 
 import { LoginForm } from "./login-form";
 import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
+import { OpenInAppHint } from "@/app/_components/open-in-app-hint";
 
 export const metadata = { title: "Sign In" };
 
@@ -61,6 +62,9 @@ export default async function LoginPage({
 
   return (
     <AuthShell farmName={farmName} footer="No public sign-up — the farm creates accounts.">
+      {/* On an iPhone a shared link lands here, in Safari, signed out: Safari
+          and the home-screen app do not share a sign-in. Say where to go. */}
+      <OpenInAppHint link={next} />
       <LoginForm next={next} />
     </AuthShell>
   );

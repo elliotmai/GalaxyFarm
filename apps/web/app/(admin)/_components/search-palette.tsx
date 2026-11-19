@@ -23,6 +23,7 @@ import { animalHref, horseHref, petHref } from "@/lib/animal-slug";
 import { flockHref } from "@/lib/flock-slug";
 import { useRecords } from "@/lib/local/use-records";
 import type { LocalStoreName } from "@/lib/local/store";
+import { appPathFromLink } from "@/lib/share";
 
 /**
  * One box for the whole farm (spec §7, §8 v0.9).
@@ -253,6 +254,16 @@ function SearchPalette({
     { label: "Pages", hits: pages },
   ].filter((group) => group.hits.length > 0);
 
+  // A shared link pasted in — the way across from Safari on an iPhone, where
+  // links never reach the installed app — opens the screen it points at.
+  const linked = appPathFromLink(text);
+  if (linked !== undefined) {
+    groups.unshift({
+      label: "Shared link",
+      hits: [{ key: linked, href: linked, title: "Open the shared screen", line: linked }],
+    });
+  }
+
   const first = groups[0]?.hits[0];
 
   return (
@@ -279,7 +290,7 @@ function SearchPalette({
           autoComplete="off"
           value={text}
           onChange={(event) => setText(event.target.value)}
-          placeholder="Animals, people, kit, pages…"
+          placeholder="Animals, people, kit, pages, or paste a link…"
           className="h-12 w-full rounded-density border-2 border-action bg-panel px-4 text-density text-ink outline-none"
         />
       </form>
@@ -325,7 +336,7 @@ function SearchPalette({
         </div>
       )}
 
-      {words === "" ? null : (
+      {words === "" || linked !== undefined ? null : (
         <Link
           href={`/admin/cattle/catalog?text=${encodeURIComponent(words)}`}
           onClick={onClose}

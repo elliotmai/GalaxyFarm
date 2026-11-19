@@ -9,7 +9,16 @@ import {
   ShareProvider,
   useShareSummary,
 } from "@/app/(admin)/_components/share-button";
-import { MAX_SHARE_LINES, requestedTabs, shareMessage, shareText, shareUrl } from "@/lib/share";
+import { OpenInAppHint } from "@/app/_components/open-in-app-hint";
+import {
+  appPathFromLink,
+  isAppleMobile,
+  MAX_SHARE_LINES,
+  requestedTabs,
+  shareMessage,
+  shareText,
+  shareUrl,
+} from "@/lib/share";
 
 /** Sharing a screen with the household (spec §8). */
 
@@ -42,13 +51,13 @@ describe("the link back", () => {
 
   it("keeps the page and its query, and names the open tabs", () => {
     expect(shareUrl(here, ["catalog"])).toBe(
-      "https://farm.test/admin/garden/seeds?q=1&tab=catalog",
+      "https://farm.test/admin/garden/seeds?q=1&tab=catalog&shared=1",
     );
   });
 
   it("replaces tabs a link already carried rather than piling them up", () => {
     expect(shareUrl({ ...here, search: "?tab=box" }, ["catalog", "plan"])).toBe(
-      "https://farm.test/admin/garden/seeds?tab=catalog&tab=plan",
+      "https://farm.test/admin/garden/seeds?tab=catalog&tab=plan&shared=1",
     );
     expect(requestedTabs("?tab=catalog&tab=plan")).toEqual(["catalog", "plan"]);
   });
@@ -118,7 +127,7 @@ describe("the button", () => {
     expect(share).toHaveBeenCalledWith({
       title: "Feeding today",
       text: "Feeding today\n☐ Morning feed · Herd ration — 40 lb hay",
-      url: `${window.location.origin}/admin/feed?view=plan&tab=plan`,
+      url: `${window.location.origin}/admin/feed?view=plan&tab=plan&shared=1`,
     });
   });
 
@@ -143,7 +152,7 @@ describe("the button", () => {
     await userEvent.click(screen.getByRole("button", { name: "Share this screen" }));
 
     expect(writeText).toHaveBeenCalledWith(
-      `Feed\nHay, grain and what is left\n${window.location.origin}/admin/feed?view=plan&tab=plan`,
+      `Feed\nHay, grain and what is left\n${window.location.origin}/admin/feed?view=plan&tab=plan&shared=1`,
     );
     expect(await screen.findByText(/Copied/)).toBeInTheDocument();
   });
@@ -159,5 +168,65 @@ describe("the button", () => {
 
     expect(writeText).not.toHaveBeenCalled();
     expect(screen.queryByText(/Copied|Could not/)).not.toBeInTheDocument();
+  });
+});
+
+describe("getting a shared link into the installed app", () => {
+  it("reads the screen out of a pasted link, or the whole shared message", () => {
+    expect(appPathFromLink("https://farm.test/admin/feed?tab=plan&shared=1")).toBe(
+      "/admin/feed?tab=plan",
+    );
+    expect(
+      appPathFromLink(
+        "Feeding today\n☐ Morning feed\nhttps://farm.test/admin/feed?tab=today&shared=1.",
+      ),
+    ).toBe("/admin/feed?tab=today");
+    expect(appPathFromLink("/admin/garden/seeds")).toBe("/admin/garden/seeds");
+  });
+
+  it("only ever opens a screen of this app, whatever host the link names", () => {
+    expect(appPathFromLink("https://evil.test/admin/feed")).toBe("/admin/feed");
+    expect(appPathFromLink("https://farm.test/login")).toBeUndefined();
+    expect(appPathFromLink("Bessie")).toBeUndefined();
+    expect(appPathFromLink("https://farm.test/administrator")).toBeUndefined();
+  });
+
+  it("knows an iPhone, and an iPad that says it is a Mac", () => {
+    expect(
+      isAppleMobile({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)" }),
+    ).toBe(true);
+    expect(
+      isAppleMobile({
+        userAgent: "Mozilla/5.0 (Macintosh)",
+        platform: "MacIntel",
+        maxTouchPoints: 5,
+      }),
+    ).toBe(true);
+    expect(isAppleMobile({ userAgent: "Mozilla/5.0 (Linux; Android 15)" })).toBe(false);
+  });
+
+  it("says what to do in Safari on an iPhone, only for a shared link", async () => {
+    const ua = vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone)");
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+
+    window.history.replaceState(null, "", "/admin/feed?tab=plan&shared=1");
+    const { unmount } = render(<OpenInAppHint />);
+    expect(await screen.findByRole("note", { name: "Open in the app" })).toHaveTextContent(
+      /paste it into Search/,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Copy link" }));
+    expect(writeText).toHaveBeenCalledWith(
+      `${window.location.origin}/admin/feed?tab=plan&shared=1`,
+    );
+    unmount();
+
+    // Somebody just browsing the site is not asked about an app.
+    window.history.replaceState(null, "", "/admin/feed");
+    render(<OpenInAppHint />);
+    expect(screen.queryByRole("note", { name: "Open in the app" })).not.toBeInTheDocument();
+
+    ua.mockRestore();
+    window.history.replaceState(null, "", "/");
   });
 });

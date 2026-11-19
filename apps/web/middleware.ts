@@ -44,7 +44,8 @@ export default auth((request) => {
     // Carry where they were going, so getting a session lands them there
     // rather than on a dashboard they then navigate away from.
     const away = new URL(destination, request.nextUrl);
-    away.searchParams.set("next", request.nextUrl.pathname);
+    // The query too: a shared link's tabs (`?tab=`) are part of where.
+    away.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(away);
   }
 
