@@ -4,9 +4,13 @@ import { can, choreDaySheet, FALLBACK_FARM_NAME, startOfDay } from "@galaxy-farm
 
 import { SitterScreen } from "@/app/(sitter)/sitter/_components/sitter-screen";
 import { currentActor } from "@/lib/auth";
+import { DEFAULT_TIMEZONE } from "@/lib/board-api";
+import { database } from "@/lib/credential-store";
 import { withDeadline } from "@/lib/deadline";
+import { offWallClock, onWallClock, wallClock } from "@/lib/farm-time";
 import { peopleNames } from "@/lib/people-names";
-import { EMPTY_SITTER_VIEW, sitterView, sitterWeather } from "@/lib/sitter-store";
+import { requestTimeZone } from "@/lib/request-time-zone";
+import { EMPTY_SITTER_VIEW, farmTimeZone, sitterView, sitterWeather } from "@/lib/sitter-store";
 
 export const metadata = { title: "Care Guide" };
 
@@ -45,11 +49,27 @@ export default async function SitterPage() {
         view={EMPTY_SITTER_VIEW}
         chores={[]}
         day={now}
+        timeZone={(await requestTimeZone()) ?? DEFAULT_TIMEZONE}
         mayTick={false}
         closed={actor.accessWindow}
       />
     );
   }
+
+  /*
+   * The sitter's own clock, not the server's.
+   *
+   * This page is drawn on the server, which runs in UTC, so after about 6 p.m.
+   * in Texas `startOfDay(now)` was already tomorrow and the sitter was shown
+   * tomorrow's chores. The day is worked out on the device's wall clock (from
+   * its cookie, falling back to the property's zone) and every time is brought
+   * back to a real instant before it goes to the browser.
+   */
+  const timeZone =
+    (await requestTimeZone()) ??
+    (await farmTimeZone(database(), actor.propertyId).catch(() => undefined)) ??
+    DEFAULT_TIMEZONE;
+  const wallNow = wallClock(now, timeZone);
 
   // Started before the guide is read rather than after, so the two lookups
   // run side by side: on a database that is not answering, each waits out
@@ -58,7 +78,7 @@ export default async function SitterPage() {
   // The weather's chores and its say over weather templates — covers before a
   // freeze, not every night. Never rejects; with no forecast it keeps them.
   const weather = withDeadline(
-    sitterWeather(actor.propertyId, startOfDay(now), now),
+    sitterWeather(actor.propertyId, startOfDay(wallNow), wallNow),
     "the forecast",
   ).catch(() => ({ derived: [], weather: undefined, arrives: {} }));
 
@@ -77,24 +97,31 @@ export default async function SitterPage() {
   }
 
   const { derived, weather: forecastWeather, arrives } = await weather;
-  const chores = choreDaySheet(
-    {
-      tasks: view.tasks,
-      templates: view.templates,
-      derived,
-      weather: forecastWeather,
-      weatherArrives: arrives,
-    },
-    startOfDay(now),
-    now,
+  // The guide on the same wall clock as the day, so "current" medicines and
+  // pen assignments are judged against the sitter's today.
+  const local = onWallClock(view, timeZone);
+  const chores = offWallClock(
+    choreDaySheet(
+      {
+        tasks: local.tasks,
+        templates: local.templates,
+        derived,
+        weather: forecastWeather,
+        weatherArrives: onWallClock(arrives, timeZone),
+      },
+      startOfDay(wallNow),
+      wallNow,
+    ),
+    timeZone,
   );
 
   return (
     <SitterScreen
       farmName={farmName}
-      view={view}
+      view={local}
       chores={chores}
       day={now}
+      timeZone={timeZone}
       mayTick={can(actor, "chores.complete", now)}
       actorId={actor.id}
       // Unawaited: the guide streams without the names, and each "Done by"

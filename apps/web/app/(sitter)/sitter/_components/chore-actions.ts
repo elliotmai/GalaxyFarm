@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { can, isUlid, type Ulid } from "@galaxy-farm/core";
 
 import { currentActor } from "@/lib/auth";
+import { requestTimeZone } from "@/lib/request-time-zone";
 import { tickChore } from "@/lib/sitter-store";
 
 /**
@@ -91,6 +92,7 @@ export async function setChoreDone(input: SetChoreDoneInput): Promise<ChoreActio
     date,
     at: now,
     done: input.done,
+    timeZone: await requestTimeZone(),
   });
 
   if (!result.ok) return { ok: false, error: result.reason };

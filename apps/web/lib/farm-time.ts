@@ -96,6 +96,24 @@ export function onWallClock<T>(value: T, timeZone: string): T {
 }
 
 /**
+ * Every `Date` inside a value, brought back from the wall clock to a real
+ * instant. The inverse of `onWallClock`, for results computed on the wall
+ * clock that are about to go to a browser, which formats them in its own zone.
+ */
+export function offWallClock<T>(value: T, timeZone: string): T {
+  if (value instanceof Date) return fromWallClock(value, timeZone) as T;
+  if (Array.isArray(value)) return value.map((item) => offWallClock(item, timeZone)) as T;
+  if (value !== null && typeof value === "object") {
+    const prototype = Object.getPrototypeOf(value) as unknown;
+    if (prototype !== Object.prototype && prototype !== null) return value;
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, offWallClock(item, timeZone)]),
+    ) as T;
+  }
+  return value;
+}
+
+/**
  * The real instant at which a clock in `timeZone` reads the *local* fields of
  * `local` — the inverse of `wallClock`, for an instant the kernel produced on
  * the wall clock (a due time, say) that is about to be stored.

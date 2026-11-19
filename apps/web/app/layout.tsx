@@ -3,6 +3,8 @@ import localFont from "next/font/local";
 
 import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
 
+import { DeviceTimeZone } from "@/app/_components/device-time-zone";
+
 import "./globals.css";
 
 /**
@@ -126,7 +128,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`${sourceSerif.variable} ${plexSans.variable} ${barlowCondensed.variable} ${plexMono.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        {children}
+        <DeviceTimeZone />
+      </body>
     </html>
   );
 }
