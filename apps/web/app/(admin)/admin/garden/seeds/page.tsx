@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { SeedsScreen } from "@/app/(admin)/admin/garden/seeds/_components/seeds-screen";
 import { currentActor } from "@/lib/auth";
 
-export const metadata = { title: "Seed Inventory" };
+export const metadata = { title: "What to grow" };
 
 /**
  * The seed box, and the catalogue underneath it (§5.5, §7 `/admin/garden/seeds`).

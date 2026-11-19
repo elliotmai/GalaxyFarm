@@ -218,8 +218,8 @@ export const SUB_SECTIONS: Readonly<Record<string, readonly NavItem[]>> = {
   ],
   "/admin/garden/plantings": [
     { href: "/admin/garden/plantings", label: "Plantings" },
+    { href: "/admin/garden/seeds", label: "What to grow" },
     { href: "/admin/garden/layout", label: "Layout" },
-    { href: "/admin/garden/seeds", label: "Seeds" },
     { href: "/admin/garden/harvest", label: "Harvest" },
   ],
   "/admin/chickens/flock": [

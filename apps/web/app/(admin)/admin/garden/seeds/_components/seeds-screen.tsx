@@ -48,22 +48,26 @@ export function SeedsScreen({
   const { records: plantings } = useRecords<Planting>("plantings", query);
   const { records: planned } = useRecords<PlannedPlanting>("plannedPlantings", query);
 
-  const [tab, setTab] = useState("box");
+  // Ideas first: a garden starts as a list of what somebody would like to
+  // grow, long before there is a packet of anything.
+  const [tab, setTab] = useState("catalog");
 
   const now = new Date();
   const stale = seed.filter((entry) => isStaleSeed(entry, now));
   const withSeed = new Set(seed.map((entry) => entry.varietyId));
   // What four tiles used to say, as facts beside the title — kept short, so
   // a big seed box does not push the line past a fact into an explanation.
-  const facts = [
-    `${seed.length} in the box`,
-    `${withSeed.size} of ${varieties.length} varieties`,
-    `${crops.length} crop${crops.length === 1 ? "" : "s"}`,
-  ].join(" · ");
+  const facts =
+    varieties.length === 0
+      ? "Jot down anything you might grow — no seeds needed"
+      : [
+          `${varieties.length} idea${varieties.length === 1 ? "" : "s"}`,
+          withSeed.size === 0 ? "no seeds yet" : `seeds for ${withSeed.size}`,
+        ].join(" · ");
 
   return (
     <PageBody>
-      <PageHeader eyebrow="Farm" title="Seed" subtitle={facts} />
+      <PageHeader eyebrow="Garden" title="What to grow" subtitle={facts} />
 
       {/* The stale count earns its line everywhere but the box, which says
           it again with the packets beside it. */}
@@ -75,18 +79,18 @@ export function SeedsScreen({
             onClick={() => setTab("box")}
             className="inline-flex min-h-target items-center font-semibold text-action underline-offset-2 hover:underline"
           >
-            See the box
+            See the seeds
           </button>
         </StatusLine>
       )}
 
       <Tabs
-        label="Seed"
+        label="What to grow"
         activeTab={tab}
         onTabChange={setTab}
         tabs={[
-          { id: "box", label: "Seed box" },
-          { id: "catalog", label: "Plants" },
+          { id: "catalog", label: "Ideas" },
+          { id: "box", label: "Seeds I have" },
         ]}
       >
         {(active) =>

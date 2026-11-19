@@ -97,7 +97,7 @@ describe("Plan my garden", () => {
     );
     const list = within(dialog.getByRole("list", { name: "To grow" }));
     expect(list.getByRole("listitem", { name: "Jalapeño pepper" })).toHaveTextContent(
-      /added to Plants when saved/,
+      /added to your ideas when saved/,
     );
     // Started from seed indoors unless said otherwise.
     expect(
@@ -144,5 +144,29 @@ describe("Plan my garden", () => {
     expect(entries[0]).toMatchObject({ method: "indoor_start", planStatus: "open" });
     expect(entries.every((entry) => entry["bedId"] !== undefined)).toBe(true);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("starts with every idea on the list when opened from Plan these", () => {
+    render(
+      <ToastProvider>
+        <GardenPlanner
+          varieties={[CHEROKEE]}
+          crops={[TOMATO]}
+          beds={BEDS}
+          plantings={[]}
+          plans={[]}
+          planned={[]}
+          frostFor={frostFor}
+          propertyId={PROPERTY}
+          actorId={ACTOR}
+          onClose={vi.fn()}
+          now={NOW}
+          startWith={[CHEROKEE]}
+        />
+      </ToastProvider>,
+    );
+    const list = within(screen.getByRole("list", { name: "To grow" }));
+    expect(list.getByRole("listitem", { name: "Cherokee Purple" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next: which years" })).toBeEnabled();
   });
 });

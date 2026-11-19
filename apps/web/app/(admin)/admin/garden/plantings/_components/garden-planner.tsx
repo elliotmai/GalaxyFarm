@@ -132,6 +132,7 @@ export function GardenPlanner({
   propertyId,
   actorId,
   onClose,
+  startWith = [],
   now = new Date(),
 }: {
   readonly varieties: readonly Variety[];
@@ -144,6 +145,8 @@ export function GardenPlanner({
   readonly propertyId: Ulid;
   readonly actorId: Ulid;
   readonly onClose: () => void;
+  /** Ideas already on the list when it opens — "Plan these" from What to grow. */
+  readonly startWith?: readonly Variety[];
   readonly now?: Date;
 }) {
   const varietyApi = useMutations<Variety>(
@@ -174,7 +177,19 @@ export function GardenPlanner({
   const yearChoices = [start, start + 1, start + 2];
 
   const [step, setStep] = useState<"want" | "years" | "review">("want");
-  const [wishes, setWishes] = useState<Wish[]>([]);
+  const [wishes, setWishes] = useState<Wish[]>(() =>
+    startWith.map((variety) => {
+      const facts = factsOf({ varietyId: variety.id, name: variety.name });
+      return {
+        key: variety.id,
+        varietyId: variety.id,
+        name: variety.name,
+        count: String(suggestedCount(facts)),
+        start: startsFor(facts)[0] ?? "direct_sow",
+        fall: hasFallPlanting(facts, frostFor(start)),
+      };
+    }),
+  );
   const [query, setQuery] = useState("");
   const [years, setYears] = useState<number[]>([start]);
   /** Beds changed by hand on the review, by row key. */
@@ -457,7 +472,7 @@ export function GardenPlanner({
 
           {yours.length === 0 ? null : (
             <div className="flex flex-col gap-1">
-              <p className="gf-label m-0">From your plants</p>
+              <p className="gf-label m-0">From your ideas</p>
               <div className="flex flex-wrap gap-2">
                 {yours.map((variety) => (
                   <button
@@ -491,7 +506,7 @@ export function GardenPlanner({
                         <span className="font-medium text-ink">{wish.name}</span>
                         <span className="text-xs text-muted">
                           {wish.varietyId === undefined
-                            ? "New — added to Plants when saved"
+                            ? "New — added to your ideas when saved"
                             : varietyLabel(byId(varieties).get(wish.varietyId), crops)}
                         </span>
                       </div>

@@ -203,6 +203,10 @@ describe("seed", () => {
     const user = userEvent.setup();
     wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
 
+    // Ideas open first; the stale seed is said once there, a tap from the box.
+    expect(screen.getByRole("tab", { name: "Ideas" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(/1 worth a germination test/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "See the seeds" }));
     expect(screen.getByText(/1 worth a germination test/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Show them" }));
 
@@ -252,6 +256,7 @@ describe("optional amounts", () => {
     const user = userEvent.setup();
     wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
 
+    await user.click(screen.getByRole("tab", { name: "Seeds I have" }));
     await user.click(screen.getAllByRole("button", { name: /Add seed/ })[0] as HTMLElement);
     const dialog = within(await screen.findByRole("dialog"));
     await user.selectOptions(dialog.getByLabelText(/^Plant/), CHEROKEE.id);
@@ -292,17 +297,17 @@ describe("plants — one list, what it grows like worked out", () => {
 
   async function openNewPlant(user: ReturnType<typeof userEvent.setup>) {
     wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
-    await user.click(screen.getByRole("tab", { name: "Plants" }));
-    await user.click(screen.getAllByRole("button", { name: /Add plant/ })[0] as HTMLElement);
+    await user.click(screen.getByRole("tab", { name: "Ideas" }));
+    await user.click(screen.getAllByRole("button", { name: /Add idea/ })[0] as HTMLElement);
     return within(await screen.findByRole("dialog"));
   }
 
   it("lists plants once, with no separate crops to manage", async () => {
     const user = userEvent.setup();
     wrap(<SeedsScreen propertyId={PROPERTY} actorId={ACTOR} />);
-    await user.click(screen.getByRole("tab", { name: "Plants" }));
+    await user.click(screen.getByRole("tab", { name: "Ideas" }));
 
-    const list = within(screen.getByRole("list", { name: "Plants" }));
+    const list = within(screen.getByRole("list", { name: "Ideas" }));
     expect(list.getByRole("button", { name: "Edit Cherokee Purple" })).toBeInTheDocument();
     // The crop it is filed under is a word on its row, not a list of its own.
     expect(screen.queryByRole("button", { name: /Add crop/ })).not.toBeInTheDocument();
@@ -314,7 +319,7 @@ describe("plants — one list, what it grows like worked out", () => {
     const dialog = await openNewPlant(user);
     await user.type(dialog.getByLabelText(/^Name/), "Early Jalapeño");
     expect(dialog.getByLabelText(/Grows like/)).toHaveDisplayValue("Pepper (from the name)");
-    await user.click(dialog.getByRole("button", { name: "Add plant" }));
+    await user.click(dialog.getByRole("button", { name: "Add to ideas" }));
 
     // No pepper on the list yet: one is made, quietly, then the plant on it.
     expect(writes.created.map((row) => row["store"])).toEqual(["crops", "varieties"]);
@@ -331,7 +336,7 @@ describe("plants — one list, what it grows like worked out", () => {
     const dialog = await openNewPlant(user);
     await user.type(dialog.getByLabelText(/^Name/), "Brandywine tomato");
     expect(dialog.getByLabelText(/Grows like/)).toHaveDisplayValue("Tomato (from the name)");
-    await user.click(dialog.getByRole("button", { name: "Add plant" }));
+    await user.click(dialog.getByRole("button", { name: "Add to ideas" }));
 
     expect(writes.created.map((row) => row["store"])).toEqual(["varieties"]);
     expect(writes.created[0]).toMatchObject({ name: "Brandywine tomato", cropId: TOMATO.id });
@@ -353,7 +358,7 @@ describe("plants — one list, what it grows like worked out", () => {
     // A zucchini's figures, not a pumpkin's.
     expect(dialog.getByLabelText(/Days to maturity/)).toHaveValue(50);
     expect(dialog.getByLabelText(/Spacing/)).toHaveValue(24);
-    await user.click(dialog.getByRole("button", { name: "Add plant" }));
+    await user.click(dialog.getByRole("button", { name: "Add to ideas" }));
 
     expect(writes.created[0]).toMatchObject({
       store: "crops",
@@ -375,7 +380,7 @@ describe("plants — one list, what it grows like worked out", () => {
     expect(dialog.getByLabelText(/Grows like/)).toHaveDisplayValue("Moonflower (from the name)");
     await user.click(dialog.getByText("Change"));
     await user.type(dialog.getByLabelText(/Plant family/), "convolvulaceae");
-    await user.click(dialog.getByRole("button", { name: "Add plant" }));
+    await user.click(dialog.getByRole("button", { name: "Add to ideas" }));
 
     expect(writes.created[0]).toMatchObject({
       store: "crops",

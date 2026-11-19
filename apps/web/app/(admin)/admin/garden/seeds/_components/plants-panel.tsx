@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import {
@@ -458,7 +459,10 @@ export function PlantsPanel({
       return;
     }
 
-    show({ message: editing === undefined ? `${name} added` : `${name} saved`, tone: "success" });
+    show({
+      message: editing === undefined ? `${name} added to your ideas` : `${name} saved`,
+      tone: "success",
+    });
     setDraft(undefined);
     setEditing(undefined);
     setEmptyCrop(undefined);
@@ -494,8 +498,8 @@ export function PlantsPanel({
       })),
       consequence:
         packets.length === 0
-          ? "Nothing is planted, planned, or in the seed box for it."
-          : "The seed for it in the box goes too.",
+          ? "Nothing is planted or planned for it, and you have no seeds for it."
+          : "The seeds you recorded for it go too.",
       action: "Delete",
     });
     if (!confirmed) return;
@@ -576,7 +580,7 @@ export function PlantsPanel({
       typeLabel(variety.name, cropById.get(variety.cropId)?.name),
       facts?.daysToMaturity === undefined ? undefined : `${facts.daysToMaturity} days`,
       facts?.spacingInches === undefined ? undefined : `${facts.spacingInches}" apart`,
-      packets === 0 ? undefined : `${packets} in the seed box`,
+      packets === 0 ? "no seeds yet" : `seeds on hand (${packets})`,
       ...new Set(found?.blocking ?? []),
     ]
       .filter((part) => part !== undefined)
@@ -620,11 +624,27 @@ export function PlantsPanel({
   const shared = resolved?.kind === "existing" ? (plantsOf.get(resolved.crop.id) ?? []).length : 0;
 
   return (
-    <Section title="Plants" actions={<AddAction label="Add plant" onClick={() => open(BLANK)} />}>
+    <Section
+      title="Ideas"
+      actions={
+        <span className="flex items-center gap-2">
+          {varieties.length === 0 ? null : (
+            <Link
+              href="/admin/garden/plantings?tab=plan&plan=ideas"
+              className="inline-flex min-h-target items-center rounded-density px-3 text-sm font-semibold text-action hover:bg-raised"
+            >
+              Plan these
+            </Link>
+          )}
+          <AddAction label="Add idea" onClick={() => open(BLANK)} />
+        </span>
+      }
+    >
       {rows.length === 0 ? (
         <p className="text-sm text-muted">
-          Nothing yet. Add what you grow the way the packet names it — “Early Jalapeño”, “Cherokee
-          Purple tomato”, “Genovese basil”.
+          Nothing yet. Jot down anything you might like to grow — “jalapeño”, “cherry tomato”,
+          “zinnias”. No seeds needed. Each one says how it grows, and when the list feels right,
+          “Plan these” works out when and where.
         </p>
       ) : (
         <>
@@ -637,7 +657,7 @@ export function PlantsPanel({
             labels={filter === "" ? [] : [cropById.get(filter as Ulid)?.name ?? "A kind"]}
             onClear={() => setFilter("")}
           />
-          <RowList label="Plants">
+          <RowList label="Ideas">
             {shown.map((row) => (
               <LandRow
                 key={row.kind === "plant" ? row.variety.id : row.crop.id}
@@ -657,13 +677,17 @@ export function PlantsPanel({
         <Modal
           key={editing?.id ?? emptyCrop?.id ?? "new-plant"}
           placement="side"
-          title={editing === undefined ? (emptyCrop?.name ?? "New plant") : `Edit ${editing.name}`}
-          description="Name it the way the packet does. Days and spacing fill in; change them to match."
+          title={
+            editing === undefined
+              ? (emptyCrop?.name ?? "Something to grow")
+              : `Edit ${editing.name}`
+          }
+          description="A name is enough — “jalapeño” will do. Days and spacing fill in; a packet's figures can replace them later."
           onClose={() => setDraft(undefined)}
           footer={
             <>
               <Button variant="primary" onClick={() => void save()}>
-                {editing === undefined ? "Add plant" : "Save changes"}
+                {editing === undefined ? "Add to ideas" : "Save changes"}
               </Button>
               <Button onClick={() => setDraft(undefined)}>Cancel</Button>
               {editing === undefined && emptyCrop === undefined ? null : (
@@ -750,8 +774,8 @@ export function PlantsPanel({
                 onChange={(event) => setDraft({ ...draft, spacingInches: event.target.value })}
               />
               <TextInput
-                label="Where the seed came from"
-                placeholder="Baker Creek, saved, a neighbour"
+                label="Where to get seed"
+                placeholder="Baker Creek, a neighbour, the feed store"
                 value={draft.source}
                 error={errors["source"]}
                 onChange={(event) => setDraft({ ...draft, source: event.target.value })}

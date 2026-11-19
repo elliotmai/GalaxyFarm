@@ -177,7 +177,7 @@ export function UpNextPanel({
         detail={
           frost === undefined
             ? "Set your growing zone or frost dates in Settings → Farm, and add crops to the season plan — the dates come from them."
-            : "Add crops to the season plan, or check When to plant for what could go in now."
+            : "Jot down what you would like to grow under What to grow, then Plan my garden on the Plan tab works out when and where."
         }
       />
     );

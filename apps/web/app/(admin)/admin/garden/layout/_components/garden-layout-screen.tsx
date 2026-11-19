@@ -575,7 +575,7 @@ export function GardenLayoutScreen({
             {varietyOptions.length === 0 ? (
               <EmptyState
                 title="No plants yet"
-                detail="Add what you grow under Garden → Seeds → Plants, and the plan colours itself by rotation."
+                detail="Jot down what you would like to grow under Garden → What to grow, and the plan colours itself by rotation."
               />
             ) : (
               <div className="flex flex-col gap-density">

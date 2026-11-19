@@ -242,10 +242,10 @@ export function SeedBoxPanel({
       {varieties.length === 0 ? (
         <EmptyState
           title="No plants yet"
-          detail="Seed is seed of something. Add the plant first, then the packet."
+          detail="Nothing to record yet. Add ideas first; when you buy or save seed for one, put the packet here."
           action={
             <Button variant="primary" onClick={onNeedsCatalog}>
-              Add a plant
+              Go to ideas
             </Button>
           }
         />

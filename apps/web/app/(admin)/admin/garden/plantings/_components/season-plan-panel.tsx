@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   Button,
@@ -157,6 +157,13 @@ export function SeasonPlanPanel({
   const [converting, setConverting] = useState<PlannedPlanting | undefined>();
   const [convertBed, setConvertBed] = useState("");
   const [planning, setPlanning] = useState(false);
+  /** Opened from What to grow's "Plan these": every idea already on the list. */
+  const [fromIdeas, setFromIdeas] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("plan") !== "ideas") return;
+    setFromIdeas(true);
+    setPlanning(true);
+  }, []);
 
   const now = new Date();
   const openBeds = beds.filter((bed) => bed.active);
@@ -585,7 +592,11 @@ export function SeasonPlanPanel({
           frostFor={frostFor ?? (() => undefined)}
           propertyId={propertyId}
           actorId={actorId}
-          onClose={() => setPlanning(false)}
+          onClose={() => {
+            setPlanning(false);
+            setFromIdeas(false);
+          }}
+          startWith={fromIdeas ? varieties : []}
         />
       ) : null}
       {/*
@@ -666,7 +677,7 @@ export function SeasonPlanPanel({
                             if (varieties.length > 0) startCreateEntry(plan);
                             else
                               show({
-                                message: "Add a variety under Garden → Seeds first.",
+                                message: "Add something to grow under Garden → What to grow first.",
                                 tone: "warning",
                               });
                           }}
