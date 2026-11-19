@@ -141,3 +141,12 @@ describe("searchGardenCrops", () => {
     for (const family of families) expect(normaliseFamily(family)).toBe(family);
   });
 });
+
+describe("what people call things", () => {
+  it("finds green beans as green beans", () => {
+    const names = searchGardenCrops("green beans").map((crop) => crop.name);
+    expect(names.slice(0, 2)).toEqual(["Green bean (bush)", "Green bean (pole)"]);
+    expect(searchGardenCrops("string beans")[0]?.name).toBe("Green bean (bush)");
+    expect(searchGardenCrops("green onions")[0]?.name).toBe("Green onion");
+  });
+});

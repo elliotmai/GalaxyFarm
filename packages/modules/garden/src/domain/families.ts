@@ -452,6 +452,10 @@ export function searchGardenCrops(query: string, limit = 8): GardenCrop[] {
       // the start of "romaine".
       if (name === q || singularName === words.join(" ")) best = Math.max(best, 200 + 100 * weight);
       else if (name.startsWith(q)) best = Math.max(best, 50 * weight);
+      // Every word typed, in any order: "green beans" is the pole kind too,
+      // ahead of a name that only shares "bean".
+      else if (words.length > 1 && words.every((word) => ` ${singularName} `.includes(` ${word} `)))
+        best = Math.max(best, 40 * weight);
       else if (words.some((word) => word.length >= 3 && ` ${singularName} `.includes(` ${word} `)))
         best = Math.max(best, 20 * weight);
       else if (q.length >= 3 && name.includes(q)) best = Math.max(best, 10 * weight);

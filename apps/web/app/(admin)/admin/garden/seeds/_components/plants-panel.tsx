@@ -739,98 +739,113 @@ export function PlantsPanel({
               )}
             </div>
 
-            <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
-              <Select
-                label="Grows like"
-                hint="For rotation, companions and planting dates. Worked out from the name."
-                options={growsLikeOptions}
-                value={draft.growsLike}
-                error={errors["growsLike"]}
-                onChange={(event) =>
-                  setDraft({ ...draft, growsLike: event.target.value, growing: undefined })
-                }
-              />
-              <TextInput
-                label="Days to maturity"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                step={1}
-                numeric
-                hint="From transplant, for a plant set out as a seedling."
-                value={draft.daysToMaturity}
-                error={errors["daysToMaturity"]}
-                onChange={(event) => setDraft({ ...draft, daysToMaturity: event.target.value })}
-              />
-              <TextInput
-                label="Spacing (inches)"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="any"
-                numeric
-                value={draft.spacingInches}
-                error={errors["spacingInches"]}
-                onChange={(event) => setDraft({ ...draft, spacingInches: event.target.value })}
-              />
-              <TextInput
-                label="Where to get seed"
-                placeholder="Baker Creek, a neighbour, the feed store"
-                value={draft.source}
-                error={errors["source"]}
-                onChange={(event) => setDraft({ ...draft, source: event.target.value })}
-              />
-            </div>
-
-            <TextArea
-              label="Notes"
-              rows={3}
-              placeholder="How it did, how it tasted, whether it cracked"
-              value={draft.notes}
-              error={errors["notes"]}
-              onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-            />
-
-            {typeName === undefined ? null : (
-              <details className="group text-sm">
-                <summary className="flex min-h-target cursor-pointer list-none flex-wrap items-center gap-x-2 [&::-webkit-details-marker]:hidden">
-                  <span className="font-medium text-ink">How {typeName} grows</span>
-                  <span className="text-muted">
-                    {resolved?.kind === "existing" && shared > 1
-                      ? `shared by your ${shared} plants that grow like it`
-                      : "sun, sowing, frost, when it goes in"}
-                  </span>
-                  <span className="font-semibold text-action">Change</span>
-                </summary>
-                <div className="flex flex-col gap-density pt-2">
-                  <TextInput
-                    label="Plant family"
-                    list="garden-families"
-                    placeholder={inferredFamily ?? "Solanaceae"}
-                    hint={
-                      inferredFamily === undefined
-                        ? "Not known from the name. Rotation is checked on this."
-                        : `Worked out as ${inferredFamily}. Rotation is checked on this.`
+            {/* A name is the whole of an idea. Everything else is for later —
+                when there is a packet to copy figures off — and stays folded. */}
+            <details className="group" open={Object.keys(errors).some((key) => key !== "name")}>
+              <summary className="flex min-h-target cursor-pointer list-none items-center gap-2 text-sm [&::-webkit-details-marker]:hidden">
+                <span className="font-medium text-ink">Details</span>
+                <span className="text-muted">
+                  optional
+                  {typeName === undefined ? "" : ` · grows like ${typeName}`}
+                  {draft.daysToMaturity === "" ? "" : ` · ${draft.daysToMaturity} days`}
+                </span>
+                <span className="ml-auto font-semibold text-action group-open:hidden">Show</span>
+              </summary>
+              <div className="flex flex-col gap-density pt-2">
+                <div className="flex flex-col gap-density sm:grid sm:grid-cols-2">
+                  <Select
+                    label="Grows like"
+                    hint="For rotation, companions and planting dates. Worked out from the name."
+                    options={growsLikeOptions}
+                    value={draft.growsLike}
+                    error={errors["growsLike"]}
+                    onChange={(event) =>
+                      setDraft({ ...draft, growsLike: event.target.value, growing: undefined })
                     }
-                    value={draft.family}
-                    error={errors["family"]}
-                    onChange={(event) => setDraft({ ...draft, family: event.target.value })}
                   />
-                  <datalist id="garden-families">
-                    {COMMON_FAMILIES.map((family) => (
-                      <option key={family} value={family} />
-                    ))}
-                  </datalist>
-                  <GrowingFields
-                    legend={`What every ${typeName.toLowerCase()} shares`}
-                    withoutDaysAndSpacing
-                    value={draft.growing ?? growingDraft(growsLikeFacts(resolved))}
-                    onChange={(growing) => setDraft({ ...draft, growing })}
-                    errors={errors}
+                  <TextInput
+                    label="Days to maturity"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    numeric
+                    hint="From transplant, for a plant set out as a seedling."
+                    value={draft.daysToMaturity}
+                    error={errors["daysToMaturity"]}
+                    onChange={(event) => setDraft({ ...draft, daysToMaturity: event.target.value })}
+                  />
+                  <TextInput
+                    label="Spacing (inches)"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="any"
+                    numeric
+                    value={draft.spacingInches}
+                    error={errors["spacingInches"]}
+                    onChange={(event) => setDraft({ ...draft, spacingInches: event.target.value })}
+                  />
+                  <TextInput
+                    label="Where to get seed"
+                    placeholder="Baker Creek, a neighbour, the feed store"
+                    value={draft.source}
+                    error={errors["source"]}
+                    onChange={(event) => setDraft({ ...draft, source: event.target.value })}
                   />
                 </div>
-              </details>
-            )}
+
+                <TextArea
+                  label="Notes"
+                  rows={3}
+                  placeholder="How it did, how it tasted, whether it cracked"
+                  value={draft.notes}
+                  error={errors["notes"]}
+                  onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
+                />
+
+                {typeName === undefined ? null : (
+                  <details className="group text-sm">
+                    <summary className="flex min-h-target cursor-pointer list-none flex-wrap items-center gap-x-2 [&::-webkit-details-marker]:hidden">
+                      <span className="font-medium text-ink">How {typeName} grows</span>
+                      <span className="text-muted">
+                        {resolved?.kind === "existing" && shared > 1
+                          ? `shared by your ${shared} plants that grow like it`
+                          : "sun, sowing, frost, when it goes in"}
+                      </span>
+                      <span className="font-semibold text-action">Change</span>
+                    </summary>
+                    <div className="flex flex-col gap-density pt-2">
+                      <TextInput
+                        label="Plant family"
+                        list="garden-families"
+                        placeholder={inferredFamily ?? "Solanaceae"}
+                        hint={
+                          inferredFamily === undefined
+                            ? "Not known from the name. Rotation is checked on this."
+                            : `Worked out as ${inferredFamily}. Rotation is checked on this.`
+                        }
+                        value={draft.family}
+                        error={errors["family"]}
+                        onChange={(event) => setDraft({ ...draft, family: event.target.value })}
+                      />
+                      <datalist id="garden-families">
+                        {COMMON_FAMILIES.map((family) => (
+                          <option key={family} value={family} />
+                        ))}
+                      </datalist>
+                      <GrowingFields
+                        legend={`What every ${typeName.toLowerCase()} shares`}
+                        withoutDaysAndSpacing
+                        value={draft.growing ?? growingDraft(growsLikeFacts(resolved))}
+                        onChange={(growing) => setDraft({ ...draft, growing })}
+                        errors={errors}
+                      />
+                    </div>
+                  </details>
+                )}
+              </div>
+            </details>
           </div>
         </Modal>
       )}

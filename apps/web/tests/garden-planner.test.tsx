@@ -95,13 +95,20 @@ describe("Plan my garden", () => {
         name: /^Jalapeño pepper/,
       }),
     );
+    // The first step is only names: no counts, no methods yet.
     const list = within(dialog.getByRole("list", { name: "To grow" }));
-    expect(list.getByRole("listitem", { name: "Jalapeño pepper" })).toHaveTextContent(
+    expect(list.getByRole("listitem", { name: "Jalapeño pepper" })).toBeInTheDocument();
+    expect(dialog.queryByLabelText("How many")).not.toBeInTheDocument();
+    expect(dialog.queryByLabelText("Start from")).not.toBeInTheDocument();
+
+    await user.click(dialog.getByRole("button", { name: "Next" }));
+    const how = within(dialog.getByRole("list", { name: "How much of each" }));
+    expect(how.getByRole("listitem", { name: "Jalapeño pepper" })).toHaveTextContent(
       /added to your ideas when saved/,
     );
     // Started from seed indoors unless said otherwise.
     expect(
-      within(list.getByRole("listitem", { name: "Cherokee Purple" })).getByLabelText("Start from"),
+      within(how.getByRole("listitem", { name: "Cherokee Purple" })).getByLabelText("Start from"),
     ).toHaveValue("indoor_start");
 
     await user.click(dialog.getByRole("button", { name: "Next: which years" }));
@@ -167,6 +174,6 @@ describe("Plan my garden", () => {
     );
     const list = within(screen.getByRole("list", { name: "To grow" }));
     expect(list.getByRole("listitem", { name: "Cherokee Purple" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Next: which years" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
   });
 });

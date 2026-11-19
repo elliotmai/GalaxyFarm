@@ -319,17 +319,26 @@ export const GARDEN_KINDS: readonly GardenKind[] = [
 
   // Beans and peas — how they grow, and what you eat.
   {
-    name: "Bush bean",
+    name: "Green bean (bush)",
     crop: "Bean",
-    note: "Green beans on a compact plant · no trellis, picks in a rush",
-    aliases: ["bush beans", "green bean", "green beans", "snap bean"],
+    note: "Compact plant · no trellis needed, picks in a rush",
+    aliases: [
+      "green bean",
+      "green beans",
+      "bush bean",
+      "bush beans",
+      "snap bean",
+      "snap beans",
+      "string bean",
+      "string beans",
+    ],
     growing: { daysToMaturity: 55, spacingInches: 4, harvestWeeks: 3 },
   },
   {
-    name: "Pole bean",
+    name: "Green bean (pole)",
     crop: "Bean",
-    note: "Green beans on a vine · needs a trellis, picks all summer",
-    aliases: ["pole beans", "runner bean", "runner beans"],
+    note: "Climbs · needs a trellis, picks all summer",
+    aliases: ["pole bean", "pole beans", "runner bean", "runner beans", "climbing bean"],
     growing: { daysToMaturity: 65, spacingInches: 6, harvestWeeks: 8 },
   },
   {

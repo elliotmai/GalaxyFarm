@@ -176,7 +176,7 @@ export function GardenPlanner({
   const start = firstYear(now, frostFor);
   const yearChoices = [start, start + 1, start + 2];
 
-  const [step, setStep] = useState<"want" | "years" | "review">("want");
+  const [step, setStep] = useState<"want" | "how" | "years" | "review">("want");
   const [wishes, setWishes] = useState<Wish[]>(() =>
     startWith.map((variety) => {
       const facts = factsOf({ varietyId: variety.id, name: variety.name });
@@ -400,17 +400,24 @@ export function GardenPlanner({
   const footer =
     step === "want" ? (
       <>
-        <Button variant="primary" disabled={wishes.length === 0} onClick={() => setStep("years")}>
-          Next: which years
+        <Button variant="primary" disabled={wishes.length === 0} onClick={() => setStep("how")}>
+          Next
         </Button>
         <Button onClick={onClose}>Cancel</Button>
+      </>
+    ) : step === "how" ? (
+      <>
+        <Button variant="primary" onClick={() => setStep("years")}>
+          Next: which years
+        </Button>
+        <Button onClick={() => setStep("want")}>Back</Button>
       </>
     ) : step === "years" ? (
       <>
         <Button variant="primary" disabled={years.length === 0} onClick={() => setStep("review")}>
           Next: see the plan
         </Button>
-        <Button onClick={() => setStep("want")}>Back</Button>
+        <Button onClick={() => setStep("how")}>Back</Button>
       </>
     ) : (
       <>
@@ -430,19 +437,22 @@ export function GardenPlanner({
       title="Plan my garden"
       description={
         step === "want"
-          ? "What do you want to grow? Add everything — how many, and how you will start it."
-          : step === "years"
-            ? "For which years? Each year rotates what goes where."
-            : "When and where for each. Change a bed if you like; the dates follow your frost dates."
+          ? "What do you want to grow? Just the names — the rest comes after."
+          : step === "how"
+            ? "How many of each, and how you will start them. Filled in already; change what you like."
+            : step === "years"
+              ? "For which years? Each year rotates what goes where."
+              : "When and where for each. Change a bed if you like; the dates follow your frost dates."
       }
       size="wide"
       onClose={onClose}
       footer={footer}
     >
       <ol aria-label="Steps" className="m-0 flex list-none gap-2 p-0 text-xs text-muted">
-        {(["want", "years", "review"] as const).map((id, index) => (
+        {(["want", "how", "years", "review"] as const).map((id, index) => (
           <li key={id} className={step === id ? "font-semibold text-ink" : undefined}>
-            {index + 1}. {id === "want" ? "What" : id === "years" ? "Years" : "Plan"}
+            {index + 1}.{" "}
+            {id === "want" ? "What" : id === "how" ? "How much" : id === "years" ? "Years" : "Plan"}
           </li>
         ))}
       </ol>
@@ -491,7 +501,35 @@ export function GardenPlanner({
           {wishes.length === 0 ? (
             <p className="text-sm text-muted">Nothing on the list yet.</p>
           ) : (
-            <ul aria-label="To grow" className="m-0 flex list-none flex-col gap-2 p-0">
+            <ul aria-label="To grow" className="m-0 flex list-none flex-wrap gap-2 p-0">
+              {wishes.map((wish) => (
+                <li
+                  key={wish.key}
+                  aria-label={wish.name}
+                  className="flex min-h-target items-center gap-1 rounded-full bg-action/10 pl-3 text-sm font-medium text-ink"
+                >
+                  {wish.name}
+                  <button
+                    type="button"
+                    onClick={() => setWishes(wishes.filter((held) => held.key !== wish.key))}
+                    aria-label={`Remove ${wish.name}`}
+                    className="flex min-h-target min-w-target items-center justify-center rounded-full text-muted hover:text-danger"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+
+      {step === "how" ? (
+        <div className="flex flex-col gap-density">
+          {wishes.length === 0 ? (
+            <p className="text-sm text-muted">Nothing on the list yet — go back and add some.</p>
+          ) : (
+            <ul aria-label="How much of each" className="m-0 flex list-none flex-col gap-2 p-0">
               {wishes.map((wish) => {
                 const facts = factsOf(wish);
                 const fallOk = hasFallPlanting(facts, frostFor(start));
