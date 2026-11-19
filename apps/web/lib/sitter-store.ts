@@ -174,6 +174,11 @@ export interface TickInput {
    * whichever family member happened to be standing in front of it.
    */
   readonly deviceId?: string | undefined;
+  /**
+   * The zone of the device the tick came from (`lib/request-time-zone.ts`).
+   * When it is missing, the property's own zone is used.
+   */
+  readonly timeZone?: string | undefined;
 }
 
 export type TickOutcome =
@@ -197,7 +202,7 @@ export type TickOutcome =
  * The farm's timezone, or undefined when the property has none this runtime
  * can use — in which case the tick keeps the process's local time, as before.
  */
-async function farmTimeZone(db: Database, propertyId: Ulid): Promise<string | undefined> {
+export async function farmTimeZone(db: Database, propertyId: Ulid): Promise<string | undefined> {
   const property = await propertyFor(propertyId, db);
   return isTimeZone(property?.timezone) ? property.timezone : undefined;
 }
@@ -252,7 +257,7 @@ export async function tickChore(input: TickInput, db: Database = database()): Pr
     if (template === undefined || template.propertyId !== propertyId) {
       return { ok: false, reason: "That chore is not on this property." };
     }
-    const farm = onFarmClock(await farmTimeZone(db, propertyId), date, at);
+    const farm = onFarmClock(input.timeZone ?? (await farmTimeZone(db, propertyId)), date, at);
     // The template has to actually fire on the day being ticked. Without this
     // the day is whatever the request said it was, and a chore could be
     // written onto a date the rule never produced.
@@ -456,7 +461,7 @@ async function tickFeedingOccurrence(
   // Rebuilt on the farm's own clock (a tick from the barn at 11pm is that
   // day's), then matched by id: a weather chore against the weather's
   // occurrences, a feeding trip against the plans'.
-  const farm = onFarmClock(await farmTimeZone(db, propertyId), date, at);
+  const farm = onFarmClock(input.timeZone ?? (await farmTimeZone(db, propertyId)), date, at);
   const entry = (
     isWeatherChoreKey(sourceKey)
       ? await weatherOccurrences(propertyId, farm.day, farm.now, db)

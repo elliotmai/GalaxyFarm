@@ -11,7 +11,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 
-import { loadCursors, saveCursors } from "@/lib/local/cursors";
+import { loadCursors, saveCursors, verifyCursors } from "@/lib/local/cursors";
 import { localStore, type LocalStore } from "@/lib/local/store";
 import { photoUploader } from "@/lib/photos/uploader";
 import { nextSyncDelay } from "@/lib/sync-schedule";
@@ -186,13 +186,29 @@ export function SyncProvider({
   /** Server refusals in a row, for the heartbeat's backoff. */
   const refusals = useRef(0);
 
-  // Cursors are a `localStorage` read, so they wait for the client the same way
-  // the store does — but only the sync loop below needs them, and that starts
-  // in an effect regardless.
-  useEffect(() => {
-    if (store === undefined) return;
-    store.engine.restoreCursors(loadCursors());
-  }, [store]);
+  /*
+   * The cursors, once they have been checked against the records.
+   *
+   * They live in `localStorage` and the records live in IndexedDB, and a
+   * browser can clear one without the other. A device that kept its cursors
+   * after losing its records would only ever be sent newer changes, so it would
+   * show today's edits and nothing older. `verifyCursors` drops any cursor
+   * whose last record is not on the device. Every sync waits for this, so even
+   * the first pull uses checked cursors.
+   */
+  const [cursorsReady] = useState<Promise<void>>(() => {
+    if (store === undefined) return Promise.resolve();
+    return verifyCursors(loadCursors(), {
+      has: async (entity, id) => {
+        try {
+          return (await store.db.table(entity).get(id)) !== undefined;
+        } catch {
+          // A table this build does not have holds nothing for the cursor.
+          return false;
+        }
+      },
+    }).then((cursors) => store.engine.restoreCursors(cursors));
+  });
 
   const syncNow = useCallback(async () => {
     if (store === undefined) return;
@@ -212,6 +228,7 @@ export function SyncProvider({
     running.current = true;
     setSyncing(true);
     try {
+      await cursorsReady;
       let settled = true;
       do {
         again.current = false;
@@ -249,7 +266,7 @@ export function SyncProvider({
       again.current = false;
       setSyncing(false);
     }
-  }, [store, pushEnabled, uploads]);
+  }, [store, pushEnabled, uploads, cursorsReady]);
 
   const retryStuck = useCallback(async () => {
     if (store === undefined) return;

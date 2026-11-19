@@ -9,6 +9,7 @@ import { isDeviceLive, revokeDevice } from "@/lib/device-store";
 import { forgetDeviceToken } from "@/lib/kiosk-session";
 import { logEggsForKiosk, moveAnimalForKiosk, type LogEggsInput } from "@/lib/kiosk-store";
 import { verifyKioskPin } from "@/lib/kiosk-pin-store";
+import { requestTimeZone } from "@/lib/request-time-zone";
 import { tickChore } from "@/lib/sitter-store";
 
 /**
@@ -115,6 +116,7 @@ async function tickFromKiosk(input: Parameters<typeof setKioskChoreDone>[0]): Pr
     at: now,
     done: input.done,
     deviceId: actor.deviceId ?? `kiosk-surface:${actor.id}`,
+    timeZone: await requestTimeZone(),
   });
 
   if (!result.ok) return { ok: false, error: result.reason };

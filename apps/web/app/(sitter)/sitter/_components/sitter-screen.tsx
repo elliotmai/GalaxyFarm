@@ -14,6 +14,7 @@ import {
   guideZonesFrom,
   type GuideContact,
 } from "@/lib/guide-composition";
+import { wallClock } from "@/lib/farm-time";
 import type { PeopleNames } from "@/lib/people-names";
 import { currentMedicinesFor, feedingLinesFor } from "@/lib/pet-care";
 import { guideIncludes, type SitterView } from "@/lib/sitter-store";
@@ -38,12 +39,28 @@ import { guideIncludes, type SitterView } from "@/lib/sitter-store";
  *   once and looked up after, so each is one line with a count until opened.
  */
 
-function formatDay(date: Date): string {
-  return date.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+/** Formatted in the sitter's zone: this is drawn on a server running in UTC. */
+function formatDay(date: Date, timeZone: string): string {
+  return date.toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone,
+  });
 }
 
+/**
+ * An access window's ends are calendar dates, kept as UTC midnight, so they
+ * are read back in UTC. In any other zone west of Greenwich, "15 June" would
+ * show as the 14th.
+ */
 const formatDate = (date: Date): string =>
-  date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  date.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 
 /** The page's own column: phone-width measure, a 16px gutter, clear of the call bar. */
 function Column({
@@ -65,12 +82,24 @@ function Column({
   );
 }
 
-function Header({ farmName, title, day }: { farmName: string; title: string; day?: Date }) {
+function Header({
+  farmName,
+  title,
+  day,
+  timeZone,
+}: {
+  farmName: string;
+  title: string;
+  day?: Date;
+  timeZone?: string;
+}) {
   return (
     <header className="flex flex-col gap-1">
       <p className="gf-label">{farmName}</p>
       <h1 className="text-ink">{title}</h1>
-      {day === undefined ? null : <p className="text-sm text-muted">{formatDay(day)}</p>}
+      {day === undefined || timeZone === undefined ? null : (
+        <p className="text-sm text-muted">{formatDay(day, timeZone)}</p>
+      )}
     </header>
   );
 }
@@ -176,6 +205,7 @@ export function SitterScreen({
   view,
   chores,
   day,
+  timeZone,
   mayTick,
   actorId,
   names,
@@ -183,9 +213,14 @@ export function SitterScreen({
   unavailable,
 }: {
   readonly farmName: string;
+  /** Records on the sitter's wall clock (`onWallClock`), for judging "today". */
   readonly view: SitterView;
+  /** Real instants, for the browser to show in its own zone. */
   readonly chores: readonly ChoreEntry[];
+  /** Now, as a real instant. */
   readonly day: Date;
+  /** The sitter's device zone (`lib/request-time-zone.ts`). */
+  readonly timeZone: string;
   readonly mayTick: boolean;
   /** The sitter, so their own ticks read "Done by you". */
   readonly actorId?: Ulid | undefined;
@@ -211,7 +246,8 @@ export function SitterScreen({
   }
 
   const { guide } = view;
-  const now = day;
+  // On the same wall clock as `view`, so the guide's "today" is the sitter's.
+  const now = wallClock(day, timeZone);
 
   const composed = composeGuide(
     guide ?? { title: "Care guide" },
@@ -249,7 +285,7 @@ export function SitterScreen({
 
   return (
     <Column callBar={first !== undefined}>
-      <Header farmName={farmName} title={composed.title} day={day} />
+      <Header farmName={farmName} title={composed.title} day={day} timeZone={timeZone} />
 
       {unavailable === undefined ? null : (
         <Callout tone="danger" title="Could not load the guide">
@@ -277,6 +313,7 @@ export function SitterScreen({
       <SitterChores
         entries={chores}
         day={day}
+        timeZone={timeZone}
         zones={view.zones}
         mayTick={mayTick}
         actorId={actorId}

@@ -8,6 +8,7 @@ import { Pill, tickBoxClass } from "@galaxy-farm/ui";
 import { choreProgress, type ChoreEntry, type Ulid, type Zone } from "@galaxy-farm/core";
 
 import { setChoreDone } from "@/app/(sitter)/sitter/_components/chore-actions";
+import { wallClock, zonedNoon } from "@/lib/farm-time";
 import type { PeopleNames } from "@/lib/people-names";
 
 /**
@@ -26,8 +27,13 @@ import type { PeopleNames } from "@/lib/people-names";
  * so by going busy rather than by pretending it is already done.
  */
 
-function timeLabel(date: Date): string {
-  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+/**
+ * In the sitter's zone, stated rather than assumed: this is also drawn on the
+ * server, which runs in UTC, and a time that changed once the page woke up in
+ * the browser would read as a mistake.
+ */
+function timeLabel(date: Date, timeZone: string): string {
+  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone });
 }
 
 /** "Done by Mai · 6:40", once the server has said who Mai is. */
@@ -46,14 +52,16 @@ function NamedDone({
 
 function DoneLine({
   entry,
+  timeZone,
   actorId,
   names,
 }: {
   readonly entry: ChoreEntry;
+  readonly timeZone: string;
   readonly actorId: Ulid | undefined;
   readonly names: Promise<PeopleNames> | undefined;
 }) {
-  const at = entry.completedAt === undefined ? "" : timeLabel(entry.completedAt);
+  const at = entry.completedAt === undefined ? "" : timeLabel(entry.completedAt, timeZone);
   const by = entry.completedBy;
   const plain = <>Done · {at}</>;
 
@@ -91,13 +99,17 @@ function Box({ done }: { readonly done: boolean }) {
 export function SitterChores({
   entries,
   day,
+  timeZone,
   zones,
   mayTick,
   actorId,
   names,
 }: {
   readonly entries: readonly ChoreEntry[];
+  /** Now, as a real instant. */
   readonly day: Date;
+  /** The sitter's device zone; the day on screen is the day there. */
+  readonly timeZone: string;
   readonly zones: readonly Zone[];
   readonly mayTick: boolean;
   readonly actorId?: Ulid | undefined;
@@ -110,6 +122,9 @@ export function SitterChores({
 
   const zoneName = (id: Ulid | undefined) =>
     id === undefined ? undefined : zones.find((zone) => zone.id === id)?.name;
+
+  const wall = wallClock(day, timeZone);
+  const screenDay = `${wall.getFullYear()}-${String(wall.getMonth() + 1).padStart(2, "0")}-${String(wall.getDate()).padStart(2, "0")}`;
 
   const progress = choreProgress(entries);
   const open = entries.filter((entry) => entry.completedAt === undefined);
@@ -129,11 +144,10 @@ export function SitterChores({
           ? { sourceKey: entry.id }
           : {}),
         // The day on screen, not "today": a tick landing at ten past midnight
-        // belongs to the evening round it finished. Sent as noon in this
-        // device's own timezone, as an absolute instant, so the server reads
-        // back the same day rather than reinterpreting a bare date in its own
-        // timezone.
-        day: new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12, 0, 0).toISOString(),
+        // belongs to the evening round it finished. Sent as noon in the
+        // sitter's zone, as an absolute instant, so the server reads back the
+        // same day rather than reinterpreting a bare date in its own zone.
+        day: zonedNoon(screenDay, timeZone).toISOString(),
         done: entry.completedAt === undefined,
       });
 
@@ -149,9 +163,11 @@ export function SitterChores({
   const row = (entry: ChoreEntry) => {
     const finished = entry.completedAt !== undefined;
     const late = !finished && entry.overdue;
-    const facts = [entry.detail, zoneName(entry.zoneId), `by ${timeLabel(entry.dueAt)}`].filter(
-      (part): part is string => part !== undefined && part !== "",
-    );
+    const facts = [
+      entry.detail,
+      zoneName(entry.zoneId),
+      `by ${timeLabel(entry.dueAt, timeZone)}`,
+    ].filter((part): part is string => part !== undefined && part !== "");
 
     const face = (
       <>
@@ -171,7 +187,7 @@ export function SitterChores({
             ].join(" ")}
           >
             {finished ? (
-              <DoneLine entry={entry} actorId={actorId} names={names} />
+              <DoneLine entry={entry} timeZone={timeZone} actorId={actorId} names={names} />
             ) : (
               <>
                 {late ? "Late · " : ""}

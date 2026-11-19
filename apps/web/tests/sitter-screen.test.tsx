@@ -27,6 +27,8 @@ const PROPERTY = "01ARZ3NDEKTSV4RRFFQ69G5FP1" as Ulid;
 const SITTER = "01ARZ3NDEKTSV4RRFFQ69G5U03" as Ulid;
 const OWNER = "01ARZ3NDEKTSV4RRFFQ69G5U01" as Ulid;
 const NOW = new Date(2026, 8, 17, 9, 0);
+/** The runner's own zone, which is the one `NOW` was built in. */
+const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const id = (n: number) => `01ARZ3NDEKTSV4RRFFQ69G5F${String(n).padStart(2, "0")}` as Ulid;
 const base = { propertyId: PROPERTY, createdAt: NOW, updatedAt: NOW };
 
@@ -103,6 +105,7 @@ function renderGuide(
       view={full}
       chores={chores}
       day={NOW}
+      timeZone={TZ}
       mayTick
       actorId={SITTER}
       names={names}
@@ -162,6 +165,7 @@ describe("today's jobs come first", () => {
         view={{ ...EMPTY_SITTER_VIEW, guide, tasks: [hay] }}
         chores={chores}
         day={NOW}
+        timeZone={TZ}
         mayTick={false}
       />,
     );
