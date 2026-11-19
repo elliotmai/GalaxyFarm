@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { PageBody, PageHeader, Tabs } from "@galaxy-farm/ui";
+import { PageBody, PageHeader, Section, Tabs } from "@galaxy-farm/ui";
 import type { Property, Ulid, Zone } from "@galaxy-farm/core";
 import {
   frostDatesFor,
@@ -99,7 +99,8 @@ export function PlantingsScreen({
       asked === "plan" ||
       asked === "calendar"
     ) {
-      setTab(asked);
+      // "When to plant" is part of the plan now; an old link still lands there.
+      setTab(asked === "calendar" ? "plan" : asked);
     }
     const bed = params.get("bed");
     if (bed !== null && bed !== "") {
@@ -150,17 +151,19 @@ export function PlantingsScreen({
         label="Plantings"
         activeTab={tab}
         onTabChange={setTab}
+        // Five, so they fit a phone: the plan second, because planning is
+        // the way in, and "When to plant" inside it rather than a tab of its
+        // own — it is the page somebody reads while deciding the plan.
         tabs={[
           { id: "next", label: "Up next" },
-          { id: "plantings", label: "Plantings" },
-          { id: "beds", label: "Beds" },
-          { id: "calendar", label: "When to plant" },
-          { id: "care", label: "Care log" },
           {
             id: "plan",
-            label: "Season plan",
+            label: "Plan",
             adornment: openNow.length === 0 ? undefined : openNow.length,
           },
+          { id: "plantings", label: "Plantings" },
+          { id: "beds", label: "Beds" },
+          { id: "care", label: "Care" },
         ]}
       >
         {(active) =>
@@ -219,15 +222,6 @@ export function PlantingsScreen({
                 setTab("plantings");
               }}
             />
-          ) : active === "calendar" ? (
-            <PlantingCalendarPanel
-              crops={crops}
-              frostFor={(year) =>
-                property === undefined
-                  ? undefined
-                  : frostDatesFor(property.growingZone, year, property)
-              }
-            />
           ) : active === "care" ? (
             <CareLogPanel
               care={care}
@@ -240,23 +234,35 @@ export function PlantingsScreen({
               actorId={actorId}
             />
           ) : (
-            <SeasonPlanPanel
-              plans={plans}
-              planned={planned}
-              beds={beds}
-              varieties={varieties}
-              crops={crops}
-              plantings={plantings}
-              loading={plansLoading}
-              propertyId={propertyId}
-              actorId={actorId}
-              leadDays={WINDOW_LEAD_DAYS}
-              frostFor={(year) =>
-                property === undefined
-                  ? undefined
-                  : frostDatesFor(property.growingZone, year, property)
-              }
-            />
+            <div className="flex flex-col gap-density">
+              <SeasonPlanPanel
+                plans={plans}
+                planned={planned}
+                beds={beds}
+                varieties={varieties}
+                crops={crops}
+                plantings={plantings}
+                loading={plansLoading}
+                propertyId={propertyId}
+                actorId={actorId}
+                leadDays={WINDOW_LEAD_DAYS}
+                frostFor={(year) =>
+                  property === undefined
+                    ? undefined
+                    : frostDatesFor(property.growingZone, year, property)
+                }
+              />
+              <Section title="When to plant">
+                <PlantingCalendarPanel
+                  crops={crops}
+                  frostFor={(year) =>
+                    property === undefined
+                      ? undefined
+                      : frostDatesFor(property.growingZone, year, property)
+                  }
+                />
+              </Section>
+            </div>
           )
         }
       </Tabs>

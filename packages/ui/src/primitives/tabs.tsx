@@ -67,6 +67,22 @@ export function Tabs({ tabs, children, defaultTab, activeTab, onTabChange, label
     [activeTab, onTabChange],
   );
 
+  // The open tab is always on screen: a strip wider than a phone scrolls it
+  // into view rather than leaving "you are here" past the edge. The strip
+  // scrolls, never the page.
+  const strip = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const track = strip.current;
+    const tab = refs.current.get(active);
+    if (track == null || tab == null) return;
+    const left = tab.offsetLeft - track.offsetLeft;
+    const right = left + tab.offsetWidth;
+    if (left < track.scrollLeft) track.scrollLeft = Math.max(0, left - 8);
+    else if (right > track.scrollLeft + track.clientWidth) {
+      track.scrollLeft = right - track.clientWidth + 8;
+    }
+  }, [active]);
+
   // Once, on arrival: the tab a shared link names, if it is one of ours.
   const arrived = useRef(false);
   useEffect(() => {
@@ -100,7 +116,13 @@ export function Tabs({ tabs, children, defaultTab, activeTab, onTabChange, label
 
   return (
     <div>
-      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className={SEGMENT_TRACK_CLASS}>
+      <div
+        ref={strip}
+        role="tablist"
+        aria-label={label}
+        onKeyDown={onKeyDown}
+        className={SEGMENT_TRACK_CLASS}
+      >
         {tabs.map((tab) => {
           const selected = tab.id === active;
           return (

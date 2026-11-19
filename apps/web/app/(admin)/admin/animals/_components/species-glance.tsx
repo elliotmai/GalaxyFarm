@@ -69,8 +69,11 @@ function Fact({
       <span className="text-xs text-muted">{label}</span>
     </>
   );
-  const box =
-    "flex min-h-[64px] flex-col justify-center gap-0.5 rounded-density border border-rule bg-panel px-3 py-2";
+  // A zero is news on a laptop, where there is room for "0 due to calve" to
+  // say all is well. On a phone it is a row of nothing between somebody and
+  // the herd: status by exception, so a zero steps aside there.
+  const quiet = value === 0 ? "hidden sm:flex" : "flex";
+  const box = `${quiet} min-h-[64px] flex-col justify-center gap-0.5 rounded-density border border-rule bg-panel px-3 py-2`;
   return href === undefined ? (
     <div className={box}>{body}</div>
   ) : (

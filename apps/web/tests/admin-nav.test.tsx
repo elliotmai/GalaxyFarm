@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Ulid } from "@galaxy-farm/core";
@@ -236,5 +237,27 @@ describe("SectionStrip", () => {
     at("/admin/contacts");
     const { container } = render(<SectionStrip />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("SectionStrip on a phone", () => {
+  it("is one row: where you are, as a switch, and that place's own views", async () => {
+    at("/admin/garden/plantings");
+    render(<SectionStrip />);
+
+    const row = screen.getByRole("navigation", { name: "Where you are" });
+    // Garden, not whichever sections happened to fit on screen.
+    const here = within(row).getByRole("button", { name: /Garden — switch within Farm/ });
+    for (const label of ["Plantings", "What to grow", "Layout", "Harvest"]) {
+      expect(within(row).getByRole("link", { name: label })).toBeInTheDocument();
+    }
+
+    // Every sibling at once, in a sheet, the current one marked.
+    await userEvent.click(here);
+    const sheet = within(screen.getByRole("navigation", { name: "Switch within Farm" }));
+    for (const label of ["Feed", "Pastures and water", "Map", "Supplies", "Equipment", "Garden"]) {
+      expect(sheet.getByRole("link", { name: label })).toBeInTheDocument();
+    }
+    expect(sheet.getByRole("link", { name: "Garden" })).toHaveAttribute("aria-current", "page");
   });
 });
