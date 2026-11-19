@@ -1,4 +1,4 @@
-import type { CursorSet } from "@galaxy-farm/core";
+import type { Cursor, CursorSet } from "@galaxy-farm/core";
 
 /**
  * Pull cursors, kept across restarts.
@@ -31,9 +31,15 @@ const KEY = "galaxy-farm:cursors";
  * 2: timestamps inside JSON blobs (a hair card's `testedOn`, a breeding's
  * `pregCheck.date`) were left as strings by `reviveRecord`, and a screen that
  * formatted one crashed the app.
+ *
+ * 3: cursors outlived the records they describe. A phone whose IndexedDB had
+ * been emptied kept its cursors in `localStorage`, and from then on was sent
+ * only what changed after them — it showed today's edits and nothing older.
+ * `verifyCursors` below stops that happening again; this revision repairs the
+ * devices it already happened to.
  */
 const REVISION_KEY = "galaxy-farm:cursors:revision";
-export const CURSOR_REVISION = "2";
+export const CURSOR_REVISION = "3";
 
 export function loadCursors(storage: Storage | undefined = globalThis.localStorage): CursorSet {
   // Stamped here rather than on save, so a device that never manages a full
@@ -82,4 +88,47 @@ export function saveCursors(
     // A full quota is not worth failing a sync over — the cost is re-pulling
     // next time, and the pull already succeeded.
   }
+}
+
+/** The part of the local database `verifyCursors` reads. */
+export interface CursorCheckStore {
+  /** Whether a record with this id is in this entity's table. */
+  has(entity: string, id: string): Promise<boolean>;
+}
+
+/**
+ * Only the cursors whose records are actually on this device.
+ *
+ * A cursor means "everything up to here is already in the local store", but it
+ * lives in `localStorage` and the records live in IndexedDB, and a browser can
+ * empty one without the other. Older Android in particular evicts IndexedDB
+ * when storage runs low and leaves `localStorage` alone. The cursors then tell
+ * the server the device is up to date, the server sends only newer changes, and
+ * the older records are never sent again.
+ *
+ * So every cursor is checked against its own last record (`lastId`), which the
+ * pull that set it wrote into that table. If the record is missing, the table
+ * is not what the cursor says it is, and that entity is pulled again from the
+ * start. That costs one lookup per entity, once per tab.
+ *
+ * A store that cannot be read gives no cursors at all: a full pull is always
+ * safe, and trusting cursors without being able to check them is the bug.
+ */
+export async function verifyCursors(
+  cursors: CursorSet,
+  store: CursorCheckStore,
+): Promise<CursorSet> {
+  const kept: Record<string, Cursor> = {};
+  try {
+    await Promise.all(
+      Object.entries(cursors).map(async ([entity, cursor]) => {
+        if (cursor !== undefined && (await store.has(entity, cursor.lastId))) {
+          kept[entity] = cursor;
+        }
+      }),
+    );
+  } catch {
+    return {};
+  }
+  return kept;
 }

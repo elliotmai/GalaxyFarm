@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CURSOR_REVISION, loadCursors, saveCursors } from "../lib/local/cursors.js";
+import { CURSOR_REVISION, loadCursors, saveCursors, verifyCursors } from "../lib/local/cursors.js";
 
 /**
  * Cursors across restarts (spec §4.2).
@@ -139,5 +139,41 @@ describe("the cursor revision", () => {
 
     expect(() => loadCursors(storage)).not.toThrow();
     expect(loadCursors(storage)).toEqual({});
+  });
+});
+
+describe("verifyCursors", () => {
+  const cursor = (entity: string, lastId: string) => ({
+    entity,
+    updatedAt: new Date("2026-11-19T08:00:00.000Z"),
+    lastId,
+  });
+
+  it("keeps a cursor whose last record is on the device", async () => {
+    const cursors = { animals: cursor("animals", "A1") };
+    const kept = await verifyCursors(cursors, { has: async () => true });
+    expect(kept).toEqual(cursors);
+  });
+
+  it("drops a cursor whose records were cleared, so that entity pulls from the start", async () => {
+    // The phone that showed only today's edits: its records were gone from
+    // IndexedDB, but the cursors in localStorage still said "up to date".
+    const kept = await verifyCursors(
+      { animals: cursor("animals", "A1"), tasks: cursor("tasks", "T1") },
+      { has: async (entity) => entity === "tasks" },
+    );
+    expect(Object.keys(kept)).toEqual(["tasks"]);
+  });
+
+  it("trusts nothing when the store cannot be read", async () => {
+    const kept = await verifyCursors(
+      { animals: cursor("animals", "A1") },
+      {
+        has: async () => {
+          throw new Error("IndexedDB unavailable");
+        },
+      },
+    );
+    expect(kept).toEqual({});
   });
 });
