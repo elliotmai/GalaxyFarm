@@ -28,7 +28,14 @@ import { registryCode } from "./registries.js";
  * Angus is on the list because an Angus page is one this app can read, and a
  * registration read off one had nowhere valid to be filed until now.
  */
-export const ASSOCIATIONS = ["Maine-Anjou", "Chianina", "Shorthorn", "Angus", "other"] as const;
+export const ASSOCIATIONS = [
+  "Maine-Anjou",
+  "Chianina",
+  "Shorthorn",
+  "Angus",
+  "Simmental",
+  "other",
+] as const;
 export type Association = (typeof ASSOCIATIONS)[number];
 
 export const HORN_STATUSES = ["polled", "horned", "scurred", "dehorned"] as const;
