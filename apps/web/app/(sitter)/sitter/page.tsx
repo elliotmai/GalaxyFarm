@@ -15,6 +15,14 @@ import { EMPTY_SITTER_VIEW, farmTimeZone, sitterView, sitterWeather } from "@/li
 export const metadata = { title: "Care Guide" };
 
 /**
+ * The time-zone lookup's own, shorter deadline. It runs only when the device
+ * sent no zone, it has a fallback, and the forecast cannot start until it
+ * answers — so its whole wait is added to the page's, unlike the reads that
+ * run side by side. Two seconds still covers a Neon cold start.
+ */
+const ZONE_DEADLINE_MS = 2_000;
+
+/**
  * The housesitter's view (spec §5.10, §7 `/sitter`).
  *
  * The second of §5.10's three outputs, off the same composition as the PDF —
@@ -65,16 +73,28 @@ export default async function SitterPage() {
    * its cookie, falling back to the property's zone) and every time is brought
    * back to a real instant before it goes to the browser.
    */
-  const timeZone =
-    (await requestTimeZone()) ??
-    (await farmTimeZone(database(), actor.propertyId).catch(() => undefined)) ??
-    DEFAULT_TIMEZONE;
+  // Every database read starts here, side by side. On a database that is not
+  // answering each waits out its own deadline, and one after the other is
+  // the sum of the waits — which is what turned this page into a 30-second
+  // spinner when the time-zone lookup went in front of the rest unbounded.
+  const names = peopleNames(actor.propertyId);
+  const viewRead = withDeadline(sitterView(actor.propertyId), "the care guide");
+  // Awaited below, after the zone; until then its rejection must not count as
+  // unhandled, which would take the server down with it.
+  void viewRead.catch(() => undefined);
+  const zoneRead = requestTimeZone().then(
+    (cookie) =>
+      cookie ??
+      withDeadline(
+        farmTimeZone(database(), actor.propertyId),
+        "the farm's time zone",
+        ZONE_DEADLINE_MS,
+      ).catch(() => undefined),
+  );
+
+  const timeZone = (await zoneRead) ?? DEFAULT_TIMEZONE;
   const wallNow = wallClock(now, timeZone);
 
-  // Started before the guide is read rather than after, so the two lookups
-  // run side by side: on a database that is not answering, each waits out
-  // its own deadline, and one after the other is twice the wait.
-  const names = peopleNames(actor.propertyId);
   // The weather's chores and its say over weather templates — covers before a
   // freeze, not every night. Never rejects; with no forecast it keeps them.
   const weather = withDeadline(
@@ -86,7 +106,7 @@ export default async function SitterPage() {
   let unavailable: string | undefined;
 
   try {
-    view = await withDeadline(sitterView(actor.propertyId), "the care guide");
+    view = await viewRead;
   } catch (error) {
     // Logged, because a page that renders an apology and records nothing can
     // only be diagnosed by reproducing it — and the person looking at it is a
