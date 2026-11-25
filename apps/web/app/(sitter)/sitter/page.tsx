@@ -14,6 +14,9 @@ import { EMPTY_SITTER_VIEW, farmTimeZone, sitterView, sitterWeather } from "@/li
 
 export const metadata = { title: "Care Guide" };
 
+/** How long the fallback zone lookup may hold the page. */
+const ZONE_DEADLINE_MS = 2_000;
+
 /**
  * The housesitter's view (spec §5.10, §7 `/sitter`).
  *
@@ -56,6 +59,14 @@ export default async function SitterPage() {
     );
   }
 
+  // Started first, and before anything is awaited: neither depends on the
+  // time zone, and on a database that is not answering each waits out its own
+  // deadline — so they have to be waiting side by side, not queued behind the
+  // zone lookup below. Queued, a dead database held the page on "Loading…"
+  // past thirty seconds (the driver's connect timeout) before any apology.
+  const names = peopleNames(actor.propertyId);
+  const guide = withDeadline(sitterView(actor.propertyId), "the care guide");
+
   /*
    * The sitter's own clock, not the server's.
    *
@@ -64,17 +75,20 @@ export default async function SitterPage() {
    * tomorrow's chores. The day is worked out on the device's wall clock (from
    * its cookie, falling back to the property's zone) and every time is brought
    * back to a real instant before it goes to the browser.
+   *
+   * The property's zone is a fallback, so it gets a short deadline: a guess at
+   * Texas is a far better answer than a guest staring at a spinner.
    */
   const timeZone =
     (await requestTimeZone()) ??
-    (await farmTimeZone(database(), actor.propertyId).catch(() => undefined)) ??
+    (await withDeadline(
+      farmTimeZone(database(), actor.propertyId),
+      "the farm's time zone",
+      ZONE_DEADLINE_MS,
+    ).catch(() => undefined)) ??
     DEFAULT_TIMEZONE;
   const wallNow = wallClock(now, timeZone);
 
-  // Started before the guide is read rather than after, so the two lookups
-  // run side by side: on a database that is not answering, each waits out
-  // its own deadline, and one after the other is twice the wait.
-  const names = peopleNames(actor.propertyId);
   // The weather's chores and its say over weather templates — covers before a
   // freeze, not every night. Never rejects; with no forecast it keeps them.
   const weather = withDeadline(
@@ -86,7 +100,7 @@ export default async function SitterPage() {
   let unavailable: string | undefined;
 
   try {
-    view = await withDeadline(sitterView(actor.propertyId), "the care guide");
+    view = await guide;
   } catch (error) {
     // Logged, because a page that renders an apology and records nothing can
     // only be diagnosed by reproducing it — and the person looking at it is a
