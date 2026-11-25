@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AuthShell } from "@/app/(public)/_components/public-shell";
 
+import { HiveSignIn } from "./hive-sign-in";
 import { LoginForm } from "./login-form";
 import { FALLBACK_FARM_NAME } from "@galaxy-farm/core";
 import { OpenInAppHint } from "@/app/_components/open-in-app-hint";
@@ -65,6 +66,8 @@ export default async function LoginPage({
       {/* On an iPhone a shared link lands here, in Safari, signed out: Safari
           and the home-screen app do not share a sign-in. Say where to go. */}
       <OpenInAppHint link={next} />
+      {/* Signed in to Hive? Then signed in here, with no second login. */}
+      <HiveSignIn next={next} />
       <LoginForm next={next} />
     </AuthShell>
   );

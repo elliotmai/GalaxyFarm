@@ -7,6 +7,7 @@ import { signIn as verifyCredentials } from "@galaxy-farm/infra-auth";
 import { authConfig } from "@/lib/auth.config";
 import { credentialStore } from "@/lib/credential-store";
 import { authenticateDevice } from "@/lib/device-store";
+import { hiveSignIn } from "@/lib/hive-sign-in";
 
 /**
  * Auth.js, over our own users table (spec §4.3).
@@ -59,6 +60,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           accessFrom: result.actor.accessWindow?.from.toISOString() ?? null,
           accessTo: result.actor.accessWindow?.to.toISOString() ?? null,
         } as never;
+      },
+    }),
+
+    /**
+     * A person signed in to Hive (spec §4.3, "From Hive, as a person"): the
+     * login page gets a two-minute pass from Hive — from Hive's frame, or by
+     * a quick top-level step through Hive — and trades it here. Same people
+     * and same session as the password provider; every refusal is `null`.
+     */
+    Credentials({
+      id: "hive-pass",
+      name: "Hive",
+      credentials: { pass: { label: "Hive pass", type: "text" } },
+      async authorize(raw) {
+        const pass = typeof raw?.["pass"] === "string" ? raw["pass"] : "";
+        if (pass === "") return null;
+        const user = await hiveSignIn(pass, systemClock().now());
+        return (user ?? null) as never;
       },
     }),
 
