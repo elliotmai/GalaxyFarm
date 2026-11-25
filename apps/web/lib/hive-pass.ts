@@ -53,7 +53,11 @@ export function verifyHivePass(
   if (header["alg"] !== "EdDSA") return undefined;
   let ok = false;
   try {
-    const key = createPublicKey({ key: Buffer.from(publicKey, "base64"), format: "der", type: "spki" });
+    const key = createPublicKey({
+      key: Buffer.from(publicKey, "base64"),
+      format: "der",
+      type: "spki",
+    });
     ok = verify(null, Buffer.from(`${head}.${body}`), key, Buffer.from(sig, "base64url"));
   } catch {
     return undefined;
@@ -63,7 +67,8 @@ export function verifyHivePass(
   const exp = Number(claims["exp"]);
   const iat = Number(claims["iat"]);
   if (claims["iss"] !== ISSUER || claims["aud"] !== app) return undefined;
-  if (!(exp + LEEWAY > secs) || !(iat - LEEWAY <= secs) || exp - iat > PASS_SECONDS) return undefined;
+  if (!(exp + LEEWAY > secs) || !(iat - LEEWAY <= secs) || exp - iat > PASS_SECONDS)
+    return undefined;
   const sub = claims["sub"];
   if (typeof sub !== "string" || sub === "" || sub.length > 128) return undefined;
   return {

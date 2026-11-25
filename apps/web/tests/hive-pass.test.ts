@@ -3,7 +3,11 @@ import { generateKeyPairSync, sign } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import { apiTokenDeviceId } from "../lib/api-token-store.js";
-import { authorizeBoardRequest, hiveUserMayUseBoard, type HiveBoardUser } from "../lib/board-store.js";
+import {
+  authorizeBoardRequest,
+  hiveUserMayUseBoard,
+  type HiveBoardUser,
+} from "../lib/board-store.js";
 import { verifyHivePass } from "../lib/hive-pass.js";
 
 /**
@@ -20,13 +24,26 @@ const enc = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
 
 function pass(claims: Record<string, unknown> = {}, key = privateKey): string {
   const head = `${enc({ alg: "EdDSA", typ: "JWT" })}.${enc({
-    iss: "hive", aud: "galaxyfarm", sub: "hive-1", email: "owner@farm.test", email_verified: true,
-    name: "Owner", iat: secs - 10, exp: secs + 110, ...claims,
+    iss: "hive",
+    aud: "galaxyfarm",
+    sub: "hive-1",
+    email: "owner@farm.test",
+    email_verified: true,
+    name: "Owner",
+    iat: secs - 10,
+    exp: secs + 110,
+    ...claims,
   })}`;
   return `${head}.${sign(null, Buffer.from(head), key).toString("base64url")}`;
 }
 
-const owner: HiveBoardUser = { id: "01OWNER", propertyId: "01PROP", role: "owner", active: true, hasPassword: true };
+const owner: HiveBoardUser = {
+  id: "01OWNER",
+  propertyId: "01PROP",
+  role: "owner",
+  active: true,
+  hasPassword: true,
+};
 const findUser = async (email: string) => (email === "owner@farm.test" ? owner : undefined);
 const noToken = async () => undefined;
 const check = (header: string) => {
@@ -41,7 +58,9 @@ describe("verifyHivePass", () => {
   it("refuses another app, another key, an expired pass, and junk", () => {
     expect(verifyHivePass(pass({ aud: "learnleaf" }), NOW, "galaxyfarm", PUBLIC)).toBeUndefined();
     expect(verifyHivePass(pass({}, other.privateKey), NOW, "galaxyfarm", PUBLIC)).toBeUndefined();
-    expect(verifyHivePass(pass({ iat: secs - 400, exp: secs - 280 }), NOW, "galaxyfarm", PUBLIC)).toBeUndefined();
+    expect(
+      verifyHivePass(pass({ iat: secs - 400, exp: secs - 280 }), NOW, "galaxyfarm", PUBLIC),
+    ).toBeUndefined();
     expect(verifyHivePass("not.a.pass", NOW, "galaxyfarm", PUBLIC)).toBeUndefined();
   });
 });
@@ -49,7 +68,12 @@ describe("verifyHivePass", () => {
 describe("authorizeBoardRequest with a Hive pass", () => {
   it("acts as the person with that email, on their property", async () => {
     const caller = await check(`Hive ${pass()}`);
-    expect(caller).toMatchObject({ id: "01OWNER", propertyId: "01PROP", createdBy: "01OWNER", via: "hive" });
+    expect(caller).toMatchObject({
+      id: "01OWNER",
+      propertyId: "01PROP",
+      createdBy: "01OWNER",
+      via: "hive",
+    });
     expect(apiTokenDeviceId(caller!)).toBe("hive:01OWNER");
   });
   it("refuses an unconfirmed email, an unknown email, or a forged pass", async () => {
@@ -71,7 +95,17 @@ describe("hiveUserMayUseBoard", () => {
     expect(hiveUserMayUseBoard({ ...owner, active: false }, NOW)).toBe(false);
     expect(hiveUserMayUseBoard({ ...owner, hasPassword: false }, NOW)).toBe(false);
     const sitter = { ...owner, role: "housesitter" };
-    expect(hiveUserMayUseBoard({ ...sitter, accessFrom: new Date("2026-11-18"), accessTo: new Date("2026-11-25") }, NOW)).toBe(true);
-    expect(hiveUserMayUseBoard({ ...sitter, accessFrom: new Date("2026-11-20"), accessTo: new Date("2026-11-25") }, NOW)).toBe(false);
+    expect(
+      hiveUserMayUseBoard(
+        { ...sitter, accessFrom: new Date("2026-11-18"), accessTo: new Date("2026-11-25") },
+        NOW,
+      ),
+    ).toBe(true);
+    expect(
+      hiveUserMayUseBoard(
+        { ...sitter, accessFrom: new Date("2026-11-20"), accessTo: new Date("2026-11-25") },
+        NOW,
+      ),
+    ).toBe(false);
   });
 });
