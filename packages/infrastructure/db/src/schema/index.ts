@@ -1600,6 +1600,46 @@ export const apiTokens = pgTable(
 );
 
 /**
+ * Eggs to the kitchen (spec §4.3 "Connected apps") — when this property
+ * started feeding KitchenHub, and how the last send went.
+ *
+ * **Deliberately outside `allTables`**, with `api_tokens`: server
+ * bookkeeping, never synced. `apps/web/lib/kitchen-egg-store.ts` is its only
+ * reader and writer. Records created before `startedAt` are never sent, so
+ * switching the link on does not pour the egg history into the fridge.
+ */
+export const kitchenEggLinks = pgTable("kitchen_egg_links", {
+  propertyId: text("property_id").primaryKey(),
+  startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }).notNull(),
+  lastSentAt: timestamp("last_sent_at", { withTimezone: true, mode: "date" }),
+  lastError: text("last_error"),
+});
+
+/**
+ * The version of each egg log and disposition KitchenHub last acknowledged.
+ *
+ * The farm's own records are the outbox: one is waiting while its
+ * `updated_at` is newer than `version` here (or there is no row), so a failed
+ * send loses nothing and the next write retries it. Outside `allTables`, like
+ * the table above.
+ */
+export const kitchenEggSends = pgTable(
+  "kitchen_egg_sends",
+  {
+    /** The sync entity name — `eggLogs` or `eggDispositions`. */
+    entity: text("entity").notNull(),
+    recordId: text("record_id").notNull(),
+    propertyId: text("property_id").notNull(),
+    version: timestamp("version", { withTimezone: true, mode: "date" }).notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (table) => [
+    primaryKey({ name: "kitchen_egg_sends_pk", columns: [table.entity, table.recordId] }),
+    index("kitchen_egg_sends_property_idx").on(table.propertyId),
+  ],
+);
+
+/**
  * One browser on one device, subscribed to push (spec §6).
  *
  * A subscription is a capability URL plus the two keys that decrypt what is

@@ -291,6 +291,12 @@ Both answer `401 { "error": "unauthorized" }` without `Authorization: Bearer <to
 
 **Minting a token.** `/admin/settings` → **Connected apps** (owners only) → **Mint a token**, name it after the app, and copy the token from the dialog — it is shown once and only its SHA-256 hash is kept, in `api_tokens`. Paste it into the other app as its secret. **Revoking** is the **Revoke** button on the same row; the app is refused from its next request. A lost token is never recovered: mint a new one and revoke the old. Each token reaches the one property it was minted on.
 
+### Eggs to the kitchen
+
+The farm also feeds KitchenHub (spec §4.3 "Eggs to the kitchen"): every egg log and disposition, once written, is sent to KitchenHub's `POST /api/farm/eggs` as it now is, versioned by its `updatedAt`, and KitchenHub moves its Eggs item by the difference — collections in, eggs given or sold out, kept and deleted ones nothing. It runs from `applyPushAndMark` after the write commits, so a KitchenHub outage never fails a farm write; the records themselves are the outbox (`kitchen_egg_sends` holds the version last acknowledged), and anything waiting goes with the next push. Eggs logged before the link first ran are left alone.
+
+Set `KITCHENHUB_URL`, `KITCHENHUB_TOKEN` (a KitchenHub Settings → Connected apps token, which names the household) and `KITCHENHUB_PROPERTY_ID` (the farm property that feeds it) in the Netlify environment, as secrets. Any one missing and nothing is sent. `lib/kitchen-eggs.ts` is what is sent, `lib/kitchen-egg-store.ts` the sending.
+
 ### Email
 
 `RESEND_API_KEY` and `EMAIL_FROM` are the whole of it. Both are read in exactly one place — `apps/web/lib/notifier.ts`, the composition root — and everything else asks for the kernel's `Notifier` port. §6's "web push later" turned out to be exactly that: [a change to that one file](#notifications).

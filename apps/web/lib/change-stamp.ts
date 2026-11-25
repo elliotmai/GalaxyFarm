@@ -3,6 +3,8 @@ import { getStore } from "@netlify/blobs";
 import type { OutboxEntry, PushResult } from "@galaxy-farm/core";
 import { applyPush, type Database, type PushContext } from "@galaxy-farm/infra-db";
 
+import { afterFarmWrite } from "@/lib/kitchen-egg-store";
+
 /**
  * "Has anything changed since you last looked?" — answered without Postgres.
  *
@@ -87,6 +89,10 @@ export async function markChanged(propertyId: string): Promise<void> {
  * Every server-side writer of synced records goes through this rather than
  * `applyPush` directly — the push route, the kiosk and sitter actions, the
  * Wander trip writer — so none of them can forget the stamp.
+ *
+ * It is also where egg logs and dispositions are sent on to the kitchen
+ * (`kitchen-egg-store.ts`): after the write has committed, so a send that
+ * fails never costs the farm its write, and for every writer at once.
  */
 export async function applyPushAndMark(
   db: Database,
@@ -95,5 +101,11 @@ export async function applyPushAndMark(
 ): Promise<PushResult> {
   const result = await applyPush(db, entries, context);
   if (result.accepted.length > 0) await markChanged(context.propertyId);
+  const accepted = new Set(result.accepted);
+  await afterFarmWrite(
+    db,
+    context.propertyId,
+    entries.filter((entry) => accepted.has(entry.id)),
+  );
   return result;
 }

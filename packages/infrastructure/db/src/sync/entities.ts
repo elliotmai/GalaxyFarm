@@ -67,6 +67,10 @@ export const BOOKKEEPING_TABLES: readonly string[] = ["syncAudit", "syncFieldMet
  * token another app holds. A hash rather than the token, but still nothing a
  * barn screen has any business holding — and the app it belongs to reads
  * through the server, never through sync.
+ *
+ * `kitchen_egg_links` and `kitchen_egg_sends` joined it with eggs to the
+ * kitchen (§4.3): the server's record of which egg logs KitchenHub has
+ * acknowledged. Bookkeeping about a connected app, of no use to a device.
  */
 export const UNTRACKED_TABLES: readonly string[] = [
   "kiosk_pins",
@@ -74,6 +78,8 @@ export const UNTRACKED_TABLES: readonly string[] = [
   "notification_settings",
   "wander_connections",
   "api_tokens",
+  "kitchen_egg_links",
+  "kitchen_egg_sends",
 ];
 
 export const SYNCED_ENTITIES: readonly string[] = Object.keys(allTables).filter(
