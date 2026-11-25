@@ -24,6 +24,7 @@ import { signIn } from "next-auth/react";
  */
 export const HIVE_ORIGIN = "https://hive.flyingdoublemranch.com";
 const HOPPED = "galaxyfarm.hiveHop";
+const SITE = "https://flyingdoublemranch.com";
 
 const session = {
   get(): string | null {
@@ -90,6 +91,8 @@ export function HiveSignIn({ next }: { readonly next: string }) {
       return undefined;
     }
 
+    // Only from the real address (Hive's catalog): the hop sends a pass back to nowhere else.
+    if (window.location.origin !== SITE) return undefined;
     if (window.matchMedia?.("(display-mode: standalone)").matches) return undefined;
     if (session.get() !== null || !session.set()) return undefined; // once a visit; no storage, no risk of a loop
     const back = `${window.location.origin}${window.location.pathname}${window.location.search}`;
