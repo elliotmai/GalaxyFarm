@@ -50,6 +50,7 @@ import {
   damsThatHaveCalved,
   projectedDueDate,
   unclassified,
+  withCalvesAtFoot,
   type BreedingRecord,
   type CalvingRecord,
   type CattleProfile,
@@ -478,9 +479,23 @@ export function HerdScreen({
     // The placement, after the animal exists. Both slots go through the same
     // move as every other, so an edit that changes a pen closes the old
     // assignment rather than overwriting it and losing where she was.
+    //
+    // Her unweaned calves go where she goes (§6), worked out against where
+    // everybody stood *before* this save, so a calf still beside her old pen
+    // is recognised as hers to bring.
     const animalId = editing?.id ?? (result.value as Animal).id;
-    await placeIn(animalId, draft.outsideZoneId as Ulid);
-    if (draft.insideZoneId !== "") await placeIn(animalId, draft.insideZoneId as Ulid);
+    const party = withCalvesAtFoot([animalId], {
+      animals: everyone,
+      profiles,
+      calvings,
+      assignments,
+      indoorZoneIds,
+      asOf: new Date(),
+    });
+    for (const member of party) {
+      await placeIn(member.animalId, draft.outsideZoneId as Ulid);
+      if (draft.insideZoneId !== "") await placeIn(member.animalId, draft.insideZoneId as Ulid);
+    }
 
     show({ message: editing === undefined ? "Animal added" : "Animal saved", tone: "success" });
     setDraft(undefined);

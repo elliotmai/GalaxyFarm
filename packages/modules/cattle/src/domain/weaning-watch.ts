@@ -1,5 +1,6 @@
 import {
   ageInDays,
+  assignmentInSlot,
   DEFAULT_WEANING_BATCH_WINDOW_DAYS,
   DEFAULT_WEANING_EARLIEST_DAYS,
   DEFAULT_WEANING_LATEST_DAYS,
@@ -8,6 +9,7 @@ import {
   isOnFarm,
   type Animal,
   type Ulid,
+  type ZoneAssignment,
 } from "@galaxy-farm/core";
 
 import type { CattleProfile } from "./cattle-profile.js";
@@ -386,4 +388,82 @@ export function describeBatch(batch: WeaningBatch): string {
   return `${subject}${spread} — old enough in ${wait} ${
     wait === 1 ? "day" : "days"
   }, once the youngest is 120.`;
+}
+
+/**
+ * The calves that go where she goes.
+ *
+ * An unweaned calf runs with the cow raising it, so moving her without it is
+ * not a move anybody makes on purpose — it is half a move, and the record then
+ * says the calf is standing in a pen its mother left. Every screen that moves
+ * an animal asks this and moves the calves with her, which is the same pair
+ * the weaning watch eventually splits.
+ *
+ * "The cow raising it" is the weaning watch's answer, not the pedigree's: a
+ * recipient cow brings her ET calf, a graft follows the cow it was grafted on,
+ * and the donor named on the papers brings nothing.
+ *
+ * ## A calf already standing somewhere else stays
+ *
+ * A calf known to be in a different outside zone from her has been separated
+ * by somebody, for a reason — a sick pen, early weaning nobody has written
+ * down — and dragging it back across the place would undo a decision this
+ * cannot see. A calf with no outside placement at all has nowhere to be left
+ * in, so it follows. When she has no outside placement either, there is
+ * nothing to compare, and the calf follows.
+ */
+export function calvesAtFoot(
+  damId: Ulid,
+  input: Pick<WeaningWatchInput, "animals" | "profiles" | "calvings" | "asOf"> & {
+    readonly assignments: readonly ZoneAssignment[];
+    readonly indoorZoneIds: ReadonlySet<Ulid>;
+  },
+): WeaningCandidate[] {
+  const outsideOf = (animalId: Ulid) =>
+    assignmentInSlot(input.assignments, animalId, "outside", input.indoorZoneIds)?.zoneId;
+  const hers = outsideOf(damId);
+
+  return weaningCandidates(input).filter((calf) => {
+    if (calf.damId !== damId || calf.calfId === damId) return false;
+    const its = outsideOf(calf.calfId);
+    return hers === undefined || its === undefined || its === hers;
+  });
+}
+
+/** An animal to move, and the cow it is going with when it is a calf at foot. */
+export interface MoveParty {
+  readonly animalId: Ulid;
+  /** Set when this calf was added because its dam is moving. */
+  readonly withDamId?: Ulid | undefined;
+}
+
+/**
+ * Who actually moves when these animals are moved: them, and their calves.
+ *
+ * The animals asked for come first and in order; calves follow their dam.
+ * A calf that was asked for itself is not listed twice, and is not marked as
+ * following — somebody chose it.
+ */
+export function withCalvesAtFoot(
+  animalIds: readonly Ulid[],
+  input: Parameters<typeof calvesAtFoot>[1],
+): MoveParty[] {
+  const party: MoveParty[] = [];
+  const seen = new Set<Ulid>();
+
+  for (const animalId of animalIds) {
+    if (seen.has(animalId)) continue;
+    seen.add(animalId);
+    party.push({ animalId });
+  }
+
+  for (const damId of animalIds) {
+    for (const calf of calvesAtFoot(damId, input)) {
+      if (seen.has(calf.calfId)) continue;
+      seen.add(calf.calfId);
+      party.push({ animalId: calf.calfId, withDamId: damId });
+    }
+  }
+
+  return party;
 }

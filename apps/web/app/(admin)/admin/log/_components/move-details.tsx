@@ -9,10 +9,16 @@ import {
   encodeUlid,
   moveToZone,
   zoneAssignmentSchema,
+  type Animal,
   type Ulid,
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
+import {
+  withCalvesAtFoot,
+  type CalvingRecord,
+  type CattleProfile,
+} from "@galaxy-farm/module-cattle";
 
 import { useMutations } from "@/lib/local/mutations";
 import { useRecords } from "@/lib/local/use-records";
@@ -34,6 +40,11 @@ import { DetailsForm, forCount, whoLine, type DetailsProps } from "./log-parts";
  * one, so where a cow was in March survives; and it is a no-op for an animal
  * already standing there, reported rather than written twice. "None" closes
  * the open inside assignment and opens nothing.
+ *
+ * A cow's unweaned calf goes with her (§6 — calves run with their dams until
+ * weaning), whether or not it was picked: `withCalvesAtFoot` adds it, and the
+ * confirmation says so, because a calf that moved without being chosen should
+ * not be a surprise on the pen board.
  */
 
 /** "" leaves a place alone; `none` (inside only) takes them out of it. */
@@ -44,6 +55,9 @@ export function MoveDetails({ propertyId, actorId, animals, onSaved }: DetailsPr
   const query = { propertyId };
   const { records: zones } = useRecords<Zone>("zones", query);
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
+  const { records: everyone } = useRecords<Animal>("animals", query);
+  const { records: profiles } = useRecords<CattleProfile>("cattleProfiles", query);
+  const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", query);
   const placements = useMutations<ZoneAssignment>(
     "zoneAssignments",
     "zoneAssignments",
@@ -91,7 +105,13 @@ export function MoveDetails({ propertyId, actorId, animals, onSaved }: DetailsPr
     try {
       let moved = 0;
       let already = 0;
-      for (const animal of animals) {
+      const followers: string[] = [];
+      const party = withCalvesAtFoot(
+        animals.map((animal) => animal.id),
+        { animals: everyone, profiles, calvings, assignments, indoorZoneIds, asOf: new Date() },
+      );
+      for (const member of party) {
+        const animal = { id: member.animalId };
         let changed = false;
         let stayed = false;
 
@@ -139,6 +159,15 @@ export function MoveDetails({ propertyId, actorId, animals, onSaved }: DetailsPr
           else stayed = true;
         }
 
+        if (member.withDamId !== undefined) {
+          // Counted apart from the ones chosen: the headline is about what
+          // was asked for, and the calves get a line of their own.
+          if (changed) {
+            const calf = everyone.find((candidate) => candidate.id === member.animalId);
+            followers.push(calf?.name ?? calf?.tagNumber ?? "a calf");
+          }
+          continue;
+        }
         if (changed) moved += 1;
         else if (stayed) already += 1;
       }
@@ -150,12 +179,17 @@ export function MoveDetails({ propertyId, actorId, animals, onSaved }: DetailsPr
       ]
         .filter((part) => part !== undefined)
         .join(", ");
+      const calves =
+        followers.length === 0
+          ? ""
+          : ` ${followers.length === 1 ? "Calf at foot" : "Calves at foot"} went too: ${followers.join(", ")}.`;
       onSaved({
         headline: `Saved for ${forCount(animals.length)}`,
         detail:
-          already === 0
+          (already === 0
             ? `Moved: ${where}.`
-            : `${moved === 0 ? "Nobody moved" : `${forCount(moved)} moved`} — ${forCount(already)} already there.`,
+            : `${moved === 0 ? "Nobody moved" : `${forCount(moved)} moved`} — ${forCount(already)} already there.`) +
+          calves,
       });
     } finally {
       setBusy(false);

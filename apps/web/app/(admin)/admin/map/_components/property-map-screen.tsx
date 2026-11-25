@@ -35,6 +35,11 @@ import {
   type ZoneAssignment,
   type Animal,
 } from "@galaxy-farm/core";
+import {
+  withCalvesAtFoot,
+  type CalvingRecord,
+  type CattleProfile,
+} from "@galaxy-farm/module-cattle";
 
 import {
   BLANK_FENCE,
@@ -92,6 +97,8 @@ export function PropertyMapScreen({
   const { records: assignments } = useRecords<ZoneAssignment>("zoneAssignments", query);
   const { records: properties } = useRecords<Property>("properties", query);
   const { records: water } = useRecords<WaterSource>("waterSources", query);
+  const { records: profiles } = useRecords<CattleProfile>("cattleProfiles", query);
+  const { records: calvings } = useRecords<CalvingRecord>("calvingRecords", query);
 
   // Off-site zones have no ground here to draw, and prompting somebody to
   // trace a boundary for a collection facility two counties away is noise.
@@ -179,46 +186,75 @@ export function PropertyMapScreen({
    * was she in March" answerable — and it is why they are separate patches: a
    * device that syncs the close but not the open must not end up with the
    * animal nowhere.
+   *
+   * Dragging a cow brings her unweaned calves (§6): they run with her until
+   * weaning, so a chip dropped on a new pasture is the pair, not half of it.
    */
   const performMove = useCallback(
     async (animal: Animal, zone: Zone) => {
       const at = new Date();
-      const { closed, opened } = moveToZone(
+      const party = withCalvesAtFoot([animal.id], {
+        animals,
+        profiles,
+        calvings,
         assignments,
-        {
-          id: encodeUlid(at.getTime()) as Ulid,
-          propertyId,
-          createdAt: at,
-          updatedAt: at,
-          animalId: animal.id,
-          zoneId: zone.id,
-          indoor: zone.indoor,
-          at,
-        },
         indoorZoneIds,
-      );
+        asOf: at,
+      });
 
-      // Side by side: each close is its own record, and an animal holding a
-      // stall and a pasture has two to close before the new one may open.
-      await Promise.all(
-        closed.map((entry) => placements.update(entry.id, { periodTo: entry.periodTo })),
-      );
+      let herMove: { opened: boolean; ok: boolean } = { opened: false, ok: true };
+      let calvesMoved = 0;
+      for (const member of party) {
+        const { closed, opened } = moveToZone(
+          assignments,
+          {
+            id: encodeUlid(at.getTime()) as Ulid,
+            propertyId,
+            createdAt: at,
+            updatedAt: at,
+            animalId: member.animalId,
+            zoneId: zone.id,
+            indoor: zone.indoor,
+            at,
+          },
+          indoorZoneIds,
+        );
 
-      if (opened === undefined) {
+        // Side by side: each close is its own record, and an animal holding a
+        // stall and a pasture has two to close before the new one may open.
+        await Promise.all(
+          closed.map((entry) => placements.update(entry.id, { periodTo: entry.periodTo })),
+        );
+
+        const ok = opened === undefined ? true : (await placements.create(opened)).ok;
+        if (member.withDamId === undefined) herMove = { opened: opened !== undefined, ok };
+        else if (opened !== undefined && ok) calvesMoved += 1;
+      }
+
+      const withCalves =
+        calvesMoved === 0
+          ? ""
+          : calvesMoved === 1
+            ? ", with her calf"
+            : `, with ${calvesMoved} calves`;
+
+      if (!herMove.opened) {
         // Already there. Saying so is the honest answer to the gesture that
         // was made; writing a second identical assignment was the old one.
-        show({ message: `${animal.name ?? "She"} is already in ${zone.name}`, tone: "info" });
+        show({
+          message: `${animal.name ?? "She"} is already in ${zone.name}${withCalves}`,
+          tone: "info",
+        });
         return;
       }
 
-      const result = await placements.create(opened);
       show(
-        result.ok
-          ? { message: `Moved to ${zone.name}`, tone: "success" }
+        herMove.ok
+          ? { message: `Moved to ${zone.name}${withCalves}`, tone: "success" }
           : { message: "That move would not save.", tone: "danger" },
       );
     },
-    [assignments, indoorZoneIds, placements, propertyId, show],
+    [animals, assignments, calvings, indoorZoneIds, placements, profiles, propertyId, show],
   );
 
   const onReassign = useCallback(
