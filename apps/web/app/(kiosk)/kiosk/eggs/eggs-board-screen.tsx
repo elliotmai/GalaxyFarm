@@ -1,39 +1,44 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { PageBody, Select, useToast } from "@galaxy-farm/ui";
 import { dayKey, type Ulid } from "@galaxy-farm/core";
-import type { EggBreakdown, EggLog, Flock } from "@galaxy-farm/module-poultry";
+import type { EggLog, Flock } from "@galaxy-farm/module-poultry";
 
 import { KioskHeader } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { logKioskEggs } from "@/app/(kiosk)/kiosk/_actions";
 import { useSyncEngine } from "@/app/_components/sync-provider";
+import { MAX_KIOSK_EGG_COUNT } from "@/lib/kiosk-limits";
 import { useRecords } from "@/lib/local/use-records";
 
 /**
  * Egg Quick-Entry (spec §4.4, §5.4).
  *
- * Big +1 buttons at the coop, breakdown optional — the total is the only
- * required field because a log that demanded a colour and a size for every
- * egg is a log nobody keeps up. Three presets rather than the full colour ×
- * size matrix, matching the mockup: two breakdown-carrying combinations for
- * whatever this flock lays most, and "Other" for everything else, which logs
- * a bare count with no breakdown at all.
+ * How many, and nothing else. Count the basket up with the big buttons, log
+ * it once — one row for the whole collection, no colour and no size, because
+ * a log that asks for either at the coop is a log nobody keeps up.
+ *
+ * Opened on its own from the boards, or straight from ticking off the egg
+ * round on a chore board; then `returnTo` names that board, back goes there,
+ * and logging the count hands back to it.
  */
 
-const PRESETS: readonly { readonly label: string; readonly breakdown: readonly EggBreakdown[] }[] =
-  [
-    { label: "Brown · large", breakdown: [{ colour: "brown", size: "large", count: 1 }] },
-    { label: "Brown · medium", breakdown: [{ colour: "brown", size: "medium", count: 1 }] },
-    { label: "Other", breakdown: [] },
-  ];
+const STEPS = [1, 6, 12] as const;
 
-export function EggsBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
+export function EggsBoardScreen({
+  propertyId,
+  returnTo,
+}: {
+  readonly propertyId: Ulid;
+  readonly returnTo?: string | undefined;
+}) {
   const { store, syncNow } = useSyncEngine();
   const { show } = useToast();
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [busyLabel, setBusyLabel] = useState<string | undefined>();
+  const [count, setCount] = useState(0);
   const [flockId, setFlockId] = useState<Ulid | undefined>();
 
   const query = useMemo(() => ({ propertyId }), [propertyId]);
@@ -55,19 +60,24 @@ export function EggsBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
     .filter((log) => selected === undefined || log.flockId === selected)
     .reduce((sum, log) => sum + log.total, 0);
 
-  function tap(preset: (typeof PRESETS)[number]) {
-    setBusyLabel(preset.label);
+  const adjust = (by: number) =>
+    setCount((current) => Math.min(MAX_KIOSK_EGG_COUNT, Math.max(0, current + by)));
+
+  function logCount() {
+    if (count < 1) return;
     startTransition(async () => {
       const result = await logKioskEggs({
         ...(selected === undefined ? {} : { flockId: selected }),
-        breakdown: preset.breakdown,
+        count,
       });
 
-      setBusyLabel(undefined);
       if (!result.ok) {
         show({ message: result.error, tone: "danger" });
         return;
       }
+      show({ message: `Logged ${count} ${count === 1 ? "egg" : "eggs"}.` });
+      setCount(0);
+      if (returnTo !== undefined) router.push(returnTo);
       await syncNow();
     });
   }
@@ -75,9 +85,10 @@ export function EggsBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
   return (
     <PageBody>
       <KioskHeader
-        back={false}
+        back={returnTo !== undefined}
+        {...(returnTo === undefined ? {} : { backTo: returnTo })}
         title="Egg Quick-Entry"
-        fact="Tap +1 for every egg as you collect it."
+        fact={logsLoading ? "…" : `${todayTotal} collected today`}
       />
 
       {flocksLoading || store === undefined ? (
@@ -94,28 +105,50 @@ export function EggsBoardScreen({ propertyId }: { readonly propertyId: Ulid }) {
               onChange={(event) => setFlockId(event.target.value as Ulid)}
             />
           ) : null}
+
           <div className="gf-kiosk-egg-count" aria-live="polite">
-            <p className="gf-kiosk-egg-count__n">{logsLoading ? "…" : todayTotal}</p>
-            <p className="text-muted">
-              {todayTotal === 1 ? "egg collected today" : "eggs collected today"}
+            <p className="gf-kiosk-egg-count__n" aria-label={`${count} eggs`}>
+              {count}
             </p>
+            <p className="text-muted">{count === 1 ? "egg" : "eggs"} in this collection</p>
           </div>
-          <div className="grid grid-cols-1 gap-density sm:grid-cols-3">
-            {PRESETS.map((preset) => (
+
+          <div className="grid grid-cols-2 gap-density sm:grid-cols-4">
+            <button
+              type="button"
+              disabled={pending || count === 0}
+              onClick={() => adjust(-1)}
+              aria-label="One fewer"
+              className="gf-kiosk-egg-button"
+            >
+              <span className="gf-kiosk-egg-button__plus">−1</span>
+            </button>
+            {STEPS.map((step) => (
               <button
-                key={preset.label}
+                key={step}
                 type="button"
-                disabled={pending}
-                onClick={() => tap(preset)}
+                disabled={pending || count >= MAX_KIOSK_EGG_COUNT}
+                onClick={() => adjust(step)}
+                aria-label={`Add ${step}`}
                 className="gf-kiosk-egg-button"
               >
-                <span className="gf-kiosk-egg-button__plus">
-                  {pending && busyLabel === preset.label ? "…" : "+1"}
-                </span>
-                <span>{preset.label}</span>
+                <span className="gf-kiosk-egg-button__plus">+{step}</span>
               </button>
             ))}
-          </div>{" "}
+          </div>
+
+          <button
+            type="button"
+            disabled={pending || count === 0}
+            onClick={logCount}
+            className="gf-kiosk-egg-log"
+          >
+            {pending
+              ? "Logging…"
+              : count === 0
+                ? "Count the eggs first"
+                : `Log ${count} ${count === 1 ? "egg" : "eggs"}`}
+          </button>
         </div>
       )}
     </PageBody>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 import { useToast } from "@galaxy-farm/ui";
 import {
@@ -13,7 +14,7 @@ import {
 
 import { setKioskChoreDone } from "@/app/(kiosk)/kiosk/_actions";
 import { useSyncEngine } from "@/app/_components/sync-provider";
-import { groupChoresForBoard } from "@/lib/chores";
+import { eggReturnBoard, groupChoresForBoard, isEggCollectionChore } from "@/lib/chores";
 import type { PeopleNames } from "@/lib/people-names";
 
 /**
@@ -42,6 +43,12 @@ import type { PeopleNames } from "@/lib/people-names";
  * tapped, the write happens behind it, and the tick is put back with an error
  * if the farm refuses it. The overrides that carry that are dropped as soon as
  * the synced store agrees, so the server stays the authority.
+ *
+ * Ticking off the egg round opens Egg Quick-Entry once the tick has landed,
+ * so the count is taken with the basket still in hand, and the egg screen
+ * hands back to this board when it is logged. Only on the way to done — and
+ * only once the farm has accepted the tick, so a refused one leaves you on the
+ * board with the error rather than on a screen for a chore that is not done.
  */
 
 /**
@@ -84,6 +91,8 @@ export function ChoreBoard({
 }) {
   const { syncNow } = useSyncEngine();
   const { show } = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
   const [, startTransition] = useTransition();
   /** In-flight rows, so a double tap cannot write the same chore twice. */
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
@@ -189,6 +198,10 @@ export function ChoreBoard({
         });
         show({ message: result.error, tone: "danger" });
         return;
+      }
+      if (done && isEggCollectionChore(entry)) {
+        const back = eggReturnBoard(pathname ?? undefined);
+        router.push(back === undefined ? "/kiosk/eggs" : `/kiosk/eggs?from=${back}`);
       }
       await syncNow();
     });

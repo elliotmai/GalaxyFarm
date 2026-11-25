@@ -306,11 +306,6 @@
   color: var(--gf-text);
 }
 
-.gf-kiosk-egg-button:first-child {
-  background: var(--gf-action);
-  color: var(--gf-action-ink);
-}
-
 .gf-kiosk-egg-button:active:not(:disabled) {
   background: var(--gf-raised);
   color: var(--gf-text);
@@ -318,6 +313,22 @@
 
 .gf-kiosk-egg-button:disabled {
   opacity: 0.6;
+}
+
+.gf-kiosk-egg-log {
+  min-height: 6rem;
+  border: 2px solid var(--gf-action);
+  background: var(--gf-action);
+  color: var(--gf-action-ink);
+  font-family: var(--gf-font-display);
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.gf-kiosk-egg-log:disabled {
+  border-color: var(--gf-rule);
+  background: var(--gf-panel);
+  color: var(--gf-muted);
 }
 
 .gf-kiosk-egg-button__plus {

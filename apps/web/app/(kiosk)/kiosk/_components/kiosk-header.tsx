@@ -18,6 +18,7 @@ export function KioskHeader({
   title,
   fact,
   back = true,
+  backTo = "/kiosk",
   actions,
 }: {
   readonly title: string;
@@ -25,11 +26,13 @@ export function KioskHeader({
   readonly fact?: ReactNode;
   /** Off for the picker itself, which is where back would go. */
   readonly back?: boolean;
+  /** Where back goes, when a board was opened from another one. */
+  readonly backTo?: string;
   readonly actions?: ReactNode;
 }) {
   return (
     <header className="flex flex-wrap items-center gap-x-density gap-y-2">
-      {back ? <KioskBackLink /> : null}
+      {back ? <KioskBackLink href={backTo} /> : null}
       <div className="flex min-w-0 flex-1 flex-col">
         <h1 className="text-ink">{title}</h1>
         {fact === undefined ? null : <p className="text-density text-muted">{fact}</p>}
@@ -49,12 +52,12 @@ export function KioskHeader({
  * `prefetch`, because the picker is the one screen every board goes back to
  * and the barn is the place most likely to be out of signal.
  */
-export function KioskBackLink() {
+export function KioskBackLink({ href = "/kiosk" }: { readonly href?: string } = {}) {
   return (
     <Link
-      href="/kiosk"
+      href={href}
       prefetch
-      aria-label="All boards"
+      aria-label={href === "/kiosk" ? "All boards" : "Back"}
       className="inline-flex min-h-target min-w-target shrink-0 items-center justify-center self-start rounded-density border border-rule bg-panel text-ink hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
     >
       <svg aria-hidden width="28" height="28" viewBox="0 0 24 24" fill="none">

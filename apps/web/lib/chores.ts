@@ -251,3 +251,30 @@ export async function toggleChore(
       : { completedAt: undefined, completedBy: undefined },
   );
 }
+
+/**
+ * Whether a chore is the egg round — "Collect eggs", "Collect chicken eggs",
+ * "Gather the eggs".
+ *
+ * Read off the title because that is all a chore says about itself: there is
+ * no kind on a task or a template, and the egg round is whatever the farm
+ * chose to call it. Ticking one on a kiosk board opens Egg Quick-Entry, so
+ * the count is taken while the basket is still in hand.
+ */
+export function isEggCollectionChore(entry: Pick<ChoreEntry, "title">): boolean {
+  const title = entry.title.toLowerCase();
+  return /\beggs?\b/.test(title) && /\b(collect|gather|pick)/.test(title);
+}
+
+/**
+ * The kiosk boards Egg Quick-Entry may hand back to. Anything else in the
+ * `from` parameter is ignored, so the link can never be pointed off the
+ * barn surface.
+ */
+export const EGG_RETURN_BOARDS = ["/kiosk/chores", "/kiosk/housesitter"] as const;
+
+export function eggReturnBoard(
+  from: string | undefined,
+): (typeof EGG_RETURN_BOARDS)[number] | undefined {
+  return EGG_RETURN_BOARDS.find((board) => board === from);
+}

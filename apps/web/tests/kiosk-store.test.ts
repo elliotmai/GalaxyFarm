@@ -151,6 +151,24 @@ describe("logEggsForKiosk", () => {
     expect(logs[0]?.breakdown).toEqual([]);
   });
 
+  it("logs a whole collection as one row of that many, with no breakdown", async () => {
+    const outcome = await logEggsForKiosk(kioskActor(), { count: 14 }, NOW, db);
+    expect(outcome.ok).toBe(true);
+
+    const logs = await repositoryFor<EggLog>(db, "eggLogs").list({ propertyId: PROPERTY });
+    expect(logs).toHaveLength(1);
+    expect(logs[0]?.total).toBe(14);
+    expect(logs[0]?.breakdown).toEqual([]);
+  });
+
+  it.each([0, -3, 2.5, 501])("refuses a count of %s", async (count) => {
+    const outcome = await logEggsForKiosk(kioskActor(), { count }, NOW, db);
+    expect(outcome.ok).toBe(false);
+
+    const logs = await repositoryFor<EggLog>(db, "eggLogs").list({ propertyId: PROPERTY });
+    expect(logs).toHaveLength(0);
+  });
+
   it("two taps write two independent rows, not a read-modify-write of one", async () => {
     await logEggsForKiosk(kioskActor(), {}, NOW, db);
     await logEggsForKiosk(kioskActor(), {}, new Date(NOW.getTime() + 1000), db);

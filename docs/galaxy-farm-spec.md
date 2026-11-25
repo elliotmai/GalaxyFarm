@@ -137,7 +137,7 @@ Anything without a live token or a good pass is `401 { error: "unauthorized" }`.
 
 ### 4.4 Kiosk mode
 
-Barn screens pair via a one-time code and hold a long-lived device token. Kiosk home offers preset boards: **Pen Board** (property map + who's where + care instructions), **Calendar**, **Today's Chores**, **Egg Quick-Entry** (big +1 buttons per coop/color/size), **Program Day Sheet** (today's show-program schedule as a calf × activity grid — tap to check off rinses, exercise, and training slots as they happen), and **Housesitter Mode**. Large touch targets, high contrast, auto-refresh on sync, screen-wake hints. Any screen can be locked to a single board from settings.
+Barn screens pair via a one-time code and hold a long-lived device token. Kiosk home offers preset boards: **Pen Board** (property map + who's where + care instructions), **Calendar**, **Today's Chores**, **Egg Quick-Entry** (count only: big −1 / +1 / +6 / +12 buttons per coop, logged once as one total — no color or size; ticking off an egg-collection chore — “Collect eggs”, “Collect chicken eggs” — on a chore board opens it and hands back to that board once logged), **Program Day Sheet** (today's show-program schedule as a calf × activity grid — tap to check off rinses, exercise, and training slots as they happen), and **Housesitter Mode**. Large touch targets, high contrast, auto-refresh on sync, screen-wake hints. Any screen can be locked to a single board from settings.
 
 ### 4.5 Data operations contract (non-negotiable)
 
@@ -277,7 +277,7 @@ Services are **grouped into attempts**, derived rather than stored (§2): a cow 
 
 **Flock** — species (`chicken | quail | ...` — quail is a dropdown value, not a new module), coop (Zone), breed mix, headCount maintained by an **adjustment log** (`added | died | predator | culled | sold`, qty, note) so count history is auditable.
 
-**EggLog** — date, flock/coop, total count, optional breakdown rows by `{color, size, count}`. Kiosk quick-entry: tap +1 buttons at the coop; detailed breakdown optional on the same screen.
+**EggLog** — date, flock/coop, total count, optional breakdown rows by `{color, size, count}`. Kiosk quick-entry logs the count only — tap the basket up and log it once; the colour/size breakdown is entered from the admin app, never at the coop.
 
 **EggDisposition** (lightweight, optional) — date, qty, `kept | given | sold`, contact, price. Keeps the door open for real sales without pretending it's a business.
 
