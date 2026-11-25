@@ -6,12 +6,18 @@ import {
   openAssignments,
   systemClock,
   type Actor,
+  type Animal,
   type FieldValue,
   type Ulid,
   type Zone,
   type ZoneAssignment,
 } from "@galaxy-farm/core";
 import { repositoryFor, type Database } from "@galaxy-farm/infra-db";
+import {
+  withCalvesAtFoot,
+  type CalvingRecord,
+  type CattleProfile,
+} from "@galaxy-farm/module-cattle";
 import type { EggBreakdown, EggLog } from "@galaxy-farm/module-poultry";
 
 import { database } from "@/lib/credential-store";
@@ -127,6 +133,11 @@ export interface MoveAnimalInput {
  * needs comes straight from Postgres: a kiosk write action is a single
  * request with no local store of its own reads to lean on the way the
  * client-side herd screen does.
+ *
+ * A cow's unweaned calves move with her (§6), in the same push: the Pen Board
+ * is where a pair is most often walked to a new trap, and a kiosk move that
+ * left the calf behind on the record would be the one screen telling the truth
+ * about the cow and a lie about the calf.
  */
 export async function moveAnimalForKiosk(
   actor: Actor,
@@ -153,66 +164,82 @@ export async function moveAnimalForKiosk(
     return refused("That animal has no current location to move from.");
   }
 
-  const { closed, opened } = moveToZone(
+  const [animals, profiles, calvings] = await Promise.all([
+    repositoryFor<Animal>(db, "animals").list({ propertyId: actor.propertyId }),
+    repositoryFor<CattleProfile>(db, "cattleProfiles").list({ propertyId: actor.propertyId }),
+    repositoryFor<CalvingRecord>(db, "calvingRecords").list({ propertyId: actor.propertyId }),
+  ]);
+  const party = withCalvesAtFoot([input.animalId], {
+    animals,
+    profiles,
+    calvings,
     assignments,
-    {
-      id: encodeUlid(at.getTime()) as Ulid,
-      propertyId: actor.propertyId,
-      createdAt: at,
-      updatedAt: at,
-      animalId: input.animalId,
-      zoneId: input.zoneId,
-      indoor: zone.indoor,
-      at,
-    },
     indoorZoneIds,
-  );
+    asOf: at,
+  });
 
   const meta = { at, deviceId };
   const ids = { next: () => encodeUlid(at.getTime()) };
-  const entries = [
-    ...closed.map((assignment) => ({
-      id: ids.next(),
-      operation: "update" as const,
-      patch: {
-        entity: "zoneAssignments",
-        recordId: assignment.id,
-        changes: diff({}, { periodTo: assignment.periodTo } as Record<string, FieldValue>, meta),
+  const entries = party.flatMap((member) => {
+    const { closed, opened } = moveToZone(
+      assignments,
+      {
+        id: encodeUlid(at.getTime()) as Ulid,
+        propertyId: actor.propertyId,
+        createdAt: at,
+        updatedAt: at,
+        animalId: member.animalId,
+        zoneId: input.zoneId,
+        indoor: zone.indoor,
+        at,
       },
-      queuedAt: at,
-      deviceId,
-      attempts: 0,
-    })),
-    // Absent when she is already standing in the target zone — the whole
-    // move is a no-op past whatever `closed` repaired, and writing a second
-    // identical assignment is exactly the fault `moveToZone` now refuses to
-    // produce.
-    ...(opened === undefined
-      ? []
-      : [
-          {
-            id: ids.next(),
-            operation: "create" as const,
-            patch: {
-              entity: "zoneAssignments",
-              recordId: opened.id,
-              changes: diff(
-                {},
-                {
-                  animalId: opened.animalId,
-                  zoneId: opened.zoneId,
-                  slot: opened.slot,
-                  periodFrom: opened.periodFrom,
-                } as Record<string, FieldValue>,
-                meta,
-              ),
+      indoorZoneIds,
+    );
+
+    return [
+      ...closed.map((assignment) => ({
+        id: ids.next(),
+        operation: "update" as const,
+        patch: {
+          entity: "zoneAssignments",
+          recordId: assignment.id,
+          changes: diff({}, { periodTo: assignment.periodTo } as Record<string, FieldValue>, meta),
+        },
+        queuedAt: at,
+        deviceId,
+        attempts: 0,
+      })),
+      // Absent when she is already standing in the target zone — the whole
+      // move is a no-op past whatever `closed` repaired, and writing a second
+      // identical assignment is exactly the fault `moveToZone` now refuses to
+      // produce.
+      ...(opened === undefined
+        ? []
+        : [
+            {
+              id: ids.next(),
+              operation: "create" as const,
+              patch: {
+                entity: "zoneAssignments",
+                recordId: opened.id,
+                changes: diff(
+                  {},
+                  {
+                    animalId: opened.animalId,
+                    zoneId: opened.zoneId,
+                    slot: opened.slot,
+                    periodFrom: opened.periodFrom,
+                  } as Record<string, FieldValue>,
+                  meta,
+                ),
+              },
+              queuedAt: at,
+              deviceId,
+              attempts: 0,
             },
-            queuedAt: at,
-            deviceId,
-            attempts: 0,
-          },
-        ]),
-  ];
+          ]),
+    ];
+  });
 
   if (entries.length === 0) return { ok: true };
 

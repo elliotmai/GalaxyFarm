@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { Actor, Animal, Ulid, Zone, ZoneAssignment } from "@galaxy-farm/core";
 import { kioskDevices, repositoryFor, type Database } from "@galaxy-farm/infra-db";
+import type { CattleProfile } from "@galaxy-farm/module-cattle";
 import type { EggLog } from "@galaxy-farm/module-poultry";
 
 import { logEggsForKiosk, moveAnimalForKiosk } from "../lib/kiosk-store.js";
@@ -203,6 +204,47 @@ describe("moveAnimalForKiosk", () => {
     expect(closed?.periodTo).toBeDefined();
     expect(opened?.zoneId).toBe(id(3));
     expect(opened?.periodTo).toBeUndefined();
+  });
+
+  it("brings her unweaned calf along, and leaves a weaned one behind", async () => {
+    await saveZone(id(2), { name: "North Trap" });
+    await saveZone(id(3), { name: "South Trap" });
+    await saveAnimal(id(1));
+    await saveAnimal(id(5), { name: "Bandit", sex: "male", dob: new Date("2026-04-01T00:00:00Z") });
+    await saveAnimal(id(6), { name: "Old", sex: "male", dob: new Date("2026-02-01T00:00:00Z") });
+    await saveAssignment(id(4), { animalId: id(1), zoneId: id(2), periodFrom: NOW });
+    await saveAssignment(id(7), { animalId: id(5), zoneId: id(2), periodFrom: NOW });
+    await saveAssignment(id(8), { animalId: id(6), zoneId: id(2), periodFrom: NOW });
+    const profiles = repositoryFor<CattleProfile>(db, "cattleProfiles");
+    await profiles.save({
+      ...base(id(9)),
+      animalId: id(5),
+      dam: { kind: "animal", id: id(1) },
+    } as unknown as CattleProfile);
+    await profiles.save({
+      ...base(id(10)),
+      animalId: id(6),
+      dam: { kind: "animal", id: id(1) },
+      weanedOn: new Date("2026-06-01T00:00:00Z"),
+    } as unknown as CattleProfile);
+
+    const outcome = await moveAnimalForKiosk(
+      kioskActor(),
+      { animalId: id(1), zoneId: id(3) },
+      new Date(NOW.getTime() + 60_000),
+      db,
+    );
+    expect(outcome.ok).toBe(true);
+
+    const assignments = await repositoryFor<ZoneAssignment>(db, "zoneAssignments").list({
+      propertyId: PROPERTY,
+    });
+    const openFor = (animalId: Ulid) =>
+      assignments.filter((a) => a.animalId === animalId && a.periodTo === undefined);
+
+    expect(openFor(id(1)).map((a) => a.zoneId)).toEqual([id(3)]);
+    expect(openFor(id(5)).map((a) => a.zoneId)).toEqual([id(3)]);
+    expect(openFor(id(6)).map((a) => a.zoneId)).toEqual([id(2)]);
   });
 
   it("refuses when the animal has nowhere it is currently assigned", async () => {

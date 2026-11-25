@@ -46,7 +46,10 @@ export interface HiveBoardUser {
 }
 
 /** The account with this email, if any — tombstones excluded. */
-export async function hiveBoardUser(email: string, db: Database = database()): Promise<HiveBoardUser | undefined> {
+export async function hiveBoardUser(
+  email: string,
+  db: Database = database(),
+): Promise<HiveBoardUser | undefined> {
   const [row] = await db
     .select()
     .from(users)
@@ -73,7 +76,10 @@ export function hiveUserMayUseBoard(user: HiveBoardUser, now: Date): boolean {
   if (!canSignIn({ active: user.active, hasPassword: user.hasPassword }, now)) return false;
   if (user.role === "owner" || user.role === "member") return true;
   if (user.role !== "housesitter") return false;
-  return (user.accessFrom === undefined || user.accessFrom <= now) && (user.accessTo === undefined || now <= user.accessTo);
+  return (
+    (user.accessFrom === undefined || user.accessFrom <= now) &&
+    (user.accessTo === undefined || now <= user.accessTo)
+  );
 }
 
 /**
