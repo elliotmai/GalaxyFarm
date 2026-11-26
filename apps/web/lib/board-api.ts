@@ -24,7 +24,7 @@ import type { FeedType } from "@galaxy-farm/module-feed";
 import { petBriefings, petsOnFarm } from "@galaxy-farm/module-pets";
 
 import { guideIncludes } from "@/lib/care-guide-selection";
-import { groupChoresForBoard } from "@/lib/chores";
+import { groupChoresForBoard, isEggCollectionChore } from "@/lib/chores";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import {
   guideChores,
@@ -69,6 +69,12 @@ export interface BoardChore {
   readonly detail: string | null;
   readonly slot: BoardSlot;
   readonly done: boolean;
+  /**
+   * The egg round. Ticking it off should open Egg Quick-Entry, at
+   * `/kiosk/eggs?from=hive` inside Hive — the same rule this site applies on
+   * every screen a chore is ticked on (`isEggCollectionChore`).
+   */
+  readonly eggs: boolean;
 }
 
 export interface BoardProperty {
@@ -203,6 +209,7 @@ export function boardChores(entries: readonly ChoreEntry[]): BoardChore[] {
       detail: entry.detail ?? null,
       slot: SLOT_OF_SECTION[section.label] ?? "night",
       done: entry.completedAt !== undefined,
+      eggs: isEggCollectionChore(entry),
     })),
   );
 }

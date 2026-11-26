@@ -11,12 +11,19 @@ export default async function KioskEggsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const actor = await currentActor();
-  if (actor === undefined) redirect("/kiosk/pair?next=/kiosk/eggs");
-
-  // Opened by ticking off the egg round: hand back to that board once logged.
+  // Opened by ticking off the egg round: hand back to that screen once logged.
   const from = (await searchParams).from;
   const returnTo = eggReturnBoard(typeof from === "string" ? from : undefined);
+
+  const actor = await currentActor();
+  if (actor === undefined) {
+    // Inside Hive it is a person, signed in with Hive; anywhere else, a screen.
+    redirect(
+      returnTo === "hive"
+        ? `/login?as=person&next=${encodeURIComponent("/kiosk/eggs?from=hive")}`
+        : "/kiosk/pair?next=/kiosk/eggs",
+    );
+  }
 
   return <EggsBoardScreen propertyId={actor.propertyId} returnTo={returnTo} />;
 }

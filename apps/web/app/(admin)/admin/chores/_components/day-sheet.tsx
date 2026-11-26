@@ -17,6 +17,7 @@ import {
   useToast,
 } from "@galaxy-farm/ui";
 import {
+  dayKey,
   displayName,
   endOfDay,
   taskSchema,
@@ -29,6 +30,7 @@ import {
 } from "@galaxy-farm/core";
 
 import { toggleChore } from "@/lib/chores";
+import { useEggHandoff } from "@/lib/use-egg-handoff";
 import { useMutations } from "@/lib/local/mutations";
 
 /**
@@ -87,6 +89,7 @@ export function DaySheet({
   const tasks = useMutations<Task>("tasks", "tasks", taskSchema, propertyId, actorId);
   const confirmDelete = useConfirmDelete();
   const { show } = useToast();
+  const eggHandoff = useEggHandoff();
 
   const [editing, setEditing] = useState<ChoreEntry | undefined>();
   const [draft, setDraft] = useState<Draft | undefined>();
@@ -121,7 +124,15 @@ export function DaySheet({
         actorId,
       });
 
-      if (!result.ok) show({ message: "Could not change that chore", tone: "danger" });
+      if (!result.ok) {
+        show({ message: "Could not change that chore", tone: "danger" });
+        return;
+      }
+      // Ticking off today's egg round opens the egg count. Another day's is
+      // catching up the record, not a basket in hand, so it opens nothing.
+      if (dayKey(date) === dayKey(new Date())) {
+        eggHandoff(entry, entry.completedAt !== undefined);
+      }
     } finally {
       setBusy(undefined);
     }

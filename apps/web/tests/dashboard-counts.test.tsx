@@ -41,6 +41,7 @@ vi.mock("@/lib/local/mutations", () => ({
 vi.mock("next/navigation", () => ({
   usePathname: () => "/admin",
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: () => {} }),
 }));
 
 vi.mock("@/app/_components/sync-provider", () => ({

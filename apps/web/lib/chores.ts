@@ -267,14 +267,30 @@ export function isEggCollectionChore(entry: Pick<ChoreEntry, "title">): boolean 
 }
 
 /**
- * The kiosk boards Egg Quick-Entry may hand back to. Anything else in the
- * `from` parameter is ignored, so the link can never be pointed off the
- * barn surface.
+ * Where Egg Quick-Entry may hand back to once the count is logged.
+ *
+ * The screens a chore is ticked on — the kiosk boards, the home screen and
+ * the chores page — and `hive`, which is not a path: it means the screen was
+ * opened inside Hive (the fridge board or a Hive widget) and closing it is
+ * Hive's to do. Anything else in the `from` parameter is ignored, so the link
+ * can never be pointed off this site.
  */
-export const EGG_RETURN_BOARDS = ["/kiosk/chores", "/kiosk/housesitter"] as const;
+export const EGG_RETURN_BOARDS = [
+  "/kiosk/chores",
+  "/kiosk/housesitter",
+  "/admin",
+  "/admin/chores",
+  "hive",
+] as const;
 
-export function eggReturnBoard(
-  from: string | undefined,
-): (typeof EGG_RETURN_BOARDS)[number] | undefined {
+export type EggReturn = (typeof EGG_RETURN_BOARDS)[number];
+
+export function eggReturnBoard(from: string | undefined): EggReturn | undefined {
   return EGG_RETURN_BOARDS.find((board) => board === from);
+}
+
+/** Egg Quick-Entry, opened from `from` so it can hand back there. */
+export function eggEntryHref(from: string | undefined): string {
+  const back = eggReturnBoard(from);
+  return back === undefined ? "/kiosk/eggs" : `/kiosk/eggs?from=${back}`;
 }
