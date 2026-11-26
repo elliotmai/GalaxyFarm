@@ -21,6 +21,7 @@ import {
 import type { EggBreakdown, EggLog } from "@galaxy-farm/module-poultry";
 
 import { database } from "@/lib/credential-store";
+import { MAX_KIOSK_EGG_COUNT } from "@/lib/kiosk-limits";
 import { isDeviceLive } from "@/lib/device-store";
 import { applyPushAndMark } from "@/lib/change-stamp";
 
@@ -67,10 +68,12 @@ export interface LogEggsInput {
   readonly flockId?: Ulid | undefined;
   readonly zoneId?: Ulid | undefined;
   readonly breakdown?: readonly EggBreakdown[] | undefined;
+  /** How many were collected. Wins over the breakdown's sum when both are given. */
+  readonly count?: number | undefined;
 }
 
 /**
- * One tap of a kiosk's +1 button (spec §4.4, §5.4).
+ * One collection logged from a kiosk (spec §4.4, §5.4) — a count, or one tap of +1.
  *
  * Always a fresh row, never a read-modify-write of today's total. Two taps a
  * second apart — the ordinary case, someone collecting a basketful — are two
@@ -91,8 +94,15 @@ export async function logEggsForKiosk(
   // same fallback `tickChore` uses for a housesitter with no device of theirs.
   const deviceId = actor.deviceId ?? `kiosk-surface:${actor.id}`;
 
-  const breakdown = input.breakdown ?? [];
-  const total = breakdown.reduce((sum, row) => sum + row.count, 0) || 1;
+  if (
+    input.count !== undefined &&
+    (!Number.isInteger(input.count) || input.count < 1 || input.count > MAX_KIOSK_EGG_COUNT)
+  ) {
+    return refused(`Log between 1 and ${MAX_KIOSK_EGG_COUNT} eggs.`);
+  }
+
+  const breakdown = input.count === undefined ? (input.breakdown ?? []) : [];
+  const total = input.count ?? (breakdown.reduce((sum, row) => sum + row.count, 0) || 1);
   const id = encodeUlid(at.getTime()) as Ulid;
 
   const fields: EggLog = {

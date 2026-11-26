@@ -29,6 +29,13 @@ const action = vi.hoisted(() => ({
   resolve: undefined as ((result: { ok: boolean; error?: string }) => void) | undefined,
 }));
 
+const navigation = vi.hoisted(() => ({ pushed: [] as string[] }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: (href: string) => navigation.pushed.push(href) }),
+  usePathname: () => "/kiosk/chores",
+}));
+
 vi.mock("@/lib/local/use-records", () => ({
   useRecords: (store: string) => ({ records: stored.current[store] ?? [], loading: false }),
   useRecord: () => ({ record: undefined, loading: false }),
@@ -102,6 +109,7 @@ beforeEach(() => {
 
   action.calls = [];
   action.resolve = undefined;
+  navigation.pushed = [];
   stored.current = { tasks: [ICE, RINSE, SCRATCH], zones: [NORTH], animals: [ANDROMEDA] };
 });
 
@@ -112,6 +120,14 @@ function view(names?: Promise<Readonly<Record<string, string>>>) {
     </ToastProvider>,
   );
 }
+
+/** The egg round, under the name this farm gave it. */
+const EGGS = {
+  ...base,
+  id: "01ARZ3NDEKTSV4RRFFQ69G5T04" as Ulid,
+  title: "Collect chicken eggs",
+  dueAt: new Date(2026, 10, 12, 10, 0),
+} as Task;
 
 /** The section column with this heading, as a query scope. */
 function section(label: string) {
@@ -275,5 +291,38 @@ describe("Today's Chores on a kiosk", () => {
       "aria-pressed",
       "true",
     );
+  });
+});
+
+describe("ticking off the egg round", () => {
+  it("opens Egg Quick-Entry once the farm has the tick, with the way back", async () => {
+    stored.current = { ...stored.current, tasks: [ICE, EGGS] };
+    view();
+
+    await userEvent.click(screen.getByRole("button", { name: /Collect chicken eggs/ }));
+    // Not before the answer: a refused tick must leave you on the board.
+    expect(navigation.pushed).toEqual([]);
+
+    await act(async () => action.resolve?.({ ok: true }));
+    expect(navigation.pushed).toEqual(["/kiosk/eggs?from=/kiosk/chores"]);
+  });
+
+  it("stays on the board when the farm refuses the tick", async () => {
+    stored.current = { ...stored.current, tasks: [EGGS] };
+    view();
+
+    await userEvent.click(screen.getByRole("button", { name: /Collect chicken eggs/ }));
+    await act(async () => action.resolve?.({ ok: false, error: "This screen has been unpaired." }));
+
+    expect(navigation.pushed).toEqual([]);
+  });
+
+  it("opens nothing for any other chore", async () => {
+    view();
+
+    await userEvent.click(screen.getByRole("button", { name: /Break ice/ }));
+    await act(async () => action.resolve?.({ ok: true }));
+
+    expect(navigation.pushed).toEqual([]);
   });
 });

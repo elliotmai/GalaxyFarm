@@ -66,6 +66,9 @@ export default async function SitterPage() {
   // past thirty seconds (the driver's connect timeout) before any apology.
   const names = peopleNames(actor.propertyId);
   const guide = withDeadline(sitterView(actor.propertyId), "the care guide");
+  // Awaited only after the zone; a fast failure before then must not count as
+  // an unhandled rejection, which takes the server down with it.
+  void guide.catch(() => undefined);
 
   /*
    * The sitter's own clock, not the server's.
