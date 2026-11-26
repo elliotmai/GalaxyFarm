@@ -39,13 +39,19 @@ export default auth((request) => {
     // goes to `/kiosk/pair` instead, which signs it straight back in from the
     // device token it holds (spec §4.4) and only asks for a code if that
     // token is genuinely no good any more.
-    const destination = surface === "kiosk" ? "/kiosk/pair" : "/login";
+    //
+    // Except a kiosk page opened inside Hive (`from=hive`, the egg count after
+    // a fridge-board tick): that is a person, and `/login` signs them in with
+    // Hive. `as=person` keeps the login page from bouncing them to pairing.
+    const fromHive = surface === "kiosk" && request.nextUrl.searchParams.get("from") === "hive";
+    const destination = surface === "kiosk" && !fromHive ? "/kiosk/pair" : "/login";
 
     // Carry where they were going, so getting a session lands them there
     // rather than on a dashboard they then navigate away from.
     const away = new URL(destination, request.nextUrl);
     // The query too: a shared link's tabs (`?tab=`) are part of where.
     away.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+    if (fromHive) away.searchParams.set("as", "person");
     return NextResponse.redirect(away);
   }
 

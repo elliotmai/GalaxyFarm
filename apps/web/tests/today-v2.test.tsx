@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -44,9 +45,12 @@ vi.mock("@/lib/local/mutations", () => ({
   }),
 }));
 
+const navigation = vi.hoisted(() => ({ pushed: [] as string[] }));
+
 vi.mock("next/navigation", () => ({
   usePathname: () => "/admin",
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: (href: string) => navigation.pushed.push(href) }),
 }));
 
 vi.mock("@/app/_components/sync-provider", () => ({
@@ -210,5 +214,31 @@ describe("the Today lists", () => {
 
     expect(screen.getByText(`Done · ${clock(at(8, 15))}`)).toBeInTheDocument();
     expect(screen.getByText(`Done by You · ${clock(at(7, 5))}`)).toBeInTheDocument();
+  });
+});
+
+describe("ticking off the egg round on the home screen", () => {
+  beforeEach(() => {
+    navigation.pushed = [];
+  });
+
+  it("opens the egg count, handing back to the home screen", async () => {
+    view();
+
+    await userEvent.click(
+      within(section("Chores")).getByRole("checkbox", { name: /Collect eggs/ }),
+    );
+
+    expect(navigation.pushed).toEqual(["/kiosk/eggs?from=/admin"]);
+  });
+
+  it("opens nothing when a finished chore is un-ticked", async () => {
+    view();
+
+    await userEvent.click(
+      within(section("Chores")).getByRole("checkbox", { name: /Tank covers on/ }),
+    );
+
+    expect(navigation.pushed).toEqual([]);
   });
 });

@@ -20,6 +20,7 @@ import {
 } from "@galaxy-farm/core";
 
 import { toggleChore } from "@/lib/chores";
+import { useEggHandoff } from "@/lib/use-egg-handoff";
 import { useMutations } from "@/lib/local/mutations";
 import type { FeedType } from "@galaxy-farm/module-feed";
 
@@ -80,6 +81,7 @@ export function useChoreSheet(propertyId: Ulid, actorId: Ulid): ChoreSheet {
 
   const api = useMutations<Task>("tasks", "tasks", taskSchema, propertyId, actorId);
   const { show } = useToast();
+  const eggHandoff = useEggHandoff();
   const [busy, setBusy] = useState<string | undefined>();
 
   const now = new Date();
@@ -130,7 +132,12 @@ export function useChoreSheet(propertyId: Ulid, actorId: Ulid): ChoreSheet {
         actorId,
       });
 
-      if (!result.ok) show({ message: "Could not tick that off", tone: "danger" });
+      if (!result.ok) {
+        show({ message: "Could not tick that off", tone: "danger" });
+        return;
+      }
+      // Ticking off the egg round opens the egg count.
+      eggHandoff(entry, entry.completedAt !== undefined);
     } finally {
       setBusy(undefined);
     }

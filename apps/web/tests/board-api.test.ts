@@ -190,6 +190,7 @@ describe("today's chores", () => {
         detail: "North side",
         slot: "owed",
         done: false,
+        eggs: false,
       },
       {
         id: `occurrence:${MORNING_TEMPLATE}:2026-11-16`,
@@ -197,6 +198,7 @@ describe("today's chores", () => {
         detail: null,
         slot: "morning",
         done: false,
+        eggs: false,
       },
       {
         id: `feeding:zone:${NORTH}:morning:2026-11-16`,
@@ -204,6 +206,7 @@ describe("today's chores", () => {
         detail: "40 lb Coastal hay",
         slot: "morning",
         done: false,
+        eggs: false,
       },
       {
         id: `occurrence:${EVENING_TEMPLATE}:2026-11-16`,
@@ -211,6 +214,7 @@ describe("today's chores", () => {
         detail: null,
         slot: "evening",
         done: false,
+        eggs: false,
       },
       {
         id: "01ARZ3NDEKTSV4RRFFQ69G5FK2",
@@ -218,6 +222,7 @@ describe("today's chores", () => {
         detail: null,
         slot: "evening",
         done: true,
+        eggs: false,
       },
     ]);
   });
@@ -229,6 +234,24 @@ describe("today's chores", () => {
       TZ,
     );
     expect(boardChores(sheet.entries).map((chore) => chore.slot)).toEqual(["night"]);
+  });
+
+  it("marks the egg round, so a board opens the egg count by this site's rule", () => {
+    const sheet = todaySheet(
+      sources({
+        templates: [
+          template(MORNING_TEMPLATE, { title: "Collect chicken eggs", timeOfDay: "morning" }),
+          template(EVENING_TEMPLATE, { title: "Shut the coop", timeOfDay: "evening" }),
+        ],
+      }),
+      NOW,
+      TZ,
+    );
+
+    expect(boardChores(sheet.entries).map((chore) => [chore.title, chore.eggs])).toEqual([
+      ["Collect chicken eggs", true],
+      ["Shut the coop", false],
+    ]);
   });
 });
 

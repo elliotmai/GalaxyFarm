@@ -315,6 +315,26 @@ test.describe("the gate itself", () => {
     await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Fcattle/);
   });
 
+  test("sends a signed-out egg count inside Hive to sign in with Hive, not to pairing", async ({
+    page,
+  }) => {
+    // A barn screen goes to `/kiosk/pair`; the egg count opened by a fridge
+    // board tick is a person in Hive's frame, and `/login` signs them in with
+    // Hive. `as=person` stops the login page bouncing them to pairing.
+    await page.goto("/kiosk/eggs?from=hive");
+
+    await expect(page).toHaveURL(/\/login\?/);
+    const url = new URL(page.url());
+    expect(url.searchParams.get("next")).toBe("/kiosk/eggs?from=hive");
+    expect(url.searchParams.get("as")).toBe("person");
+  });
+
+  test("still sends a signed-out barn screen to pairing", async ({ page }) => {
+    await page.goto("/kiosk/eggs");
+
+    await expect(page).toHaveURL(/\/kiosk\/pair\?next=%2Fkiosk%2Feggs/);
+  });
+
   test("the sync endpoints refuse an unauthenticated caller", async ({ request }) => {
     // These used to answer 501 as stubs. They are implemented now, and the
     // property worth asserting is the one that matters: a device with no

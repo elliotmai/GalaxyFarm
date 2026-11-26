@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { usePathname, useRouter } from "next/navigation";
 
 import { useToast } from "@galaxy-farm/ui";
 import {
@@ -14,8 +13,9 @@ import {
 
 import { setKioskChoreDone } from "@/app/(kiosk)/kiosk/_actions";
 import { useSyncEngine } from "@/app/_components/sync-provider";
-import { eggReturnBoard, groupChoresForBoard, isEggCollectionChore } from "@/lib/chores";
+import { groupChoresForBoard } from "@/lib/chores";
 import type { PeopleNames } from "@/lib/people-names";
+import { useEggHandoff } from "@/lib/use-egg-handoff";
 
 /**
  * A day's chores on a kiosk board, checkable in place (spec §4.4, §5.1, §5.10).
@@ -91,8 +91,7 @@ export function ChoreBoard({
 }) {
   const { syncNow } = useSyncEngine();
   const { show } = useToast();
-  const router = useRouter();
-  const pathname = usePathname();
+  const eggHandoff = useEggHandoff();
   const [, startTransition] = useTransition();
   /** In-flight rows, so a double tap cannot write the same chore twice. */
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
@@ -199,10 +198,7 @@ export function ChoreBoard({
         show({ message: result.error, tone: "danger" });
         return;
       }
-      if (done && isEggCollectionChore(entry)) {
-        const back = eggReturnBoard(pathname ?? undefined);
-        router.push(back === undefined ? "/kiosk/eggs" : `/kiosk/eggs?from=${back}`);
-      }
+      eggHandoff(entry, !done);
       await syncNow();
     });
   }

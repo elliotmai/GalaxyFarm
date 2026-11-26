@@ -159,6 +159,7 @@ describe("the board", () => {
         detail: null,
         slot: "evening",
         done: false,
+        eggs: false,
       },
     ]);
     expect(board.sitter).toEqual({

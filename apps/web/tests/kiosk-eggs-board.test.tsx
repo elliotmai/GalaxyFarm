@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Ulid } from "@galaxy-farm/core";
 
+import type { EggReturn } from "../lib/chores.js";
+
 /**
  * Egg Quick-Entry (spec §4.4, §5.4): how many, and nothing else.
  *
@@ -53,7 +55,7 @@ beforeEach(() => {
   calls.pushed = [];
 });
 
-function view(returnTo?: string) {
+function view(returnTo?: EggReturn) {
   return render(
     <ToastProvider>
       <EggsBoardScreen propertyId={PROPERTY} returnTo={returnTo} />
@@ -92,5 +94,23 @@ describe("Egg Quick-Entry", () => {
     await userEvent.click(screen.getByRole("button", { name: "Log 6 eggs" }));
 
     expect(calls.pushed).toEqual(["/kiosk/chores"]);
+  });
+
+  it("inside Hive, asks Hive to close it once logged, with no back link of its own", async () => {
+    const posted: unknown[] = [];
+    const parent = { postMessage: (message: unknown) => posted.push(message) };
+    const spy = vi.spyOn(window, "parent", "get").mockReturnValue(parent as unknown as Window);
+
+    view("hive");
+
+    expect(screen.queryByRole("link", { name: "Back" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Add 12" }));
+    await userEvent.click(screen.getByRole("button", { name: "Log 12 eggs" }));
+
+    expect(calls.logged).toEqual([{ flockId: COOP, count: 12 }]);
+    expect(posted).toEqual([{ type: "hive:close", v: 1 }]);
+    expect(calls.pushed).toEqual([]);
+    spy.mockRestore();
   });
 });

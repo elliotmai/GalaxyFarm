@@ -10,6 +10,7 @@ import type { EggLog, Flock } from "@galaxy-farm/module-poultry";
 import { KioskHeader } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { logKioskEggs } from "@/app/(kiosk)/kiosk/_actions";
 import { useSyncEngine } from "@/app/_components/sync-provider";
+import type { EggReturn } from "@/lib/chores";
 import { MAX_KIOSK_EGG_COUNT } from "@/lib/kiosk-limits";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -21,9 +22,21 @@ import { useRecords } from "@/lib/local/use-records";
  * a log that asks for either at the coop is a log nobody keeps up.
  *
  * Opened on its own from the boards, or straight from ticking off the egg
- * round on a chore board; then `returnTo` names that board, back goes there,
- * and logging the count hands back to it.
+ * round anywhere a chore is ticked; then `returnTo` names that screen, back
+ * goes there, and logging the count hands back to it.
+ *
+ * `hive` is the fridge board and Hive's widgets: the screen is in one of
+ * Hive's frames, so handing back is asking Hive to close it. Hive draws its
+ * own Home button around the frame, so there is no back link of ours.
  */
+
+/** Ask Hive to close the frame this screen is in. Nothing else is said. */
+function closeHiveFrame() {
+  if (window.parent === window) return;
+  // Any origin: the message carries nothing, and Hive checks that it came
+  // from a frame it opened, at GalaxyFarm's own address, before acting on it.
+  window.parent.postMessage({ type: "hive:close", v: 1 }, "*");
+}
 
 const STEPS = [1, 6, 12] as const;
 
@@ -32,7 +45,7 @@ export function EggsBoardScreen({
   returnTo,
 }: {
   readonly propertyId: Ulid;
-  readonly returnTo?: string | undefined;
+  readonly returnTo?: EggReturn | undefined;
 }) {
   const { store, syncNow } = useSyncEngine();
   const { show } = useToast();
@@ -77,7 +90,8 @@ export function EggsBoardScreen({
       }
       show({ message: `Logged ${count} ${count === 1 ? "egg" : "eggs"}.` });
       setCount(0);
-      if (returnTo !== undefined) router.push(returnTo);
+      if (returnTo === "hive") closeHiveFrame();
+      else if (returnTo !== undefined) router.push(returnTo);
       await syncNow();
     });
   }
@@ -85,8 +99,8 @@ export function EggsBoardScreen({
   return (
     <PageBody>
       <KioskHeader
-        back={returnTo !== undefined}
-        {...(returnTo === undefined ? {} : { backTo: returnTo })}
+        back={returnTo !== undefined && returnTo !== "hive"}
+        {...(returnTo === undefined || returnTo === "hive" ? {} : { backTo: returnTo })}
         title="Egg Quick-Entry"
         fact={logsLoading ? "…" : `${todayTotal} collected today`}
       />
