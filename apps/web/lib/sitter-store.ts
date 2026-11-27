@@ -24,9 +24,11 @@ import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
 import type { Crop, Planting, Variety } from "@galaxy-farm/module-garden";
 import { isPet } from "@galaxy-farm/module-pets";
+import type { Flock, FlockAdjustment } from "@galaxy-farm/module-poultry";
 
 import { guideForSitter, guideIncludes, visibleToSitter } from "@/lib/care-guide-selection";
 import { database } from "@/lib/credential-store";
+import { eggChoresFor, isEggChoreKey } from "@/lib/egg-chores";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { weatherSnapshot } from "@/lib/weather-service";
 import { choreWeatherDay, isWeatherChoreKey, weatherChores, weatherJobs } from "@/lib/weather-jobs";
@@ -71,6 +73,9 @@ export interface SitterView {
   readonly tasks: readonly Task[];
   readonly plans: readonly FeedingPlan[];
   readonly feeds: readonly FeedType[];
+  /** The flocks and their headcount log, for the egg round. */
+  readonly flocks: readonly Flock[];
+  readonly flockAdjustments: readonly FlockAdjustment[];
   /** Pets only. A herd's treatment history is not care information. */
   readonly petHealth: readonly HealthRecord[];
 }
@@ -86,6 +91,8 @@ export const EMPTY_SITTER_VIEW: SitterView = {
   tasks: [],
   plans: [],
   feeds: [],
+  flocks: [],
+  flockAdjustments: [],
   petHealth: [],
 };
 
@@ -93,19 +100,33 @@ export const EMPTY_SITTER_VIEW: SitterView = {
 export async function sitterView(propertyId: Ulid, db: Database = database()): Promise<SitterView> {
   const query = { propertyId };
 
-  const [guides, sections, zones, animals, assignments, contacts, templates, tasks, plans, feeds] =
-    await Promise.all([
-      repositoryFor<CareGuide>(db, "careGuides").list(query),
-      repositoryFor<GuideSection>(db, "guideSections").list(query),
-      repositoryFor<Zone>(db, "zones").list(query),
-      repositoryFor<Animal>(db, "animals").list(query),
-      repositoryFor<ZoneAssignment>(db, "zoneAssignments").list(query),
-      repositoryFor<Contact>(db, "contacts").list(query),
-      repositoryFor<ChoreTemplate>(db, "choreTemplates").list(query),
-      repositoryFor<Task>(db, "tasks").list(query),
-      repositoryFor<FeedingPlan>(db, "feedingPlans").list(query),
-      repositoryFor<FeedType>(db, "feedTypes").list(query),
-    ]);
+  const [
+    guides,
+    sections,
+    zones,
+    animals,
+    assignments,
+    contacts,
+    templates,
+    tasks,
+    plans,
+    feeds,
+    flocks,
+    flockAdjustments,
+  ] = await Promise.all([
+    repositoryFor<CareGuide>(db, "careGuides").list(query),
+    repositoryFor<GuideSection>(db, "guideSections").list(query),
+    repositoryFor<Zone>(db, "zones").list(query),
+    repositoryFor<Animal>(db, "animals").list(query),
+    repositoryFor<ZoneAssignment>(db, "zoneAssignments").list(query),
+    repositoryFor<Contact>(db, "contacts").list(query),
+    repositoryFor<ChoreTemplate>(db, "choreTemplates").list(query),
+    repositoryFor<Task>(db, "tasks").list(query),
+    repositoryFor<FeedingPlan>(db, "feedingPlans").list(query),
+    repositoryFor<FeedType>(db, "feedTypes").list(query),
+    repositoryFor<Flock>(db, "flocks").list(query),
+    repositoryFor<FlockAdjustment>(db, "flockAdjustments").list(query),
+  ]);
 
   const guide = guideForSitter(guides);
   const petIds = new Set(
@@ -138,6 +159,8 @@ export async function sitterView(propertyId: Ulid, db: Database = database()): P
     tasks,
     plans,
     feeds,
+    flocks,
+    flockAdjustments,
     petHealth,
   };
 }
@@ -387,6 +410,25 @@ async function feedingOccurrences(
 }
 
 /**
+ * A day's egg round, rebuilt from the flocks, so a tick is checked against
+ * whether there were laying birds on the property that day.
+ */
+async function eggOccurrences(
+  propertyId: Ulid,
+  date: Date,
+  at: Date,
+  db: Database,
+): Promise<ChoreEntry[]> {
+  const [flocks, adjustments, zones] = await Promise.all([
+    repositoryFor<Flock>(db, "flocks").list({ propertyId }),
+    repositoryFor<FlockAdjustment>(db, "flockAdjustments").list({ propertyId }),
+    repositoryFor<Zone>(db, "zones").list({ propertyId }),
+  ]);
+
+  return eggChoresFor({ flocks, adjustments, zones }, date, at);
+}
+
+/**
  * A day's weather chores — covers, ice, the garden — rebuilt from the same
  * forecast and records the screens read, so a tick from the barn is checked
  * against what the weather actually asked for that day.
@@ -465,7 +507,9 @@ async function tickFeedingOccurrence(
   const entry = (
     isWeatherChoreKey(sourceKey)
       ? await weatherOccurrences(propertyId, farm.day, farm.now, db)
-      : await feedingOccurrences(propertyId, farm.day, farm.now, db)
+      : isEggChoreKey(sourceKey)
+        ? await eggOccurrences(propertyId, farm.day, farm.now, db)
+        : await feedingOccurrences(propertyId, farm.day, farm.now, db)
   ).find((occurrence) => occurrence.id === sourceKey);
   if (entry === undefined) {
     return { ok: false, reason: "That chore is not on that day's list." };

@@ -23,7 +23,9 @@ import { toggleChore } from "@/lib/chores";
 import { useEggHandoff } from "@/lib/use-egg-handoff";
 import { useMutations } from "@/lib/local/mutations";
 import type { FeedType } from "@galaxy-farm/module-feed";
+import type { Flock, FlockAdjustment } from "@galaxy-farm/module-poultry";
 
+import { eggChoresFor } from "@/lib/egg-chores";
 import { feedingChoreText, feedingChoresFor } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
 import { useWeatherChores, type WeatherChores } from "@/lib/use-weather-chores";
@@ -78,6 +80,9 @@ export function useChoreSheet(propertyId: Ulid, actorId: Ulid): ChoreSheet {
   const { records: plans } = useRecords<FeedingPlan>("feedingPlans", query);
   const { records: feeds } = useRecords<FeedType>("feedTypes", query);
   const { records: zones } = useRecords<Zone>("zones", query);
+  // The egg round rides the flocks (§5.4), not a template.
+  const { records: flocks } = useRecords<Flock>("flocks", query);
+  const { records: flockAdjustments } = useRecords<FlockAdjustment>("flockAdjustments", query);
 
   const api = useMutations<Task>("tasks", "tasks", taskSchema, propertyId, actorId);
   const { show } = useToast();
@@ -100,7 +105,11 @@ export function useChoreSheet(propertyId: Ulid, actorId: Ulid): ChoreSheet {
     {
       tasks,
       templates,
-      derived: [...feeding, ...weather.derived],
+      derived: [
+        ...feeding,
+        ...eggChoresFor({ flocks, adjustments: flockAdjustments, zones }, today, now),
+        ...weather.derived,
+      ],
       weather: weather.weather,
       weatherArrives: weather.arrives,
     },

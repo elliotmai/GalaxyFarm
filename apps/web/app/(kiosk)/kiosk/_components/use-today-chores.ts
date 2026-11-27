@@ -13,7 +13,9 @@ import {
   type Zone,
 } from "@galaxy-farm/core";
 import type { FeedType } from "@galaxy-farm/module-feed";
+import type { Flock, FlockAdjustment } from "@galaxy-farm/module-poultry";
 
+import { eggChoresFor } from "@/lib/egg-chores";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
 import { useWeatherChores } from "@/lib/use-weather-chores";
@@ -39,6 +41,9 @@ export function useTodayChores(propertyId: Ulid): {
   // Feeding is derived from the plans (§2), here as on every other surface.
   const { records: plans } = useRecords<FeedingPlan>("feedingPlans", query);
   const { records: feeds } = useRecords<FeedType>("feedTypes", query);
+  // The egg round rides the flocks (§5.4), not a template.
+  const { records: flocks } = useRecords<Flock>("flocks", query);
+  const { records: flockAdjustments } = useRecords<FlockAdjustment>("flockAdjustments", query);
 
   const today = useMemo(() => new Date(), []);
   // The weather's chores — tank covers, ice, the tender beds on a frost night
@@ -56,7 +61,11 @@ export function useTodayChores(propertyId: Ulid): {
       {
         tasks,
         templates,
-        derived: [...derived, ...weather.derived],
+        derived: [
+          ...derived,
+          ...eggChoresFor({ flocks, adjustments: flockAdjustments, zones }, today, today),
+          ...weather.derived,
+        ],
         weather: weather.weather,
         weatherArrives: weather.arrives,
       },
@@ -70,6 +79,8 @@ export function useTodayChores(propertyId: Ulid): {
     zones,
     feeds,
     animals,
+    flocks,
+    flockAdjustments,
     today,
     weather.derived,
     weather.weather,

@@ -21,10 +21,12 @@ import {
 } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
+import type { Flock, FlockAdjustment } from "@galaxy-farm/module-poultry";
 import { petBriefings, petsOnFarm } from "@galaxy-farm/module-pets";
 
 import { guideIncludes } from "@/lib/care-guide-selection";
 import { groupChoresForBoard, isEggCollectionChore } from "@/lib/chores";
+import { eggChoresFor } from "@/lib/egg-chores";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import {
   guideChores,
@@ -152,6 +154,9 @@ export interface ChoreSources {
   readonly plans: readonly FeedingPlan[];
   readonly zones: readonly Zone[];
   readonly feeds: readonly FeedType[];
+  /** The flocks and their headcount log: the egg round rides them. */
+  readonly flocks?: readonly Flock[];
+  readonly flockAdjustments?: readonly FlockAdjustment[];
 }
 
 export interface TodaySheet {
@@ -165,8 +170,9 @@ export interface TodaySheet {
 
 /**
  * Today's sheet, exactly as the kiosk's Today's Chores board derives it
- * (`use-today-chores.ts`): feeding trips from the plans, merged by
- * `choreDaySheet` with the stored tasks and the templates' occurrences.
+ * (`use-today-chores.ts`): feeding trips from the plans and the egg round from
+ * the flocks, merged by `choreDaySheet` with the stored tasks and the
+ * templates' occurrences.
  */
 export function todaySheet(sources: ChoreSources, now: Date, timeZone: string): TodaySheet {
   const today = wallClock(now, timeZone);
@@ -174,16 +180,28 @@ export function todaySheet(sources: ChoreSources, now: Date, timeZone: string): 
   const templates = onWallClock(sources.templates, timeZone);
   const plans = onWallClock(sources.plans, timeZone);
 
-  const derived = feedingChoresFor(
-    plans,
-    feedingChoreText({
-      zones: sources.zones,
-      feeds: sources.feeds,
-      propertyId: sources.propertyId,
-    }),
-    today,
-    today,
-  );
+  const derived = [
+    ...feedingChoresFor(
+      plans,
+      feedingChoreText({
+        zones: sources.zones,
+        feeds: sources.feeds,
+        propertyId: sources.propertyId,
+      }),
+      today,
+      today,
+    ),
+    // The egg round, for as long as there are laying birds (§5.4).
+    ...eggChoresFor(
+      {
+        flocks: sources.flocks ?? [],
+        adjustments: onWallClock(sources.flockAdjustments ?? [], timeZone),
+        zones: sources.zones,
+      },
+      today,
+      today,
+    ),
+  ];
 
   return {
     date: dayKey(today),

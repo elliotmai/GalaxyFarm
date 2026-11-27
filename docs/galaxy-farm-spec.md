@@ -275,7 +275,7 @@ Services are **grouped into attempts**, derived rather than stored (§2): a cow 
 
 ### 5.4 Poultry module
 
-**Flock** — species (`chicken | quail | ...` — quail is a dropdown value, not a new module), coop (Zone), breed mix, headCount maintained by an **adjustment log** (`added | died | predator | culled | sold`, qty, note) so count history is auditable.
+**Flock** — species (`chicken | quail | ...` — quail is a dropdown value, not a new module), coop (Zone), breed mix, headCount maintained by an **adjustment log** (`added | died | predator | culled | sold`, qty, note) so count history is auditable. **The egg round is derived from the flocks, not written as a template**: while any active flock has a bird in it that day, the day sheet carries one "Collect eggs" chore for the property (detail: each laying flock and its coop, with its headcount), due by the end of the day and keyed `eggs:YYYY-MM-DD` like a feeding trip. Sell the last hen and it stops; add pullets and it starts. Ticking it opens Egg Quick-Entry (§4.4) wherever it is ticked.
 
 **EggLog** — date, flock/coop, total count, optional breakdown rows by `{color, size, count}`. Kiosk quick-entry logs the count only — tap the basket up and log it once; the colour/size breakdown is entered from the admin app, never at the coop.
 
