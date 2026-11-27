@@ -6,6 +6,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ChoreTemplate, Property, Task, Ulid } from "@galaxy-farm/core";
+import type { Flock } from "@galaxy-farm/module-poultry";
 import { hashApiToken } from "@galaxy-farm/infra-auth";
 import { apiTokens, repositoryFor, syncFieldMeta, type Database } from "@galaxy-farm/infra-db";
 
@@ -76,7 +77,7 @@ afterAll(async () => {
 beforeEach(async () => {
   marked.length = 0;
   await client.exec(
-    "truncate table api_tokens, properties, chore_templates, tasks, sync_field_meta, sync_audit",
+    "truncate table api_tokens, properties, chore_templates, tasks, flocks, flock_adjustments, sync_field_meta, sync_audit",
   );
   await repositoryFor<Property>(db, "properties").save({
     id: PROPERTY,
@@ -221,5 +222,41 @@ describe("the board", () => {
       await tickBoardChore(apiToken, `occurrence:${TEMPLATE}:2026-11-16`, false, NOW, db),
     ).toEqual({ kind: "ticked", done: false });
     expect(marked).toEqual([]);
+  });
+
+  it("puts the egg round on the board while there are hens, and ticks it", async () => {
+    const { apiToken } = await mint();
+    await repositoryFor<Flock>(db, "flocks").save({
+      id: "01ARZ3NDEKTSV4RRFFQ69G5FL1" as Ulid,
+      propertyId: PROPERTY,
+      createdAt: MADE,
+      updatedAt: MADE,
+      name: "Barn hens",
+      species: "chicken",
+      openingCount: 9,
+      active: true,
+    } as Flock);
+
+    const eggs = (await boardSnapshot(apiToken, NOW, db)).chores.find((chore) => chore.eggs);
+    expect(eggs).toEqual({
+      id: "eggs:2026-11-16",
+      title: "Collect eggs",
+      detail: "Barn hens (9)",
+      slot: "night",
+      done: false,
+      eggs: true,
+    });
+
+    // Ticked from the fridge: one row, keyed by the day, done on the board.
+    expect(await tickBoardChore(apiToken, "eggs:2026-11-16", true, NOW, db)).toEqual({
+      kind: "ticked",
+      done: true,
+    });
+    const rows = await repositoryFor<Task>(db, "tasks").list({ propertyId: PROPERTY });
+    expect(rows).toEqual([
+      expect.objectContaining({ sourceKey: "eggs:2026-11-16", title: "Collect eggs" }),
+    ]);
+    const after = (await boardSnapshot(apiToken, NOW, db)).chores.filter((chore) => chore.eggs);
+    expect(after).toEqual([expect.objectContaining({ done: true, eggs: true })]);
   });
 });
