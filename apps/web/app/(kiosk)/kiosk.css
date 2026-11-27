@@ -1,5 +1,11 @@
 .gf-kiosk-frame {
-  min-height: 100dvh;
+  min-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  .gf-kiosk-frame {
+    min-height: 100dvh;
+  }
 }
 
 .gf-kiosk-masthead {

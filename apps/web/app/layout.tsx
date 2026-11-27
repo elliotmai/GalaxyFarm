@@ -122,6 +122,19 @@ export const viewport: Viewport = {
   ],
 };
 
+/**
+ * Inside Hive's frame: no pinch or double-tap zoom. The viewport above already
+ * asks for that, but iOS Safari ignores `user-scalable=no`, and Hive cannot
+ * stop a pinch that starts inside the frame. Inline so it applies before the
+ * first touch, and only when framed — the app opened on its own is untouched.
+ *
+ * A stylesheet appended to <head> rather than a style on <html>: when a
+ * hydration mismatch makes React re-render the document, it resets <html>'s
+ * attributes, and the inline style went with them. It leaves foreign head
+ * nodes alone.
+ */
+const FRAMED_NO_ZOOM_SCRIPT = `if(window.parent!==window){var s=document.createElement("style");s.textContent="html{touch-action:pan-x pan-y}";document.head.appendChild(s);document.addEventListener("gesturestart",function(e){e.preventDefault()},{passive:false})}`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
@@ -129,6 +142,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${sourceSerif.variable} ${plexSans.variable} ${barlowCondensed.variable} ${plexMono.variable}`}
     >
       <body>
+        <script dangerouslySetInnerHTML={{ __html: FRAMED_NO_ZOOM_SCRIPT }} />
         {children}
         <DeviceTimeZone />
       </body>

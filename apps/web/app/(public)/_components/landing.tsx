@@ -68,7 +68,7 @@ export function Landing({
   readonly businessName?: string | undefined;
 }) {
   return (
-    <div className="flex min-h-[100dvh] flex-col">
+    <div className="flex min-h-screen supports-[height:100dvh]:min-h-[100dvh] flex-col">
       <SiteHeader farmName={farmName} />
 
       <main className="flex flex-1 flex-col">

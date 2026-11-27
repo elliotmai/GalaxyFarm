@@ -47,7 +47,7 @@ export default async function KioskPairPage({
   const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME;
 
   return (
-    <div className="flex min-h-[calc(100dvh-2*var(--gf-gap))] flex-col items-center justify-center gap-density">
+    <div className="flex min-h-[calc(100vh-2*var(--gf-gap))] supports-[height:100dvh]:min-h-[calc(100dvh-2*var(--gf-gap))] flex-col items-center justify-center gap-density">
       <div className="flex flex-col items-center gap-2 text-center">
         <Logomark size="large" decorative />
         <h1 className="text-ink">{farmName}</h1>

@@ -24,7 +24,11 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   const farmName = process.env["NEXT_PUBLIC_FARM_NAME"] ?? FALLBACK_FARM_NAME;
 
   return (
-    <div data-surface="account" data-theme="flying-day" className="flex min-h-[100dvh] flex-col">
+    <div
+      data-surface="account"
+      data-theme="flying-day"
+      className="flex min-h-screen supports-[height:100dvh]:min-h-[100dvh] flex-col"
+    >
       <header className="border-b border-rule bg-panel">
         <div className="mx-auto flex w-full max-w-5xl flex-col px-4 sm:px-6">
           <Link href="/account" className="flex min-h-target min-w-0 items-center gap-2.5 pt-2">
