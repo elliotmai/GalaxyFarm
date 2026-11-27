@@ -7,6 +7,7 @@ import { currentActor } from "@/lib/auth";
 import { DEFAULT_TIMEZONE } from "@/lib/board-api";
 import { database } from "@/lib/credential-store";
 import { withDeadline } from "@/lib/deadline";
+import { eggChoresFor } from "@/lib/egg-chores";
 import { offWallClock, onWallClock, wallClock } from "@/lib/farm-time";
 import { peopleNames } from "@/lib/people-names";
 import { requestTimeZone } from "@/lib/request-time-zone";
@@ -122,7 +123,15 @@ export default async function SitterPage() {
       {
         tasks: local.tasks,
         templates: local.templates,
-        derived,
+        // The egg round rides the flocks, for as long as there are laying birds.
+        derived: [
+          ...derived,
+          ...eggChoresFor(
+            { flocks: local.flocks, adjustments: local.flockAdjustments, zones: local.zones },
+            startOfDay(wallNow),
+            wallNow,
+          ),
+        ],
         weather: forecastWeather,
         weatherArrives: onWallClock(arrives, timeZone),
       },

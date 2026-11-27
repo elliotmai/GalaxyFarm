@@ -20,7 +20,9 @@ import { DaySheet } from "@/app/(admin)/admin/chores/_components/day-sheet";
 import { TemplatesPanel } from "@/app/(admin)/admin/chores/_components/templates-panel";
 import { dayLabel } from "@/lib/chores";
 import type { FeedType } from "@galaxy-farm/module-feed";
+import type { Flock, FlockAdjustment } from "@galaxy-farm/module-poultry";
 
+import { eggChoresFor } from "@/lib/egg-chores";
 import { feedingChoreText, feedingChoresFor } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
 import { useWeatherChores } from "@/lib/use-weather-chores";
@@ -62,6 +64,9 @@ export function ChoresScreen({
   // write a chore template beside every ration.
   const { records: plans } = useRecords<FeedingPlan>("feedingPlans", query);
   const { records: feeds } = useRecords<FeedType>("feedTypes", query);
+  // The egg round rides the flocks (§5.4), not a template.
+  const { records: flocks } = useRecords<Flock>("flocks", query);
+  const { records: flockAdjustments } = useRecords<FlockAdjustment>("flockAdjustments", query);
 
   /**
    * Which day is on screen, as an offset rather than a date.
@@ -78,7 +83,11 @@ export function ChoresScreen({
 
   const text = feedingChoreText({ zones, feeds, propertyId });
   const weather = useWeatherChores(propertyId, date, now);
-  const derived = [...feedingChoresFor(plans, text, date, now), ...weather.derived];
+  const derived = [
+    ...feedingChoresFor(plans, text, date, now),
+    ...eggChoresFor({ flocks, adjustments: flockAdjustments, zones }, date, now),
+    ...weather.derived,
+  ];
   const sheet = choreDaySheet(
     { tasks, templates, derived, weather: weather.weather, weatherArrives: weather.arrives },
     date,

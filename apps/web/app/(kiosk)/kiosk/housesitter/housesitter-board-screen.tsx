@@ -23,6 +23,7 @@ import {
 } from "@galaxy-farm/module-housesitting";
 import type { HealthRecord } from "@galaxy-farm/module-cattle";
 import type { FeedType } from "@galaxy-farm/module-feed";
+import type { Flock, FlockAdjustment } from "@galaxy-farm/module-poultry";
 
 import { KioskHeader } from "@/app/(kiosk)/kiosk/_components/kiosk-header";
 import { ChoreBoard } from "@/app/(kiosk)/kiosk/_components/chore-board";
@@ -30,6 +31,7 @@ import { HousesitterGuide } from "@/app/(kiosk)/kiosk/housesitter/housesitter-gu
 import { useSyncEngine } from "@/app/_components/sync-provider";
 import type { PeopleNames } from "@/lib/people-names";
 import { guideForSitter } from "@/lib/care-guide-selection";
+import { eggChoresFor } from "@/lib/egg-chores";
 import { feedingChoresFor, feedingChoreText } from "@/lib/feeding-chores";
 import { useRecords } from "@/lib/local/use-records";
 
@@ -71,14 +73,32 @@ export function HousesitterBoardScreen({
   const today = useMemo(() => {
     // Feeding rides the plans rather than a template written beside them —
     // the same derivation the admin day sheet makes, so the two agree.
-    const derived = feedingChoresFor(
-      store.plans,
-      feedingChoreText({ zones: store.zones, feeds: store.feeds, propertyId }),
-      now,
-      now,
-    );
+    const derived = [
+      ...feedingChoresFor(
+        store.plans,
+        feedingChoreText({ zones: store.zones, feeds: store.feeds, propertyId }),
+        now,
+        now,
+      ),
+      // The egg round rides the flocks (§5.4), not a template.
+      ...eggChoresFor(
+        { flocks: store.flocks, adjustments: store.flockAdjustments, zones: store.zones },
+        now,
+        now,
+      ),
+    ];
     return choreDaySheet({ tasks: store.tasks, templates: store.templates, derived }, now, now);
-  }, [store.tasks, store.templates, store.plans, store.zones, store.feeds, propertyId, now]);
+  }, [
+    store.tasks,
+    store.templates,
+    store.plans,
+    store.zones,
+    store.feeds,
+    store.flocks,
+    store.flockAdjustments,
+    propertyId,
+    now,
+  ]);
 
   const progress = choreProgress(today);
 
@@ -138,6 +158,8 @@ function useHousesitterData(propertyId: Ulid) {
   const feeds = useRecords<FeedType>("feedTypes", query);
   const health = useRecords<HealthRecord>("healthRecords", query);
   const trips = useRecords<Trip>("trips", query);
+  const flocks = useRecords<Flock>("flocks", query);
+  const flockAdjustments = useRecords<FlockAdjustment>("flockAdjustments", query);
 
   return {
     loading:
@@ -155,6 +177,8 @@ function useHousesitterData(propertyId: Ulid) {
         feeds,
         health,
         trips,
+        flocks,
+        flockAdjustments,
       ].some((r) => r.loading),
     store: {
       guides: guides.records,
@@ -169,6 +193,8 @@ function useHousesitterData(propertyId: Ulid) {
       feeds: feeds.records,
       health: health.records,
       trips: trips.records,
+      flocks: flocks.records,
+      flockAdjustments: flockAdjustments.records,
     },
   };
 }

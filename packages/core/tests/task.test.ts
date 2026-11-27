@@ -238,6 +238,41 @@ describe("the chore day sheet", () => {
     expect(sheet[0]?.carriedOver).toBe(false);
   });
 
+  it("does not carry a template's row forward when it was ticked and then un-ticked", () => {
+    // Tuesday's "Collect eggs" ticked by mistake and put back leaves a stored
+    // row with nothing in completedAt. It is Tuesday's answer, like the
+    // untouched occurrence it replaced, and not a debt on every day after.
+    const daily = template({ title: "Collect eggs" });
+    const putBack = task({
+      title: daily.title,
+      templateId: daily.id,
+      dueAt: new Date(2026, 0, 13, 23, 59, 59, 999),
+    });
+
+    const sheet = choreDaySheet({ tasks: [putBack], templates: [daily] }, thursday, morning);
+
+    expect(sheet).toHaveLength(1);
+    expect(sheet[0]?.carriedOver).toBe(false);
+    expect(sheet[0]?.taskId).toBeUndefined();
+    // Tuesday's own sheet still shows it, missed.
+    const tuesday = choreDaySheet(
+      { tasks: [putBack], templates: [daily] },
+      new Date(2026, 0, 13),
+      morning,
+    );
+    expect(tuesday.map((entry) => entry.taskId)).toEqual([putBack.id]);
+  });
+
+  it("does not carry an un-ticked feeding or weather row forward either", () => {
+    const putBack = task({
+      title: "Senior ration",
+      sourceKey: "feeding:plan:01ARZ3NDEKTSV4RRFFQ69G5FA9:morning:2026-01-13",
+      dueAt: new Date(2026, 0, 13, 11, 0),
+    });
+
+    expect(choreDaySheet({ tasks: [putBack], templates: [] }, thursday, morning)).toEqual([]);
+  });
+
   it("holds a template's chore open until the day is over", () => {
     // A template says which day, never which hour, so it cannot be late at
     // breakfast.
