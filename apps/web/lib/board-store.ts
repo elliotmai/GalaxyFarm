@@ -87,7 +87,10 @@ export function hiveUserMayUseBoard(user: HiveBoardUser, now: Date): boolean {
  *
  *   `Authorization: Bearer <token>`  a connected-app token (`lookup`)
  *   `Authorization: Hive <pass>`     a person signed in to Hive, found by the
- *                                    confirmed email on the pass (`findUser`)
+ *                                    confirmed email on the pass (`findUser`);
+ *                                    or Hive's household screen (a household
+ *                                    pass), on the farm an owner among the
+ *                                    household's people owns
  *
  * Both are injectable so the check itself is testable without Postgres.
  */
@@ -100,6 +103,8 @@ export async function authorizeBoardRequest(
   const hive = /^Hive\s+(\S+)$/i.exec(header ?? "");
   if (hive !== null) {
     const claims = verifyHivePass(hive[1] ?? "", now);
+    if (claims?.household !== undefined)
+      return householdCaller(claims.household.members, now, findUser);
     if (claims === undefined || claims.email === null || !claims.email_verified) return undefined;
     const user = await findUser(claims.email);
     if (user === undefined || !hiveUserMayUseBoard(user, now)) return undefined;
@@ -115,6 +120,33 @@ export async function authorizeBoardRequest(
   const token = bearerToken(header);
   if (token === undefined) return undefined;
   return lookup(token, now);
+}
+
+/**
+ * Hive's household screen: the farm of the first of the household's people
+ * (owners first, as Hive sends them) who is an owner here and could sign in.
+ * Acts as that owner, labelled as the screen, exactly as a person's pass
+ * would; members, sitters and unknown emails don't make a farm the
+ * household's.
+ */
+async function householdCaller(
+  members: readonly string[],
+  now: Date,
+  findUser: (email: string) => Promise<HiveBoardUser | undefined>,
+): Promise<ApiToken | undefined> {
+  for (const email of members) {
+    const user = await findUser(email);
+    if (user === undefined || user.role !== "owner" || !hiveUserMayUseBoard(user, now)) continue;
+    return {
+      id: user.id as Ulid,
+      propertyId: user.propertyId as Ulid,
+      label: "Hive household screen",
+      createdAt: now,
+      createdBy: user.id as Ulid,
+      via: "hive",
+    };
+  }
+  return undefined;
 }
 
 export async function boardSnapshot(

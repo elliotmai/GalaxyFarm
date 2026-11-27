@@ -109,3 +109,50 @@ describe("hiveUserMayUseBoard", () => {
     ).toBe(false);
   });
 });
+
+describe("a household pass (Hive's household screen)", () => {
+  const household = (claims: Record<string, unknown> = {}) =>
+    pass({
+      sub: "household:h-1",
+      kind: "household",
+      household: "h-1",
+      email: null,
+      email_verified: false,
+      members: ["stranger@else.test", "owner@farm.test"],
+      ...claims,
+    });
+
+  it("is never read as a person, even if it carries an email", () => {
+    const claims = verifyHivePass(
+      household({ email: "owner@farm.test", email_verified: true }),
+      NOW,
+      "galaxyfarm",
+      PUBLIC,
+    );
+    expect(claims?.email).toBeNull();
+    expect(claims?.email_verified).toBe(false);
+    expect(claims?.household).toEqual({
+      id: "h-1",
+      members: ["stranger@else.test", "owner@farm.test"],
+    });
+  });
+
+  it("reads the farm an owner among the household's people owns", async () => {
+    expect(await check(`Hive ${household()}`)).toMatchObject({
+      id: "01OWNER",
+      propertyId: "01PROP",
+      label: "Hive household screen",
+      via: "hive",
+    });
+  });
+
+  it("refuses a household with no owner here", async () => {
+    expect(await check(`Hive ${household({ members: ["stranger@else.test"] })}`)).toBeUndefined();
+    const member = async (email: string) =>
+      email === "owner@farm.test" ? { ...owner, role: "member" } : undefined;
+    process.env["HIVE_PUBLIC_KEY"] = PUBLIC;
+    expect(
+      await authorizeBoardRequest(`Hive ${household()}`, NOW, noToken, member),
+    ).toBeUndefined();
+  });
+});

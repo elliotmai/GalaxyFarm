@@ -26,6 +26,12 @@ export interface HivePassClaims {
   readonly email: string | null;
   readonly email_verified: boolean;
   readonly name: string | null;
+  /**
+   * Set on a *household pass*: Hive's household screen (the fridge tablet
+   * signed in as the household, not a person). It has no email; `members`
+   * are the household's people's confirmed emails, owners first.
+   */
+  readonly household?: { readonly id: string; readonly members: readonly string[] } | undefined;
 }
 
 function decode(part: string): Record<string, unknown> {
@@ -71,10 +77,21 @@ export function verifyHivePass(
     return undefined;
   const sub = claims["sub"];
   if (typeof sub !== "string" || sub === "" || sub.length > 128) return undefined;
+  const household =
+    claims["kind"] === "household" && typeof claims["household"] === "string"
+      ? {
+          id: claims["household"],
+          members: (Array.isArray(claims["members"]) ? (claims["members"] as unknown[]) : [])
+            .filter((m): m is string => typeof m === "string" && m.includes("@"))
+            .slice(0, 20),
+        }
+      : undefined;
   return {
     sub,
-    email: typeof claims["email"] === "string" ? claims["email"] : null,
-    email_verified: claims["email_verified"] === true,
+    // A household pass never names a person, whatever else it carries.
+    email: household === undefined && typeof claims["email"] === "string" ? claims["email"] : null,
+    email_verified: household === undefined && claims["email_verified"] === true,
     name: typeof claims["name"] === "string" ? claims["name"] : null,
+    ...(household === undefined ? {} : { household }),
   };
 }
