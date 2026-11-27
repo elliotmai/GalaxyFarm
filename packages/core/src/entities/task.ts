@@ -373,8 +373,19 @@ export function choreDaySheet(input: ChoreDayInput, date: Date, now: Date): Chor
 
   // Owed from before, and still not done. A completed one belongs to the day it
   // was due, not to every day after it.
+  //
+  // Only a chore somebody wrote down is owed. A template's chore, or a derived
+  // one (a feeding trip, a weather job), is that day's answer and nothing more:
+  // the flock was fed on Tuesday or it was not, and Thursday's sheet has its
+  // own. An untouched occurrence already ends with its day; the row it leaves
+  // when it is ticked and then un-ticked has to end there too, or one slip of
+  // a finger turns into a second "Collect eggs" under "Owed from earlier".
   const owed = input.tasks.filter(
-    (task) => task.dueAt < dayStart && task.completedAt === undefined,
+    (task) =>
+      task.dueAt < dayStart &&
+      task.completedAt === undefined &&
+      task.templateId === undefined &&
+      task.sourceKey === undefined,
   );
 
   // A template fires once per day, and the row it became is that day's answer.
