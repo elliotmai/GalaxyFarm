@@ -9,6 +9,16 @@
 @import "tailwindcss";
 @import "@galaxy-farm/ui/theme.css";
 
+/* The phone's safe areas, as variables everything uses instead of env(). Inside
+   Hive's frame layout.tsx sets them to 0: iOS hands the frame the screen's
+   insets too, and Hive already keeps its frame clear of them. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+
 /* The design system lives outside this app, so Tailwind is told to scan it. */
 @source "../../../packages/ui/src";
 
@@ -129,9 +139,9 @@ body {
 [data-surface] {
   /* `vh` where the dynamic unit is missing (older Android); `dvh` below. */
   min-height: 100vh;
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+  padding-bottom: var(--safe-bottom);
 
   /*
    * A seatbelt, not a fix.

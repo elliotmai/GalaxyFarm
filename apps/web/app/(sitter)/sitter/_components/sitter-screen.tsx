@@ -74,7 +74,7 @@ function Column({
     <main
       className={[
         "mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 pt-5",
-        callBar ? "pb-[calc(6.5rem+env(safe-area-inset-bottom))]" : "pb-10",
+        callBar ? "pb-[calc(6.5rem+var(--safe-bottom))]" : "pb-10",
       ].join(" ")}
     >
       {children}
@@ -179,7 +179,7 @@ function CallBar({ first }: { readonly first: GuideContact & { readonly phone: s
   return (
     <nav
       aria-label="Get help"
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-rule bg-panel px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-rule bg-panel px-4 pt-3 pb-[calc(0.75rem+var(--safe-bottom))]"
     >
       <div className="mx-auto flex max-w-2xl items-center gap-2">
         <a

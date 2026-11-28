@@ -47,7 +47,7 @@ export function buttonClass(
 
 /** `Fab`'s classes, for the one floating add that navigates instead. */
 export const FAB_CLASS =
-  "fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 " +
+  "fixed right-4 bottom-[calc(6rem+var(--safe-bottom))] z-20 " +
   "inline-flex h-14 items-center gap-2 rounded-full bg-action pl-4 pr-5 " +
   "font-semibold text-action-ink shadow-float hover:opacity-90 " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action " +

@@ -251,7 +251,7 @@ export function BottomTabs() {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-30 flex items-end border-t border-rule bg-panel px-1 pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 flex items-end border-t border-rule bg-panel px-1 pb-[var(--safe-bottom)] md:hidden"
     >
       {NAV.slice(0, 2).map(tab)}
       <Link

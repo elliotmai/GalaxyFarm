@@ -90,7 +90,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                   {/* The bottom padding on a phone clears the tab bar, the floating
                   add button above it and the home-indicator inset, so the last
                   row of a list scrolls clear of both rather than under them. */}
-                  <main className="min-w-0 flex-1 px-3 pb-[calc(9rem+env(safe-area-inset-bottom))] pt-density md:p-density md:pb-density">
+                  <main className="min-w-0 flex-1 px-3 pb-[calc(9rem+var(--safe-bottom))] pt-density md:p-density md:pb-density">
                     <OpenInAppHint />
                     <Refreshable>
                       {/*

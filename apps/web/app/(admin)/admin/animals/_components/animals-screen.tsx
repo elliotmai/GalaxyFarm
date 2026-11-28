@@ -494,7 +494,7 @@ export function AnimalsScreen({
       {selecting ? (
         // Sticky rather than fixed, so it sits above the phone's tab bar and
         // inside the page column on a laptop without knowing where the rail is.
-        <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex items-center justify-between gap-3 rounded-density border border-rule bg-panel p-2 pl-4 shadow-float md:bottom-4">
+        <div className="sticky bottom-[calc(4.5rem+var(--safe-bottom))] z-20 flex items-center justify-between gap-3 rounded-density border border-rule bg-panel p-2 pl-4 shadow-float md:bottom-4">
           <span className="text-sm font-semibold text-ink" aria-live="polite">
             {selected.length} selected
           </span>

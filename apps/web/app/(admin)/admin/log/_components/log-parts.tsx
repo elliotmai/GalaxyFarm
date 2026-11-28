@@ -135,7 +135,7 @@ export function StepBody({ children }: { readonly children: ReactNode }) {
 /** The bar the primary action lives in, pinned to the bottom. */
 export function StepFooter({ children }: { readonly children: ReactNode }) {
   return (
-    <div className="border-t border-rule bg-panel px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 md:sticky md:bottom-0 md:mt-2 md:bg-canvas md:px-0 md:pb-4">
+    <div className="border-t border-rule bg-panel px-4 pb-[calc(1rem+var(--safe-bottom))] pt-3 md:sticky md:bottom-0 md:mt-2 md:bg-canvas md:px-0 md:pb-4">
       {children}
     </div>
   );

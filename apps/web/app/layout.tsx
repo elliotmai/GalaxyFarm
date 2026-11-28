@@ -132,8 +132,13 @@ export const viewport: Viewport = {
  * hydration mismatch makes React re-render the document, it resets <html>'s
  * attributes, and the inline style went with them. It leaves foreign head
  * nodes alone.
+ *
+ * The same sheet zeroes the safe-area variables (globals.css): on iOS the frame
+ * is handed the screen's notch and home-indicator insets too, and Hive already
+ * keeps its frame clear of them, so the app adding them doubled the gaps.
+ * `html:root` outranks the `:root` that defines them.
  */
-const FRAMED_NO_ZOOM_SCRIPT = `if(window.parent!==window){var s=document.createElement("style");s.textContent="html{touch-action:pan-x pan-y}";document.head.appendChild(s);document.addEventListener("gesturestart",function(e){e.preventDefault()},{passive:false})}`;
+const FRAMED_NO_ZOOM_SCRIPT = `if(window.parent!==window){var s=document.createElement("style");s.textContent="html{touch-action:pan-x pan-y}html:root{--safe-top:0px;--safe-right:0px;--safe-bottom:0px;--safe-left:0px}";document.head.appendChild(s);document.addEventListener("gesturestart",function(e){e.preventDefault()},{passive:false})}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

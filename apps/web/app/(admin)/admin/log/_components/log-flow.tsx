@@ -236,7 +236,7 @@ function Shell({
 }) {
   return (
     <>
-      <header className="flex items-center justify-between px-2.5 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] md:px-0">
+      <header className="flex items-center justify-between px-2.5 pb-2 pt-[calc(0.5rem+var(--safe-top))] md:px-0">
         {onBack === undefined ? (
           <span className="w-11" />
         ) : (

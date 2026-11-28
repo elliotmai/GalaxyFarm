@@ -412,7 +412,7 @@
   border-width: 1px 0 0 0;
   border-top-left-radius: calc(var(--gf-radius) + 6px);
   border-top-right-radius: calc(var(--gf-radius) + 6px);
-  padding-bottom: calc(var(--gf-gap) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--gf-gap) + var(--safe-bottom));
   box-shadow: var(--gf-shadow-overlay);
 }
 
@@ -450,7 +450,7 @@
     max-height: none;
     border-width: 0 0 0 1px;
     border-radius: 0;
-    padding-right: calc(var(--gf-gap) + env(safe-area-inset-right));
+    padding-right: calc(var(--gf-gap) + var(--safe-right));
     padding-bottom: var(--gf-gap);
     box-shadow: var(--gf-shadow-overlay);
   }
